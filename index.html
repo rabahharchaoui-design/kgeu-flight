@@ -1550,8 +1550,8 @@ function trackAtScreen(cx,cy){
   _rc.setFromCamera(_nd,camera);
   if(!groundHit(_rc.ray.origin,_rc.ray.direction,_sp)){toast('Nothing to lock on there');return;}
   const t=targetUnder(_sp,60);
-  if(t){SENSOR.tgt=t;SENSOR.track=null;toast('Track: '+t.kind);}
-  else{SENSOR.tgt=null;SENSOR.track=_sp.clone();toast('Track: ground point');}
+  if(t){SENSOR.tgt=t;SENSOR.track=null;toast('Tracking '+t.name);}
+  else{SENSOR.tgt=null;SENSOR.track=_sp.clone();toast('Tracking ground point');}
 }
 glc.addEventListener('pointerdown',e=>{
   if(sensorMode){
@@ -2089,7 +2089,8 @@ function buildRange(){
     const Yg=groundHeight(x,z);
     mesh.position.set(x,Yg,z);mesh.rotation.y=yaw;g.add(mesh);
     mesh.traverse(o=>{if(o.isMesh)o.userData.m0=o.material;});   // so a replay can undo the scorch
-    const t={kind:kind,mesh:mesh,x:x,z:z,y:Yg,r:hitR,dead:false,moving:false};
+    const t={kind:kind,mesh:mesh,x:x,z:z,y:Yg,r:hitR,dead:false,moving:false,
+      name:kind==='hull'?'Armour':kind==='bunker'?'Bunker':'Truck'};
     STRIKE.targets.push(t);return t;
   }
   const R=RANGE;
@@ -2150,8 +2151,8 @@ function targetUnder(p,maxD){
 function sensorTrackHere(){
   if(!SENSOR.valid){toast('Nothing to lock on down there');return;}
   const t=targetUnder(SENSOR.spot,60);
-  if(t){SENSOR.tgt=t;SENSOR.track=null;toast('Track: '+t.kind);}
-  else{SENSOR.tgt=null;SENSOR.track=SENSOR.spot.clone();toast('Track: ground point');}
+  if(t){SENSOR.tgt=t;SENSOR.track=null;toast('Tracking '+t.name);}
+  else{SENSOR.tgt=null;SENSOR.track=SENSOR.spot.clone();toast('Tracking ground point');}
 }
 function sensorBreak(why){
   if(!SENSOR.track&&!SENSOR.tgt)return;
@@ -2280,7 +2281,7 @@ function impact(m,gh){
   if(killed){killTarget(hit);STRIKE.hits++;}
   STRIKE.missSum+=Math.min(miss,999);
   const md=miss<999?Math.round(miss)+' m':'long';
-  toast(killed?('Good hit. '+hit.kind+' destroyed'):('Miss by '+md+(m.trackLost?'. Track broke':'')));
+  toast(killed?('Good hit. '+hit.name+' destroyed'):('Miss by '+md+(m.trackLost?'. Track broke':'')));
   radioQ.push(killed
     ?L('Gila Range Control','tower','Good hit, good hit, target destroyed.','Good hit, good hit. Target destroyed.')
     :L('Gila Range Control','tower','Miss, '+md+'. Reset and try again.','Miss, '+md+'. Reset and try again.'));
@@ -2360,7 +2361,7 @@ function sensorText(){
   if(STRIKE.active){
     const rng=SENSOR.valid?(SENSOR.slant/1000).toFixed(1)+' km':'---';
     const tof=STRIKE.missiles.length?'   TOF '+Math.max(0,Math.ceil(STRIKE.missiles[0].tof)):'';
-    l2=`LASER ${lasing?(SENSOR.tgt?'TRACK '+SENSOR.tgt.kind.toUpperCase():'TRACK PT'):'SAFE'}   SLANT ${rng}   ${inr?'IN RANGE':'NO RANGE'}   MSL ${4-STRIKE.shots}${tof}`;
+    l2=`LASER ${lasing?(SENSOR.tgt?'TRACK '+SENSOR.tgt.name.toUpperCase():'TRACK PT'):'SAFE'}   SLANT ${rng}   ${inr?'IN RANGE':'NO RANGE'}   MSL ${4-STRIKE.shots}${tof}`;
     if(SENSOR.gimbal)l2+='   GIMBAL';
   }
   return l1+(l2?'\n'+l2:'');
