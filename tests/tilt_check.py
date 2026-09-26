@@ -38,9 +38,11 @@ async def main():
 
     # ---------- granted: orientation path ----------
     pg = await newpage(ctx, errs, 'granted')
-    await pg.tap('[data-a="tilt"]')          # a real tap, not a synthetic click
+    await pg.tap('#bMore'); await pg.wait_for_timeout(250)   # Tilt lives in the More drawer
+    await pg.tap('[data-a="tilt"]')                          # a real tap, not a synthetic click
     await pg.wait_for_timeout(250)
     chk('tilt arms from a real tap on the button', await pg.evaluate("__kgeu.tilt.on"))
+    chk('the drawer closes after the tap', not await pg.evaluate("document.getElementById('drawer').classList.contains('on')"))
     chk('both permissions requested in the gesture', await pg.evaluate("window.__permCalls") == 2,
         str(await pg.evaluate("window.__permCalls")))
 
@@ -93,7 +95,7 @@ async def main():
 
     # ---------- granted: devicemotion fallback ----------
     pg2 = await newpage(ctx, errs, 'granted')
-    await pg2.evaluate("document.querySelector('[data-a=\"tilt\"]').click()")
+    await pg2.evaluate("document.getElementById('bMore').click();document.querySelector('[data-a=\"tilt\"]').click()")
     await pg2.wait_for_timeout(150)
     async def feedM(x,y,z,n=40):
         await pg2.evaluate("""([x,y,z,n])=>{for(let i=0;i<n;i++)
@@ -117,7 +119,7 @@ async def main():
 
     # ---------- granted but no events at all: blocked viewer ----------
     pg3 = await newpage(ctx, errs, 'granted')
-    await pg3.evaluate("document.querySelector('[data-a=\"tilt\"]').click()")
+    await pg3.evaluate("document.getElementById('bMore').click();document.querySelector('[data-a=\"tilt\"]').click()")
     await pg3.wait_for_timeout(2400)
     msg = await pg3.inner_text('#toast')
     chk('warns when no motion data arrives', 'Safari' in msg or 'No motion data' in msg, repr(msg))
@@ -125,7 +127,7 @@ async def main():
 
     # ---------- denied ----------
     pg4 = await newpage(ctx, errs, 'denied')
-    await pg4.evaluate("document.querySelector('[data-a=\"tilt\"]').click()")
+    await pg4.evaluate("document.getElementById('bMore').click();document.querySelector('[data-a=\"tilt\"]').click()")
     await pg4.wait_for_timeout(500)
     chk('denied leaves tilt off', not await pg4.evaluate("__kgeu.tilt.on"))
     msg4 = await pg4.inner_text('#toast')
