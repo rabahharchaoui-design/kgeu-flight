@@ -176,6 +176,7 @@ body.touch #coach button{ min-height:var(--tap); min-width:var(--tap); padding:6
 .pick span{ font-size:13px; color:var(--soft); }
 .pick.sel{ border-color:var(--caution); box-shadow:inset 0 0 0 2px var(--caution); }
 .picks.bases{ grid-template-columns:repeat(2,1fr); margin-top:-6px; }
+.picks.tods{ grid-template-columns:repeat(3,1fr); }
 .gLetter{ font-size:84px; font-weight:900; line-height:1; margin:0; }
 .gLetter.gA,.gLetter.gB{ color:#4cd97b; } .gLetter.gC{ color:var(--caution); } .gLetter.gD,.gLetter.gF{ color:var(--warn); }
 #gLines{ margin:0 0 16px; font-size:16px; line-height:1.55; }
@@ -331,6 +332,11 @@ body.touch #tiltDiag{ display:block; }
     <button class="pick" data-t="cessna"><b>C172</b><span>N8401L</span></button>
     <button class="pick" data-t="c130"><b>C-130</b><span>Hercules</span></button>
     <button class="pick" data-t="alpha"><b>Alpha</b><span>Pipistrel</span></button>
+  </div>
+  <div class="picks bases tods">
+    <button class="pick" data-tod="day"><b>Day</b><span>Midday sun</span></button>
+    <button class="pick" data-tod="sunset"><b>Sunset</b><span>Low light</span></button>
+    <button class="pick" data-tod="night"><b>Night</b><span>Runway lights</span></button>
   </div>
   <div class="picks bases">
     <button class="pick" data-b="kgeu"><b>Glendale</b><span>KGEU runway 1</span></button>
@@ -2147,7 +2153,7 @@ const HAZE=new THREE.Color(0xdfe4e6);
 scene.fog=new THREE.Fog(HAZE,5000,45000);
 scene.background=HAZE;
 const camera=new THREE.PerspectiveCamera(62,1,0.2,90000);
-scene.add(new THREE.HemisphereLight(0xdbe8ff,0xa08060,0.72));
+const hemi=new THREE.HemisphereLight(0xdbe8ff,0xa08060,0.72);scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xfff0d8,1.0); sun.position.set(-0.55,0.75,0.37); scene.add(sun);
 const MAXANI=Math.min(8,renderer.capabilities.getMaxAnisotropy());
 const F='"Saira Condensed","Arial Narrow",sans-serif';
@@ -2168,6 +2174,60 @@ const sky=(function(){
   g.setAttribute('color',new THREE.BufferAttribute(c,3));
   const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide,fog:false,depthWrite:false}));m.renderOrder=-1;scene.add(m);return m;
 })();
+
+// ---------- time of day ----------
+// Three presets rather than a continuous clock: the point is to fly an approach
+// into a sunset or onto a lit runway, and three distinct looks do that without a
+// day/night cycle running under everything else.
+const TOD_SET={
+  day:   {id:'day',   name:'Day',    haze:0xdfe4e6, top:0x3a78c0, sun:0xfff0d8, sunI:1.00,
+          sunPos:[-0.55,0.75,0.37], hemiSky:0xdbe8ff, hemiGnd:0xa08060, hemiI:0.72,
+          fog:[5000,45000], night:false, lights:0.0, stars:0},
+  sunset:{id:'sunset',name:'Sunset', haze:0xe8a469, top:0x27407e, sun:0xffa452, sunI:0.92,
+          sunPos:[-0.95,0.13,0.28], hemiSky:0xffc796, hemiGnd:0x6a4632, hemiI:0.52,
+          fog:[3000,38000], night:false, lights:0.55, stars:0.15},
+  night: {id:'night', name:'Night',  haze:0x0d1220, top:0x05070f, sun:0x9ab4e8, sunI:0.14,
+          sunPos:[0.42,0.52,-0.55], hemiSky:0x1d2740, hemiGnd:0x0e0c14, hemiI:0.26,
+          fog:[2200,30000], night:true, lights:1.0, stars:1}
+};
+let TOD=TOD_SET.day;
+let rwyLightMesh=null,rwyLightBase=null,lukeLightMesh=null,lukeLightBase=null,starField=null;
+function skyPaint(){
+  const p=sky.geometry.attributes.position,c=sky.geometry.attributes.color;
+  const top=new THREE.Color(TOD.top),col=new THREE.Color();
+  for(let i=0;i<p.count;i++){const t=clamp(p.getY(i)/80000,0,1);
+    col.copy(HAZE).lerp(top,Math.pow(t,0.5));c.setXYZ(i,col.r,col.g,col.b);}
+  c.needsUpdate=true;
+}
+// Runway lights are instanced boxes. Scaling the instances is what makes them
+// read as lights after dark instead of specks of paint.
+function lightScale(mesh,base,k){
+  if(!mesh||!base)return;
+  const m=new THREE.Matrix4();
+  for(let i=0;i<base.length;i++){
+    m.copy(base[i]).scale(new V3(k,k,k));
+    mesh.setMatrixAt(i,m);
+  }
+  mesh.instanceMatrix.needsUpdate=true;
+}
+function setTOD(id){
+  TOD=TOD_SET[id]||TOD_SET.day;
+  try{localStorage.setItem('kgeuTOD',TOD.id);}catch(e){}
+  HAZE.setHex(TOD.haze);
+  scene.fog.color.copy(HAZE);scene.fog.near=TOD.fog[0];scene.fog.far=TOD.fog[1];
+  scene.background=HAZE;
+  skyPaint();
+  sun.color.setHex(TOD.sun);sun.intensity=TOD.sunI;
+  sun.position.set(TOD.sunPos[0],TOD.sunPos[1],TOD.sunPos[2]);
+  hemi.color.setHex(TOD.hemiSky);hemi.groundColor.setHex(TOD.hemiGnd);hemi.intensity=TOD.hemiI;
+  const k=1+TOD.lights*2.2;
+  lightScale(rwyLightMesh,rwyLightBase,k);
+  lightScale(lukeLightMesh,lukeLightBase,k);
+  if(starField){starField.visible=TOD.stars>0;starField.material.opacity=TOD.stars;}
+  for(const g of GLOWS){g.visible=TOD.lights>0;g.material.opacity=TOD.lights*0.85;}
+  const b=document.getElementById('todV');if(b)b.textContent=TOD.name;
+  document.querySelectorAll('.pick[data-tod]').forEach(e=>e.classList.toggle('sel',e.dataset.tod===TOD.id));
+}
 
 // ---------- terrain ----------
 const T_SIZE=64000,T_SEG=isTouch?160:256;
@@ -2240,18 +2300,37 @@ flatLocal(320,960,lam(0xffffff,{map:apronTex}),1120,-282,0.045);
 const signTex=tex(128,56,(x,w,h)=>{x.fillStyle='#c8102e';x.fillRect(0,0,w,h);x.strokeStyle='#fff';x.lineWidth=3;x.strokeRect(3,3,w-6,h-6);x.fillStyle='#fff';x.font='800 40px '+F;x.textAlign='center';x.textBaseline='middle';x.fillText('1-19',w/2,h/2+2);});
 const signM=[lam(0xc8102e),new THREE.MeshBasicMaterial({map:signTex}),lam(0x222222),lam(0x222222),lam(0xc8102e),lam(0xc8102e)];
 for(const c of CONNECT) boxLocal(0.25,0.9,2.2,signM,c+14,-62,0.3);
+const glowTex=tex(64,64,(x,w,h)=>{const g=x.createRadialGradient(32,32,2,32,32,31);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(0.35,'rgba(255,255,255,.7)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,64,64);});
+// A glow layer over the light fixtures. Geometry that small vanishes on a long
+// final, so the thing you actually see at night is an additive Points cloud at
+// the same positions: one draw call, and it scales with distance like a light.
+const GLOWS=[];
+function lightGlow(pts,xf,y){
+  const n=pts.length,pos=new Float32Array(n*3),col=new Float32Array(n*3),c=new THREE.Color();
+  pts.forEach((p,i)=>{const w=xf(p[0],p[1]);
+    pos[i*3]=w[0];pos[i*3+1]=y;pos[i*3+2]=w[1];
+    c.setHex(p[2]);col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b;});
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  g.setAttribute('color',new THREE.BufferAttribute(col,3));
+  const m=new THREE.Points(g,new THREE.PointsMaterial({map:glowTex,vertexColors:true,size:26,
+    sizeAttenuation:true,transparent:true,opacity:0,depthWrite:false,fog:false,
+    blending:THREE.AdditiveBlending}));
+  m.visible=false;scene.add(m);GLOWS.push(m);return m;
+}
 // edge lights, thresholds
 (function(){
   const g=new THREE.CylinderGeometry(0.09,0.12,0.4,6),pts=[];
   for(let u=0;u<=RWY_LEN;u+=61){pts.push([u,-17.5,0xfff6d8]);pts.push([u,17.5,0xfff6d8]);}
   for(const s of [-1,1])for(let k=0;k<4;k++){pts.push([THR01,s*(12-k*3),0x3fe06a]);pts.push([THR19,s*(12-k*3),0x3fe06a]);pts.push([-1,s*(12-k*3),0xff3b30]);pts.push([RWY_LEN+1,s*(12-k*3),0xff3b30]);}
   for(let u=-40;u<=RWY_LEN+40;u+=60){pts.push([u,-110.5,0x2d6cff]);pts.push([u,-129.5,0x2d6cff]);}
-  const im=new THREE.InstancedMesh(g,new THREE.MeshBasicMaterial({color:0xffffff}),pts.length),m=new THREE.Matrix4(),col=new THREE.Color();
-  pts.forEach((p,i)=>{m.makeTranslation(wX(p[0],p[1]),0.25,wZ(p[0],p[1]));im.setMatrixAt(i,m);im.setColorAt(i,col.setHex(p[2]));});
-  scene.add(im);
+  const im=new THREE.InstancedMesh(g,new THREE.MeshBasicMaterial({color:0xffffff,fog:false}),pts.length),m=new THREE.Matrix4(),col=new THREE.Color();
+  rwyLightBase=[];
+  pts.forEach((p,i)=>{m.makeTranslation(wX(p[0],p[1]),0.25,wZ(p[0],p[1]));im.setMatrixAt(i,m);im.setColorAt(i,col.setHex(p[2]));rwyLightBase.push(m.clone());});
+  scene.add(im);rwyLightMesh=im;
+  lightGlow(pts,(u,v)=>[wX(u,v),wZ(u,v)],0.5);
 })();
 // PAPI (P2L, 3.00 degrees) on the left of each runway
-const glowTex=tex(64,64,(x,w,h)=>{const g=x.createRadialGradient(32,32,2,32,32,31);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(0.35,'rgba(255,255,255,.7)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,64,64);});
 const PAPI=[];
 function papiUnit(u,v,dir,setAng){boxLocal(1.6,0.9,1.0,lam(0x3a3d42),u,v,0,0);
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color:0xff2020,fog:false,depthWrite:false,blending:THREE.AdditiveBlending}));
@@ -2494,6 +2573,22 @@ function updateCars(dt){cars.forEach((c,k)=>{c.s+=c.dir*c.sp*dt;
   const jetG=new THREE.Group();{const b=new THREE.Mesh(new THREE.BoxGeometry(1.6,1.4,15),lam(0x6b7280));jetG.add(b);const w=new THREE.Mesh(new THREE.BoxGeometry(10.5,0.3,5),lam(0x6b7280));w.position.set(0,0,1.5);jetG.add(w);
     for(const sx of [-1,1]){const t=new THREE.Mesh(new THREE.BoxGeometry(0.3,2.4,2.4),lam(0x6b7280));t.position.set(sx*1.2,1.4,6);t.rotation.z=sx*0.4;jetG.add(t);}}
   for(let k=0;k<10;k++){const j=jetG.clone();j.position.set(LKX(-600+k*60,300),1.4,LKZ(-600+k*60,300));j.rotation.y=-lh+Math.PI/2;scene.add(j);}
+  // runway lighting on both Luke runways, so a night landing there works too
+  (function(){
+    const g=new THREE.BoxGeometry(0.75,0.28,0.75),pts=[];
+    for(const r of LUKE_RWY){
+      const half=r.len/2;
+      for(let u=-half;u<=half;u+=76){pts.push([u,r.v-25,0xfff6d8]);pts.push([u,r.v+25,0xfff6d8]);}
+      for(let k=-3;k<=3;k++){pts.push([-half+2,r.v+k*6,0x3fe06a]);pts.push([half-2,r.v+k*6,0x3fe06a]);}
+      for(let k=-3;k<=3;k++){pts.push([-half-3,r.v+k*6,0xff3b30]);pts.push([half+3,r.v+k*6,0xff3b30]);}
+    }
+    const im=new THREE.InstancedMesh(g,new THREE.MeshBasicMaterial({color:0xffffff,fog:false}),pts.length);
+    const m=new THREE.Matrix4(),col=new THREE.Color();lukeLightBase=[];
+    pts.forEach((p,i)=>{m.makeTranslation(LKX(p[0],p[1]),0.3,LKZ(p[0],p[1]));im.setMatrixAt(i,m);im.setColorAt(i,col.setHex(p[2]));lukeLightBase.push(m.clone());});
+    scene.add(im);lukeLightMesh=im;
+    lightGlow(pts,(u,v)=>[LKX(u,v),LKZ(u,v)],0.55);
+  })();
+
   // Downtown Phoenix skyline, about 21 km ESE
   const win=tex(64,128,(x,w,h)=>{x.fillStyle='#5f7488';x.fillRect(0,0,w,h);for(let y=0;y<h;y+=8)for(let i=0;i<w;i+=8){x.fillStyle=Math.random()<0.5?'#8fa6ba':'#4a5d70';x.fillRect(i+1,y+1,6,5);}},[1,1]);
   for(let k=0;k<30;k++){const hgt=40+Math.pow(hash(k,9),1.6)*150,wd=25+hash(k,8)*25;const b=new THREE.Mesh(new THREE.BoxGeometry(wd,hgt,wd*(0.8+hash(k,6)*0.5)),lam(0xffffff,{map:win}));
@@ -4225,6 +4320,7 @@ function coachUpdate(dt){
 function pickBase(id){SPAWN_BASE=BASES[id]?id:'kgeu';try{localStorage.setItem('kgeuBase',SPAWN_BASE);}catch(e){}
   document.querySelectorAll('.pick[data-b]').forEach(b=>b.classList.toggle('sel',b.dataset.b===SPAWN_BASE));}
 document.querySelectorAll('.pick[data-b]').forEach(b=>b.addEventListener('click',()=>pickBase(b.dataset.b)));
+document.querySelectorAll('.pick[data-tod]').forEach(b=>b.addEventListener('click',()=>setTOD(b.dataset.tod)));
 function pickType(id){acType=TYPES[id]?id:'reaper';try{localStorage.setItem('kgeuType',acType);}catch(e){}
   pickBase(HOME(acType));
   document.querySelectorAll('.pick').forEach(b=>b.classList.toggle('sel',b.dataset.t===acType));
@@ -4805,6 +4901,7 @@ function frame(t){
 }
 // test hook: headless UI checks need to reach a few internals
 window.__kgeu={tilt:tilt,setTilt:setTilt,state:()=>st,toast:toast,start:start,
+  setTOD:setTOD,isNight:isNight,TOD:()=>TOD,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
   RADIO:RADIO,radioQ:()=>radioQ,radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,initAudio:initAudio,
   pick:pickType,pickBase:pickBase,togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
@@ -4824,6 +4921,19 @@ window.__kgeu={tilt:tilt,setTilt:setTilt,state:()=>st,toast:toast,start:start,
     let az=Math.atan2(dx,-dz)-(-e.y);az=Math.atan2(Math.sin(az),Math.cos(az));
     SENSOR.az=clamp(az,-GIM_AZ,GIM_AZ);SENSOR.el=clamp(Math.atan2(dy,hz),GIM_EL_LO,GIM_EL_HI);
     return Math.abs(az)<=GIM_AZ;}};
+// stars: a fixed dome of points that only shows once the sun is down
+(function(){
+  const N=520,pos=new Float32Array(N*3);
+  for(let i=0;i<N;i++){
+    const u2=Math.random()*2-1,th=Math.random()*6.2832,r=Math.sqrt(1-u2*u2),R=60000;
+    pos[i*3]=Math.cos(th)*r*R;pos[i*3+1]=Math.abs(u2)*R*0.9+2000;pos[i*3+2]=Math.sin(th)*r*R;
+  }
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  starField=new THREE.Points(g,new THREE.PointsMaterial({color:0xdfe8ff,size:260,sizeAttenuation:true,
+    transparent:true,opacity:0,depthWrite:false,fog:false}));
+  starField.visible=false;starField.renderOrder=-1;scene.add(starField);
+})();
+(function(){let t='day';try{const v=localStorage.getItem('kgeuTOD');if(v&&TOD_SET[v])t=v;}catch(e){}setTOD(t);})();
 rebuildTerrain(st.pos.x,st.pos.z);
 requestAnimationFrame(frame);
 }

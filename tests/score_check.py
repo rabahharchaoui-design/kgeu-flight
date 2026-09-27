@@ -95,6 +95,20 @@ async def main():
     chk('the banner shows', await pg.evaluate("()=>document.getElementById('banner').classList.contains('on')"))
     await pg.screenshot(path=f'{SHOTS}/score_banner.png')
 
+    print('-- night --')
+    n=await pg.evaluate("""()=>{const K=window.__kgeu,out={};
+      for(const t of ['day','sunset','night']){K.setTOD(t);out[t]=K.isNight();}
+      return out;}""")
+    chk('only night counts as night', n['day']==False and n['sunset']==False and n['night']==True, json.dumps(n))
+    await pg.evaluate("()=>{const K=window.__kgeu;K.setTOD('night');K.SCORE.ach={};}")
+    got=await pg.evaluate("""()=>{const K=window.__kgeu,AIM=213.7+300;
+      K.onLanding({type:'touchdown',fpm:200,paved:true,x:K.wX(AIM,1),z:K.wZ(AIM,1),
+                   ias:65/1.943844,bank:0,wdir:20,wkt:3});
+      return Object.keys(K.SCORE.ach);}""")
+    chk('landing at night grants Night Landing', 'night' in got, json.dumps(got))
+    await pg.evaluate("()=>{const K=window.__kgeu;K.setTOD('day');K.SCORE.ach={};K.achGrant('greaser');K.scReset();K.achGrant('greaser');K.logLanding({letter:'A'});K.logLanding({letter:'B'});K.logLanding({letter:'A'});K.logLanding({letter:'F'});K.logLanding({letter:'B'});K.scRecord('cessna',{pts:91,letter:'A',fpm:80,off:1});}")
+    await pg.evaluate("()=>document.getElementById('landOv').classList.remove('on')")
+
     print('-- persistence --')
     saved=await pg.evaluate("()=>localStorage.getItem('kgeuScores')")
     chk('everything is saved to localStorage', saved and 'greaser' in saved and 'bestStreak' in saved, str(len(saved or ''))+' bytes')
