@@ -314,6 +314,12 @@ body.touch #tiltDiag{ display:block; }
     <button class="tog tonly" id="oTilt">Tilt steering: Off</button>
     <button class="tog tonly" id="oInv">Tilt pitch: Normal</button>
   </div>
+  <div class="row opts">
+    <button class="tog" id="oRadio">Radio: On</button>
+    <label class="sens">Radio volume
+      <input type="range" id="oRvol" min="0" max="10" step="1" value="7">
+      <b id="oRvolV">70%</b></label>
+  </div>
   <div class="row opts tonly" id="sensRow">
     <label class="sens">Tilt sensitivity
       <input type="range" id="oSens" min="0" max="4" step="1" value="2">
@@ -462,11 +468,11 @@ function hitObstacle(x,z,y){
 const LKs=Math.sin(42.6*Math.PI/180),LKc=Math.cos(42.6*Math.PI/180);
 const lkX=(u,v)=>-7679+LKs*u+LKc*v, lkZ=(u,v)=>-1855-LKc*u+LKs*v;
 const BASES={
-  kgeu:{id:'kgeu',name:'Glendale KGEU',rwy:'1',hdg:26,twr:'Glendale Tower 121.0',gnd:'Glendale Ground 118.0',sayRwy:'one',
+  kgeu:{id:'kgeu',name:'Glendale KGEU',rwy:'1',hdg:26,twr:'Glendale Tower 121.0',gnd:'Glendale Ground 118.0',twrClip:'glendale_tower',gndClip:'glendale_ground',rwyClip:'rwy_1',
         runway:[()=>wX(12,0),()=>wZ(12,0)],
         ramp:[()=>wX(1150,-250),()=>wZ(1150,-250)],rampHdg:116,
         fin:d=>[wX(THR01+300-d,0),wZ(THR01+300-d,0)]},
-  luke:{id:'luke',name:'Luke AFB',rwy:'03L',hdg:42.6,twr:'Luke Tower 133.45',gnd:'Luke Ground 121.8',sayRwy:'zero three left',
+  luke:{id:'luke',name:'Luke AFB',rwy:'03L',hdg:42.6,twr:'Luke Tower 133.45',gnd:'Luke Ground 121.8',twrClip:'luke_tower',gndClip:'luke_ground',rwyClip:'rwy_03l',
         runway:[()=>lkX(-1498,-152.5),()=>lkZ(-1498,-152.5)],
         ramp:[()=>lkX(-300,430),()=>lkZ(-300,430)],rampHdg:312.6,
         fin:d=>[lkX(-1210-d,-152.5),lkZ(-1210-d,-152.5)]}
@@ -2915,7 +2921,7 @@ function updatePeople(dt,t){
 }
 
 // ---------- state & input ----------
-let st=createState('runway'),running=false,paused=false,camMode=0,muted=false,atcVoice=true;
+let st=createState('runway'),running=false,paused=false,camMode=0,muted=false;
 let sensorMode=false,strikeBtn=null,camBump=0,camLean=0,strikeBest=null;
 try{strikeBest=JSON.parse(localStorage.getItem('kgeuStrikeBest')||'null');}catch(e){}
 const keys={},events=[];
@@ -3151,7 +3157,7 @@ window.addEventListener('keydown',e=>{
   if(k==='g') toggleGear();
   if(k==='p'&&running) togglePause();
   if(k==='m'){muted=!muted;if(muted&&window.speechSynthesis)speechSynthesis.cancel();toast(muted?'Sound off':'Sound on');}
-  if(k==='t'){atcVoice=!atcVoice;if(!atcVoice&&window.speechSynthesis)speechSynthesis.cancel();toast(atcVoice?'Tower voice on':'Tower voice off');}
+  if(k==='t'){setRadioOn(!RADIO.on);toast(RADIO.on?'Radio on':'Radio off');}
   if(k==='enter') start('runway');
   if(k==='escape') openMenu();
 });
@@ -3241,7 +3247,7 @@ function missDrop(){
   p.g.position.copy(p.pos);
   MISS.pallet=p;MISS.dropped=true;
   toast('Load away');
-  radioQ.unshift(L(AC.cs,'heavy',AC.cs+', load away, one bundle.',AC.say+', load away, one bundle.'));
+  radioQ.unshift(L(AC.cs,'pilot',AC.cs+', load away, one bundle.',[csP(),'p_load_away']));
 }
 const _pw=new V3();
 function missUpdate(dt){
@@ -3475,6 +3481,7 @@ function initAudio(){
     whine=actx.createOscillator();whine.type='sine';whine.frequency.value=2600;whineG=actx.createGain();whineG.gain.value=0;whine.connect(whineG).connect(actx.destination);whine.start();
     const horn=actx.createOscillator();horn.type='square';horn.frequency.value=640;hornG=actx.createGain();hornG.gain.value=0;horn.connect(hornG).connect(actx.destination);horn.start();
   }catch(e){actx=null;}
+  try{radioBuild();radioLoad();}catch(e){}
 }
 function squelch(){if(!actx||muted)return;try{const t=actx.currentTime,n=actx.sampleRate*0.07|0,b=actx.createBuffer(1,n,actx.sampleRate),d=b.getChannelData(0);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);
   const sr=actx.createBufferSource(),f=actx.createBiquadFilter(),g=actx.createGain();sr.buffer=b;f.type='bandpass';f.frequency.value=1900;g.gain.value=0.06;sr.connect(f).connect(g).connect(actx.destination);sr.start(t);}catch(e){}}
@@ -3506,34 +3513,143 @@ function updateAudio(){
   if(on&&cheerLevel>0.15&&Math.random()<cheerLevel*0.04)whistle(cheerLevel);
 }
 
-// ---------- tower radio ----------
-const atcEl=document.getElementById('atc');let atcT=0,voices=[],radioQ=[],radioBusy=0,chatT=9,chatI=0,advT=4;
-const NOVELTY=/bubbles|bells|boing|bad news|good news|cellos|organ|trinoids|zarvox|whisper|wobble|jester|superstar|hysterical|deranged|albert|bahh/i;
-function loadVoices(){if(!window.speechSynthesis)return;const vs=speechSynthesis.getVoices().filter(v=>!NOVELTY.test(v.name));voices=vs.filter(v=>/^en/i.test(v.lang));if(!voices.length)voices=vs;}
-if(window.speechSynthesis){loadVoices();speechSynthesis.onvoiceschanged=loadVoices;}
-function vhash(x){let h=7;for(let i=0;i<x.length;i++)h=(h*31+x.charCodeAt(i))|0;return Math.abs(h);}
-const VP={tower:[1.12,0.92],fighter:[1.28,1.02],heavy:[1.0,0.8],ga:[1.12,1.1],uav:[1.1,0.95]};
-function playLine(l){
-  atcEl.innerHTML='';const b=document.createElement('b');b.textContent=l.who;atcEl.appendChild(b);atcEl.appendChild(document.createTextNode(l.text));atcEl.classList.add('on');atcT=6;
-  const sp=l.spoken||l.text,P=VP[l.kind]||VP.tower;radioBusy=Math.max(2.4,sp.length*0.064/P[0])+0.8;squelch();
-  if(muted||!atcVoice||!window.speechSynthesis)return;
-  try{const u=new SpeechSynthesisUtterance(sp);if(voices.length)u.voice=voices[vhash(l.voice||l.who.split(' ')[0])%voices.length];
-    u.rate=P[0];u.pitch=P[1];u.volume=0.9;u.onend=()=>{radioBusy=Math.min(radioBusy,0.7);};speechSynthesis.speak(u);}catch(e){}
+// ---------- radio: pre-recorded voice, played through a radio ----------
+// Every line is stitched from clips in radio/, recorded by tools/make_radio.py with
+// the macOS say command: Samantha (Enhanced) is the controller, Evan (Enhanced) is
+// the pilot. The signal chain is what makes it sound like a radio rather than a
+// text reader: 300-3000 Hz band pass, light tanh drive, a squelch click at each
+// end of the transmission and a faint carrier hiss underneath it.
+const atcEl=document.getElementById('atc');
+let atcT=0,radioQ=[],radioBusy=0,chatT=9,chatI=0,advT=4;
+const RADIO={vol:0.7,on:true,buf:Object.create(null),want:0,got:0,err:0,loaded:false};
+try{const v=localStorage.getItem('kgeuRadioVol');if(v!==null)RADIO.vol=Math.max(0,Math.min(1,+v));
+    const o=localStorage.getItem('kgeuRadioOn');if(o!==null)RADIO.on=o==='1';}catch(e){}
+let radioIn=null,radioGain=null,staticG=null;
+
+function driveCurve(k){const n=1024,c=new Float32Array(n),d=1+k*6;
+  for(let i=0;i<n;i++){const x=i*2/n-1;c[i]=Math.tanh(x*d)/Math.tanh(d);}return c;}
+// The chain is built by one function so the offline spectrum probe in
+// tests/radio_check.py measures the same filters the game actually plays through.
+function radioChain(ctx,gain){
+  const inp=ctx.createGain();
+  const hp=ctx.createBiquadFilter();hp.type='highpass';hp.frequency.value=300;hp.Q.value=0.7;
+  const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=3000;lp.Q.value=0.7;
+  const sh=ctx.createWaveShaper();sh.curve=driveCurve(0.35);sh.oversample='2x';
+  const out=ctx.createGain();out.gain.value=gain;
+  inp.connect(hp);hp.connect(lp);lp.connect(sh);sh.connect(out);out.connect(ctx.destination);
+  return {inp:inp,out:out};
 }
-function say(who,text,spoken){radioQ.length=0;if(window.speechSynthesis)try{speechSynthesis.cancel();}catch(e){}playLine({who:who,text:text,spoken:spoken,kind:'tower'});}
-const L=(who,kind,text,spoken)=>({who,kind,text,spoken});
+function radioBuild(){
+  if(!actx||radioIn)return;
+  const c=radioChain(actx,RADIO.on?RADIO.vol:0);
+  radioIn=c.inp;radioGain=c.out;
+  const n=(actx.sampleRate*2)|0,b=actx.createBuffer(1,n,actx.sampleRate),d=b.getChannelData(0);
+  for(let i=0;i<n;i++)d[i]=Math.random()*2-1;
+  const ss=actx.createBufferSource();ss.buffer=b;ss.loop=true;
+  const sf=actx.createBiquadFilter();sf.type='bandpass';sf.frequency.value=1600;sf.Q.value=0.6;
+  staticG=actx.createGain();staticG.gain.value=0;
+  ss.connect(sf);sf.connect(staticG);staticG.connect(radioGain);ss.start();
+}
+function radioVolApply(){if(radioGain&&actx)radioGain.gain.setTargetAtTime(RADIO.on?RADIO.vol:0,actx.currentTime,0.03);}
+function setRadioOn(v){RADIO.on=!!v;try{localStorage.setItem('kgeuRadioOn',RADIO.on?'1':'0');}catch(e){}radioVolApply();radioUI();}
+function setRadioVol(v){RADIO.vol=Math.max(0,Math.min(1,v));try{localStorage.setItem('kgeuRadioVol',String(RADIO.vol));}catch(e){}radioVolApply();radioUI();}
+function radioUI(){
+  const b=document.getElementById('oRadio');if(!b)return;
+  b.textContent='Radio: '+(RADIO.on?'On':'Off');b.classList.toggle('on',RADIO.on);
+  const r=document.getElementById('oRvol');if(r)r.value=String(Math.round(RADIO.vol*10));
+  const v=document.getElementById('oRvolV');if(v)v.textContent=Math.round(RADIO.vol*100)+'%';
+}
+
+// clips load in the background once the context exists; a line with nothing loaded
+// still shows its text and clicks the squelch, which is a fine degraded mode
+function radioLoad(){
+  if(RADIO.loaded||!actx)return;RADIO.loaded=true;
+  fetch('radio/clips.json').then(r=>r.json()).then(list=>{
+    RADIO.want=list.length;let i=0;
+    const next=()=>{if(i>=list.length)return;const id=list[i++];
+      fetch('radio/'+id+'.m4a').then(r=>r.arrayBuffer())
+        .then(a=>new Promise((res,rej)=>actx.decodeAudioData(a,res,rej)))
+        .then(b=>{RADIO.buf[id]=b;RADIO.got++;}).catch(()=>{RADIO.err++;}).then(next);};
+    for(let k=0;k<6;k++)next();                 // six at a time, not 103 at once
+  }).catch(()=>{RADIO.err=-1;});
+}
+function radioSquelch(t){
+  if(!actx||!radioIn)return;
+  const n=(actx.sampleRate*0.05)|0,b=actx.createBuffer(1,n,actx.sampleRate),d=b.getChannelData(0);
+  for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,2);
+  const s=actx.createBufferSource();s.buffer=b;const g=actx.createGain();g.gain.value=0.45;
+  s.connect(g);g.connect(radioIn);s.start(t);
+}
+// returns how long the radio is busy, so the queue paces itself either way
+function radioSpeak(clips,textLen){
+  const est=Math.max(1.6,textLen*0.052)+0.5;
+  if(!actx||!radioIn||muted||!RADIO.on)return est;
+  const t0=actx.currentTime+0.04;
+  radioSquelch(t0);
+  let t=t0+0.10,any=false;
+  for(const id of clips||[]){const b=RADIO.buf[id];if(!b)continue;any=true;
+    const s=actx.createBufferSource();s.buffer=b;s.connect(radioIn);s.start(t);t+=b.duration+0.025;}
+  if(!any)return est;
+  const end=t+0.05;
+  radioSquelch(end);
+  const g=staticG.gain;
+  g.cancelScheduledValues(t0);g.setValueAtTime(0,t0);
+  g.linearRampToValueAtTime(0.011,t0+0.06);
+  g.setValueAtTime(0.011,Math.max(t0+0.07,end-0.05));
+  g.linearRampToValueAtTime(0,end+0.07);
+  return end-actx.currentTime+0.30;
+}
+function playLine(l){
+  atcEl.innerHTML='';const b=document.createElement('b');b.textContent=l.who;atcEl.appendChild(b);
+  atcEl.appendChild(document.createTextNode(l.text));atcEl.classList.add('on');
+  radioBusy=radioSpeak(l.clips,l.text.length);atcT=Math.max(5,radioBusy+1.2);
+}
+function say(who,text,clips){radioQ.length=0;playLine({who:who,text:text,clips:clips});}
+const L=(who,kind,text,clips)=>({who,kind,text,clips});
+
+// ---- clip helpers ----
+const CSC ={cessna:'cs_skyhawk',  alpha:'cs_pipistrel',  reaper:'cs_reaper',  f16:'cs_viper',c130:'cs_herky'};
+const CSCS={cessna:'cs_skyhawk_s',alpha:'cs_pipistrel_s',reaper:'cs_reaper_s',f16:'cs_viper',c130:'cs_herky'};
+const csT =()=>'t_'+(CSC[AC.id] ||'cs_skyhawk');
+const csTs=()=>'t_'+(CSCS[AC.id]||'cs_skyhawk_s');
+const csP =()=>'p_'+(CSC[AC.id] ||'cs_skyhawk');
+const DIG=['zero','one','two','three','four','five','six','seven','eight','niner'];
+function windNow(){const d=Math.round(st.windDir/10)*10||360,k=Math.max(1,Math.round(st.windKt));return [String(d).padStart(3,'0'),k];}
+function windTxt(){const w=windNow();return 'wind '+w[0]+' at '+w[1];}
+function ktC(k){return k===10?['t_n_10']:k<10?['t_n_'+k]:String(k).split('').map(d=>'t_n_'+d);}
+function windC(){const w=windNow();return ['t_wind'].concat(w[0].split('').map(d=>'t_n_'+d),['t_at'],ktC(w[1]));}
+const CLK=['','t_n_1','t_n_2','t_n_3','t_n_4','t_n_5','t_n_6','t_n_7','t_n_8','t_n_9','t_c_10','t_c_11','t_c_12'];
+const TFCC={'a Cessna':'t_tfc_cessna','a flight of two F-16s':'t_tfc_vipers','a C-17':'t_tfc_c17','an MQ-9':'t_tfc_reaper'};
+function altC(ft){
+  if(ft<100)return [];
+  if(ft>=1000)return ['t_n_'+Math.min(9,Math.round(ft/1000)),'t_thousand_feet'];
+  return ['t_n_'+Math.max(1,Math.round(ft/100)),'t_hundred_feet'];
+}
+
+// ---- ambient chatter, recorded whole because these lines never change ----
 const CHAT=[
- [L('Viper 21','fighter','Luke Tower, Viper 21, flight of two, initial runway 3 left.','Luke tower, viper two one, flight of two, initial, runway three left.'),L('Luke Tower','tower','Viper 21 flight, runway 3 left, break at the numbers, wind 050 at 6.','Viper two one flight, runway three left, break at the numbers, wind zero five zero at six.')],
- [L('Reach 482','heavy','Phoenix Approach, Reach 482, level eight thousand.','Phoenix approach, reach four eight two, level eight thousand.'),L('Phoenix Approach','tower','Reach 482, Phoenix altimeter 29.83.','Reach four eight two, Phoenix altimeter two niner eight three.')],
- [L('Cessna 5231G','ga','Glendale Tower, Cessna 5231G, right downwind runway 1, touch and go.','Glendale tower, Cessna five two three one golf, right downwind runway one, touch and go.'),L('Glendale Tower 121.0','tower','Cessna 31G, runway 1, cleared touch and go.','Cessna three one golf, runway one, cleared touch and go.')],
- [L('Viper 21','fighter','Viper 21 flight, push button 5.','Viper two one flight, push button five.'),L('Viper 22','fighter','Two.','Two.')],
- [L('Hunter 11','uav','Phoenix Approach, Hunter 11, MQ-9, request block six thousand to seven thousand.','Phoenix approach, hunter one one, M Q nine, request block six thousand to seven thousand.'),L('Phoenix Approach','tower','Hunter 11, block six to seven thousand approved, report exiting.','Hunter one one, block six thousand to seven thousand approved, report exiting.')],
- [L('Viper 21','fighter','Viper 21, low approach, gear down.','Viper two one, low approach, gear down.'),L('Luke Tower','tower','Viper 21, runway 3 left, cleared low approach.','Viper two one, runway three left, cleared low approach.')],
- [L('Bolt 11','fighter','Luke Tower, Bolt 11, five miles south with Kilo.','Luke tower, bolt one one, five miles south, with kilo.'),L('Luke Tower','tower','Bolt 11, report initial runway 3 left.','Bolt one one, report initial, runway three left.')],
- [L('Glendale Ground 118.0','tower','Cessna 738GE, runway 1, taxi via Alpha.','Cessna seven three eight golf echo, runway one, taxi via alpha.'),L('Cessna 738GE','ga','Runway 1 via Alpha, 38GE.','Runway one via alpha, three eight golf echo.')],
- [L('Reach 482','heavy','Phoenix Approach, Reach 482, request direct Luke.','Phoenix approach, reach four eight two, request direct Luke.'),L('Phoenix Approach','tower','Reach 482, direct Luke approved, maintain eight thousand.','Reach four eight two, direct Luke approved, maintain eight thousand.')],
- [L('Viper 22','fighter','Viper 22, bingo.','Viper two two, bingo.'),L('Viper 21','fighter','Copy. Viper 21 flight, knock it off, rejoin, RTB.','Copy. Viper two one flight, knock it off. Rejoin, R T B.')],
- [L('Luke Tower','tower','Viper 21 flight, check wheels down, runway 3 left cleared to land.','Viper two one flight, check wheels down. Runway three left, cleared to land.'),L('Viper 21','fighter','Cleared to land, Viper 21.','Cleared to land, viper two one.')]
+ [L('Viper 21','fighter','Luke Tower, Viper 21, flight of two, initial runway 3 left.',['p_ch_p1']),
+  L('Luke Tower','tower','Viper 21 flight, runway 3 left, break at the numbers, wind 050 at 6.',['t_ch_t1'])],
+ [L('Reach 482','heavy','Phoenix Approach, Reach 482, level eight thousand.',['p_ch_p2']),
+  L('Phoenix Approach','tower','Reach 482, Phoenix altimeter 29.83.',['t_ch_t2'])],
+ [L('Cessna 5231G','ga','Glendale Tower, Cessna 5231G, right downwind runway 1, touch and go.',['p_ch_p3']),
+  L('Glendale Tower 121.0','tower','Cessna 31G, runway 1, cleared touch and go.',['t_ch_t3'])],
+ [L('Viper 21','fighter','Viper 21 flight, push button 5.',['p_ch_p4']),
+  L('Viper 22','fighter','Two.',['p_ch_p5'])],
+ [L('Hunter 11','uav','Phoenix Approach, Hunter 11, MQ-9, request block six thousand to seven thousand.',['p_ch_p6']),
+  L('Phoenix Approach','tower','Hunter 11, block six to seven thousand approved, report exiting.',['t_ch_t4'])],
+ [L('Viper 21','fighter','Viper 21, low approach, gear down.',['p_ch_p7']),
+  L('Luke Tower','tower','Viper 21, runway 3 left, cleared low approach.',['t_ch_t5'])],
+ [L('Bolt 11','fighter','Luke Tower, Bolt 11, five miles south with Kilo.',['p_ch_p8']),
+  L('Luke Tower','tower','Bolt 11, report initial runway 3 left.',['t_ch_t6'])],
+ [L('Glendale Ground 118.0','tower','Cessna 738GE, runway 1, taxi via Alpha.',['t_ch_t7']),
+  L('Cessna 738GE','ga','Runway 1 via Alpha, 38GE.',['p_ch_p9'])],
+ [L('Reach 482','heavy','Phoenix Approach, Reach 482, request direct Luke.',['p_ch_p2']),
+  L('Phoenix Approach','tower','Reach 482, direct Luke approved, maintain eight thousand.',['t_ch_t8'])],
+ [L('Viper 22','fighter','Viper 22, bingo.',['p_ch_p10']),
+  L('Viper 21','fighter','Copy. Viper 21 flight, knock it off, rejoin, RTB.',['p_ch_p11'])],
+ [L('Luke Tower','tower','Viper 21 flight, check wheels down, runway 3 left cleared to land.',['t_ch_t9']),
+  L('Viper 21','fighter','Cleared to land, Viper 21.',['p_ch_p12'])]
 ];
 const _rp=new V3();
 function radioUpdate(dt){
@@ -3549,37 +3665,65 @@ function radioUpdate(dt){
       if(d<5500&&d>500&&Math.abs(dy)<450){seen[o.grp]=1;TRAFFIC.forEach(q=>{if(q.grp===o.grp)q.cool=100;});
         let rel=Math.atan2(dx,-dz)-hdg;rel=((rel%(2*Math.PI))+2*Math.PI)%(2*Math.PI);const clk=Math.round(rel/(Math.PI/6))%12||12;
         const mi=Math.max(1,Math.round(d/1852)),ft=Math.round(Math.abs(dy)*M2FT/100)*100;
-        const alt=Math.abs(dy)<60?'same altitude':ft+' ft '+(dy>0?'above':'below');
-        const twr=Math.hypot(st.pos.x-LUKE.x,st.pos.z-LUKE.z)<9000?'Luke Tower':'Glendale Tower 121.0';
-        radioQ.unshift(L(twr,'tower',`${AC.csS}, traffic ${clk} o'clock, ${mi} mile${mi>1?'s':''}, ${alt}, ${o.kind}.`,`${AC.sayS}, traffic, ${clk} o'clock, ${mi} mile${mi>1?'s':''}, ${alt.replace(' ft',' feet')}, ${o.kind}.`));break;}}}
+        const near=Math.abs(dy)<60;
+        const alt=near?'same altitude':ft+' ft '+(dy>0?'above':'below');
+        const atLuke=Math.hypot(st.pos.x-LUKE.x,st.pos.z-LUKE.z)<9000;
+        const twr=atLuke?'Luke Tower 133.45':'Glendale Tower 121.0';
+        const twrC=atLuke?'t_luke_tower':'t_glendale_tower';
+        const clips=[csTs(),twrC,'t_traffic',CLK[clk],'t_oclock'].concat(
+          ktC(mi),[mi>1?'t_miles':'t_mile'],
+          near?['t_same_alt']:altC(ft).concat([dy>0?'t_above':'t_below']),
+          [TFCC[o.kind]].filter(Boolean));
+        radioQ.unshift(L(twr,'tower',`${AC.csS}, traffic ${clk} o'clock, ${mi} mile${mi>1?'s':''}, ${alt}, ${o.kind}.`,clips));
+        break;}}}
 }
-const DIG=['zero','one','two','three','four','five','six','seven','eight','niner'];
-function windNow(){const d=Math.round(st.windDir/10)*10||360,k=Math.max(1,Math.round(st.windKt));return [String(d).padStart(3,'0'),k];}
-function windTxt(){const w=windNow();return 'wind '+w[0]+' at '+w[1];}
-function windSay(){const w=windNow();return 'wind '+w[0].split('').map(c=>DIG[+c]).join(' ')+' at '+(w[1]===10?'one zero':DIG[w[1]]);}
 let A={};
+// a readback after a clearance, in the pilot's voice, the way a real exchange goes
+function readback(kind){
+  const T={to:['Cleared for takeoff, ','p_rb_cleared_to'],
+           land:['Cleared to land, ','p_rb_cleared_land'],
+           wilco:['Wilco, ','p_rb_wilco'],
+           roger:['Roger, ','p_rb_roger'],
+           tfc:['Looking for the traffic, ','p_rb_traffic']}[kind];
+  radioQ.push(L(AC.cs,'pilot',T[0]+AC.cs+'.',[T[1],csP()]));
+}
 function atcUpdate(){
   const s=st,u=toU(s.pos.x,s.pos.z),v=toV(s.pos.x,s.pos.z);
   if(s.onGround) A.ground=1;
-  const B=BASES[s.base]||BASES.kgeu, bN=B.name.split(' ')[0].toLowerCase();
-  if(s.mode==='runway'&&!A.tko&&s.time>0.6){A.tko=1;say(B.twr,AC.cs+', runway '+B.rwy+', '+windTxt()+', cleared for takeoff.',AC.say+', '+bN+' tower, runway '+B.sayRwy+', '+windSay()+', cleared for takeoff.');}
-  if(s.mode==='ramp'&&!A.taxi&&s.time>0.6){A.taxi=1;say(B.gnd,AC.cs+', runway '+B.rwy+', taxi via Alpha, '+windTxt()+'.',AC.say+', '+bN+' ground, runway '+B.sayRwy+', taxi via alpha, '+windSay()+'.');}
-  if(s.mode==='ramp'&&A.taxi&&!A.tko&&s.onGround&&s.base==='kgeu'&&v>-70&&v<-20&&u<560){A.tko=1;say(B.twr,AC.cs+', runway 1, cleared for takeoff.',AC.say+', Glendale tower, runway one, cleared for takeoff.');}
-  if(s.mode==='final'&&!A.land&&s.time>0.6){A.land=1;say('Glendale Tower 121.0',AC.cs+', runway 1, '+windTxt()+', cleared to land.',AC.say+', Glendale tower, runway one, '+windSay()+', cleared to land.');}
-  if(!A.pattern&&A.ground&&!s.onGround&&s.agl>240){A.pattern=1;say('Glendale Tower 121.0',AC.csS+', make right closed traffic, runway 1.',AC.sayS+', make right closed traffic, runway one.');}
+  const B=BASES[s.base]||BASES.kgeu;
+  const twrC='t_'+B.twrClip, gndC='t_'+B.gndClip, rwyC='t_'+B.rwyClip;
+  if(s.mode==='runway'&&!A.tko&&s.time>0.6){A.tko=1;
+    say(B.twr,AC.cs+', '+B.twr.split(' ').slice(0,2).join(' ')+', '+windTxt()+', runway '+B.rwy+', cleared for takeoff.',
+        [csT(),twrC].concat(windC(),[rwyC,'t_cleared_to']));readback('to');}
+  if(s.mode==='ramp'&&!A.taxi&&s.time>0.6){A.taxi=1;
+    say(B.gnd,AC.cs+', '+B.gnd.split(' ').slice(0,2).join(' ')+', runway '+B.rwy+', taxi to the active via Alpha.',
+        [csT(),gndC,rwyC,'t_taxi_alpha']);readback('wilco');}
+  if(s.mode==='ramp'&&A.taxi&&!A.tko&&s.onGround&&s.base==='kgeu'&&v>-70&&v<-20&&u<560){A.tko=1;
+    say(B.twr,AC.cs+', runway '+B.rwy+', cleared for takeoff.',[csT(),rwyC,'t_cleared_to']);readback('to');}
+  if(s.mode==='final'&&!A.land&&s.time>0.6){A.land=1;
+    say(B.twr,AC.cs+', '+B.twr.split(' ').slice(0,2).join(' ')+', '+windTxt()+', runway '+B.rwy+', cleared to land.',
+        [csT(),twrC].concat(windC(),[rwyC,'t_cleared_land']));readback('land');}
+  if(!A.pattern&&A.ground&&!s.onGround&&s.agl>240){A.pattern=1;
+    say(B.twr,AC.csS+', make right closed traffic, runway '+B.rwy+'.',[csTs(),'t_closed_traffic',rwyC]);}
   const hdg=((-new THREE.Euler().setFromQuaternion(s.quat,'YXZ').y*180/Math.PI)%360+360)%360;
-  if(!A.land&&A.pattern&&!s.onGround&&s.agl<420&&u<THR01+150&&u>-7000&&Math.abs(v)<450&&Math.abs(((hdg-26+540)%360)-180)<35){A.land=1;say('Glendale Tower 121.0',AC.csS+', runway 1, cleared to land.',AC.sayS+', runway one, cleared to land.');}
+  if(!A.land&&A.pattern&&!s.onGround&&s.agl<420&&u<THR01+150&&u>-7000&&Math.abs(v)<450&&Math.abs(((hdg-26+540)%360)-180)<35){A.land=1;
+    say('Glendale Tower 121.0',AC.csS+', runway 1, check wheels down, cleared to land.',
+        [csTs(),'t_glendale_tower','t_rwy_1','t_wheels_down','t_cleared_land']);readback('land');}
 }
 function atcTouchdown(e){
-  const u=toU(e.x,e.z),v=toV(e.x,e.z),L=lukeUV(e.x,e.z);
-  if(Math.abs(L[0])<1700&&Math.abs(L[1])<400) say('Luke Tower',AC.cs+', you just landed at Luke Air Force Base. Hold position, security is on the way.',AC.say+', Luke tower. You just landed at Luke Air Force Base. Hold position, security is on the way.');
-  else if(Math.abs(v)<17&&u>-5&&u<RWY_LEN+5){say('Glendale Tower 121.0',AC.csS+', nice landing. Turn left next taxiway, contact ground 118.0.',AC.sayS+', nice landing. Turn left next taxiway, contact ground one one eight point zero.');A.land=0;A.pattern=0;}
+  const u=toU(e.x,e.z),v=toV(e.x,e.z),K=lukeUV(e.x,e.z);
+  if(Math.abs(K[0])<1700&&Math.abs(K[1])<400)
+    say('Luke Tower 133.45',AC.cs+', you just landed at Luke Air Force Base. Hold position, security is on the way.',
+        [csT(),'t_luke_tower','t_luke_security']);
+  else if(Math.abs(v)<17&&u>-5&&u<RWY_LEN+5){
+    say('Glendale Tower 121.0',AC.csS+', nice landing. Turn left next taxiway, contact ground 118.0.',
+        [csTs(),'t_nice_landing']);A.land=0;A.pattern=0;}
 }
 
 // ---------- menus ----------
 const menu=document.getElementById('menu'),crashEl=document.getElementById('crash'),resumeBtn=document.getElementById('bResume');
 function start(mode){
-  initAudio();if(window.speechSynthesis){try{speechSynthesis.cancel();const pr=new SpeechSynthesisUtterance(' ');pr.volume=0;speechSynthesis.speak(pr);}catch(e){}}
+  initAudio();
   setType(acType);useModel(acType);sizeShadow();radioQ.length=0;
   st=createState(mode,SPAWN_BASE);st.type=acType;st.easy=easy;st.noPF=isTouch||easy;document.body.classList.toggle('easy',easy);A={};running=true;paused=false;events.length=0;cfgReset();camBump=0;
   menu.classList.remove('on');crashEl.classList.remove('on');resumeBtn.style.display='';document.getElementById('bPause').textContent='Pause';snapCamera=true;
@@ -3609,7 +3753,9 @@ document.getElementById('oEasy').onclick=()=>{easy=!easy;try{localStorage.setIte
 document.getElementById('oTilt').onclick=()=>setTilt(!tilt.on);
 document.getElementById('oInv').onclick=()=>{tilt.inv=!tilt.inv;try{localStorage.setItem('kgeuTiltInv',tilt.inv?'1':'0');}catch(e){}tiltUI();};
 document.getElementById('oSens').addEventListener('input',e=>{tilt.sens=+e.target.value;try{localStorage.setItem('kgeuTiltSens',String(tilt.sens));}catch(e2){}tiltUI();});
-easyUI();tiltUI();
+document.getElementById('oRadio').onclick=()=>{initAudio();setRadioOn(!RADIO.on);};
+document.getElementById('oRvol').addEventListener('input',e=>{initAudio();setRadioVol(+e.target.value/10);});
+easyUI();tiltUI();radioUI();
 // Add to Home Screen tip. iOS has no install prompt a page can trigger, so the
 // best we can do is say exactly where the button is, and only when it applies.
 (function(){
@@ -3648,7 +3794,15 @@ const altMSL=()=>(st.pos.y-GEAR)*M2FT+FIELD_FT,aglFt=()=>st.agl*M2FT,kts=()=>st.
 const angD=(a,b)=>Math.abs((((a-b)%360)+540)%360-180);
 const dev=f=>(f>=0?'+':'')+Math.round(f)+' ft',h3=h=>String(Math.round(h)%360||360).padStart(3,'0');
 function lesShow(i,m){if(lesI.textContent!==i)lesI.textContent=i;lesM.textContent=m;}
-function coach2(t,sp){say('Instructor',t,sp||t);}
+// The instructor sits beside you rather than transmitting, so this one voice is
+// still synthesised and deliberately bypasses the radio filter. Its lines are
+// built at runtime from measured numbers and cannot be pre-recorded.
+function coach2(t,sp){
+  radioQ.length=0;playLine({who:'Instructor',text:t,clips:null});
+  if(muted||!RADIO.on||!window.speechSynthesis)return;
+  try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(sp||t);
+    u.rate=1.02;u.volume=0.9*RADIO.vol;speechSynthesis.speak(u);}catch(e){}
+}
 function airStart(u,v,altFt,hdg,kt,flap,thr){
   const y=(altFt-FIELD_FT)/M2FT+GEAR,h=hdg*Math.PI/180,V=kt/MS2KT/Math.sqrt(1.097*Math.exp(-y/9200)/1.225);
   st.pos.set(wX(u,v),y,wZ(u,v));st.vel.set(Math.sin(h)*V,0,-Math.cos(h)*V);st.quat.setFromEuler(new THREE.Euler(0.03,-h,0,'YXZ'));st.w.set(0,0,0);
@@ -4197,7 +4351,8 @@ function strikeScore(){
   if(better){strikeBest=sc;try{localStorage.setItem('kgeuStrikeBest',JSON.stringify(sc));}catch(e){}}
   toast(`${sc.hits} of 4 hits. Average miss ${sc.avg} m, ${sc.t} s${better?'. New best':''}`);
   radioQ.push(L('Gila Range Control','tower',
-    `${AC.csS}, range is cold. ${sc.hits} of 4.`,`${AC.sayS}, range is cold. ${sc.hits} of four.`));
+    `${AC.csS}, range is cold. ${sc.hits} of 4.`,
+    [csTs(),'t_gila_range','t_range_cold','t_n_'+sc.hits,'t_of_four']));
 }
 function strikeBestText(){
   return strikeBest?`${strikeBest.hits}/4, ${strikeBest.avg} m avg, ${strikeBest.t} s`:'none yet';
@@ -4219,7 +4374,7 @@ function strikeStart(){
   camMode=2;snapCamera=true;
   radioQ.push(L('Gila Range Control','tower',
     AC.cs+', Gila range control, you are cleared hot. Range is clear, four targets.',
-    AC.say+', Gila range control. You are cleared hot. Range is clear, four targets.'));
+    [csT(),'t_gila_range','t_cleared_hot']));
 }
 function strikeBtnPress(a){
   if(a==='fire')fireMissile();
@@ -4270,7 +4425,7 @@ function frame(t){
     updateControls(dt);lessonTick(dt);acc+=dt;
     while(acc>=DT){autopilot(st,DT,events);step(st,DT,events);acc-=DT;if(st.crashed)break;}
     if(st.crashed&&LES.on){const k=(acType==='alpha'?'alpha':'cessna')+':'+LES.on;if(!schoolBest[k]){schoolBest[k]='F';try{localStorage.setItem('kgeuSchool',JSON.stringify(schoolBest));}catch(e){}}lesEnd();}
-    if(st.crashed){$('crashWhy').textContent=st.crashReason;crashEl.classList.add('on');say('Glendale Tower 121.0','Crash, crash, crash. Emergency vehicles are rolling.','Crash, crash, crash. Emergency vehicles are rolling.');}
+    if(st.crashed){$('crashWhy').textContent=st.crashReason;crashEl.classList.add('on');say('Glendale Tower 121.0','Crash, crash, crash. Emergency vehicles are rolling.',['t_crash']);}
     else atcUpdate();
   }
   while(events.length){const ev=events.shift();if(LES.on)lessonEvent(ev);
@@ -4362,6 +4517,7 @@ function frame(t){
 }
 // test hook: headless UI checks need to reach a few internals
 window.__kgeu={tilt:tilt,setTilt:setTilt,state:()=>st,toast:toast,start:start,
+  RADIO:RADIO,radioQ:()=>radioQ,radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,initAudio:initAudio,
   pick:pickType,pickBase:pickBase,togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   MISS:MISS,DROPZ:DROPZ,LZ:LZ,lzUV:lzUV,lzX:lzX,lzZ:lzZ,missDrop:missDrop,missTouchdown:missTouchdown,
   // step the mission clock without waiting on rAF: the pallet takes 50 s to come down

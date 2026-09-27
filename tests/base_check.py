@@ -1,9 +1,19 @@
 # Spawn picker: the F-16 starts at Luke, everything else at Glendale, and either
 # aircraft can be sent to either field.
-import asyncio, os, sys, json
+import asyncio, os, sys, json, threading, functools, http.server, socketserver
 from playwright.async_api import async_playwright
+
+# Serve over http rather than file://: the radio clips are fetched at runtime and
+# fetch() is blocked on file:// origins, so a file:// run would silently test a
+# game with no radio audio.
+def serve(root):
+    h = functools.partial(http.server.SimpleHTTPRequestHandler, directory=root)
+    class Q(socketserver.TCPServer): allow_reuse_address = True
+    srv = Q(('127.0.0.1', 0), h)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv, f'http://127.0.0.1:{srv.server_address[1]}/index.html'
 THREE=open('node_modules/three/build/three.min.js').read()
-URL='file://'+os.path.abspath('index.html')
+SRV,URL=serve(os.path.abspath('.'))
 SHOTS=os.path.abspath('overnight-screenshots')
 fails=[]
 def chk(n,c,d=''):

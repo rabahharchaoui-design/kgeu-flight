@@ -1,10 +1,20 @@
 # Overnight build check: iPhone landscape, every aircraft, fps floor and console errors.
 # Usage: .venv/bin/python tests/overnight_check.py <label> [type ...]
-import asyncio, os, sys, json
+import asyncio, os, sys, json, threading, functools, http.server, socketserver
 from playwright.async_api import async_playwright
 
+# Serve over http rather than file://: the radio clips are fetched at runtime and
+# fetch() is blocked on file:// origins, so a file:// run would silently test a
+# game with no radio audio.
+def serve(root):
+    h = functools.partial(http.server.SimpleHTTPRequestHandler, directory=root)
+    class Q(socketserver.TCPServer): allow_reuse_address = True
+    srv = Q(('127.0.0.1', 0), h)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv, f'http://127.0.0.1:{srv.server_address[1]}/index.html'
+
 THREE = open('node_modules/three/build/three.min.js').read()
-URL = 'file://' + os.path.abspath('index.html')
+SRV, URL = serve(os.path.abspath('.'))
 SHOTS = os.path.abspath('overnight-screenshots')
 LABEL = sys.argv[1] if len(sys.argv) > 1 else 'run'
 TYPES = sys.argv[2:] or ['cessna', 'f16', 'reaper', 'c130']
