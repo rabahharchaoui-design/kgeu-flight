@@ -466,6 +466,15 @@ function lzUV(x,z){const dx=x-LZ.x,dz=z-LZ.z;return [dx*LZs-dz*LZc, dx*LZc+dz*LZ
 function lzX(u,v){return LZ.x+LZs*u+LZc*v;}
 function lzZ(u,v){return LZ.z-LZc*u+LZs*v;}
 function lukeUV(x,z){const dx=x-LUKE.x,dz=z-LUKE.z,s=Math.sin(LUKE.h),c=Math.cos(LUKE.h);return [dx*s-dz*c,dx*c+dz*s];}
+// Sky Harbor, 28.6 km east southeast. Placed from the published ARP the same way
+// Luke is: KPHX is at 33.4343 N, 112.0116 W against KGEU at 33.52683, -112.29517.
+const SKY_HARBOR={x:26795,z:9287,h:92*Math.PI/180};
+const SHs=Math.sin(SKY_HARBOR.h),SHc=Math.cos(SKY_HARBOR.h);
+const shX=(u,v)=>SKY_HARBOR.x+SHs*u+SHc*v, shZ=(u,v)=>SKY_HARBOR.z-SHc*u+SHs*v;
+function shUV(x,z){const dx=x-SKY_HARBOR.x,dz=z-SKY_HARBOR.z;return [dx*SHs-dz*SHc, dx*SHc+dz*SHs];}
+const SH_RWY=[{v:-300,len:3502,lo:'07L',hi:'25R'},   // 11,489 ft
+              {v:   0,len:2377,lo:'07R',hi:'25L'},   //  7,800 ft
+              {v: 330,len:3140,lo:'08', hi:'26' }];  // 10,300 ft
 function riverX(z){return 1400+170*Math.sin(z/2300)+70*Math.sin(z/640+1.3);}
 function rangeH(x,z,cx,cz,ax,az,rot,h,seed){
   const dx=x-cx,dz=z-cz,c=Math.cos(rot),s=Math.sin(rot);
@@ -501,6 +510,8 @@ function isPaved(x,z){
   if(Math.abs(L[0]+300)<=13&&L[1]>=-185&&L[1]<=200) return true;     // ramp to both runways
   const Z=lzUV(x,z);
   if(Math.abs(Z[0])<=LZ.len/2+10&&Math.abs(Z[1])<=LZ.wid/2+4) return true;
+  const S=shUV(x,z);
+  for(const r of SH_RWY) if(Math.abs(S[0])<=r.len/2&&Math.abs(S[1]-r.v)<=23) return true;
   return false;
 }
 const OBST=[];
@@ -2593,6 +2604,44 @@ function updateCars(dt){cars.forEach((c,k)=>{c.s+=c.dir*c.sp*dt;
     pts.forEach((p,i)=>{m.makeTranslation(LKX(p[0],p[1]),0.3,LKZ(p[0],p[1]));im.setMatrixAt(i,m);im.setColorAt(i,col.setHex(p[2]));lukeLightBase.push(m.clone());});
     scene.add(im);lukeLightMesh=im;
     lightGlow(pts,(u,v)=>[LKX(u,v),LKZ(u,v)],0.55);
+  })();
+
+  // Sky Harbor: three parallel runways east to west, the terminals between the
+  // inner two, and the tower. 28.6 km out, so it is geometry and no textures.
+  (function(){
+    const conc2=lam(0x8e8c85),pale=lam(0xb4b2ab),glass2=lam(0x3f5f7a),roof=lam(0x9a9790);
+    for(const r of SH_RWY){
+      const g=new THREE.PlaneGeometry(46,r.len);g.rotateX(-Math.PI/2);
+      const m=new THREE.Mesh(g,conc2);m.position.set(shX(0,r.v),0.3,shZ(0,r.v));
+      m.rotation.y=-SKY_HARBOR.h;scene.add(m);
+      // centreline, so the runways read as runways from the air
+      const cg=new THREE.PlaneGeometry(2.2,r.len-160);cg.rotateX(-Math.PI/2);
+      const cm=new THREE.Mesh(cg,lam(0xe8e6de));cm.position.set(shX(0,r.v),0.36,shZ(0,r.v));
+      cm.rotation.y=-SKY_HARBOR.h;scene.add(cm);
+    }
+    // parallel taxiways either side of the middle runway
+    for(const v of [-150,165]){
+      const g=new THREE.PlaneGeometry(24,3000);g.rotateX(-Math.PI/2);
+      const m=new THREE.Mesh(g,pale);m.position.set(shX(0,v),0.28,shZ(0,v));
+      m.rotation.y=-SKY_HARBOR.h;scene.add(m);
+    }
+    // Terminals 3 and 4 with their concourses, between the inner runways
+    for(const [u0,v0,L,W] of [[-620,150,300,90],[120,150,420,100]]){
+      const t=new THREE.Mesh(new THREE.BoxGeometry(L,26,W),roof);
+      t.position.set(shX(u0,v0),13,shZ(u0,v0));t.rotation.y=-SKY_HARBOR.h;scene.add(t);
+      const gl=new THREE.Mesh(new THREE.BoxGeometry(L-8,9,W+2),glass2);
+      gl.position.set(shX(u0,v0),19,shZ(u0,v0));gl.rotation.y=-SKY_HARBOR.h;scene.add(gl);
+      for(let k=-1;k<=1;k++){
+        const c=new THREE.Mesh(new THREE.BoxGeometry(46,16,150),roof);
+        c.position.set(shX(u0+k*L*0.34,v0-115),8,shZ(u0+k*L*0.34,v0-115));
+        c.rotation.y=-SKY_HARBOR.h;scene.add(c);
+      }
+    }
+    // the tower
+    const tw=new THREE.Mesh(new THREE.CylinderGeometry(7,10,74,10),pale);
+    tw.position.set(shX(-180,205),37,shZ(-180,205));scene.add(tw);
+    const cab=new THREE.Mesh(new THREE.CylinderGeometry(14,11,13,10),glass2);
+    cab.position.set(shX(-180,205),79,shZ(-180,205));scene.add(cab);
   })();
 
   // Downtown Phoenix skyline, about 21 km ESE
@@ -5052,6 +5101,7 @@ function frame(t){
 }
 // test hook: headless UI checks need to reach a few internals
 window.__kgeu={tilt:tilt,setTilt:setTilt,state:()=>st,toast:toast,start:start,
+  SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
   setTOD:setTOD,isNight:isNight,TOD:()=>TOD,drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
   RADIO:RADIO,radioQ:()=>radioQ,radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,initAudio:initAudio,
