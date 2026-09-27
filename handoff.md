@@ -3,6 +3,20 @@
 Single file game in `index.html`. Checkpoints after each task: `index_task1.html`
 through `index_task4.html`. Each task is one git commit.
 
+## Live app
+
+https://rabahharchaoui-design.github.io/kgeu-flight/
+
+Public repo `rabahharchaoui-design/kgeu-flight`, GitHub Pages serving `master`
+at `/`. Installable on an iPhone home screen: open in Safari, Share, Add to
+Home Screen. It launches full screen with no browser bar.
+
+There is deliberately **no service worker**, so any push is live immediately.
+The trade is that there is no offline play and no install prompt on Android.
+
+Every change to the game gets committed and pushed, so the live app tracks the
+repo. `tests/live_check.py` verifies the deployed URL end to end.
+
 ## Running the tests
 
 ```
@@ -23,6 +37,7 @@ node tests/bound.js         # theoretical lower bound on autoland time
 .venv/bin/python tests/tilt_check.py     # tilt steering
 .venv/bin/python tests/strike_check.py   # range siting and a full engagement
 .venv/bin/python tests/desktop_check.py  # Mac smoke test
+.venv/bin/python tests/live_check.py     # the deployed https site, end to end
 ```
 
 All of the above pass as of the Task 4 commit.
