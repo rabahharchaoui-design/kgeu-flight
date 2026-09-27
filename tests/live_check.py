@@ -78,7 +78,40 @@ async def main():
     chk('auto takeoff runs on the live site',ap['ap'] in ('to','hold'),str(ap))
     await pg.screenshot(path='/Users/rabahharchaoui/Desktop/cc-test/kgeu/tests/live_iphone.png')
     chk('no errors after play',not errs,str(errs[:2]))
+    # ---- overnight build ----
+    print('-- overnight build --')
+    # the checks above leave a flight running, so bring the menu back up first
+    await pg.evaluate("()=>window.__kgeu.openMenu()")
+    await pg.wait_for_timeout(600)
+    for t in ['cessna','alpha','f16','reaper','c130']:
+        ok = await pg.is_visible(f'.pick[data-t="{t}"]')
+        chk(f'{t} is offered in the menu', ok)
+    chk('spawn picker is there', await pg.is_visible('.pick[data-b="luke"]'))
+    chk('time of day picker is there', await pg.is_visible('.pick[data-tod="night"]'))
+    chk('radio controls are there', await pg.is_visible('#oRadio') and await pg.is_visible('#oRvol'))
+    chk('records screen is reachable', await pg.is_visible('#bRecords'))
+    chk('C-130 missions are offered', await pg.is_visible('#bDrop') and await pg.is_visible('#bShort'))
+    n0=len(errs)
+    for t in ['cessna','f16','reaper','c130']:
+        await pg.evaluate(f"()=>{{window.__kgeu.pick('{t}');window.__kgeu.start('runway');}}")
+        await pg.wait_for_timeout(2000)
+        s2=await pg.evaluate("()=>{const s=window.__kgeu.state();return [s.type,s.crashed,s.base];}")
+        chk(f'{t} spawns on the live site', s2[0]==t and not s2[1], str(s2))
+        await pg.evaluate("()=>window.__kgeu.openMenu()")
+        await pg.wait_for_timeout(300)
+    chk('no console errors while spawning', len(errs)==n0, str(errs[n0:n0+2]))
+    # the radio clips must actually come down from the live host
+    await pg.evaluate("()=>window.__kgeu.initAudio()")
+    for _ in range(50):
+        r=await pg.evaluate("()=>{const R=window.__kgeu.RADIO;return [R.want,R.got,R.err];}")
+        if r[0] and r[1]+max(0,r[2])>=r[0]: break
+        await pg.wait_for_timeout(500)
+    chk('radio clips fetch and decode from the live host', r[0]>100 and r[1]>=r[0]-2, f'want {r[0]} got {r[1]} err {r[2]}')
+    await pg.screenshot(path='overnight-screenshots/live_after_merge.png')
+
     await b.close()
 asyncio.run(main())
 print('\nlive check: '+('FAILED '+', '.join(fails) if fails else 'deployed site is good'))
 sys.exit(1 if fails else 0)
+
+# ---- overnight build: the new aircraft, fields and radio, on the live site ----
