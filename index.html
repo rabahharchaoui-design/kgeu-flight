@@ -179,6 +179,19 @@ body.touch #coach button{ min-height:var(--tap); min-width:var(--tap); padding:6
 .gLetter.gA,.gLetter.gB{ color:#4cd97b; } .gLetter.gC{ color:var(--caution); } .gLetter.gD,.gLetter.gF{ color:var(--warn); }
 #gLines{ margin:0 0 16px; font-size:16px; line-height:1.55; }
 #gLines .ok::before{ content:'\2713  '; color:#4cd97b; font-weight:800; } #gLines .no::before{ content:'\2717  '; color:var(--warn); font-weight:800; }
+/* mission HUD and result card, sharing the grade card's letter styling */
+#mLines,#sLines{ margin:0 0 16px; font-size:16px; line-height:1.55; }
+.gl{ display:flex; justify-content:space-between; gap:18px; border-bottom:1px solid rgba(255,255,255,.09); padding:4px 0; }
+.gl span{ color:var(--soft); } .gl b{ font-variant-numeric:tabular-nums; white-space:nowrap; }
+#miss{ position:fixed; left:50%; top:calc(env(safe-area-inset-top,0px) + 8px); transform:translateX(-50%);
+  display:none; flex-direction:column; gap:1px; text-align:center; z-index:5; pointer-events:none;
+  border:2px solid #7fd4ff; max-width:min(560px,86vw); }
+#miss.on{ display:flex; }
+#miss.warn{ border-color:var(--caution); }
+#miss b{ font-size:17px; letter-spacing:.02em; }
+#miss span{ font-size:14px; color:var(--soft); }
+body.touch #miss{ font-size:13px; padding:5px 10px; max-width:44vw; }
+body.touch #miss b{ font-size:14px; } body.touch #miss span{ font-size:12px; }
 #school{ display:none; margin:0 0 14px; }
 #school.on{ display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:8px; }
 #school button{ text-align:left; padding:10px 12px; line-height:1.25; }
@@ -278,6 +291,7 @@ body.touch #tiltDiag{ display:block; }
 <div id="coach" class="card"><span></span><button id="coachSkip">Skip</button></div>
 <div id="lesson" class="card"><div class="lesTop"><b id="lesT"></b><button id="lesQuit">End</button></div><div id="lesI"></div><div id="lesM"></div></div>
 </div>
+<div id="miss" class="card"><b id="missT"></b><span id="missS"></span></div>
 <div id="yoke"><div id="yokeK"></div></div>
 <div id="rotate"><div>Turn your phone sideways</div><div style="font-size:16px;font-weight:500;color:var(--soft)">Landscape gives you the stick, throttle, and a wider view.</div><button id="rotOk">Play in portrait anyway</button></div>
 <div class="overlay on" id="menu"><div class="sheet">
@@ -306,6 +320,8 @@ body.touch #tiltDiag{ display:block; }
     <button id="bRamp">Start at the ramp</button>
     <button id="bFinal">Start on 3 mile final</button>
     <button id="bStrike">Reaper strike: live range</button>
+    <button id="bDrop">C-130 airdrop: desert DZ</button>
+    <button id="bShort">C-130 short field landing</button>
     <button id="bSchool">Flight school</button>
     <button id="bResume" style="display:none">Resume</button>
   </div>
@@ -331,6 +347,12 @@ body.touch #tiltDiag{ display:block; }
   <p class="sub" id="gTitle"></p>
   <div id="gLines"></div>
   <div class="row"><button class="primary" id="gRetry">Try again</button><button id="gSchool">All lessons</button><button id="gFree">Free flight</button></div>
+</div></div>
+<div class="overlay" id="missOv"><div class="sheet">
+  <p class="gLetter" id="mLetter">A</p>
+  <p class="sub" id="mTitle"></p>
+  <div id="mLines"></div>
+  <div class="row"><button class="primary" id="mRetry">Try again</button><button id="mOther">Other mission</button><button id="mFree">Free flight</button></div>
 </div></div>
 <div class="overlay" id="crash"><div class="sheet">
   <p class="crashTitle">Crashed</p>
@@ -367,6 +389,15 @@ const APC={x:wX(1090,-150),z:wZ(1090,-150)};
 // asserts all of that against the real section map.
 const RANGE={x:-13400,z:14400,r:820,road:640};
 const LUKE={x:-7700,z:-1870,h:40*Math.PI/180};
+// C-130 mission area, open desert 12.7 km due west of KGEU and 4.8 km beyond Luke.
+// The two sections under it are forced to desert in the West Valley generator, the
+// same way Luke, the river and the stadium claim theirs.
+const DROPZ={x:-12700,z:900,r:150};                    // scoring circle, 150 m
+const LZ={x:-12700,z:2900,h:90*Math.PI/180,len:914,wid:27};   // assault strip, 3,000 x 90 ft
+const LZs=Math.sin(LZ.h),LZc=Math.cos(LZ.h);
+function lzUV(x,z){const dx=x-LZ.x,dz=z-LZ.z;return [dx*LZs-dz*LZc, dx*LZc+dz*LZs];}
+function lzX(u,v){return LZ.x+LZs*u+LZc*v;}
+function lzZ(u,v){return LZ.z-LZc*u+LZs*v;}
 function lukeUV(x,z){const dx=x-LUKE.x,dz=z-LUKE.z,s=Math.sin(LUKE.h),c=Math.cos(LUKE.h);return [dx*s-dz*c,dx*c+dz*s];}
 function riverX(z){return 1400+170*Math.sin(z/2300)+70*Math.sin(z/640+1.3);}
 function rangeH(x,z,cx,cz,ax,az,rot,h,seed){
@@ -400,6 +431,8 @@ function isPaved(x,z){
   const L=lukeUV(x,z);
   if(L[0]>=-1620&&L[0]<=1620&&(Math.abs(L[1]-160)<=25||Math.abs(L[1]+160)<=25)) return true;
   if(L[0]>=-900&&L[0]<=900&&L[1]>=190&&L[1]<=700) return true;
+  const Z=lzUV(x,z);
+  if(Math.abs(Z[0])<=LZ.len/2+10&&Math.abs(Z[1])<=LZ.wid/2+4) return true;
   return false;
 }
 const OBST=[];
@@ -479,6 +512,24 @@ function createState(mode){
     st.vel.set(V,0,0);                                // tracking east, turning clockwise
     st.quat.setFromEuler(new THREE.Euler(0.02,-Math.PI/2,0,'YXZ'));
     st.throttle=st.power=0.55;st.flapIdx=0;st.gearDown=false;st.gearPos=0;st.onGround=false;st.airTime=30;
+  }
+  else if(mode==='drop'){
+    // run in from 8 km east of the drop zone at 1,000 ft AGL and drop speed
+    const y=305+GEAR,V=140*KT;
+    st.pos.set(DROPZ.x+8000,y,DROPZ.z);
+    st.vel.set(-V,0,0);
+    st.quat.setFromEuler(yaw(270));
+    st.throttle=st.power=0.45;st.flapIdx=1;st.gearDown=false;st.gearPos=0;st.onGround=false;st.airTime=30;st.trim=0.5;
+  }
+  else if(mode==='short'){
+    // 2.5 nm final to the assault strip on runway 27. The 09 approach climbs into the
+    // White Tank foothills from 3.5 km out; 27 is flat desert the whole way and it
+    // faces Glendale, which is where the aeroplane comes from.
+    const aim=LZ.len/2-91,u=aim+4591,V=AC.vapp/0.93,tg=Math.tan(GS);
+    st.pos.set(lzX(u,0),4591*tg+GEAR,lzZ(u,0));
+    st.vel.set(-V,-V*tg,0);
+    st.quat.setFromEuler(new THREE.Euler(AC.finalPitch,-(270*Math.PI/180),0,'YXZ'));
+    st.throttle=st.power=AC.finalThr;st.flapIdx=AC.finalFlap;st.trim=AC.finalTrim;st.onGround=false;st.airTime=10;
   }
   else {st.pos.set(wX(12,0),GEAR,wZ(12,0));st.quat.setFromEuler(yaw(26));}
   return st;
@@ -2234,6 +2285,7 @@ for(let i=-10;i<=10;i++)for(let j=-10;j<=10;j++){
   if(!type&&Math.abs(cx-riverX(cz))<1150) type='river';
   if(!type&&Math.hypot(cx-3480,cz+979)<900) type='stadium';
   if(!type){const L=lukeUV(cx,cz);if(Math.abs(L[0])<2700&&Math.abs(L[1])<1700) type='luke';}
+  if(!type&&Math.abs(cx-DROPZ.x)<1000&&cz>-200&&cz<3200) type='desert';   // C-130 drop zone and assault strip
   if(!type){for(const [a,b] of [[0,0],[-1,-1],[1,-1],[-1,1],[1,1]]) if(mountains(cx+a*800,cz+b*800)>2){type='desert';break;}}
   if(!type){const r=hash(i+50,j+50);
     if(cx<-3500) type=r<0.62?'farm':r<0.78?'sub':'desert';
@@ -2360,6 +2412,65 @@ function updateCars(dt){cars.forEach((c,k)=>{c.s+=c.dir*c.sp*dt;
   for(let k=0;k<28;k++){const cx=APC.x+(hash(k,201)-0.5)*40000,cz=APC.z+(hash(k,202)-0.5)*40000,cy=2900+hash(k,203)*500;
     for(let j=0;j<7;j++){const r=160+hash(k*9+j,5)*200;s.set(r*1.7,r*0.5,r);p.set(cx+(hash(k*9+j,1)-0.5)*600,cy+hash(k*9+j,2)*70,cz+(hash(k*9+j,3)-0.5)*400);m.compose(p,q,s);cl.setMatrixAt(i++,m);}}
   cl.count=i;scene.add(cl);
+})();
+
+// ---------- C-130 mission area: drop zone and assault strip ----------
+(function(){
+  // Drop zone: a bullseye of crushed rock rings with VS-17 panels at the corners,
+  // the way a real airdrop DZ is marked from the air.
+  // 400 m square of texture over a 400 m plane, so one metre is 1.28 px and the
+  // painted rings land on their real radii: bullseye 20 m, then 50, 100 and the
+  // 150 m scoring edge the score is actually measured against.
+  const DZW=400,PPD=(512/2)/(DZW/2);
+  const ring=tex(512,512,(x,w,h)=>{
+    x.clearRect(0,0,w,h);const c=w/2,R=m=>m*PPD;
+    // a wash inside the scoring circle, so the DZ is findable from 1,000 ft
+    x.beginPath();x.arc(c,c,R(150),0,6.283);x.fillStyle='rgba(232,114,31,.34)';x.fill();
+    x.beginPath();x.arc(c,c,R(20),0,6.283);x.fillStyle='#e8721f';x.fill();     // bullseye
+    const band=(m,lw,col)=>{x.beginPath();x.arc(c,c,R(m),0,6.283);x.strokeStyle=col;x.lineWidth=lw;x.stroke();};
+    band(50,7,'#e8e3d6');
+    band(100,7,'#e8e3d6');
+    band(150,13,'#e8721f');                                                    // scoring edge
+    x.strokeStyle='rgba(232,227,214,.7)';x.lineWidth=5;
+    for(let k=0;k<4;k++){const a=k*Math.PI/2+Math.PI/4;x.beginPath();
+      x.moveTo(c+Math.cos(a)*R(22),c+Math.sin(a)*R(22));x.lineTo(c+Math.cos(a)*R(148),c+Math.sin(a)*R(148));x.stroke();}
+  });
+  const dz=new THREE.Mesh(flatQuad,new THREE.MeshLambertMaterial({map:ring,transparent:true,depthWrite:false}));
+  dz.scale.set(DZW,1,DZW);dz.position.set(DROPZ.x,0.22,DROPZ.z);scene.add(dz);
+  // four panels on the corners of the 150 m circle, plus a wind streamer
+  const pan=lam(0xef7d24);
+  for(let k=0;k<4;k++){const a=k*Math.PI/2+Math.PI/4;
+    const m=new THREE.Mesh(new THREE.BoxGeometry(6,0.3,2.4),pan);
+    m.position.set(DROPZ.x+Math.cos(a)*DROPZ.r,0.35,DROPZ.z+Math.sin(a)*DROPZ.r);m.rotation.y=-a;scene.add(m);}
+  const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,9,6),lam(0xd8d4cc));
+  pole.position.set(DROPZ.x+18,4.5,DROPZ.z);scene.add(pole);
+
+  // Assault strip: graded dirt, 3,000 x 90 ft, threshold bars and edge markers.
+  // graded and rolled, so it reads darker and flatter than the desert either side
+  const dirt=tex(128,512,(x,w,h)=>{
+    x.fillStyle='#7d6749';x.fillRect(0,0,w,h);speckle(x,w,h,6000,0.09);
+    x.fillStyle='rgba(60,50,36,.45)';for(let i=0;i<50;i++)x.fillRect(0,Math.random()*h,w,1+Math.random()*2);
+    x.fillStyle='rgba(232,227,214,.9)';x.fillRect(3,0,5,h);x.fillRect(w-8,0,5,h);          // edge lines
+    x.fillStyle='rgba(232,227,214,.85)';for(let y=14;y<h;y+=46)x.fillRect(w/2-3,y,6,24);   // centreline
+  },[1,LZ.len/30]);
+  const strip=new THREE.Mesh(flatQuad,lam(0xffffff,{map:dirt}));
+  strip.scale.set(LZ.wid,1,LZ.len);strip.position.set(LZ.x,0.24,LZ.z);strip.rotation.y=-LZ.h;scene.add(strip);
+  const bar=lam(0xe8e3d6);
+  for(const end of [-1,1]){
+    for(let k=-2;k<=2;k++){
+      const m=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.12,9),bar);
+      const u=end*(LZ.len/2-7),v=k*4.6;
+      m.position.set(lzX(u,v),0.30,lzZ(u,v));m.rotation.y=-LZ.h;scene.add(m);}
+  }
+  const cone=new THREE.ConeGeometry(0.8,2.6,6);
+  const cm=lam(0xef7d24);
+  for(let u=-LZ.len/2;u<=LZ.len/2+1;u+=61)for(const v of [-LZ.wid/2-3,LZ.wid/2+3]){
+    const m=new THREE.Mesh(cone,cm);m.position.set(lzX(u,v),1.3,lzZ(u,v));scene.add(m);}
+  // touchdown aim points 300 ft in from each threshold, where a Herc should plant it
+  for(const end of [-1,1])for(const s of [-1,1]){
+    const m=new THREE.Mesh(new THREE.BoxGeometry(2.2,0.12,14),bar);
+    const u=end*(LZ.len/2-91),v=s*10;
+    m.position.set(lzX(u,v),0.30,lzZ(u,v));m.rotation.y=-LZ.h;scene.add(m);}
 })();
 
 // ---------- aircraft ----------
@@ -3021,6 +3132,143 @@ if(window.visualViewport){
 window.addEventListener('orientationchange',()=>setTimeout(layoutViewport,120));
 layoutViewport();
 
+// ================= C-130 missions: airdrop and short field assault =================
+// Two things a Hercules does that nothing else in the game does: put a pallet on a
+// mark from a thousand feet, and stop on a strip that is barely longer than the
+// airport taxiway. Both score on distance, which is what the crews are judged on.
+const MISS={on:false,kind:'',armed:false,dropped:false,pallet:null,result:null,td:null,stopT:0};
+const missEl=document.getElementById('miss'),missT=document.getElementById('missT'),missS=document.getElementById('missS');
+function missHud(title,sub,warn){
+  if(!title){missEl.classList.remove('on');return;}
+  missT.textContent=title;missS.textContent=sub||'';missEl.classList.toggle('warn',!!warn);missEl.classList.add('on');
+}
+function missReset(){
+  if(MISS.pallet){scene.remove(MISS.pallet.g);MISS.pallet=null;}
+  MISS.on=false;MISS.kind='';MISS.armed=false;MISS.dropped=false;MISS.result=null;MISS.td=null;MISS.stopT=0;
+  missHud(null);
+}
+function missStart(kind){MISS.on=true;MISS.kind=kind;MISS.armed=false;MISS.dropped=false;MISS.result=null;MISS.td=null;MISS.stopT=0;}
+// ---- the pallet: a CDS bundle under a 26 ft ring slot canopy ----
+function makePallet(){
+  const g=new THREE.Group();
+  const box=new THREE.Mesh(new THREE.BoxGeometry(2.2,1.7,2.6),lam(0x6d6a5f));g.add(box);
+  const skid=new THREE.Mesh(new THREE.BoxGeometry(2.4,0.22,2.8),lam(0x4a4741));skid.position.y=-0.95;g.add(skid);
+  const ch=new THREE.Mesh(new THREE.SphereGeometry(4.0,12,8,0,6.283,0,Math.PI/2),
+    new THREE.MeshLambertMaterial({color:0xd8d2c0,side:THREE.DoubleSide}));
+  ch.position.y=7.5;ch.visible=false;g.add(ch);
+  const ln=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,6.6,4),lam(0xbdb8aa));
+  ln.position.y=4.1;ln.visible=false;g.add(ln);
+  scene.add(g);
+  return {g:g,chute:ch,line:ln,pos:new V3(),vel:new V3(),t:0,open:false,down:false};
+}
+function missDrop(){
+  if(!MISS.on||MISS.kind!=='drop'||MISS.dropped)return;
+  if(!MISS.armed){toast('Not in the drop window. 500 to 1,500 ft, under 160 kt, ramp level.');return;}
+  const p=makePallet();
+  // it leaves the ramp, so start it a little aft and below the aeroplane
+  const back=new V3(0,-1.2,6).applyQuaternion(st.quat);
+  p.pos.copy(st.pos).add(back);p.vel.copy(st.vel);
+  p.g.position.copy(p.pos);
+  MISS.pallet=p;MISS.dropped=true;
+  toast('Load away');
+  radioQ.unshift(L(AC.cs,'heavy',AC.cs+', load away, one bundle.',AC.say+', load away, one bundle.'));
+}
+const _pw=new V3();
+function missUpdate(dt){
+  if(!MISS.on||!running||paused)return;
+  const p=MISS.pallet;
+  if(MISS.kind==='drop'){
+    if(!MISS.dropped){
+      const ft=st.agl*M2FT,kt=st.ias*MS2KT;
+      const inAlt=ft>500&&ft<1500,inSpd=kt<160,lvl=Math.abs(st.gload-1)<0.35;
+      MISS.armed=inAlt&&inSpd&&lvl&&!st.onGround;
+      const d=Math.hypot(st.pos.x-DROPZ.x,st.pos.z-DROPZ.z);
+      const why=!inAlt?(ft<=500?'Too low, climb to 500 ft':'Too high, come down below 1,500 ft')
+              :!inSpd?'Too fast, slow below 160 kt':!lvl?'Wings level and steady':'Drop window open';
+      missHud('AIRDROP  '+(d/1852).toFixed(1)+' nm to the DZ',
+              MISS.armed?'DROP is live. Put the bundle on the orange bullseye.':why,!MISS.armed);
+    }
+    if(p&&!p.down){
+      p.t+=dt;
+      if(!p.open&&p.t>0.7){p.open=true;p.chute.visible=true;p.line.visible=true;}
+      if(!p.open){p.vel.y-=9.81*dt;}
+      else{
+        // under canopy: about 6 m/s down, and it weathervanes into the wind
+        p.vel.y+=( -6.0-p.vel.y)*Math.min(1,dt*2.2);
+        const wd=st.windDir*Math.PI/180,ws=Math.max(0,st.windKt*0.5144*(1+st.gust));
+        _pw.set(-Math.sin(wd)*ws,0,Math.cos(wd)*ws);
+        p.vel.x+=(_pw.x-p.vel.x)*Math.min(1,dt*0.9);
+        p.vel.z+=(_pw.z-p.vel.z)*Math.min(1,dt*0.9);
+      }
+      p.pos.addScaledVector(p.vel,dt);
+      const gh=groundHeight(p.pos.x,p.pos.z);
+      if(p.pos.y<=gh+0.95){
+        p.pos.y=gh+0.95;p.down=true;p.chute.visible=false;p.line.visible=false;
+        const d=Math.hypot(p.pos.x-DROPZ.x,p.pos.z-DROPZ.z);
+        MISS.result={kind:'drop',dist:d};
+        missScore(MISS.result);
+      }
+      p.g.position.copy(p.pos);
+      if(p.open)p.g.rotation.y+=dt*0.4;
+    }
+    if(p&&p.down&&!MISS.result)missHud(null);
+  }
+  else if(MISS.kind==='short'){
+    const Z=lzUV(st.pos.x,st.pos.z);
+    if(!MISS.td){
+      const east=(st.vel.x*LZs-st.vel.z*LZc)>0;
+      const nm=Math.max(0,(east?-Z[0]:Z[0])-LZ.len/2)/1852;
+      missHud('ASSAULT LANDING  runway '+(east?'09':'27')+(nm>0.05?'  '+nm.toFixed(1)+' nm out':'  over the threshold'),
+              'Touch down in the first 500 ft and stop in 2,000 ft.',false);
+    }else{
+      const roll=Math.hypot(st.pos.x-MISS.td.x,st.pos.z-MISS.td.z);
+      const spd=Math.hypot(st.vel.x,st.vel.z);
+      missHud('ROLLOUT  '+Math.round(roll*M2FT)+' ft','Brakes. '+Math.round(spd*MS2KT)+' kt',roll*M2FT>2000);
+      if(spd<0.6){MISS.stopT+=dt;
+        if(MISS.stopT>0.6&&!MISS.result){
+          MISS.result={kind:'short',tdFt:MISS.td.ft,stopFt:Math.round(roll*M2FT)};
+          missScore(MISS.result);}
+      } else MISS.stopT=0;
+    }
+  }
+}
+function missTouchdown(e){
+  if(!MISS.on||MISS.kind!=='short'||MISS.td)return;
+  const Z=lzUV(e.x,e.z);
+  if(Math.abs(Z[1])>LZ.wid/2+6)return;                 // not on the strip
+  // the strip is landable in both directions, so measure from the threshold behind
+  const east=(st.vel.x*LZs-st.vel.z*LZc)>0;            // rolling toward +u, so this is 09
+  const fromThr=(east?Z[0]+LZ.len/2:LZ.len/2-Z[0])*M2FT;
+  MISS.td={x:e.x,z:e.z,ft:Math.round(fromThr),fpm:e.fpm,rwy:east?'09':'27'};
+}
+
+// ---- result card ----
+const missOv=document.getElementById('missOv');
+function missScore(r){
+  let letter,title,lines=[];
+  if(r.kind==='drop'){
+    const m=r.dist;
+    letter=m<25?'A':m<50?'B':m<100?'C':m<150?'D':'F';
+    title=m<25?'Bullseye':m<50?'Good bundle':m<100?'On the DZ':m<150?'Inside the circle':'Off the drop zone';
+    lines=[['Distance from centre',Math.round(m)+' m  ('+Math.round(m*M2FT)+' ft)'],
+           ['Scoring circle',DROPZ.r+' m'],
+           ['Wind at drop',windTxt()]];
+  }else{
+    const t=r.tdFt,sd=r.stopFt;
+    const tdOK=t>=0&&t<=500,stOK=sd<=2000;
+    letter=tdOK&&sd<=1500?'A':tdOK&&stOK?'B':stOK?'C':sd<=2600?'D':'F';
+    title=tdOK&&stOK?'Assault landing':stOK?'Long in the touchdown zone':'Too much runway used';
+    lines=[['Touchdown past the '+(MISS.td?MISS.td.rwy:'')+' threshold',t+' ft'+(tdOK?'':'  (target under 500)')],
+           ['Stopping distance',sd+' ft'+(stOK?'':'  (target under 2,000)')],
+           ['Strip length','3,000 ft']];
+  }
+  const le=document.getElementById('mLetter');le.textContent=letter;le.className='gLetter g'+letter;
+  document.getElementById('mTitle').textContent=title;
+  document.getElementById('mLines').innerHTML=lines.map(l=>'<div class="gl"><span>'+l[0]+'</span><b>'+l[1]+'</b></div>').join('');
+  missHud(null);missOv.classList.add('on');paused=true;
+  if(window.logMission)logMission(r,letter);
+}
+
 // ---------- touch controls ----------
 (function(){
   const stick=document.getElementById('stick'),knob=document.getElementById('knob'),
@@ -3114,6 +3362,7 @@ layoutViewport();
     btn.addEventListener('pointerdown',e=>{e.preventDefault();const a=btn.dataset.a;
       if(a==='brake'){touchIn.brake=true;btn.classList.add('held');}
       else if(a==='fire'||a==='track'){strikeBtnPress(a);}
+      else if(a==='drop'){missDrop();}
       else doAction(a,btn,true);});
     const rel=()=>{if(btn.dataset.a==='brake'){touchIn.brake=false;btn.classList.remove('held');}};
     btn.addEventListener('pointerup',rel);btn.addEventListener('pointerleave',rel);btn.addEventListener('pointercancel',rel);
@@ -3128,6 +3377,7 @@ layoutViewport();
     let a,b=null;
     const bz=document.getElementById('bZoom');if(bz)bz.hidden=!sensorMode;
     if(sensorMode){a=['fire','Fire'];b=['track','Track'];}
+    else if(MISS.on&&MISS.kind==='drop'&&!MISS.dropped){a=['drop','DROP'];b=['view','View'];}
     else{a=['view','View'];}
     const key=(a?a[0]:'')+'|'+(b?b[0]:'');
     if(key===ctxKey)return;ctxKey=key;
@@ -3264,12 +3514,19 @@ function start(mode){
   menu.classList.remove('on');crashEl.classList.remove('on');resumeBtn.style.display='';document.getElementById('bPause').textContent='Pause';snapCamera=true;
   if((mode==='ramp'&&camMode>2)||(camMode===2&&AC.id!=='reaper'))camMode=0;
   STRIKE.active=false;lesEnd();gradeOv.classList.remove('on');
+  missReset();missOv.classList.remove('on');
   if(mode==='range')strikeStart();
+  if(mode==='drop'||mode==='short')missStart(mode==='drop'?'drop':'short');
 }
 function openMenu(){if(running&&!st.crashed){paused=true;document.getElementById('bPause').textContent='Resume';}menu.classList.add('on');tiltDiag();}
 function togglePause(){paused=!paused;document.getElementById('bPause').textContent=paused?'Resume':'Pause';}
 document.getElementById('bRunway').onclick=()=>start('runway');document.getElementById('bRamp').onclick=()=>start('ramp');document.getElementById('bFinal').onclick=()=>start('final');
 document.getElementById('bStrike').onclick=()=>{pickType('reaper');start('range');};
+document.getElementById('bDrop').onclick=()=>{pickType('c130');start('drop');};
+document.getElementById('bShort').onclick=()=>{pickType('c130');start('short');};
+document.getElementById('mRetry').onclick=()=>{missOv.classList.remove('on');start(MISS.kind==='drop'?'drop':'short');};
+document.getElementById('mOther').onclick=()=>{missOv.classList.remove('on');start(MISS.kind==='drop'?'short':'drop');};
+document.getElementById('mFree').onclick=()=>{missOv.classList.remove('on');missReset();start('runway');};
 document.getElementById('cRunway').onclick=()=>start('runway');document.getElementById('cRamp').onclick=()=>start('ramp');document.getElementById('cFinal').onclick=()=>start('final');
 resumeBtn.onclick=()=>{if(st.type!==acType){start('runway');return;}menu.classList.remove('on');paused=false;document.getElementById('bPause').textContent='Pause';initAudio();};
 document.getElementById('bView').onclick=cycleCam;
@@ -3943,6 +4200,7 @@ function frame(t){
   }
   while(events.length){const ev=events.shift();if(LES.on)lessonEvent(ev);
     if(ev.type==='touchdown'){const f=ev.fpm,g=f<120?'Butter':f<300?'Smooth':f<500?'Firm':'Hard';toast(`Touchdown ${f} fpm. ${g}.`);
+      missTouchdown(ev);
       camBump=clamp(f/620,0.12,1);
       if(ev.paved&&(best===null||f<best)){best=f;try{localStorage.setItem(bestKey(),String(f));}catch(e){}showBest();}
       atcTouchdown(ev);clusters.forEach(c=>{if(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)<1800){c.cheer=4.5;}});}
@@ -3954,6 +4212,7 @@ function frame(t){
   tilt.rateT+=dt;if(tilt.rateT>=1){tilt.rate=tilt.rateN;tilt.rateN=0;tilt.rateT=0;
     if(tilt.on&&tilt.rate===0&&!tilt.blocked&&performance.now()-tilt.onAt>1500)tiltBlockedMsg();
     if(menu.classList.contains('on'))tiltDiag();}
+  missUpdate(dt);
   radioUpdate(dt);cfgUpdate(dt);
   const s=st,q=s.quat;
   // crowd flyby cheers and sound level
@@ -4029,6 +4288,9 @@ function frame(t){
 // test hook: headless UI checks need to reach a few internals
 window.__kgeu={tilt:tilt,setTilt:setTilt,state:()=>st,toast:toast,start:start,
   pick:pickType,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  MISS:MISS,DROPZ:DROPZ,LZ:LZ,lzUV:lzUV,lzX:lzX,lzZ:lzZ,missDrop:missDrop,missTouchdown:missTouchdown,
+  // step the mission clock without waiting on rAF: the pallet takes 50 s to come down
+  missTick:(n,dt)=>{for(let i=0;i<n;i++)missUpdate(dt);},
   STRIKE:STRIKE,SENSOR:SENSOR,RANGE:RANGE,groundHeight:groundHeight,secAt:secAt,
   isPaved:isPaved,riverX:riverX,FWY_X:FWY_X,I10_Z:I10_Z,APC:APC,LUKE:LUKE,
   smokeCount:()=>smoke.filter(p=>p.life>0).length,smokeMax:SMOKE_MAX,
