@@ -18,15 +18,18 @@ def chk(n, c, d=''):
     print(('  ok   ' if c else '  FAIL ') + n + (('  ' + d) if d else ''))
     if not c: fails.append(n)
 
-async def fps(pg, seconds=3.0, warm=2.0):
+async def fps(pg, seconds=8.0, warm=2.5):
     """Measure rAF frame rate. Headless Chromium rasterises in software, so the
     absolute number is far below a real phone; only the ratio to the stored
     baseline on this same harness is meaningful. Warm up first: the first window
     after a spawn includes shader compile and the terrain rebuild."""
     await pg.wait_for_timeout(int(warm * 1000))
-    await pg.evaluate("""()=>{window.__f=0;const t=n=>{window.__f++;requestAnimationFrame(t);};requestAnimationFrame(t);}""")
-    await pg.wait_for_timeout(int(seconds * 1000))
-    n = await pg.evaluate("()=>window.__f")
+    # Stop any chain from a previous call before starting this one, or every
+    # measurement counts the frames of all the measurements before it too.
+    await pg.evaluate("""()=>{window.__stop=1;window.__f=0;
+      setTimeout(()=>{window.__stop=0;const t=()=>{if(window.__stop)return;window.__f++;requestAnimationFrame(t);};requestAnimationFrame(t);},60);}""")
+    await pg.wait_for_timeout(int(seconds * 1000) + 60)
+    n = await pg.evaluate("()=>{window.__stop=1;return window.__f;}")
     return n / seconds
 
 async def main():
@@ -52,6 +55,14 @@ async def main():
         await pg.wait_for_timeout(2500)
         chk('page loads with no console errors', not errs, ' | '.join(errs[:3]))
         chk('menu is up', await pg.is_visible('#menu'))
+
+        # Warm up once before measuring anything. Terrain build, shader compile and
+        # texture upload all land on the first few seconds of the first flight, and
+        # without this the frame rate simply tracks position in the list.
+        await pg.evaluate("()=>window.__kgeu.start('runway')")
+        await pg.wait_for_timeout(9000)
+        await pg.evaluate("()=>window.__kgeu.openMenu&&window.__kgeu.openMenu()")
+        await pg.wait_for_timeout(400)
 
         results = {}
         for t in TYPES:

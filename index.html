@@ -287,6 +287,7 @@ body.touch #tiltDiag{ display:block; }
     <button class="pick" data-t="f16"><b>F-16</b><span>Viper</span></button>
     <button class="pick" data-t="reaper"><b>MQ-9</b><span>Reaper</span></button>
     <button class="pick" data-t="cessna"><b>C172</b><span>N8401L</span></button>
+    <button class="pick" data-t="c130"><b>C-130</b><span>Hercules</span></button>
     <button class="pick" data-t="alpha"><b>Alpha</b><span>Pipistrel</span></button>
   </div>
 <div class="row opts">
@@ -435,6 +436,13 @@ const TYPES={
     cs:'Pipistrel 502AT',csS:'Pipistrel 2AT',say:'Pipistrel five zero two alpha tango',sayS:'Pipistrel two alpha tango',
     sub:'Pipistrel Alpha Trainer at Glendale KGEU. High wing, T-tail, 80 hp Rotax, 1,212 lb and glider smooth. Runway 1 is 7,150 ft, field elevation 1,071. Wind changes every flight.',
     tips:'Manual: flaps +15, full power, rotate at 47 kt, climb at 76 kt. Approach at 70 kt, then 55 kt with flaps +25 on final. It floats, so plan a long flat approach.'},
+  c130:{id:'c130',name:'C-130H Hercules',title:'HERKY 71',mass:50000,S:162.1,Tstatic:185000,Pmax:13700000,eta:0.80,CL0:0.40,CLa:5.2,aStall:0.26,CD0:0.030,k:0.042,span:40.4,len:29.8,
+    spool:1.6,pf:1,retract:1,wave:0,tipRoll:0.25,tipMsg:'Wingtip strike. That 132 ft wing is a long way from the centreline, fly it level onto the runway.',gndPitch:0.05,trimBase:0.03,trimK:0.1,
+    flaps:[{deg:0,cl:0,cd:0},{deg:50,cl:0.50,cd:0.030},{deg:100,cl:0.95,cd:0.090}],toFlap:1,landFlap:2,finalFlap:2,finalThr:0.35,finalPitch:0.03,finalTrim:0.55,vr:115*KT,vy:175*KT,vcruise:250*KT,vapp:130*KT,patAlt:305,climbVS:9,descMax:6,
+    maxBank:0.35,ipD:6500,fafD:3500,slowD:2500,decel:0.45,ezG:0.2,ezGR:0.10,ezBank:0.5,thrC:0.7,flareH:6,flareK:0.25,tdSink:0.8,tdPitch:0.02,rotP:0.07,rotRate:0.04,apRate:[0.18,0.22,0.35],vne:320,vfe:145,snd:'turboprop4',cam1:[0,1.30,-11.2],cam1Name:'Flight deck',chase:[11,58],
+    cs:'Herky 71',csS:'Herky 71',say:'Herky seven one',sayS:'Herky seven one',
+    sub:'C-130H Hercules at Glendale, KGEU. 155,000 lb, 132 ft wing, four Allison T56 turboprops. It is heavy and slow and it does not hurry, but it will get into a field the others cannot. Runway 1 is 7,150 ft, field elevation 1,071.',
+    tips:'Manual: flaps 50, all four up, rotate at 115 kt, gear up. Plan everything early, it takes a long time to slow down. Land at 130 kt with flaps 100. Firm is correct on a Herc.'},
   f16:{id:'f16',name:'F-16C Viper',title:'VIPER 1',mass:11000,S:27.87,Tstatic:95000,Pmax:1e9,eta:1,CL0:0.05,CLa:3.5,aStall:0.42,CD0:0.022,k:0.12,span:9.96,len:15,
     spool:2.2,pf:0,retract:1,wave:0.06,tipRoll:0.35,tipMsg:'Wingtip strike. Level the wings before touchdown.',gndPitch:0.2,trimBase:0.08,trimK:0.18,
     flaps:[{deg:0,cl:0,cd:0},{deg:20,cl:0.1,cd:0.02}],toFlap:1,landFlap:1,finalFlap:1,finalThr:0.18,finalPitch:0.19,finalTrim:0.9,vr:145*KT,vy:300*KT,vcruise:300*KT,vapp:155*KT,patAlt:457,climbVS:22,descMax:12,
@@ -2533,11 +2541,92 @@ function buildAlpha(){
   add(new THREE.BoxGeometry(0.05,0.5,0.05),dark,0,0.42,-2.2);
   scene.add(w);return {g:w,prop:prop,disc:disc};
 }
+// ---------- C-130H Hercules ----------
+// Built to published dimensions: 29.8 m long, 40.4 m span, 11.7 m tall, 4.11 m props.
+// Boxes and low segment cylinders, in the same spirit as the other non-HD airframes,
+// so four engines and six main wheels still cost almost nothing on a phone.
+function buildC130(){
+  const g=new THREE.Group();
+  const grey=lam(0x8d949b),dgrey=lam(0x666d74),dark=lam(0x2b3036),glass=lam(0x1e3a4d),tire=lam(0x141414),blade=lam(0x1a1a1a),warn=lam(0xb8342a);
+  const add=(geo,mat,x,y,z,par)=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);(par||g).add(m);return m;};
+  // ---- fuselage: constant section cargo box, Roman nose, upswept tail ----
+  add(new THREE.BoxGeometry(4.3,4.1,20),grey,0,0,-1);
+  // nose: two tapering steps down to the radome
+  const n1=add(new THREE.BoxGeometry(4.0,3.7,3.2),grey,0,-0.1,-12.4);
+  const nc=new THREE.CylinderGeometry(1.05,1.75,2.4,12);nc.rotateX(-Math.PI/2);
+  add(nc,dgrey,0,-0.45,-15.0);
+  n1.scale.set(1,1,1);
+  // flight deck glass: wrap around windscreen plus the eyebrow windows
+  add(new THREE.BoxGeometry(3.5,1.05,2.4),glass,0,1.05,-11.9);
+  add(new THREE.BoxGeometry(4.05,0.7,1.5),glass,0,1.55,-10.6);
+  add(new THREE.BoxGeometry(4.34,0.5,3.0),dark,0,1.95,-11.6);       // anti glare panel
+  // upswept rear fuselage and the cargo ramp
+  const tb=add(new THREE.BoxGeometry(4.3,3.4,7.5),grey,0,1.15,12.6);tb.rotation.x=-0.20;
+  const rp=add(new THREE.BoxGeometry(3.4,0.35,5.6),dgrey,0,-0.55,11.4);rp.rotation.x=-0.34;
+  // ---- high wing, straight with a tapered outer panel ----
+  const wing=new THREE.Group();wing.position.set(0,2.35,-0.8);g.add(wing);
+  add(new THREE.BoxGeometry(21.0,0.62,4.6),grey,0,0,0,wing);          // centre section
+  for(const sx of [1,-1]){
+    const o=add(new THREE.BoxGeometry(9.8,0.52,3.9),grey,sx*15.4,0.03,0.3,wing);o.rotation.z=-sx*0.018;
+    const t=add(new THREE.BoxGeometry(0.5,0.3,2.6),grey,sx*20.2,0.06,0.5,wing);t.rotation.z=-sx*0.018;
+  }
+  add(new THREE.BoxGeometry(40.4,0.14,0.9),dgrey,0,-0.22,2.0,wing);   // flap track fairings line
+  // ---- four T56 nacelles and propellers ----
+  const props=[],discs=[];
+  for(const x of [-9.9,-4.9,4.9,9.9]){
+    const nac=new THREE.Group();nac.position.set(x,2.15,-2.2);g.add(nac);
+    const body=new THREE.CylinderGeometry(0.88,0.78,6.4,10);body.rotateX(Math.PI/2);
+    add(body,grey,0,0,0,nac);
+    const spin=new THREE.CylinderGeometry(0.42,0.86,1.5,10);spin.rotateX(-Math.PI/2);
+    add(spin,dgrey,0,0,-3.6,nac);
+    add(new THREE.BoxGeometry(1.5,0.5,2.2),dgrey,0,-0.75,1.6,nac);    // oil cooler scoop under
+    const ex=new THREE.CylinderGeometry(0.2,0.24,1.1,8);ex.rotateX(Math.PI/2);
+    add(ex,dark,0.5,0.35,3.3,nac);
+    // four bladed constant speed prop, 4.11 m diameter
+    const pr=new THREE.Group();pr.position.set(0,0,-4.5);nac.add(pr);
+    for(let i=0;i<4;i++){
+      const b=new THREE.Mesh(new THREE.BoxGeometry(0.30,2.06,0.10),blade);
+      b.position.set(0,1.03,0);b.rotation.z=i*Math.PI/2;
+      b.position.set(Math.sin(i*Math.PI/2)*1.03,Math.cos(i*Math.PI/2)*1.03,0);
+      pr.add(b);
+      const tip=new THREE.Mesh(new THREE.BoxGeometry(0.31,0.26,0.11),warn);
+      tip.position.set(Math.sin(i*Math.PI/2)*1.93,Math.cos(i*Math.PI/2)*1.93,0.01);pr.add(tip);
+    }
+    add(new THREE.SphereGeometry(0.34,10,7),dgrey,0,0,-0.1,pr);
+    const d=add(new THREE.CircleGeometry(2.05,22),new THREE.MeshBasicMaterial({color:0x1f1f1f,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}),0,0,-4.6,nac);
+    props.push(pr);discs.push(d);
+  }
+  // ---- tail: tall fin with a dorsal fillet, conventional stabiliser ----
+  add(new THREE.BoxGeometry(0.42,6.6,4.6),grey,0,5.2,13.4);
+  add(new THREE.BoxGeometry(0.40,0.9,3.0),dgrey,0,8.2,13.9);          // fin cap
+  const fil=add(new THREE.BoxGeometry(0.34,1.7,6.0),grey,0,2.9,9.6);fil.rotation.x=0.30;
+  add(new THREE.BoxGeometry(16.0,0.34,3.1),grey,0,2.35,14.6);
+  add(new THREE.BoxGeometry(16.0,0.16,0.8),dgrey,0,2.35,15.9);        // elevator line
+  // ---- gear: nose wheel, and six main wheels in tandem inside the sponsons ----
+  const gear=new THREE.Group();g.add(gear);
+  for(const sx of [1,-1]) add(new THREE.BoxGeometry(1.5,2.0,7.4),grey,sx*2.55,-1.15,0.6);  // sponsons stay down
+  const wh=new THREE.CylinderGeometry(0.58,0.58,0.36,12);wh.rotateZ(Math.PI/2);
+  for(const sx of [1,-1])for(const z of [-0.6,1.9]){
+    add(wh,tire,sx*2.5,-2.35,z,gear);
+    add(new THREE.BoxGeometry(0.28,1.3,0.28),dark,sx*2.5,-1.75,z,gear);
+  }
+  const nw=new THREE.CylinderGeometry(0.42,0.42,0.28,12);nw.rotateZ(Math.PI/2);
+  for(const sx of [0.42,-0.42]) add(nw,tire,sx,-2.5,-9.6,gear);
+  add(new THREE.BoxGeometry(0.3,1.5,0.3),dark,0,-1.85,-9.6,gear);
+  // ---- markings ----
+  const mk=new THREE.MeshBasicMaterial({map:tex(512,128,(x,w,h)=>{x.clearRect(0,0,w,h);x.fillStyle='#e8eaec';x.font='800 60px '+F;x.textAlign='center';x.textBaseline='middle';x.fillText('U.S. AIR FORCE',w/2,h/2);}),transparent:true,depthWrite:false});
+  for(const sx of [1,-1]){const m=new THREE.Mesh(new THREE.PlaneGeometry(7.6,1.9),mk);m.rotation.y=sx*Math.PI/2;m.position.set(sx*2.16,1.15,-6.2);g.add(m);}
+  const tn=new THREE.MeshBasicMaterial({map:tex(256,128,(x,w,h)=>{x.clearRect(0,0,w,h);x.fillStyle='#e8eaec';x.font='800 78px '+F;x.textAlign='center';x.textBaseline='middle';x.fillText('AZ',w/2,h/2);}),transparent:true,depthWrite:false});
+  for(const sx of [1,-1]){const m=new THREE.Mesh(new THREE.PlaneGeometry(2.0,1.6),tn);m.rotation.y=sx*Math.PI/2;m.position.set(sx*0.23,7.0,13.6);g.add(m);}
+  scene.add(g);
+  return {g:g,props:props,discs:discs,gear:gear};
+}
 function getModel(id){
   if(MODELS[id])return MODELS[id];let m;
   if(id==='f16')m=hdModel('f16')||buildF16();
   else if(id==='cessna'){const c=buildPlane({reg:'N8401L',stripe:0x1d3557,accent:0xd4a017,full:true}),w=new THREE.Group();scene.remove(c.g);c.g.position.y=-0.15;w.add(c.g);scene.add(w);m={g:w,prop:c.prop,disc:c.disc};}
   else if(id==='alpha')m=buildAlpha();
+  else if(id==='c130')m=buildC130();
   else m=hdModel('reaper')||buildReaper();
   m.g.visible=false;return MODELS[id]=m;
 }
@@ -3049,13 +3138,16 @@ layoutViewport();
 })();
 
 // ---------- audio ----------
-let actx=null,eng,engF,engG,noiseG,noiseF,hornG,cheerG,whine,whineG;
+let actx=null,eng,eng2,eng2G,engF,engG,noiseG,noiseF,hornG,cheerG,whine,whineG;
 function toggleGear(){if(!running||st.crashed)return;if(!AC.retract){toast('Fixed gear on the '+(AC.id==='alpha'?'Alpha':'172'));return;}if(st.onGround){toast('Gear stays down on the ground');return;}st.gearDown=!st.gearDown;toast(st.gearDown?'Gear down':'Gear up');}
 function initAudio(){
   if(actx){actx.resume&&actx.resume();return;}
   try{
     actx=new (window.AudioContext||window.webkitAudioContext)();
     eng=actx.createOscillator();eng.type='sawtooth';engF=actx.createBiquadFilter();engF.type='lowpass';engF.frequency.value=380;engG=actx.createGain();engG.gain.value=0;eng.connect(engF).connect(engG).connect(actx.destination);eng.start();
+    // second, slightly detuned tone. Four unsynchronised T56s beat against each other
+    // at a couple of hertz, and that throb is most of what a Hercules sounds like.
+    eng2=actx.createOscillator();eng2.type='sawtooth';eng2G=actx.createGain();eng2G.gain.value=0;eng2.connect(eng2G).connect(engF);eng2.start();
     const buf=actx.createBuffer(1,actx.sampleRate*2,actx.sampleRate),d=buf.getChannelData(0);let l=0;for(let i=0;i<d.length;i++){l=(l+0.02*(Math.random()*2-1))/1.02;d[i]=l*3.5;}
     const ns=actx.createBufferSource();ns.buffer=buf;ns.loop=true;noiseF=actx.createBiquadFilter();noiseF.type='lowpass';noiseF.frequency.value=900;noiseG=actx.createGain();noiseG.gain.value=0;ns.connect(noiseF).connect(noiseG).connect(actx.destination);ns.start();
     const wb=actx.createBuffer(1,actx.sampleRate*2,actx.sampleRate),wd=wb.getChannelData(0);for(let i=0;i<wd.length;i++)wd[i]=Math.random()*2-1;
@@ -3072,12 +3164,21 @@ let cheerLevel=0;
 function updateAudio(){
   if(!actx)return;const t=actx.currentTime,on=running&&!paused&&!muted,V=st.ias,alive=on&&!st.crashed;
   const p=st.power,S=AC.snd;let ef,eg,wf,wg,ng=Math.min(0.25,V*V/10000),nq=900,lp=camMode===1||camMode===2?360:300;
+  let e2f=0,e2g=0;
   if(S==='piston'){ef=36+p*40;eg=0.05+p*0.08;wf=2000;wg=0;lp=520;}
   else if(S==='jet'){ef=58+p*30;eg=0.01+p*0.02;wf=1400+p*2600;wg=0.004+p*0.014;ng=Math.max(ng,0.03+p*0.22);nq=650+p*1000;}
+  else if(S==='turboprop4'){
+    // T56s are constant speed: 1,020 prop rpm, four blades, so blade pass sits at
+    // 68 Hz whatever the power lever does. Power moves loudness and turbine whine,
+    // not pitch, which is why a Herc sounds the same on the ramp and on the go.
+    ef=66+p*3;eg=0.045+p*0.075;e2f=ef*1.022;e2g=eg*0.8;lp=430;
+    wf=2100+p*700;wg=0.003+p*0.006;ng=Math.max(ng,0.02+p*0.10);nq=700;}
   else{ef=88+p*14;eg=0.03+p*0.055;wf=2300+p*900;wg=0.004+p*0.008;}
   eng.frequency.setTargetAtTime(ef,t,0.2);engF.frequency.setTargetAtTime(lp,t,0.2);
   const far=camMode>=3?clamp(1-camera.position.distanceTo(st.pos)/1500,0,1):1;
   engG.gain.setTargetAtTime(alive?eg*far:0,t,0.15);
+  if(e2g>0)eng2.frequency.setTargetAtTime(e2f,t,0.2);
+  eng2G.gain.setTargetAtTime(alive?e2g*far:0,t,0.15);
   whine.frequency.setTargetAtTime(wf,t,0.4);whineG.gain.setTargetAtTime(alive?wg*far:0,t,0.3);
   noiseF.frequency.setTargetAtTime(nq,t,0.3);noiseG.gain.setTargetAtTime(alive?ng*far:0,t,0.2);
   hornG.gain.setTargetAtTime(alive&&(st.aoaWarn||gearWarn)&&camMode<3?0.03:0,t,0.03);
@@ -3869,7 +3970,8 @@ function frame(t){
   smokeUpdate(dt);debrisUpdate(dt);blastUpdate(dt);
   plane.g.position.copy(s.pos);plane.g.quaternion.copy(q);
   const on=running&&!s.crashed;
-  if(plane.prop){plane.prop.rotation.z+=(on?199:0)*dt;plane.disc.material.opacity=on?0.3:0;plane.prop.visible=!on;}
+  if(plane.props){const o=on?0.3:0;for(let i=0;i<plane.props.length;i++){plane.props[i].rotation.z+=(on?107:0)*dt;plane.props[i].visible=!on;plane.discs[i].material.opacity=o;}}
+  else if(plane.prop){plane.prop.rotation.z+=(on?199:0)*dt;plane.disc.material.opacity=on?0.3:0;plane.prop.visible=!on;}
   if(plane.canopy)plane.canopy.visible=camMode!==1;
   if(plane.gear){plane.gear.scale.y=Math.max(0.02,s.gearPos);plane.gear.visible=s.gearPos>0.03;}
   if(plane.ab){const a=on&&s.power>0.82;plane.ab.visible=a;if(a)plane.ab.scale.set(1,1,1.5+(s.power-0.82)*14+Math.random()*0.6);}
@@ -3926,7 +4028,7 @@ function frame(t){
 }
 // test hook: headless UI checks need to reach a few internals
 window.__kgeu={tilt:tilt,setTilt:setTilt,state:()=>st,toast:toast,start:start,
-  pick:pickType,openMenu:openMenu,TYPES:TYPES,
+  pick:pickType,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   STRIKE:STRIKE,SENSOR:SENSOR,RANGE:RANGE,groundHeight:groundHeight,secAt:secAt,
   isPaved:isPaved,riverX:riverX,FWY_X:FWY_X,I10_Z:I10_Z,APC:APC,LUKE:LUKE,
   smokeCount:()=>smoke.filter(p=>p.life>0).length,smokeMax:SMOKE_MAX,
