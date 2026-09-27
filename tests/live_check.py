@@ -50,6 +50,22 @@ async def main():
     chk('viewport-fit=cover for the notch','viewport-fit=cover' in (tags['vp'] or ''),str(tags['vp']))
     r=await pg.evaluate("async(u)=>{const r=await fetch(u);return r.status;}",tags['icon'])
     chk('apple-touch-icon resolves',r==200,str(r))
+    # share card and install tip: these went missing once already because
+    # nothing here checked for them
+    og=await pg.evaluate("""()=>({img:(document.querySelector('meta[property="og:image"]')||{}).content,
+      title:(document.querySelector('meta[property="og:title"]')||{}).content,
+      card:(document.querySelector('meta[name="twitter:card"]')||{}).content})""")
+    chk('og:image is present',bool(og['img']),str(og['img']))
+    chk('og:title is present',og['title']=='KGEU Flight',str(og['title']))
+    chk('twitter card is the large image kind',og['card']=='summary_large_image',str(og['card']))
+    if og['img']:
+        r=await pg.evaluate("async(u)=>{const r=await fetch(u);return r.status;}",og['img'])
+        chk('share card image resolves',r==200,str(r))
+    chk('Add to Home Screen tip is in the page',
+        await pg.evaluate("()=>!!document.getElementById('a2hs')"))
+    chk('HD airframes are in the build',
+        await pg.evaluate("()=>/makeHD/.test(document.documentElement.innerHTML)"))
+
     # no service worker registered, so updates are instant
     sw=await pg.evaluate("async()=>{if(!navigator.serviceWorker)return 0;const rs=await navigator.serviceWorker.getRegistrations();return rs.length;}")
     chk('no service worker registered',sw==0,str(sw)+' registrations')
