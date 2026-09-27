@@ -180,6 +180,32 @@ body.touch #coach button{ min-height:var(--tap); min-width:var(--tap); padding:6
 .gLetter.gA,.gLetter.gB{ color:#4cd97b; } .gLetter.gC{ color:var(--caution); } .gLetter.gD,.gLetter.gF{ color:var(--warn); }
 #gLines{ margin:0 0 16px; font-size:16px; line-height:1.55; }
 #gLines .ok::before{ content:'\2713  '; color:#4cd97b; font-weight:800; } #gLines .no::before{ content:'\2717  '; color:var(--warn); font-weight:800; }
+#banner{ position:fixed; left:50%; top:calc(env(safe-area-inset-top,0px) + 6px); transform:translateX(-50%) scale(.92); opacity:0;
+  display:flex; flex-direction:column; align-items:center; gap:2px; z-index:9; pointer-events:none;
+  padding:10px 26px; border-radius:14px; background:rgba(12,16,22,.86); border:2px solid var(--caution);
+  transition:opacity .18s ease, transform .18s ease; }
+#banner.on{ opacity:1; transform:translateX(-50%) scale(1); }
+#banner b{ font-size:15px; letter-spacing:.18em; color:var(--caution); }
+#banner span{ font-size:20px; font-weight:800; }
+body.touch #banner{ padding:5px 16px; } body.touch #banner b{ font-size:10px; } body.touch #banner span{ font-size:14px; }
+/* Records sits on top of the menu, so it needs its own opaque ground and a
+   solid sheet, or the menu behind it reads straight through the text. */
+#recOv{ background:rgba(6,9,14,.94); }
+#recOv .sheet{ background:#141a22; }
+#recOv .reg{ font-size:clamp(26px,4.4vw,38px); margin:0 0 2px; text-shadow:none; letter-spacing:.01em; }
+#recOv .gl{ padding:3px 0; }
+body.touch #recOv .reg{ font-size:22px; }
+body.touch #recOv .gl{ padding:2px 0; }
+#recBody{ max-height:52vh; overflow-y:auto; overscroll-behavior:contain; margin:0 0 14px; font-size:16px; }
+body.touch #recBody{ font-size:14px; max-height:46vh; }
+body.touch #recOv .sheet{ padding:14px 18px; }
+body.touch .recSec{ margin:9px 0 2px; font-size:11px; }
+.recSec{ margin:14px 0 4px; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--soft); }
+.gl i.none{ font-style:normal; font-weight:500; color:var(--soft); }
+.gl i.pt{ display:inline-block; min-width:2.4em; text-align:right; margin-left:12px; font-style:normal; color:var(--soft); }
+.gl i.pt.good{ color:#4cd97b; } .gl i.pt.bad{ color:var(--warn); }
+.gl.got b{ color:#4cd97b; }
+button.danger{ color:var(--warn); } button.danger.arm{ background:var(--warn); color:#12161c; font-weight:800; }
 /* mission HUD and result card, sharing the grade card's letter styling */
 #mLines,#sLines{ margin:0 0 16px; font-size:16px; line-height:1.55; }
 .gl{ display:flex; justify-content:space-between; gap:18px; border-bottom:1px solid rgba(255,255,255,.09); padding:4px 0; }
@@ -293,6 +319,7 @@ body.touch #tiltDiag{ display:block; }
 <div id="lesson" class="card"><div class="lesTop"><b id="lesT"></b><button id="lesQuit">End</button></div><div id="lesI"></div><div id="lesM"></div></div>
 </div>
 <div id="miss" class="card"><b id="missT"></b><span id="missS"></span></div>
+<div id="banner"></div>
 <div id="yoke"><div id="yokeK"></div></div>
 <div id="rotate"><div>Turn your phone sideways</div><div style="font-size:16px;font-weight:500;color:var(--soft)">Landscape gives you the stick, throttle, and a wider view.</div><button id="rotOk">Play in portrait anyway</button></div>
 <div class="overlay on" id="menu"><div class="sheet">
@@ -334,6 +361,7 @@ body.touch #tiltDiag{ display:block; }
     <button id="bDrop">C-130 airdrop: desert DZ</button>
     <button id="bShort">C-130 short field landing</button>
     <button id="bSchool">Flight school</button>
+    <button id="bRecords">Records and achievements</button>
     <button id="bResume" style="display:none">Resume</button>
   </div>
   <div id="school"></div>
@@ -358,6 +386,17 @@ body.touch #tiltDiag{ display:block; }
   <p class="sub" id="gTitle"></p>
   <div id="gLines"></div>
   <div class="row"><button class="primary" id="gRetry">Try again</button><button id="gSchool">All lessons</button><button id="gFree">Free flight</button></div>
+</div></div>
+<div class="overlay" id="landOv"><div class="sheet">
+  <p class="gLetter" id="lLetter">A</p>
+  <p class="sub" id="lTitle"></p>
+  <div id="lLines"></div>
+  <div class="row"><button class="primary" id="lAgain">Fly again</button><button id="lRec">Records</button><button id="lMenu">Menu</button></div>
+</div></div>
+<div class="overlay" id="recOv"><div class="sheet">
+  <p class="reg">Records</p>
+  <div id="recBody"></div>
+  <div class="row"><button class="primary" id="recClose">Back</button><button id="recReset" class="danger">Reset all records</button></div>
 </div></div>
 <div class="overlay" id="missOv"><div class="sheet">
   <p class="gLetter" id="mLetter">A</p>
@@ -636,7 +675,7 @@ function step(st,dt,ev){
       if(Math.abs(_e.z)>AC.tipRoll){crash(st,AC.tipMsg);return;}
       if(_e.x<-0.1){crash(st,'Nose gear first. Flare so the mains touch first.');return;}
       if(!paved&&spd>16){crash(st,'Off field landing. Line up with runway 1.');return;}
-      if(st.airTime>2&&ev) ev.push({type:'touchdown',fpm:Math.round(sink*196.85),paved:paved,x:st.pos.x,z:st.pos.z});
+      if(st.airTime>2&&ev) ev.push({type:'touchdown',fpm:Math.round(sink*196.85),paved:paved,x:st.pos.x,z:st.pos.z,ias:st.ias,bank:_e.z,wdir:st.windDir,wkt:st.windKt});
       st.onGround=true; st.airTime=0;
     }
     if(!paved&&spd>16){crash(st,'Ran off the pavement at speed.');return;}
@@ -3208,6 +3247,240 @@ if(window.visualViewport){
 window.addEventListener('orientationchange',()=>setTimeout(layoutViewport,120));
 layoutViewport();
 
+// ================= scores, records, the pilot log and achievements =================
+// One localStorage blob, kgeuScores, holds everything: per aircraft records, the
+// running pilot log and the achievement dates. Landings are graded against the
+// runway they actually touched, which may be Glendale, either Luke runway, or the
+// C-130 assault strip.
+const SC_KEY='kgeuScores';
+const SCORE={
+  log:{time:0,landings:0,streak:0,bestStreak:0},
+  best:{},           // type -> record object
+  ach:{}             // achievement id -> ISO date
+};
+function scLoad(){
+  try{const j=JSON.parse(localStorage.getItem(SC_KEY)||'null');
+    if(j&&typeof j==='object'){
+      Object.assign(SCORE.log,j.log||{});
+      SCORE.best=j.best||{};SCORE.ach=j.ach||{};}
+  }catch(e){}
+}
+function scSave(){try{localStorage.setItem(SC_KEY,JSON.stringify(SCORE));}catch(e){}}
+function scReset(){SCORE.log={time:0,landings:0,streak:0,bestStreak:0};SCORE.best={};SCORE.ach={};scSave();scUI();}
+scLoad();
+
+const ACH={
+  greaser:  {name:'First Greaser',   how:'Grade an A on a landing'},
+  night:    {name:'Night Landing',   how:'Land after dark'},
+  crosswind:{name:'Crosswind Landing',how:'Land with 10 kt or more across the runway'},
+  bullseye: {name:'Bullseye Drop',   how:'Put a bundle within 25 m of the DZ centre'},
+  dash:     {name:'Luke to Glendale Under 3 Minutes',how:'Wheels up at Luke to wheels down at Glendale'}
+};
+function achGrant(id){
+  if(SCORE.ach[id])return false;
+  SCORE.ach[id]=new Date().toISOString().slice(0,10);scSave();
+  bannerShow('ACHIEVEMENT',ACH[id].name);
+  return true;
+}
+
+// ---- which runway did the wheels touch, and how well lined up ----
+// Returns distance along from that runway's aim point, offset from its centreline,
+// and its name. The aim point is 1,000 ft in from the threshold on every runway.
+function runwayFix(x,z){
+  const u=toU(x,z),v=toV(x,z);
+  if(u>-60&&u<RWY_LEN+60&&Math.abs(v)<60)
+    return {name:'Glendale runway 1',along:u-(THR01+300),off:Math.abs(v),hdg:26};
+  const K=lukeUV(x,z);
+  for(const r of LUKE_RWY){
+    if(Math.abs(K[0])<r.len/2+60&&Math.abs(K[1]-r.v)<60){
+      const thr=-r.len/2;
+      return {name:'Luke runway '+r.lo,along:K[0]-(thr+300),off:Math.abs(K[1]-r.v),hdg:42.6};
+    }
+  }
+  const Z=lzUV(x,z);
+  if(Math.abs(Z[0])<LZ.len/2+60&&Math.abs(Z[1])<40)
+    return {name:'the assault strip',along:Z[0]-(-LZ.len/2+91),off:Math.abs(Z[1]),hdg:90};
+  return null;
+}
+// crosswind component across the runway in knots
+function xwind(hdg,wdir,wkt){
+  const d=(wdir-hdg)*Math.PI/180;
+  return Math.abs(Math.sin(d)*wkt);
+}
+const band=(v,pts)=>{                     // piecewise linear score from break points
+  for(let i=0;i<pts.length-1;i++){
+    const [x0,s0]=pts[i],[x1,s1]=pts[i+1];
+    if(v<=x1)return v<=x0?s0:s0+(s1-s0)*(v-x0)/(x1-x0);
+  }
+  return pts[pts.length-1][1];
+};
+function letterFor(p){return p>=90?'A':p>=80?'B':p>=70?'C':p>=60?'D':'F';}
+// Time of day. Until sunset and night flying exist this is always day, so the
+// Night Landing achievement is listed but not yet reachable.
+function isNight(){return typeof TOD!=='undefined'&&TOD&&TOD.night;}
+
+// ---- landing grade: sink rate, centreline, aim point, airspeed ----
+function gradeLanding(e){
+  const fix=runwayFix(e.x,e.z);
+  if(!fix)return null;
+  const kt=e.ias*MS2KT, tgt=AC.vapp*MS2KT, dv=Math.abs(kt-tgt);
+  const sSink=band(e.fpm,[[0,100],[100,100],[150,88],[300,62],[500,30],[700,0]]);
+  const sOff =band(fix.off,[[0,100],[2,100],[4,86],[8,58],[15,22],[25,0]]);
+  const sAim =band(Math.abs(fix.along),[[0,100],[50,100],[150,80],[300,55],[600,20],[1000,0]]);
+  const sSpd =band(dv,[[0,100],[3,100],[8,76],[15,46],[25,12],[40,0]]);
+  const pts=Math.round(sSink*0.35+sOff*0.2+sAim*0.25+sSpd*0.2);
+  const xw=xwind(fix.hdg,e.wdir,e.wkt);
+  return {pts:pts,letter:letterFor(pts),fpm:e.fpm,off:fix.off,along:fix.along,kt:kt,tgt:tgt,
+          xw:xw,where:fix.name,
+          parts:[['Sink rate',e.fpm+' fpm',Math.round(sSink)],
+                 ['Off centreline',fix.off.toFixed(1)+' m',Math.round(sOff)],
+                 ['From the aim point',Math.round(Math.abs(fix.along))+' m '+(fix.along<0?'short':'long'),Math.round(sAim)],
+                 ['Airspeed',Math.round(kt)+' kt vs '+Math.round(tgt),Math.round(sSpd)]]};
+}
+
+// ---- records. Each aircraft is ranked on the thing that matters to it. ----
+// cmp returns true when a is better than b.
+const REC={
+  cessna:{title:'Landing grade',cmp:(a,b)=>a.pts>b.pts,fmt:r=>r.letter+'  '+r.pts+' pts, '+r.fpm+' fpm'},
+  alpha: {title:'Landing grade',cmp:(a,b)=>a.pts>b.pts,fmt:r=>r.letter+'  '+r.pts+' pts, '+r.fpm+' fpm'},
+  c130:  {title:'Missions',     cmp:()=>false,fmt:r=>''},
+  f16:   {title:'Luke to Glendale',cmp:(a,b)=>a.secs<b.secs,fmt:r=>fmtT(r.secs)+',  '+r.g.toFixed(1)+' G'},
+  reaper:{title:'Loiter and strike',cmp:(a,b)=>a.pts>b.pts,fmt:r=>r.pts+' pts, '+r.hits+'/4, '+r.avg+' m'}
+};
+function fmtT(s){const m=Math.floor(s/60);return m+':'+String(Math.round(s-m*60)).padStart(2,'0');}
+// record a result under a key; returns true when it beat the stored one
+function scRecord(key,rec){
+  const cmp=(REC[key.split(':')[0]]||{}).cmp||((a,b)=>a.pts>b.pts);
+  const old=SCORE.best[key];
+  const better=!old||cmp(rec,old);
+  if(better){SCORE.best[key]=rec;scSave();}
+  return better;
+}
+
+// ---- NEW RECORD banner ----
+const bannerEl=document.getElementById('banner');let bannerT=0;
+function bannerShow(kind,text){
+  bannerEl.innerHTML='<b>'+kind+'</b><span>'+text+'</span>';
+  bannerEl.classList.add('on');bannerT=4.2;
+}
+function bannerUpdate(dt){if(bannerT>0){bannerT-=dt;if(bannerT<=0)bannerEl.classList.remove('on');}}
+
+// ---- the pilot log ----
+function logLanding(g){
+  SCORE.log.landings++;
+  if(g&&(g.letter==='A'||g.letter==='B')){SCORE.log.streak++;
+    if(SCORE.log.streak>SCORE.log.bestStreak)SCORE.log.bestStreak=SCORE.log.streak;}
+  else SCORE.log.streak=0;
+  scSave();
+}
+let logAccum=0;
+function logTime(dt){
+  if(!running||paused||st.crashed||st.onGround)return;
+  logAccum+=dt;
+  if(logAccum>=5){SCORE.log.time+=logAccum;logAccum=0;scSave();}
+}
+
+// ---- the F-16 dash: wheels up at Luke, wheels down at Glendale ----
+const DASH={on:false,t0:0,g:1};
+function dashUpdate(dt){
+  if(AC.id!=='f16'||!running||paused||st.crashed)return;
+  if(!DASH.on&&!st.onGround&&st.base==='luke'&&st.agl>15){DASH.on=true;DASH.t0=st.time;DASH.g=1;}
+  if(DASH.on)DASH.g=Math.max(DASH.g,st.gload);
+}
+function dashLand(e){
+  if(!DASH.on)return null;
+  const fix=runwayFix(e.x,e.z);
+  if(!fix||fix.name.indexOf('Glendale')<0)return null;
+  const secs=st.time-DASH.t0,rec={secs:secs,g:DASH.g};
+  DASH.on=false;
+  const better=scRecord('f16',rec);
+  if(secs<180)achGrant('dash');
+  return {secs:secs,g:DASH.g,better:better};
+}
+
+// ---- MQ-9 loiter and strike score: time on target plus hit accuracy ----
+function loiterScore(sc){
+  const tot=STRIKE.tot||0;
+  const sHits=sc.hits*20;                                  // 0..80
+  const sAcc =band(sc.avg,[[0,100],[3,100],[8,80],[20,50],[45,20],[80,0]]);
+  const sTot =band(tot,[[0,0],[20,40],[45,75],[90,100],[240,100]]);
+  const pts=Math.round(sHits*0.45+sAcc*0.30+sTot*0.25);
+  return {pts:pts,hits:sc.hits,avg:sc.avg,t:sc.t,tot:Math.round(tot)};
+}
+
+// ---- the landing card ----
+const landOv=document.getElementById('landOv');
+function onLanding(e){
+  if(!e.paved)return;
+  const g=gradeLanding(e);
+  if(!g)return;
+  logLanding(g);
+  if(g.letter==='A')achGrant('greaser');
+  if(g.xw>=10)achGrant('crosswind');
+  if(isNight())achGrant('night');
+  const dash=AC.id==='f16'?dashLand(e):null;
+  let better=false;
+  if(AC.id==='cessna'||AC.id==='alpha')better=scRecord(AC.id,g);
+  if(dash&&dash.better)better=true;
+  document.getElementById('lLetter').textContent=g.letter;
+  document.getElementById('lLetter').className='gLetter g'+g.letter;
+  document.getElementById('lTitle').textContent=g.pts+' points on '+g.where+
+    (g.xw>=10?'  ('+Math.round(g.xw)+' kt crosswind)':'');
+  const rows=g.parts.map(p=>'<div class="gl"><span>'+p[0]+'</span><b>'+p[1]+
+    '<i class="pt'+(p[2]>=80?' good':p[2]<55?' bad':'')+'">'+p[2]+'</i></b></div>');
+  if(dash)rows.push('<div class="gl"><span>Luke to Glendale</span><b>'+fmtT(dash.secs)+
+    ',  '+dash.g.toFixed(1)+' G peak</b></div>');
+  document.getElementById('lLines').innerHTML=rows.join('');
+  landOv.classList.add('on');paused=true;
+  if(better)bannerShow('NEW RECORD',REC[AC.id]?REC[AC.id].fmt(SCORE.best[AC.id]||g):'');
+}
+// the C-130 missions feed the same record store
+function logMission(r,letter){
+  if(r.kind==='drop'){
+    const rec={dist:Math.round(r.dist),letter:letter,pts:Math.round(band(r.dist,[[0,100],[25,100],[50,85],[100,60],[150,35],[400,0]]))};
+    if(scRecord('c130:drop',rec))bannerShow('NEW RECORD','Airdrop '+rec.dist+' m from centre');
+    if(r.dist<=25)achGrant('bullseye');
+  }else{
+    const rec={stopFt:r.stopFt,tdFt:r.tdFt,letter:letter,pts:Math.round(band(r.stopFt,[[0,100],[1200,100],[1600,85],[2000,65],[2600,35],[3600,0]]))};
+    if(scRecord('c130:short',rec))bannerShow('NEW RECORD','Stopped in '+rec.stopFt+' ft');
+  }
+}
+
+// ---- records screen ----
+const REC_ROWS=[
+  ['cessna','Cessna 172','cessna','Best landing',r=>r.letter+'   '+r.pts+' pts,  '+r.fpm+' fpm,  '+r.off.toFixed(1)+' m off'],
+  ['alpha','Pipistrel Alpha','alpha','Best landing',r=>r.letter+'   '+r.pts+' pts,  '+r.fpm+' fpm'],
+  ['f16','F-16C Viper','f16','Luke to Glendale',r=>fmtT(r.secs)+',  '+r.g.toFixed(1)+' G peak'],
+  ['reaper','MQ-9A Reaper','reaper','Loiter and strike',r=>r.pts+' pts,  '+r.hits+'/4 hits,  '+r.avg+' m,  '+r.tot+' s on target'],
+  ['c130d','C-130H Hercules','c130:drop','Airdrop',r=>r.letter+'   '+r.dist+' m from centre'],
+  ['c130s','','c130:short','Short field',r=>r.letter+'   stopped in '+r.stopFt+' ft, touched at '+r.tdFt+' ft']
+];
+function scUI(){
+  const el=document.getElementById('recBody');if(!el)return;
+  const L=SCORE.log,h=Math.floor(L.time/3600),m=Math.floor((L.time-h*3600)/60);
+  let html='<div class="recSec">Pilot log</div>'+
+    '<div class="gl"><span>Total flight time</span><b>'+(h?h+' h ':'')+m+' min</b></div>'+
+    '<div class="gl"><span>Landings</span><b>'+L.landings+'</b></div>'+
+    '<div class="gl"><span>Best streak of B or better</span><b>'+L.bestStreak+'</b></div>';
+  let last='';
+  for(const [id,name,key,label,fmt] of REC_ROWS){
+    if(name&&name!==last){html+='<div class="recSec">'+name+'</div>';last=name;}
+    const r=SCORE.best[key];
+    html+='<div class="gl"><span>'+label+'</span><b>'+(r?fmt(r):'<i class="none">none yet</i>')+'</b></div>';
+  }
+  html+='<div class="recSec">Achievements</div>';
+  for(const id in ACH){
+    const got=SCORE.ach[id];
+    html+='<div class="gl'+(got?' got':'')+'"><span>'+ACH[id].name+'</span><b>'+
+      (got?got:'<i class="none">'+ACH[id].how+'</i>')+'</b></div>';
+  }
+  el.innerHTML=html;
+}
+let resetArmed=0;
+function recOpen(){scUI();resetArmed=0;
+  const b=document.getElementById('recReset');if(b){b.textContent='Reset all records';b.classList.remove('arm');}
+  document.getElementById('recOv').classList.add('on');}
+
 // ================= C-130 missions: airdrop and short field assault =================
 // Two things a Hercules does that nothing else in the game does: put a pallet on a
 // mark from a thousand feet, and stop on a strip that is barely longer than the
@@ -3342,7 +3615,7 @@ function missScore(r){
   document.getElementById('mTitle').textContent=title;
   document.getElementById('mLines').innerHTML=lines.map(l=>'<div class="gl"><span>'+l[0]+'</span><b>'+l[1]+'</b></div>').join('');
   missHud(null);missOv.classList.add('on');paused=true;
-  if(window.logMission)logMission(r,letter);
+  logMission(r,letter);
 }
 
 // ---------- touch controls ----------
@@ -3729,7 +4002,8 @@ function start(mode){
   menu.classList.remove('on');crashEl.classList.remove('on');resumeBtn.style.display='';document.getElementById('bPause').textContent='Pause';snapCamera=true;
   if((mode==='ramp'&&camMode>2)||(camMode===2&&AC.id!=='reaper'))camMode=0;
   STRIKE.active=false;lesEnd();gradeOv.classList.remove('on');
-  missReset();missOv.classList.remove('on');
+  missReset();missOv.classList.remove('on');landOv.classList.remove('on');
+  document.getElementById('recOv').classList.remove('on');DASH.on=false;
   if(mode==='range')strikeStart();
   if(mode==='drop'||mode==='short')missStart(mode==='drop'?'drop':'short');
 }
@@ -3742,6 +4016,16 @@ document.getElementById('bShort').onclick=()=>{pickType('c130');start('short');}
 document.getElementById('mRetry').onclick=()=>{missOv.classList.remove('on');start(MISS.kind==='drop'?'drop':'short');};
 document.getElementById('mOther').onclick=()=>{missOv.classList.remove('on');start(MISS.kind==='drop'?'short':'drop');};
 document.getElementById('mFree').onclick=()=>{missOv.classList.remove('on');missReset();start('runway');};
+document.getElementById('lAgain').onclick=()=>{landOv.classList.remove('on');start(st.mode==='final'?'final':'runway');};
+document.getElementById('lMenu').onclick=()=>{landOv.classList.remove('on');openMenu();};
+document.getElementById('lRec').onclick=()=>{landOv.classList.remove('on');recOpen();};
+document.getElementById('bRecords').onclick=()=>recOpen();
+document.getElementById('recClose').onclick=()=>{document.getElementById('recOv').classList.remove('on');};
+// Reset is deliberately two taps: it throws away every record on the device.
+document.getElementById('recReset').onclick=e=>{
+  if(!resetArmed){resetArmed=1;e.target.textContent='Tap again to erase everything';e.target.classList.add('arm');return;}
+  scReset();resetArmed=0;e.target.textContent='Reset all records';e.target.classList.remove('arm');
+  toast('All records and achievements erased');};
 document.getElementById('cRunway').onclick=()=>start('runway');document.getElementById('cRamp').onclick=()=>start('ramp');document.getElementById('cFinal').onclick=()=>start('final');
 resumeBtn.onclick=()=>{if(st.type!==acType){start('runway');return;}menu.classList.remove('on');paused=false;document.getElementById('bPause').textContent='Pause';initAudio();};
 document.getElementById('bView').onclick=cycleCam;
@@ -4345,6 +4629,8 @@ function strikeScore(){
   STRIKE.cleared=true;
   const avg=STRIKE.shots?STRIKE.missSum/STRIKE.shots:0,secs=Math.round(st.time-STRIKE.t0);
   const sc={hits:STRIKE.hits,avg:Math.round(avg),t:secs};
+  const loit=loiterScore(sc);
+  if(scRecord('reaper',loit))bannerShow('NEW RECORD',loit.pts+' pts,  '+loit.hits+'/4,  '+loit.tot+' s on target');
   const better=!strikeBest||sc.hits>strikeBest.hits||
     (sc.hits===strikeBest.hits&&sc.avg<strikeBest.avg)||
     (sc.hits===strikeBest.hits&&sc.avg===strikeBest.avg&&sc.t<strikeBest.t);
@@ -4361,7 +4647,7 @@ function strikeBestText(){
 function strikeStart(){
   buildRange();
   STRIKE.active=true;STRIKE.cleared=false;STRIKE.shots=0;STRIKE.hits=0;STRIKE.missSum=0;
-  STRIKE.missiles.length=0;STRIKE.t0=0;
+  STRIKE.missiles.length=0;STRIKE.t0=0;STRIKE.tot=0;
   for(const t of STRIKE.targets){
     if(t.dead){t.dead=false;t.mesh.rotation.z=0;
       t.mesh.traverse(o=>{if(o.isMesh&&o.userData.m0)o.material=o.userData.m0;});}
@@ -4430,7 +4716,7 @@ function frame(t){
   }
   while(events.length){const ev=events.shift();if(LES.on)lessonEvent(ev);
     if(ev.type==='touchdown'){const f=ev.fpm,g=f<120?'Butter':f<300?'Smooth':f<500?'Firm':'Hard';toast(`Touchdown ${f} fpm. ${g}.`);
-      missTouchdown(ev);
+      missTouchdown(ev);onLanding(ev);
       camBump=clamp(f/620,0.12,1);
       if(ev.paved&&(best===null||f<best)){best=f;try{localStorage.setItem(bestKey(),String(f));}catch(e){}showBest();}
       atcTouchdown(ev);clusters.forEach(c=>{if(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)<1800){c.cheer=4.5;}});}
@@ -4442,7 +4728,7 @@ function frame(t){
   tilt.rateT+=dt;if(tilt.rateT>=1){tilt.rate=tilt.rateN;tilt.rateN=0;tilt.rateT=0;
     if(tilt.on&&tilt.rate===0&&!tilt.blocked&&performance.now()-tilt.onAt>1500)tiltBlockedMsg();
     if(menu.classList.contains('on'))tiltDiag();}
-  missUpdate(dt);
+  missUpdate(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);
   radioUpdate(dt);cfgUpdate(dt);
   const s=st,q=s.quat;
   // crowd flyby cheers and sound level
@@ -4453,7 +4739,9 @@ function frame(t){
   updatePeople(dt,ts);
   if(running&&!paused&&!st.crashed){
     if(STRIKE.built)rangeMoving(dt);
-    if(STRIKE.active){sensorUpdate(dt);missileUpdate(dt);}
+    if(STRIKE.active){sensorUpdate(dt);missileUpdate(dt);
+      // time on target: the ball locked onto an actual target, not a ground point
+      if(SENSOR.tgt&&!SENSOR.tgt.dead)STRIKE.tot=(STRIKE.tot||0)+dt;}
   }
   if(STRIKE.built)fireUpdate(dt,ts);
   smokeUpdate(dt);debrisUpdate(dt);blastUpdate(dt);
@@ -4517,6 +4805,7 @@ function frame(t){
 }
 // test hook: headless UI checks need to reach a few internals
 window.__kgeu={tilt:tilt,setTilt:setTilt,state:()=>st,toast:toast,start:start,
+  SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
   RADIO:RADIO,radioQ:()=>radioQ,radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,initAudio:initAudio,
   pick:pickType,pickBase:pickBase,togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   MISS:MISS,DROPZ:DROPZ,LZ:LZ,lzUV:lzUV,lzX:lzX,lzZ:lzZ,missDrop:missDrop,missTouchdown:missTouchdown,
