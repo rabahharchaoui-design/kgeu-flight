@@ -11,6 +11,12 @@ Public repo `rabahharchaoui-design/kgeu-flight`, GitHub Pages serving `master`
 at `/`. Installable on an iPhone home screen: open in Safari, Share, Add to
 Home Screen. It launches full screen with no browser bar.
 
+Sharing it: the link carries Open Graph tags and `icons/share-card.png`, so a
+text message renders it as a card rather than a bare URL. There is no way for a
+link to install itself on either platform, so the menu carries a short Add to
+Home Screen tip that appears only on an iPhone or iPad in Safari that has not
+already installed it, and tells in-app browsers to open Safari first.
+
 There is deliberately **no service worker**, so any push is live immediately.
 The trade is that there is no offline play and no install prompt on Android.
 
@@ -38,6 +44,7 @@ node tests/bound.js         # theoretical lower bound on autoland time
 .venv/bin/python tests/strike_check.py   # range siting and a full engagement
 .venv/bin/python tests/desktop_check.py  # Mac smoke test
 .venv/bin/python tests/live_check.py     # the deployed https site, end to end
+.venv/bin/python tests/a2hs_check.py     # Add to Home Screen tip shows only where it should
 ```
 
 All of the above pass as of the Task 4 commit.

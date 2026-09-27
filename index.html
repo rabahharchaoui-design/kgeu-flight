@@ -12,6 +12,18 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="KGEU Flight">
+<meta property="og:title" content="KGEU Flight">
+<meta property="og:description" content="Fly an F-16C, an MQ-9A Reaper or a Cessna 172 out of Glendale, Arizona. Add to Home Screen to play full screen.">
+<meta property="og:url" content="https://rabahharchaoui-design.github.io/kgeu-flight/">
+<meta property="og:image" content="https://rabahharchaoui-design.github.io/kgeu-flight/icons/share-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="KGEU Flight">
+<meta name="twitter:description" content="F-16C, MQ-9A Reaper and Cessna 172 out of Glendale, Arizona.">
+<meta name="twitter:image" content="https://rabahharchaoui-design.github.io/kgeu-flight/icons/share-card.png">
 <title>KGEU Flight: F-16, MQ-9, C172</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -159,6 +171,14 @@ body.touch #coach button{ min-height:var(--tap); min-width:var(--tap); padding:6
 .pick.sel{ border-color:var(--caution); box-shadow:inset 0 0 0 2px var(--caution); }
 .crashTitle{ font-size:42px; font-weight:800; margin:0; color:var(--warn); }
 .touchnote{ display:none; color:var(--soft); margin:0 0 16px; font-size:16px; }
+#a2hs{ display:none; margin:0 0 14px; padding:10px 13px; font-size:15px; line-height:1.4;
+  color:var(--ink); background:rgba(242,169,0,.13); border:1px solid rgba(242,169,0,.45); border-radius:10px; }
+#a2hs b{ color:var(--caution); }
+#a2hs .shr{ display:inline-block; width:13px; height:16px; margin:0 1px -3px; position:relative; }
+#a2hs .shr::before{ content:""; position:absolute; left:0; bottom:0; width:13px; height:10px;
+  border:1.6px solid var(--caution); border-top:none; border-radius:0 0 3px 3px; }
+#a2hs .shr::after{ content:""; position:absolute; left:5.2px; top:0; width:1.6px; height:9px;
+  background:var(--caution); box-shadow:-3px 3.2px 0 -0.2px var(--caution), 3px 3.2px 0 -0.2px var(--caution); }
 body.touch .keys{ display:none; } body.touch .touchnote{ display:block; }
 .opts{ margin:0 0 14px; }
 .tog{ font-size:15px; }
@@ -269,6 +289,7 @@ body.touch #tiltDiag{ display:block; }
     <dt>C  P  M  T</dt><dd>Camera, pause, all sound, radio voices</dd>
     <dt>G  ] [  Y H</dt><dd>Realistic mode: gear, flaps, trim</dd>
   </dl>
+  <p id="a2hs"><b>Play it full screen.</b> Tap <span class="shr"></span> <b>Share</b> at the bottom of Safari, then <b>Add to Home Screen</b>. It gets its own icon and loses the browser bar.</p>
   <p class="touchnote">Put your left thumb anywhere on the left of the screen and a stick appears there. The bar on the right is the throttle: tap IDLE, CLIMB or FULL to jump. More holds the camera, tilt, brakes and the realistic mode switches. Auto up top takes off or lands for you.</p>
   <p class="sub" style="font-size:16px;margin:0 0 16px"><span id="tips"></span> Best landing: <span id="best">none yet</span>. Best strike: <span id="bestStrike">none yet</span></p>
 
@@ -1919,6 +1940,22 @@ document.getElementById('oTilt').onclick=()=>setTilt(!tilt.on);
 document.getElementById('oInv').onclick=()=>{tilt.inv=!tilt.inv;try{localStorage.setItem('kgeuTiltInv',tilt.inv?'1':'0');}catch(e){}tiltUI();};
 document.getElementById('oSens').addEventListener('input',e=>{tilt.sens=+e.target.value;try{localStorage.setItem('kgeuTiltSens',String(tilt.sens));}catch(e2){}tiltUI();});
 easyUI();tiltUI();
+// Add to Home Screen tip. iOS has no install prompt a page can trigger, so the
+// best we can do is say exactly where the button is, and only when it applies.
+(function(){
+  const el=document.getElementById('a2hs'); if(!el)return;
+  const ua=navigator.userAgent;
+  const iOS=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  const inApp=/CriOS|FxiOS|EdgiOS|OPiOS|FBAN|FBAV|Instagram|Line\//.test(ua);
+  const installed=window.navigator.standalone===true||
+    (window.matchMedia&&(matchMedia('(display-mode: standalone)').matches||
+                         matchMedia('(display-mode: fullscreen)').matches));
+  if(!iOS||installed)return;
+  if(inApp){
+    el.innerHTML='<b>Open this in Safari first.</b> Tap the menu in this app and choose Open in Safari, then Share and Add to Home Screen.';
+  }
+  el.style.display='block';
+})();
 // ---- first flight coach ----
 const coachEl=document.getElementById('coach'),coachTxt=coachEl.querySelector('span');let coachStep=0,coachT=0;try{coachStep=+(localStorage.getItem('kgeuCoach')||0);}catch(e){}
 function coachSet(n){coachStep=n;try{localStorage.setItem('kgeuCoach',String(n));}catch(e){}coachEl.classList.remove('on');}
