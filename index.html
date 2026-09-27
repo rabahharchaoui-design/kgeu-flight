@@ -181,6 +181,11 @@ body.touch #coach button{ min-height:var(--tap); min-width:var(--tap); padding:6
 .gLetter.gA,.gLetter.gB{ color:#4cd97b; } .gLetter.gC{ color:var(--caution); } .gLetter.gD,.gLetter.gF{ color:var(--warn); }
 #gLines{ margin:0 0 16px; font-size:16px; line-height:1.55; }
 #gLines .ok::before{ content:'\2713  '; color:#4cd97b; font-weight:800; } #gLines .no::before{ content:'\2717  '; color:var(--warn); font-weight:800; }
+#sixpack{ position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom,0px) + 4px);
+  transform:translateX(-50%); width:300px; height:200px; display:none; z-index:3;
+  pointer-events:none; filter:drop-shadow(0 2px 6px rgba(0,0,0,.55)); }
+#sixpack.on{ display:block; }
+body.touch #sixpack{ width:216px; height:144px; }
 #banner{ position:fixed; left:50%; top:calc(env(safe-area-inset-top,0px) + 6px); transform:translateX(-50%) scale(.92); opacity:0;
   display:flex; flex-direction:column; align-items:center; gap:2px; z-index:9; pointer-events:none;
   padding:10px 26px; border-radius:14px; background:rgba(12,16,22,.86); border:2px solid var(--caution);
@@ -321,6 +326,7 @@ body.touch #tiltDiag{ display:block; }
 </div>
 <div id="miss" class="card"><b id="missT"></b><span id="missS"></span></div>
 <div id="banner"></div>
+<canvas id="sixpack" width="300" height="200"></canvas>
 <div id="yoke"><div id="yokeK"></div></div>
 <div id="rotate"><div>Turn your phone sideways</div><div style="font-size:16px;font-weight:500;color:var(--soft)">Landscape gives you the stick, throttle, and a wider view.</div><button id="rotOk">Play in portrait anyway</button></div>
 <div class="overlay on" id="menu"><div class="sheet">
@@ -4334,6 +4340,149 @@ const toastEl=document.getElementById('toast');let toastT=0;
 function toast(msg){toastEl.textContent=msg;toastEl.classList.add('on');toastT=3;}
 
 let dpr=1;const TAU=Math.PI*2;
+// ---------- six pack: the round gauges on a 172 panel ----------
+// Canvas 2D over the scene, drawn only in the cockpit view of the two light
+// aeroplanes. Pointer events pass through so the floating stick still works
+// where the panel overlaps it.
+const spCan=document.getElementById('sixpack'),spCtx=spCan?spCan.getContext('2d'):null;
+const SP_CELL=100,SP_COLS=3,SP_ROWS=2;
+let spDpr=0;
+function spSize(){
+  if(!spCan)return;
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  if(dpr===spDpr)return;spDpr=dpr;
+  spCan.width=SP_CELL*SP_COLS*dpr;spCan.height=SP_CELL*SP_ROWS*dpr;
+}
+function spFace(x,cx,cy,r){
+  x.beginPath();x.arc(cx,cy,r+4,0,6.283);x.fillStyle='#14181d';x.fill();
+  x.beginPath();x.arc(cx,cy,r,0,6.283);x.fillStyle='#0b0e12';x.fill();
+  x.strokeStyle='#39414b';x.lineWidth=2;x.stroke();
+}
+function spNeedle(x,cx,cy,ang,len,w,col){
+  x.save();x.translate(cx,cy);x.rotate(ang);
+  x.beginPath();x.moveTo(0,6);x.lineTo(-w,0);x.lineTo(0,-len);x.lineTo(w,0);x.closePath();
+  x.fillStyle=col;x.fill();x.restore();
+}
+function spLabel(x,cx,cy,t){x.fillStyle='#8b949e';x.font='700 9px '+F;x.textAlign='center';x.fillText(t,cx,cy);}
+function spTicks(x,cx,cy,r,a0,a1,n,step){
+  x.strokeStyle='#c9d1d9';
+  for(let i=0;i<=n;i++){const a=a0+(a1-a0)*i/n,big=i%step===0;
+    x.lineWidth=big?2:1;x.beginPath();
+    x.moveTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);
+    x.lineTo(cx+Math.cos(a)*(r-(big?9:5)),cy+Math.sin(a)*(r-(big?9:5)));x.stroke();}
+}
+function drawSixPack(){
+  if(!spCtx)return;
+  spSize();
+  const x=spCtx,d=spDpr;
+  x.setTransform(d,0,0,d,0,0);
+  x.clearRect(0,0,SP_CELL*SP_COLS,SP_CELL*SP_ROWS);
+  const e=new THREE.Euler().setFromQuaternion(st.quat,'YXZ');
+  const pitch=e.x,roll=-e.z,hdgT=((-e.y*180/Math.PI)%360+360)%360;
+  const hdg=((hdgT-MAGVAR)%360+360)%360;                 // the DG reads magnetic
+  const kt=st.ias*MS2KT, ftMSL=(st.pos.y-GEAR)*M2FT+FIELD_FT, vs=st.vel.y*196.85;
+  const cell=(c,r)=>[c*SP_CELL+SP_CELL/2,r*SP_CELL+SP_CELL/2];
+  const R=38;
+
+  // --- airspeed ---
+  {const [cx,cy]=cell(0,0);spFace(x,cx,cy,R);
+   const V0=AC.vne*1.05;
+   const A=v=>2.356+4.712*clamp((v-20)/(V0-20),0,1);      // 135 deg round to 45, clockwise
+   const arc=(v0,v1,col,rr)=>{x.beginPath();x.arc(cx,cy,rr,A(v0),A(v1));x.strokeStyle=col;x.lineWidth=4;x.stroke();};
+   const vs0=AC.vapp*MS2KT*0.82;
+   arc(vs0,AC.vfe,'#e8e3d6',R-13);                        // white: flap range
+   arc(vs0*1.15,AC.vne*0.86,'#3fa860',R-8);               // green: normal
+   arc(AC.vne*0.86,AC.vne,'#d8a520',R-8);                 // yellow: caution
+   x.beginPath();x.arc(cx,cy,R-8,A(AC.vne),A(V0));x.strokeStyle='#d0342c';x.lineWidth=4;x.stroke();
+   spTicks(x,cx,cy,R-2,A(20),A(V0),Math.round((V0-20)/10),2);
+   spNeedle(x,cx,cy,A(kt)+Math.PI/2,R-10,3,'#f2f4f6');
+   spLabel(x,cx,cy+29,'KNOTS');
+   x.fillStyle='#e8eaec';x.font='700 12px '+F;x.textAlign='center';x.fillText(Math.round(kt),cx,cy-12);}
+
+  // --- attitude ---
+  {const [cx,cy]=cell(1,0);spFace(x,cx,cy,R);
+   x.save();x.beginPath();x.arc(cx,cy,R-2,0,6.283);x.clip();
+   x.translate(cx,cy);x.rotate(roll);
+   const ph=pitch*180/Math.PI*1.6;                        // 1.6 px per degree
+   x.fillStyle='#2f6ea8';x.fillRect(-80,-80+ph,160,80);
+   x.fillStyle='#6b4a2e';x.fillRect(-80,ph,160,80);
+   x.strokeStyle='#e8eaec';x.lineWidth=1.5;x.beginPath();x.moveTo(-60,ph);x.lineTo(60,ph);x.stroke();
+   x.lineWidth=1;
+   for(const p of [-20,-10,10,20]){const w=Math.abs(p)===10?14:9,y=ph-p*1.6;
+     x.beginPath();x.moveTo(-w,y);x.lineTo(w,y);x.stroke();}
+   x.restore();
+   // fixed aircraft symbol and bank pointer
+   x.strokeStyle='#ffc400';x.lineWidth=2.5;
+   x.beginPath();x.moveTo(cx-16,cy);x.lineTo(cx-5,cy);x.moveTo(cx+5,cy);x.lineTo(cx+16,cy);
+   x.moveTo(cx,cy-4);x.lineTo(cx,cy+3);x.stroke();
+   x.save();x.translate(cx,cy);x.rotate(roll);
+   x.fillStyle='#e8eaec';x.beginPath();x.moveTo(0,-R+3);x.lineTo(-4,-R+10);x.lineTo(4,-R+10);x.closePath();x.fill();x.restore();
+   for(const b of [-60,-30,-20,-10,0,10,20,30,60]){const a=(b-90)*Math.PI/180;
+     x.strokeStyle='#c9d1d9';x.lineWidth=b%30===0?2:1;x.beginPath();
+     x.moveTo(cx+Math.cos(a)*(R-1),cy+Math.sin(a)*(R-1));
+     x.lineTo(cx+Math.cos(a)*(R-(b%30===0?8:5)),cy+Math.sin(a)*(R-(b%30===0?8:5)));x.stroke();}}
+
+  // --- altimeter ---
+  {const [cx,cy]=cell(2,0);spFace(x,cx,cy,R);
+   spTicks(x,cx,cy,R-2,-Math.PI/2,Math.PI*1.5,50,5);
+   x.fillStyle='#c9d1d9';x.font='700 10px '+F;x.textAlign='center';x.textBaseline='middle';
+   for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5;
+     x.fillText(String(i),cx+Math.cos(a)*(R-17),cy+Math.sin(a)*(R-17));}
+   // A three pointer altimeter: the long needle is one turn per 1,000 ft, the
+   // short one per 10,000, and the stubby one per 100,000. The first cut had a
+   // needle turning once per 100 ft, which no altimeter has.
+   const h=ftMSL;
+   spNeedle(x,cx,cy,(h%100000)/100000*6.283,R-26,4,'#aab2bb');   // ten thousands
+   spNeedle(x,cx,cy,(h%10000)/10000*6.283,R-17,4,'#f2f4f6');     // thousands
+   spNeedle(x,cx,cy,(h%1000)/1000*6.283,R-6,3,'#f2f4f6');        // hundreds
+   spLabel(x,cx,cy+31,'FEET');}
+
+  // --- turn coordinator ---
+  {const [cx,cy]=cell(0,1);spFace(x,cx,cy,R);
+   const rate=st.w.y*180/Math.PI;                          // deg per second of yaw
+   const tilt=clamp(-rate/3,-2,2)*0.32;                    // a standard rate turn is 3 deg/s
+   x.save();x.translate(cx,cy-2);x.rotate(tilt);
+   x.strokeStyle='#e8eaec';x.lineWidth=2.5;
+   x.beginPath();x.moveTo(-22,0);x.lineTo(22,0);x.moveTo(0,-3);x.lineTo(0,4);
+   x.moveTo(-7,9);x.lineTo(7,9);x.stroke();x.restore();
+   x.strokeStyle='#e8eaec';x.lineWidth=1.5;
+   for(const s2 of [-1,1]){x.beginPath();
+     x.moveTo(cx+s2*24,cy-14);x.lineTo(cx+s2*24,cy-7);x.stroke();}
+   // inclinometer: the ball follows lateral acceleration
+   x.beginPath();x.arc(cx,cy+40,26,Math.PI*1.18,Math.PI*1.82);x.strokeStyle='#39414b';x.lineWidth=9;x.stroke();
+   const bx=cx+clamp(-st.sfR*2.6,-1,1)*13;
+   x.beginPath();x.arc(bx,cy+40-26*Math.cos(clamp(-st.sfR*2.6,-1,1)*0.32)+26-0.5,4,0,6.283);
+   x.fillStyle='#1d1d1d';x.fill();
+   x.beginPath();x.arc(bx,cy+14.5,4,0,6.283);x.fillStyle='#e8eaec';x.fill();
+   spLabel(x,cx,cy-22,'2 MIN');}
+
+  // --- heading ---
+  {const [cx,cy]=cell(1,1);spFace(x,cx,cy,R);
+   x.save();x.translate(cx,cy);x.rotate(-hdg*Math.PI/180);
+   x.strokeStyle='#c9d1d9';
+   for(let d=0;d<360;d+=5){const a=(d-90)*Math.PI/180,big=d%30===0;
+     x.lineWidth=big?2:1;x.beginPath();
+     x.moveTo(Math.cos(a)*(R-2),Math.sin(a)*(R-2));
+     x.lineTo(Math.cos(a)*(R-(big?9:5)),Math.sin(a)*(R-(big?9:5)));x.stroke();}
+   x.fillStyle='#e8eaec';x.font='700 11px '+F;x.textAlign='center';x.textBaseline='middle';
+   for(let d=0;d<360;d+=30){const a=(d-90)*Math.PI/180,t=d===0?'N':d===90?'E':d===180?'S':d===270?'W':String(d/10);
+     x.save();x.translate(Math.cos(a)*(R-18),Math.sin(a)*(R-18));x.rotate(hdg*Math.PI/180);x.fillText(t,0,0);x.restore();}
+   x.restore();
+   x.strokeStyle='#ffc400';x.lineWidth=2.5;
+   x.beginPath();x.moveTo(cx-13,cy);x.lineTo(cx-4,cy);x.moveTo(cx+4,cy);x.lineTo(cx+13,cy);x.stroke();
+   x.fillStyle='#ffc400';x.beginPath();x.moveTo(cx,cy-R+2);x.lineTo(cx-4,cy-R+9);x.lineTo(cx+4,cy-R+9);x.closePath();x.fill();}
+
+  // --- vertical speed ---
+  {const [cx,cy]=cell(2,1);spFace(x,cx,cy,R);
+   const A=v=>{const t=clamp(v/2000,-1,1);return t*2.2;};   // 0 at 9 o'clock, +/-2,000 at the top and bottom
+   spTicks(x,cx,cy,R-2,A(-2000)+Math.PI,A(2000)+Math.PI,20,5);
+   x.fillStyle='#c9d1d9';x.font='700 9px '+F;x.textAlign='center';x.textBaseline='middle';
+   for(const v of [-2000,-1000,0,1000,2000]){const a=A(v)+Math.PI;
+     x.fillText(String(Math.abs(v/1000)),cx+Math.cos(a)*(R-16),cy+Math.sin(a)*(R-16));}
+   spNeedle(x,cx,cy,A(vs)+Math.PI*1.5,R-7,3,'#f2f4f6');
+   spLabel(x,cx,cy+30,'FPM x100');}
+}
+
 // ---------- minimap ----------
 const mc=document.getElementById('map'),mx=mc.getContext('2d');let ms=140;
 function sizeMap(){dpr=Math.min(window.devicePixelRatio||1,2);ms=isTouch?96:140;mc.width=ms*dpr;mc.height=ms*dpr;mc.style.width=ms+'px';mc.style.height=ms+'px';}
@@ -4825,6 +4974,8 @@ function frame(t){
     if(tilt.on&&tilt.rate===0&&!tilt.blocked&&performance.now()-tilt.onAt>1500)tiltBlockedMsg();
     if(menu.classList.contains('on'))tiltDiag();}
   missUpdate(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);
+  {const show=camMode===1&&(AC.id==='cessna'||AC.id==='alpha')&&running&&!st.crashed;
+   if(spCan){spCan.classList.toggle('on',show);if(show)drawSixPack();}}
   radioUpdate(dt);cfgUpdate(dt);
   const s=st,q=s.quat;
   // crowd flyby cheers and sound level
@@ -4901,7 +5052,7 @@ function frame(t){
 }
 // test hook: headless UI checks need to reach a few internals
 window.__kgeu={tilt:tilt,setTilt:setTilt,state:()=>st,toast:toast,start:start,
-  setTOD:setTOD,isNight:isNight,TOD:()=>TOD,
+  setTOD:setTOD,isNight:isNight,TOD:()=>TOD,drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
   RADIO:RADIO,radioQ:()=>radioQ,radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,initAudio:initAudio,
   pick:pickType,pickBase:pickBase,togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,

@@ -47,8 +47,9 @@ async def main():
     spec=await pg.evaluate("""async()=>{
       const K=window.__kgeu, SR=48000, N=SR;            // one second
       const off=new OfflineAudioContext(1,N,SR);
+      const F=[60,120,300,800,1500,3000,6000,12000];
       const b=off.createBuffer(1,N,SR),d=b.getChannelData(0);
-      for(let i=0;i<N;i++)d[i]=(Math.random()*2-1)*0.25;
+      for(let i=0;i<N;i++){let v=0;for(const f of F)v+=Math.sin(2*Math.PI*f*i/SR);d[i]=v*0.1/F.length*8;}
       const c=K.radioChain(off,1.0);
       const s=off.createBufferSource();s.buffer=b;s.connect(c.inp);s.start(0);
       const r=await off.startRendering();
@@ -58,7 +59,7 @@ async def main():
         for(let i=0;i<N;i++){const t=x[i]+cw*s1-s2;s2=s1;s1=t;}
         return Math.sqrt(s1*s1+s2*s2-cw*s1*s2)/N;};
       const out={};
-      for(const f of [60,120,300,800,1500,3000,6000,12000]) out[f]=mag(f);
+      for(const f of F) out[f]=mag(f);
       return out;}""")
     band = spec['1500']
     chk('passband (1.5 kHz) carries the signal', band > 1e-5, f"{band:.2e}")
