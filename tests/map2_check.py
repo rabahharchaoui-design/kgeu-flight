@@ -31,9 +31,24 @@ async def main():
         await finger(pg, '#map'); await pg.wait_for_timeout(300)
         await pg.evaluate(f"()=>{K}.fmFlush()"); await pg.wait_for_timeout(200)
         await shot(pg, 'full_open')
-        for i, z in enumerate((2.5, 2.5, 2.5)):
-            await pg.evaluate(f"()=>{{const e={K}.RWY_ENDS.find(e=>e.num==='21R');{K}.FM.cx=e.x;{K}.FM.cz=e.z;{K}.FM.scale*={z};{K}.fmFlush()}}")
-            await pg.wait_for_timeout(200); await shot(pg, f'full_zoom{i+1}')
+        # five zoom levels, each centred somewhere busy: nothing overlaps anything
+        OVL = """()=>{const L=%s.LBL(),P=L.placed,bad=[];const hit=(a,b)=>a[0]<b[2]&&a[2]>b[0]&&a[1]<b[3]&&a[3]>b[1];
+          for(let i=0;i<P.length;i++){for(let j=i+1;j<P.length;j++)if(hit(P[i].box,P[j].box))bad.push(P[i].kind+'/'+P[j].kind);
+            for(const u of L.ui)if(hit(P[i].box,u))bad.push(P[i].kind+'/ui');}
+          return {n:P.length,kinds:[...new Set(P.map(p=>p.kind))],bad:bad}}""" % K
+        views = [('open', None, None, None), ('west', -6000, 0, 0.012), ('luke', 'KLUF', None, 0.05), ('phx', 'KPHX', None, 0.07), ('kgeu', 'KGEU', None, 0.2)]
+        for name, cx, cz, sc in views:
+            if name != 'open':
+                if isinstance(cx, str):
+                    await pg.evaluate(f"()=>{{const r={K}.RWY_ENDS.filter(e=>e.rwy.code==='{cx}');{K}.FM.cx=r.reduce((s,e)=>s+e.x,0)/r.length;{K}.FM.cz=r.reduce((s,e)=>s+e.z,0)/r.length;{K}.FM.scale={sc}}}")
+                else:
+                    await pg.evaluate(f"()=>{{{K}.FM.cx={cx};{K}.FM.cz={cz};{K}.FM.scale={sc}}}")
+            await pg.evaluate(f"()=>{K}.fmFlush()"); await pg.wait_for_timeout(150)
+            o = await pg.evaluate(OVL)
+            ok(f'zoom {name}: {o["n"]} labels and icons, none overlapping each other or the buttons', not o['bad'] and o['n'] >= 2, o['bad'][:6] or o['kinds'])
+            if name == 'luke':
+                ok('close in, runway numbers show', 'rwy' in o['kinds'], o['kinds'])
+            await shot(pg, f'full_{name}')
         ok('no page errors', not pg.errs, pg.errs[:3])
         await b.close()
     sys.exit(ok.done('map2_check'))
