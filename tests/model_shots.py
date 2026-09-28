@@ -34,7 +34,7 @@ REFS = {
 
 # camera offsets in the aircraft frame, scaled by the type's length or span
 def angles(L, span):
-    d = max(L, span * 0.55) * 1.15          # side and three quarter
+    d = max(L * 1.15, span * 0.7 + L * 0.5)  # side and three quarter: keep the near wingtip well off the lens
     w = max(L, span * 0.80) * 1.15          # front and top must fit the span
     return {
         'side':    {'p': [d, L * 0.10, 0.05 * L], 't': [0, 0.05 * L, 0.05 * L], 'fov': 34},
