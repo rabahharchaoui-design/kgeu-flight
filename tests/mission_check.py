@@ -45,8 +45,8 @@ async def main():
     await pg.wait_for_timeout(700)
     armed=await pg.evaluate("()=>window.__kgeu.MISS.armed")
     chk('drop window arms in the band', armed, str(armed))
-    chk('DROP button is offered', (await pg.get_attribute('#ctxA','data-a'))=='drop',
-        str(await pg.get_attribute('#ctxA','data-a')))
+    chk('DROP button is offered', (await pg.get_attribute('#wA','data-a'))=='drop',
+        str(await pg.get_attribute('#wA','data-a')))
     await pg.screenshot(path=f'{SHOTS}/mission_drop_run.png')
 
     await pg.evaluate("()=>window.__kgeu.missDrop()")

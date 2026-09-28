@@ -61,54 +61,60 @@ button:hover{ border-color:rgba(255,255,255,.35); }
 button:focus-visible{ outline:2px solid var(--caution); outline-offset:2px; }
 button.on{ background:var(--caution); color:#15110a; border-color:transparent; }
 
-/* ---------- HUD, top left ---------- */
-#hud{ position:absolute; top:var(--padT); left:var(--padL); display:flex; flex-direction:column; gap:5px; align-items:flex-start; pointer-events:none; }
-#hud .card{ padding:4px 11px 5px; min-width:118px; }
-.big{ font-size:32px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; }
-.big small{ font-size:13px; font-weight:600; color:var(--soft); margin-left:4px; }
-.lbl{ font-size:11px; color:var(--soft); letter-spacing:.08em; text-transform:uppercase; }
-#hCfg{ display:flex; gap:10px; font-size:12px; font-weight:700; letter-spacing:.05em; padding:3px 11px; color:var(--soft); }
-#hCfg span{ white-space:nowrap; }
-#hCfg .lit{ color:var(--caution); }
-#hWind{ display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; letter-spacing:.05em; padding:3px 11px; color:#bfe3ff; }
+/* ---------- in flight layout, iPhone landscape ----------
+   top left: mini map, then the four readouts. top centre: pause. top right: auto,
+   gear, flaps, camera. right edge: brake over the throttle. left 36%: the stick.
+   lower right, left of the throttle: kept clear for weapon buttons and a look pad. */
+:root{ --map:92px; --col:66px; --icon:44px; }
+#hud{ position:absolute; top:var(--padT); left:calc(var(--padL) + var(--map) + 8px); display:flex; flex-direction:column; gap:4px; align-items:flex-start; pointer-events:none; }
+#hGrid{ display:grid; grid-template-columns:repeat(2,auto); gap:4px; }
+#hud .card{ padding:3px 8px 4px; min-width:62px; border-radius:8px; }
+.big{ font-size:20px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.big small{ font-size:11px; font-weight:600; color:var(--soft); margin-left:3px; }
+.lbl{ font-size:10px; color:var(--soft); letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
+#hLine{ display:flex; gap:8px; align-items:center; font-size:10px; font-weight:700; letter-spacing:.05em; padding:2px 8px !important; color:var(--soft); }
+#hLine span{ white-space:nowrap; }
+#hLine .lit{ color:var(--caution); }
+#hWind{ display:flex; align-items:center; gap:4px; color:#bfe3ff; }
 #hWind svg{ transition:transform .25s linear; }
-body.touch #hWind{ font-size:11px; padding:2px 9px; }
-#hAp{ display:none; background:var(--caution); color:#15110a; font-weight:700; font-size:13px; letter-spacing:.04em; border-radius:6px; padding:3px 9px; }
+#hAp{ display:none; background:var(--caution); color:#15110a; font-weight:700; font-size:11px; letter-spacing:.04em; border-radius:6px; padding:2px 8px; }
 #hAp.on{ display:block; }
-body.touch .big{ font-size:24px; }
-body.touch #hud .card{ min-width:92px; padding:3px 9px 4px; }
-body.touch #hud{ gap:4px; }
-body.touch #hCfg{ font-size:11px; padding:2px 9px; }
+@media (min-width:900px){ :root{ --map:120px; } .big{ font-size:26px; } #hud .card{ min-width:84px; } }
 
-/* ---------- top bar ---------- */
+/* ---------- pause, top centre ---------- */
+#bPause{ position:absolute; top:var(--padT); left:50%; transform:translateX(-50%); width:var(--icon); height:var(--icon); padding:0; display:grid; place-items:center; }
+#bPause svg{ width:18px; height:18px; }
+
+/* ---------- icons, top right ---------- */
 #tools{ position:absolute; top:var(--padT); right:var(--padR); display:flex; gap:6px; }
-body.touch #bView,body.touch #bFull{ display:none; }
-body.touch #tools button{ min-height:var(--tap); min-width:var(--tap); padding:6px 12px; font-size:15px; }
-#drawer{ position:absolute; top:calc(var(--padT) + var(--tap) + 8px); right:var(--padR); display:none; gap:6px; flex-wrap:nowrap; max-width:calc(100% - var(--padR) - 162px); overflow:hidden; }
-#drawer.on{ display:flex; }
-#drawer button{ min-height:var(--tap); min-width:var(--tap); padding:6px 6px; font-size:13px; white-space:nowrap; }
-body.easy .adv{ display:none; }
+#tools button{ min-width:var(--icon); height:var(--icon); padding:0 8px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; font-size:12px; line-height:1; }
+#tools button svg{ width:20px; height:20px; flex:none; }
+#tools button i{ font-style:normal; font-size:9px; font-weight:700; letter-spacing:.04em; color:var(--soft); }
+#tools button.lit{ border-color:var(--caution); } #tools button.lit i{ color:var(--caution); }
+#bAuto{ font-size:13px !important; font-weight:700; padding:0 10px !important; }
+#bGear[hidden],#bFlaps[hidden]{ display:none !important; }
+#flapPop{ position:absolute; top:calc(var(--padT) + var(--icon) + 8px); right:var(--padR); display:none; gap:6px; z-index:3; }
+#flapPop.on{ display:flex; }
+#flapPop button{ min-width:var(--icon); min-height:var(--icon); padding:0 8px; font-size:14px; font-weight:700; }
+body.touch #bFull{ display:none; }
 
 /* ---------- messages ---------- */
-#warn{ position:absolute; left:50%; top:var(--padT); transform:translateX(-50%); font-size:24px; font-weight:800; letter-spacing:.06em; color:#fff; background:var(--warn); border-radius:6px; padding:2px 16px; display:none; white-space:nowrap; }
+#warn{ position:absolute; left:50%; top:24%; transform:translateX(-50%); font-size:24px; font-weight:800; letter-spacing:.06em; color:#fff; background:var(--warn); border-radius:6px; padding:2px 16px; display:none; white-space:nowrap; }
 #warn.on{ display:block; animation:blink .5s steps(2) infinite; }
 @keyframes blink{ 50%{ opacity:.35; } }
 @media (prefers-reduced-motion: reduce){ #warn.on{ animation:none; } }
-#atc{ position:absolute; left:50%; top:calc(var(--padT) + var(--tap) + 8px); transform:translateX(-50%); max-width:min(520px,44vw); font-size:15px; font-weight:500; opacity:0; transition:opacity .35s; }
-/* the drawer takes the same band across the top, so the radio call steps aside for it */
-#drawer.on ~ #atc{ opacity:0 !important; }
+#atc{ position:absolute; left:50%; top:calc(var(--padT) + var(--icon) + 8px); transform:translateX(-50%); width:max-content; max-width:clamp(150px, calc(100vw - 2 * (var(--padL) + var(--map) + 162px)), 440px); font-size:12px; font-weight:500; line-height:1.3; opacity:0; transition:opacity .35s; padding:5px 10px; }
+body.missOn #atc{ top:calc(var(--padT) + var(--icon) + 64px); }
 #atc.on{ opacity:1; }
 #atc b{ color:var(--radio); font-weight:600; margin-right:6px; }
-#toast{ position:absolute; left:50%; top:calc(var(--padT) + var(--tap) + 74px); transform:translateX(-50%); font-size:19px; font-weight:600; opacity:0; transition:opacity .3s; text-align:center; text-shadow:0 1px 3px rgba(0,0,0,.7); white-space:nowrap; }
+#atc .plain{ display:block; color:var(--ink); font-weight:600; margin-top:2px; }
+#toast{ position:absolute; left:50%; top:37%; transform:translateX(-50%); font-size:17px; font-weight:600; opacity:0; transition:opacity .3s; text-align:center; text-shadow:0 1px 3px rgba(0,0,0,.7); white-space:nowrap; }
 #toast.on{ opacity:1; }
-#bigcfg{ position:absolute; left:50%; top:57%; transform:translate(-50%,-50%); font-size:44px; font-weight:800; letter-spacing:.06em; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,.8); opacity:0; transition:opacity .45s; white-space:nowrap; }
+#bigcfg{ position:absolute; left:50%; top:57%; transform:translate(-50%,-50%); font-size:32px; font-weight:800; letter-spacing:.06em; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,.8); opacity:0; transition:opacity .45s; white-space:nowrap; }
 #bigcfg.on{ opacity:1; transition:opacity .08s; }
-body.touch #bigcfg{ font-size:32px; }
 
-/* ---------- minimap ---------- */
-#map{ position:absolute; right:var(--padR); top:calc(var(--padT) + var(--tap) + 8px); border-radius:50%; }
-/* on a phone the drawer opens into the band under the top bar, so the map sits below it */
-body.touch #map{ top:calc(var(--padT) + var(--tap) * 2 + 16px); }
+/* ---------- mini map, top left ---------- */
+#map{ position:absolute; left:var(--padL); top:var(--padT); border-radius:12px; }
 
 /* ---------- sensor ball overlay ---------- */
 #mts{ position:absolute; inset:0; display:none; }
@@ -116,44 +122,44 @@ body.touch #map{ top:calc(var(--padT) + var(--tap) * 2 + 16px); }
 #mts .h,#mts .v{ position:absolute; background:#f3f2ee; opacity:.85; }
 #mts .h{ top:50%; height:2px; width:70px; margin-top:-1px; }
 #mts .v{ left:50%; width:2px; height:70px; margin-left:-1px; }
-#mtsTxt{ position:absolute; left:50%; top:calc(var(--padT) + var(--tap) + 112px); transform:translateX(-50%); font:600 14px var(--font); color:#f3f2ee; letter-spacing:.06em; white-space:pre; text-align:center; line-height:1.5; text-shadow:0 1px 2px #000; }
+#mtsTxt{ position:absolute; left:50%; top:calc(var(--padT) + var(--icon) + 60px); transform:translateX(-50%); font:600 14px var(--font); color:#f3f2ee; letter-spacing:.06em; white-space:pre; text-align:center; line-height:1.5; text-shadow:0 1px 2px #000; }
 
 /* ---------- touch controls ---------- */
 #touch{ display:none; position:absolute; inset:0; pointer-events:none; }
 body.touch #touch{ display:block; }
-/* left thumb zone: a floating stick appears wherever the thumb lands */
-#stickZone{ position:absolute; left:0; top:calc(var(--padT) + 132px); width:40%; bottom:0; pointer-events:auto; touch-action:none; }
-#stick{ position:absolute; width:150px; height:150px; margin:-75px 0 0 -75px; border-radius:50%;
-  background:rgba(20,24,30,.42); border:1.5px solid rgba(255,255,255,.22); display:none; pointer-events:none; }
+/* left thumb: a stick appears wherever the thumb lands, and springs back on release */
+#stickZone{ position:absolute; left:0; top:calc(var(--padT) + 124px); width:36%; bottom:0; pointer-events:auto; touch-action:none; }
+#stick{ position:absolute; width:140px; height:140px; margin:-70px 0 0 -70px; border-radius:50%;
+  background:rgba(20,24,30,.36); border:2px solid rgba(255,255,255,.55); box-shadow:0 0 0 1px rgba(0,0,0,.25); display:none; pointer-events:none; }
+#stick::after{ content:''; position:absolute; left:50%; top:50%; width:10px; height:10px; margin:-5px 0 0 -5px; border-radius:50%; background:rgba(255,255,255,.35); }
 #stick.on{ display:block; }
-#knob{ position:absolute; left:50%; top:50%; width:58px; height:58px; margin:-29px 0 0 -29px; border-radius:50%; background:rgba(242,169,0,.85); }
-/* right thumb: context buttons and the throttle */
-#rightCol{ position:absolute; right:var(--padR); bottom:var(--padB); display:flex; align-items:flex-end; gap:10px; pointer-events:auto; }
-#ctxBtns{ display:flex; flex-direction:column; gap:8px; }
-#ctxBtns button{ min-width:76px; min-height:var(--tap); padding:11px 8px; font-size:15px; font-weight:700; }
-#ctxBtns button[hidden]{ display:none; }
-#ctxBtns button.held{ background:var(--caution); color:#15110a; }
-#fixBtns{ display:flex; flex-direction:column; gap:8px; }
-#fixBtns button{ min-width:80px; min-height:var(--tap); padding:11px 6px; font-size:15px; font-weight:700; }
-#fixBtns button.held{ background:var(--caution); color:#15110a; }
-/* the throttle takes the space left under the minimap, so it never slides beneath it */
-#thr{ position:relative; width:66px; min-height:126px;
-  height:min(186px, calc(var(--vvh) - var(--padT) - var(--padB) - var(--tap)*2 - 120px));
-  border-radius:12px; background:var(--glass);
-  border:1px solid rgba(255,255,255,.18); touch-action:none; overflow:hidden; }
+#knob{ position:absolute; left:50%; top:50%; width:56px; height:56px; margin:-28px 0 0 -28px; border-radius:50%; background:rgba(242,169,0,.92); border:2px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.4); z-index:1; }
+#knob.spring{ transition:transform .14s ease-out; }
+/* the idle hint shows where the stick lives until the first touch */
+#stickHint{ position:absolute; left:calc(var(--padL) + 18px); bottom:calc(var(--padB) + 18px); width:96px; height:96px; border-radius:50%; border:2px dashed rgba(255,255,255,.35); pointer-events:none; display:grid; place-items:center; font-size:11px; font-weight:700; letter-spacing:.08em; color:rgba(255,255,255,.6); text-align:center; }
+#stickHint.gone{ display:none; }
+/* right edge: brake over the throttle */
+#thrCol{ position:absolute; right:var(--padR); top:calc(var(--padT) + var(--icon) * 2 + 16px); bottom:var(--padB); width:var(--col); display:flex; flex-direction:column; gap:8px; pointer-events:auto; }
+#bBrake{ min-height:var(--icon); padding:0; font-size:13px; font-weight:800; letter-spacing:.04em; touch-action:none; }
+#bBrake.held{ background:var(--caution); color:#15110a; }
+#thr{ position:relative; flex:1; min-height:110px; border-radius:12px; background:var(--glass);
+  border:1px solid rgba(255,255,255,.22); touch-action:none; overflow:hidden; }
 #thrFill{ position:absolute; left:0; right:0; bottom:0; background:rgba(242,169,0,.8); }
-#thr .det{ position:absolute; left:0; right:0; text-align:center; font-size:12px; font-weight:800; letter-spacing:.08em;
+#thrGrip{ position:absolute; left:4px; right:4px; height:6px; margin-top:-3px; border-radius:3px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.5); pointer-events:none; }
+#thr .det{ position:absolute; left:0; right:0; text-align:center; font-size:11px; font-weight:800; letter-spacing:.06em;
   color:var(--ink); text-shadow:0 1px 2px rgba(0,0,0,.8); padding:4px 0; }
 #thr .det::before{ content:''; position:absolute; left:6px; right:6px; top:50%; height:1px; background:rgba(255,255,255,.28); }
 #thr .det span{ position:relative; }
+/* lower right: weapon and mission buttons only, when there are any */
+#wpn{ position:absolute; right:calc(var(--padR) + var(--col) + 12px); bottom:var(--padB); display:flex; flex-direction:column-reverse; gap:8px; pointer-events:auto; }
+#wpn button{ min-width:84px; min-height:52px; font-size:16px; font-weight:800; }
+#wpn button[hidden]{ display:none; }
 
-/* ---------- coach ---------- */
-#coach{ position:absolute; left:50%; bottom:var(--padB); transform:translateX(-50%); max-width:min(520px,44vw);
-  display:none; align-items:center; gap:12px; font-size:17px; font-weight:600; border:2px solid var(--caution); }
+/* ---------- coach, bottom centre between the thumbs ---------- */
+#coach{ position:absolute; left:50%; bottom:var(--padB); transform:translateX(-50%); width:max-content; max-width:min(440px,27vw);
+  display:none; align-items:center; gap:8px; font-size:13px; font-weight:600; border:2px solid var(--caution); padding:6px 8px 6px 10px; }
 #coach.on{ display:flex; }
-#coach button{ padding:5px 10px; font-size:14px; flex:none; }
-body.touch #coach{ max-width:34vw; left:calc(40% + 8px); transform:none; font-size:13px; gap:8px; padding:6px 8px 6px 10px; bottom:calc(var(--padB) + 4px); }
-body.touch #coach button{ min-height:var(--tap); min-width:var(--tap); padding:6px 8px; }
+#coach button{ min-height:var(--icon); min-width:var(--icon); padding:6px 8px; font-size:13px; flex:none; }
 
 /* ---------- mouse yoke ---------- */
 #yoke{ position:fixed; width:110px; height:110px; margin:-55px 0 0 -55px; border-radius:50%; border:2px solid rgba(242,169,0,.7); pointer-events:none; display:none; }
@@ -181,7 +187,7 @@ body.touch #coach button{ min-height:var(--tap); min-width:var(--tap); padding:6
 .gLetter.gA,.gLetter.gB{ color:#4cd97b; } .gLetter.gC{ color:var(--caution); } .gLetter.gD,.gLetter.gF{ color:var(--warn); }
 #gLines{ margin:0 0 16px; font-size:16px; line-height:1.55; }
 #gLines .ok::before{ content:'\2713  '; color:#4cd97b; font-weight:800; } #gLines .no::before{ content:'\2717  '; color:var(--warn); font-weight:800; }
-#sixpack{ position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom,0px) + 4px);
+#sixpack{ position:fixed; left:calc(50% + 20px); bottom:calc(env(safe-area-inset-bottom,0px) + 4px);
   transform:translateX(-50%); width:300px; height:200px; display:none; z-index:3;
   pointer-events:none; filter:drop-shadow(0 2px 6px rgba(0,0,0,.55)); }
 #sixpack.on{ display:block; }
@@ -195,8 +201,8 @@ body.touch #sixpack{ width:216px; height:144px; }
 #banner span{ font-size:20px; font-weight:800; }
 body.touch #banner{ padding:5px 16px; } body.touch #banner b{ font-size:10px; } body.touch #banner span{ font-size:14px; }
 /* ---------- landing grade and record badges: never pause, never take input unless tapped ---------- */
-#badges{ position:fixed; right:calc(var(--padR) + 76px); top:calc(var(--padT) + 56px); display:flex; flex-direction:column; align-items:flex-end; gap:6px; z-index:6; pointer-events:none; }
-.badge{ display:flex; align-items:center; gap:10px; max-width:min(300px,44vw); padding:6px 12px 6px 10px; border-radius:12px;
+#badges{ position:fixed; right:var(--padR); top:calc(var(--padT) + var(--icon) + 8px); display:flex; flex-direction:column; align-items:flex-end; gap:6px; z-index:6; pointer-events:none; }
+.badge{ display:flex; align-items:center; gap:10px; max-width:min(240px,32vw); padding:6px 12px 6px 10px; border-radius:12px;
   background:rgba(12,16,22,.84); border:1.5px solid rgba(255,255,255,.16); color:var(--ink); font:600 14px var(--font); line-height:1.15;
   transform:translateX(24px); opacity:0; transition:transform .28s cubic-bezier(.2,.8,.2,1), opacity .28s; pointer-events:none; cursor:pointer; min-height:44px; }
 .badge.on{ transform:none; opacity:1; pointer-events:auto; }
@@ -228,14 +234,14 @@ button.danger{ color:var(--warn); } button.danger.arm{ background:var(--warn); c
 #mLines,#sLines{ margin:0 0 16px; font-size:16px; line-height:1.55; }
 .gl{ display:flex; justify-content:space-between; gap:18px; border-bottom:1px solid rgba(255,255,255,.09); padding:4px 0; }
 .gl span{ color:var(--soft); } .gl b{ font-variant-numeric:tabular-nums; white-space:nowrap; }
-#miss{ position:fixed; left:50%; top:calc(env(safe-area-inset-top,0px) + 8px); transform:translateX(-50%);
+#miss{ position:fixed; left:50%; top:calc(var(--padT) + var(--icon) + 8px); transform:translateX(-50%);
   display:none; flex-direction:column; gap:1px; text-align:center; z-index:5; pointer-events:none;
   border:2px solid #7fd4ff; max-width:min(560px,86vw); }
 #miss.on{ display:flex; }
 #miss.warn{ border-color:var(--caution); }
 #miss b{ font-size:17px; letter-spacing:.02em; }
 #miss span{ font-size:14px; color:var(--soft); }
-body.touch #miss{ font-size:13px; padding:5px 10px; max-width:44vw; }
+body.touch #miss{ font-size:13px; padding:5px 10px; max-width:30vw; }
 body.touch #miss b{ font-size:14px; } body.touch #miss span{ font-size:12px; }
 #school{ display:none; margin:0 0 14px; }
 #school.on{ display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:8px; }
@@ -248,7 +254,7 @@ body.touch #miss b{ font-size:14px; } body.touch #miss span{ font-size:12px; }
 #lesson .lesTop b{ color:#7fd4ff; font-size:13px; letter-spacing:.08em; text-transform:uppercase; }
 #lesson .lesTop button{ padding:3px 10px; font-size:13px; }
 #lesI{ font-weight:700; } #lesM{ font-variant-numeric:tabular-nums; color:var(--soft); font-size:14px; }
-body.touch #lesson{ left:40%; max-width:36vw; font-size:13px; padding:6px 10px; bottom:calc(env(safe-area-inset-bottom,0px) + 14px); }
+body.touch #lesson{ max-width:30vw; font-size:13px; padding:6px 10px; bottom:calc(env(safe-area-inset-bottom,0px) + 10px); }
 body.touch #lesM{ font-size:12px; }
 .crashTitle{ font-size:42px; font-weight:800; margin:0; color:var(--warn); }
 .touchnote{ display:none; color:var(--soft); margin:0 0 16px; font-size:16px; }
@@ -270,8 +276,6 @@ body.touch .row.tonly{ display:flex; }
 label.sens{ display:flex; align-items:center; gap:10px; font-size:15px; color:var(--soft); }
 label.sens input[type=range]{ width:150px; accent-color:var(--caution); }
 label.sens b{ color:var(--ink); min-width:74px; }
-#tiltDiag{ display:none; font-size:13px; line-height:1.5; color:var(--soft); margin:0 0 12px; font-variant-numeric:tabular-nums; }
-body.touch #tiltDiag{ display:block; }
 @media (max-height:520px){ .reg{ font-size:44px; } .sheet{ padding:14px 16px; } .sub{ font-size:15px; margin:6px 0 10px; } .pick b{ font-size:18px; } .picks{ margin-bottom:10px; } }
 #rotate{ position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:24px; text-align:center; background:rgba(8,14,22,.92); z-index:20; font-size:22px; font-weight:700; }
 @media (orientation:portrait){ body.touch:not(.portraitok) #rotate{ display:flex; } }
@@ -282,50 +286,40 @@ body.touch #tiltDiag{ display:block; }
 <!-- everything in here is laid out inside the visual viewport, so nothing hides under
      the notch, the home indicator, or a host app header -->
 <div id="uiroot">
+  <canvas id="map"></canvas>
   <div id="hud">
-    <div class="card"><div class="big"><span id="hIas">0</span><small>KT</small></div><div class="lbl">Airspeed</div></div>
-    <div class="card"><div class="big"><span id="hAlt">1,070</span><small>FT</small></div><div class="lbl">Altitude MSL</div></div>
-    <div id="hCfg" class="card"><span id="hFlap">FLAPS 0&deg;</span><span id="hGear"></span></div>
-    <div id="hWind" class="card"><svg viewBox="0 0 20 20" width="15" height="15"><path id="hWindA" d="M10 2 L15 11 L11.5 11 L11.5 18 L8.5 18 L8.5 11 L5 11 Z" fill="currentColor"/></svg><span id="hWindT">050&deg; 5 KT</span></div>
+    <div id="hGrid">
+      <div class="card"><div class="big" id="hIas">0</div><div class="lbl" id="lIas">KIAS</div></div>
+      <div class="card"><div class="big" id="hAlt">1,070</div><div class="lbl" id="lAlt">ALT</div></div>
+      <div class="card"><div class="big" id="hVs">0</div><div class="lbl" id="lVs">VS</div></div>
+      <div class="card"><div class="big" id="hHdg">026</div><div class="lbl" id="lHdg">HDG</div></div>
+    </div>
+    <div id="hLine" class="card"><span id="hFlap">FLAPS 0&deg;</span><span id="hGear"></span><span id="hWind"><svg viewBox="0 0 20 20" width="12" height="12"><path id="hWindA" d="M10 2 L15 11 L11.5 11 L11.5 18 L8.5 18 L8.5 11 L5 11 Z" fill="currentColor"/></svg><span id="hWindT">050&deg; 5 KT</span></span></div>
     <div id="hAp"></div>
   </div>
+  <button id="bPause" title="Pause (P)" aria-label="Pause"><svg viewBox="0 0 20 20"><rect x="4" y="3" width="4" height="14" rx="1" fill="currentColor"/><rect x="12" y="3" width="4" height="14" rx="1" fill="currentColor"/></svg></button>
   <div id="tools">
     <button id="bAuto" title="Auto takeoff or land (O)">Auto T/O</button>
+    <button id="bGear" title="Gear (G)" aria-label="Landing gear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v7"/><circle cx="12" cy="15" r="6"/><circle cx="12" cy="15" r="2" fill="currentColor"/></svg><i id="bGearT">DOWN</i></button>
+    <button id="bFlaps" title="Flaps ([ ])" aria-label="Flaps"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M2 10 Q9 5 18 9 L18 11 Q9 10 2 11 Z"/><path d="M18 10 L22 15"/></svg><i id="bFlapsT">0&deg;</i></button>
+    <button id="bCam" title="Camera (C)" aria-label="Camera"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg><i>VIEW</i></button>
     <button id="bFull" class="donly" title="Full screen">Full screen</button>
-    <button id="bView" title="Camera (C)">View</button>
-    <button id="bPause" title="Pause (P)">Pause</button>
-    <button id="bMore" class="tonly">More</button>
-    <button id="bMenu" title="Menu (Esc)">Menu</button>
   </div>
-  <div id="drawer">
-    <button data-a="view">View</button>
-    <button data-a="tilt" id="tTilt">Tilt</button>
-    <button data-a="zoom" id="bZoom" hidden>Zoom</button>
-    <button data-a="gear" class="adv">Gear</button>
-    <button data-a="trimDn" class="adv">Trim &#9660;</button>
-    <button data-a="trimUp" class="adv">Trim &#9650;</button>
-  </div>
+  <div id="flapPop"></div>
   <div id="warn"></div>
   <div id="atc" class="card"></div>
   <div id="toast"></div>
   <div id="bigcfg"></div>
-  <canvas id="map"></canvas>
   <div id="mts"><div class="h" style="left:calc(50% - 90px)"></div><div class="h" style="left:calc(50% + 20px)"></div><div class="v" style="top:calc(50% - 90px)"></div><div class="v" style="top:calc(50% + 20px)"></div><div id="mtsTxt"></div></div>
   <div id="touch">
     <div id="stickZone"></div>
+    <div id="stickHint">STICK</div>
     <div id="stick"><div id="knob"></div></div>
-    <div id="rightCol">
-      <div id="ctxBtns">
-        <button id="ctxA"></button>
-        <button id="ctxB"></button>
-        <button data-a="brake" class="fixb">Brake</button>
-      </div>
-      <div id="fixBtns">
-        <button data-a="flapUp" class="fixb">Flaps UP</button>
-        <button data-a="flapDn" class="fixb">Flaps DN</button>
-      </div>
-      <div id="thr">
-        <div id="thrFill"></div>
+    <div id="wpn"><button id="wA" hidden></button><button id="wB" hidden></button><button id="wC" hidden></button></div>
+    <div id="thrCol">
+      <button id="bBrake" aria-label="Brake, hold">BRAKE</button>
+      <div id="thr" role="slider" aria-label="Throttle" aria-valuemin="0" aria-valuemax="100">
+        <div id="thrFill"></div><div id="thrGrip"></div>
         <div class="det" data-p="1" style="top:4px">FULL</div>
         <div class="det" data-p="c" style="top:50%;margin-top:-11px">CLIMB</div>
         <div class="det" data-p="0" style="bottom:4px">IDLE</div>
@@ -363,8 +357,7 @@ body.touch #tiltDiag{ display:block; }
   </div>
 <div class="row opts">
     <button class="tog" id="oEasy">Easy flight: On</button>
-    <button class="tog tonly" id="oTilt">Tilt steering: Off</button>
-    <button class="tog tonly" id="oInv">Tilt pitch: Normal</button>
+    <button class="tog oInv">Invert pitch: Off</button>
   </div>
   <div class="row opts">
     <button class="tog" id="oRadio">Radio: On</button>
@@ -372,12 +365,11 @@ body.touch #tiltDiag{ display:block; }
       <input type="range" id="oRvol" min="0" max="10" step="1" value="7">
       <b id="oRvolV">70%</b></label>
   </div>
-  <div class="row opts tonly" id="sensRow">
-    <label class="sens">Tilt sensitivity
-      <input type="range" id="oSens" min="0" max="4" step="1" value="2">
-      <b id="oSensV">Medium</b></label>
+  <div class="row opts tonly">
+    <label class="sens">Stick sensitivity
+      <input type="range" class="oSens" min="0" max="4" step="1" value="2">
+      <b class="oSensV">Medium</b></label>
   </div>
-  <div id="tiltDiag"></div>
   <div class="row" style="margin-bottom:14px">
     <button class="primary" id="bRunway">Take off from runway 1</button>
     <button id="bRamp">Start at the ramp</button>
@@ -402,9 +394,13 @@ body.touch #tiltDiag{ display:block; }
     <dt>G  ] [  Y H</dt><dd>Realistic mode: gear, flaps, trim</dd>
   </dl>
   <p id="a2hs"><b>Play it full screen.</b> Tap <span class="shr"></span> <b>Share</b> at the bottom of Safari, then <b>Add to Home Screen</b>. It gets its own icon and loses the browser bar.</p>
-  <p class="touchnote">Put your left thumb anywhere on the left of the screen and a stick appears there. The bar on the right is the throttle: tap IDLE, CLIMB or FULL to jump. More holds the camera, tilt, brakes and the realistic mode switches. Auto up top takes off or lands for you.</p>
+  <p class="touchnote">Put your left thumb anywhere on the left of the screen and a stick appears there. The bar on the right edge is the throttle: slide it, or tap IDLE, CLIMB or FULL. Gear, flaps and camera are the icons top right. Auto takes off or lands for you.</p>
   <p class="sub" style="font-size:16px;margin:0 0 16px"><span id="tips"></span> Best landing: <span id="best">none yet</span>. Best strike: <span id="bestStrike">none yet</span></p>
 
+</div></div>
+<div class="overlay" id="pauseOv"><div class="sheet">
+  <p class="reg">Paused</p>
+  <div class="row"><button class="primary" id="pResume">Resume</button><button id="pRestart">Restart</button><button id="pMenu">Main menu</button></div>
 </div></div>
 <div class="overlay" id="gradeOv"><div class="sheet">
   <p class="gLetter" id="gLetter">A</p>
@@ -3751,6 +3747,7 @@ function updatePeople(dt,t){
 }
 
 // ---------- state & input ----------
+const $=id=>document.getElementById(id);
 let st=createState('runway'),running=false,paused=false,camMode=0,muted=false,FREECAM=null;
 let sensorMode=false,strikeBtn=null,camBump=0,camLean=0,strikeBest=null;
 try{strikeBest=JSON.parse(localStorage.getItem('kgeuStrikeBest')||'null');}catch(e){}
@@ -3811,101 +3808,16 @@ function autoSmart(){if(!running||paused||st.crashed)return;
   if(st.ap){st.ap=null;st.apW=null;}
   apToggle(st.onGround?'to':'land');}
 function setThr(v){apOff('Autopilot off, your airplane');st.throttle=v;}
-// ---- tilt steering (phone) ----
-// Gravity is projected into SCREEN space, so both landscape directions work, and the
-// reading is taken relative to the pose at switch on. Working relatively also makes the
-// devicemotion fallback immune to the vendor sign disagreement on
-// accelerationIncludingGravity: flipping the sign flips baseline and sample alike.
-const TILT_SENS=[0.55,0.75,1,1.35,1.8];                       // slider positions, 3 = medium
-const tilt={on:false,x:0,y:0,base:null,inv:false,sens:2,raw:[0,0],src:'none',
-  perm:'not asked',n:0,rate:0,rateN:0,rateT:0,onAt:0,blocked:false,haveOri:false};
-try{tilt.inv=localStorage.getItem('kgeuTiltInv')==='1';}catch(e){}
-try{const v=localStorage.getItem('kgeuTiltSens');if(v!==null&&v!==''){const s=+v;if(s>=0&&s<=4)tilt.sens=s;}}catch(e){}
-const inFrame=(function(){try{return window.top!==window.self;}catch(e){return true;}})();
-const screenAngle=()=>{
-  const a=(screen.orientation&&typeof screen.orientation.angle==='number')?screen.orientation.angle:(window.orientation||0);
-  return a*Math.PI/180;
-};
-// device axes -> screen axes, then gravity direction to [roll, pitch]
-function gravToAngles(gx,gy,gz){
-  const L=Math.hypot(gx,gy,gz);if(!(L>0.2))return null;
-  gx/=L;gy/=L;gz/=L;
-  const a=screenAngle(),c=Math.cos(a),s=Math.sin(a);
-  const sx=gx*c+gy*s, sy=-gx*s+gy*c;
-  // roll: where gravity sits within the screen plane, like a steering wheel
-  // pitch: how far gravity lies out of the screen plane, tipping the top edge toward you
-  return [Math.atan2(sx,sy),Math.atan2(gz,Math.hypot(sx,sy))];
-}
-function oriToAngles(e){
-  if(e.beta===null||e.gamma===null||e.beta===undefined||e.gamma===undefined)return null;
-  const b=e.beta*Math.PI/180,g=e.gamma*Math.PI/180;
-  return gravToAngles(-Math.cos(b)*Math.sin(g),Math.sin(b),Math.cos(b)*Math.cos(g));
-}
-const dzone=(d,z)=>Math.abs(d)<z?0:d-Math.sign(d)*z;
-function tiltSample(A,src){
-  if(!A)return;
-  if(src==='orientation')tilt.haveOri=true;
-  else if(tilt.haveOri)return;                                // orientation wins when present
-  tilt.src=src;tilt.raw=A;tilt.n++;tilt.rateN++;tilt.blocked=false;
-  if(!tilt.on)return;
-  if(!tilt.base)tilt.base=A.slice();
-  const S=TILT_SENS[tilt.sens];
-  let dr=A[0]-tilt.base[0];dr=Math.atan2(Math.sin(dr),Math.cos(dr));
-  const dp=A[1]-tilt.base[1];
-  const nx=clamp(dzone(dr,0.035)/(0.45/S),-1,1);
-  const ny=clamp(-dzone(dp,0.035)/(0.30/S),-1,1)*(tilt.inv?-1:1);
-  tilt.x+=(nx-tilt.x)*0.25;tilt.y+=(ny-tilt.y)*0.25;           // low pass
-}
-window.addEventListener('deviceorientation',e=>tiltSample(oriToAngles(e),'orientation'));
-window.addEventListener('devicemotion',e=>{
-  const g=e.accelerationIncludingGravity;if(!g||g.x===null||g.x===undefined)return;
-  tiltSample(gravToAngles(g.x,g.y,g.z),'motion');
-});
-function tiltUI(){
-  document.querySelectorAll('[data-a="tilt"]').forEach(t=>t.classList.toggle('on',tilt.on));
-  const o=document.getElementById('oTilt');
-  if(o){o.textContent='Tilt steering: '+(tilt.on?'On':'Off');o.classList.toggle('on',tilt.on);}
-  const iv=document.getElementById('oInv');if(iv)iv.textContent='Tilt pitch: '+(tilt.inv?'Inverted':'Normal');
-  const sv=document.getElementById('oSens');if(sv)sv.value=String(tilt.sens);
-  const sl=document.getElementById('oSensV');if(sl)sl.textContent=['Very low','Low','Medium','High','Very high'][tilt.sens];
-}
-function tiltDiag(){
-  const d=document.getElementById('tiltDiag');if(!d)return;
-  d.textContent='Tilt: '+(tilt.on?'on':'off')+'  permission '+tilt.perm+'  source '+tilt.src+
-    '  '+tilt.rate+'/s  roll '+(tilt.raw[0]*57.3).toFixed(0)+'° pitch '+(tilt.raw[1]*57.3).toFixed(0)+'°'+
-    (inFrame?'  [in a frame]':'');
-}
-function tiltBlockedMsg(){
-  tilt.blocked=true;
-  toast(inFrame?'Tilt is blocked in this viewer. Open the link in Safari.':'No motion data from this device.');
-}
-// Permission must be requested synchronously inside a click handler: iOS does not treat
-// pointerdown or touchstart as a user gesture for DeviceOrientation/DeviceMotion.
-function setTilt(on){
-  if(!on){tilt.on=false;tilt.x=tilt.y=0;tilt.base=null;tiltUI();toast('Tilt off');return;}
-  const DOE=window.DeviceOrientationEvent,DME=window.DeviceMotionEvent;
-  if(!DOE&&!DME){tilt.perm='unsupported';tiltUI();toast('Tilt is not supported on this device');return;}
-  const go=()=>{
-    tilt.on=true;tilt.base=null;tilt.x=tilt.y=0;tilt.n=0;tilt.onAt=performance.now();tiltUI();
-    toast('Tilt on. Hold the phone how you like, that is centre');
-    setTimeout(()=>{if(tilt.on&&tilt.n===0)tiltBlockedMsg();},1500);
-  };
-  const needs=(typeof DOE==='function'&&typeof DOE.requestPermission==='function')||
-              (typeof DME==='function'&&typeof DME.requestPermission==='function');
-  if(!needs){tilt.perm='not required';go();return;}
-  // both requests fire now, in the gesture, not chained one after the other
-  let p1,p2;
-  try{p1=(DOE&&DOE.requestPermission)?DOE.requestPermission():Promise.resolve('granted');}catch(e){p1=Promise.reject(e);}
-  try{p2=(DME&&DME.requestPermission)?DME.requestPermission():Promise.resolve('granted');}catch(e){p2=Promise.reject(e);}
-  tilt.perm='asking';tiltUI();
-  Promise.all([p1.catch(e=>'error'),p2.catch(e=>'error')]).then(r=>{
-    const ori=r[0],mot=r[1];
-    tilt.perm=(ori==='granted'||mot==='granted')?'granted':(ori==='denied'||mot==='denied')?'denied':String(ori);
-    if(ori==='granted'||mot==='granted'){go();return;}
-    tiltUI();
-    if(tilt.perm==='denied')toast('Motion access denied. Settings, Safari, Motion and Orientation Access');
-    else toast(inFrame?'Tilt is blocked in this viewer. Open the link in Safari.':'Tilt could not start on this device');
-  });
+// ---- touch stick settings: sensitivity and invert pitch ----
+const STICK_SENS=[0.6,0.8,1,1.25,1.55];                       // slider positions, 3 = medium
+const TOUCH={sens:2,inv:false};
+try{const v=localStorage.getItem('kgeuStickSens');if(v!==null&&v!==''&&+v>=0&&+v<=4)TOUCH.sens=+v;TOUCH.inv=localStorage.getItem('kgeuInvPitch')==='1';}catch(e){}
+function setStickSens(v){TOUCH.sens=clamp(Math.round(v),0,4);try{localStorage.setItem('kgeuStickSens',String(TOUCH.sens));}catch(e){}stickUI();}
+function setInvPitch(v){TOUCH.inv=!!v;try{localStorage.setItem('kgeuInvPitch',TOUCH.inv?'1':'0');}catch(e){}stickUI();}
+function stickUI(){
+  document.querySelectorAll('.oSens').forEach(e=>e.value=String(TOUCH.sens));
+  document.querySelectorAll('.oSensV').forEach(e=>e.textContent=['Very low','Low','Medium','High','Very high'][TOUCH.sens]);
+  document.querySelectorAll('.oInv').forEach(e=>{e.textContent='Invert pitch: '+(TOUCH.inv?'On':'Off');e.classList.toggle('on',TOUCH.inv);});
 }
 // ---- mouse or trackpad yoke (Mac): press and drag on the scene ----
 const yoke={on:false,x0:0,y0:0,x:0,y:0,id:null},yokeEl=document.getElementById('yoke'),yokeK=document.getElementById('yokeK');
@@ -3999,11 +3911,10 @@ function updateControls(dt){
   const kR=(keys['e']?1:0)-(keys['q']?1:0);
   const tUp=keys['r']||keys['shift'],tDn=keys['f']||keys['control'];
   let ext=null,soft=false;
-  // expo on the stick and on tilt: fine control near centre, full authority at the edge
+  // expo on the stick: fine control near centre, full authority at the edge
   const expo=(x)=>{const a=Math.abs(x);return Math.sign(x)*(0.6*a*a*a+0.4*a);};
-  if(touchIn.active){ext=[touchIn.ail,touchIn.elev];soft=true;}
+  if(touchIn.active){const k=STICK_SENS[TOUCH.sens];ext=[clamp(touchIn.ail*k,-1,1),clamp(touchIn.elev*k,-1,1)*(TOUCH.inv?-1:1)];soft=true;}
   else if(padActive)ext=[padX,padY];else if(yoke.on)ext=[yoke.x,yoke.y];
-  else if(tilt.on&&tilt.base&&!kE&&!kA){ext=[tilt.x,tilt.y];soft=true;}
   if(sensorMode){
     // the ball is on the stick now; the orbit autopilot flies the aircraft
     if(ext)slewSensor(ext[0],ext[1],dt);
@@ -4435,40 +4346,38 @@ function missScore(r){
 
 // ---------- touch controls ----------
 (function(){
-  const stick=document.getElementById('stick'),knob=document.getElementById('knob'),
-        zone=document.getElementById('stickZone'),thr=document.getElementById('thr'),
-        drawer=document.getElementById('drawer'),ctxA=document.getElementById('ctxA'),ctxB=document.getElementById('ctxB');
-  // ---- floating joystick: it appears wherever the thumb lands ----
-  let sid=null,sx=0,sy=0,R=70;
-  const pad=document.getElementById('touch');
+  const stick=$('stick'),knob=$('knob'),zone=$('stickZone'),thr=$('thr'),grip=$('thrGrip'),hint=$('stickHint'),pad=$('touch');
+  // ---- floating stick: it appears wherever the left thumb lands, springs back on release ----
+  let sid=null,sx=0,sy=0,R=64;
   function place(e){
     const r=pad.getBoundingClientRect(),z=zone.getBoundingClientRect();
-    R=Math.min(74,Math.max(52,z.height*0.26));
+    R=Math.min(70,Math.max(48,z.height*0.26));
     sx=clamp(e.clientX-r.left,z.left-r.left+R,z.right-r.left-R);
     sy=clamp(e.clientY-r.top,z.top-r.top+R,z.bottom-r.top-R);
     stick.style.left=sx+'px';stick.style.top=sy+'px';
     stick.style.width=stick.style.height=(R*2)+'px';
     stick.style.margin=(-R)+'px 0 0 '+(-R)+'px';
-    stick.classList.add('on');
+    knob.classList.remove('spring');stick.classList.add('on');hint.classList.add('gone');
   }
   function mv(e){
     const r=pad.getBoundingClientRect();
     let dx=(e.clientX-r.left-sx)/R,dy=(e.clientY-r.top-sy)/R;
     const l=Math.hypot(dx,dy);if(l>1){dx/=l;dy/=l;}
     touchIn.ail=dx;touchIn.elev=dy;
-    knob.style.transform=`translate(${dx*R*0.6}px,${dy*R*0.6}px)`;
+    knob.style.transform=`translate(${dx*R*0.72}px,${dy*R*0.72}px)`;
   }
   zone.addEventListener('pointerdown',e=>{
-    if(tilt.on)return;                       // tilt replaces the stick
+    if(sid!==null)return;
     sid=e.pointerId;try{zone.setPointerCapture(sid);}catch(_){}
     touchIn.active=true;place(e);mv(e);
   });
   zone.addEventListener('pointermove',e=>{if(e.pointerId===sid)mv(e);});
   const up=e=>{if(e.pointerId!==sid)return;sid=null;touchIn.active=false;touchIn.ail=0;touchIn.elev=0;
-    knob.style.transform='';stick.classList.remove('on');};
+    knob.classList.add('spring');knob.style.transform='';setTimeout(()=>{if(sid===null)stick.classList.remove('on');},160);};
   zone.addEventListener('pointerup',up);zone.addEventListener('pointercancel',up);
+  window.stickReset=()=>{sid=null;touchIn.active=false;touchIn.ail=touchIn.elev=0;knob.style.transform='';stick.classList.remove('on');};
 
-  // ---- throttle with built in detents ----
+  // ---- throttle: a vertical slider on the right edge, with detents you can tap ----
   let tid=null,tMoved=false,tStart=0;
   function tset(e){const r=thr.getBoundingClientRect();st.throttle=clamp(1-(e.clientY-r.top)/r.height,0,1);}
   thr.addEventListener('pointerdown',e=>{
@@ -4489,68 +4398,52 @@ function missScore(r){
     else{apOff('Autopilot off, your airplane');tset(e);}
   };
   thr.addEventListener('pointerup',tup);thr.addEventListener('pointercancel',()=>tid=null);
+  window.thrUI=()=>{const v=st.throttle;$('thrFill').style.height=(v*100)+'%';grip.style.top=((1-v)*100)+'%';thr.setAttribute('aria-valuenow',Math.round(v*100));};
 
-  // ---- the More drawer: one row, closes after a tap ----
-  const hold={up:false,dn:false};
-  function doAction(a,b,down){
-    if(a==='flapUp'){setFlaps(st.flapIdx-1);return;}
-    if(a==='flapDn'){setFlaps(st.flapIdx+1);return;}
-    if(a==='zoom'){SENSOR.zoom=SENSOR.zoom?0:1;toast(SENSOR.zoom?'Narrow field':'Wide field');return;}
-    if(a==='view'){cycleCam();return;}
-    if(a==='gear'){toggleGear();return;}
-    if(a==='brake'){touchIn.brake=down;b&&b.classList.toggle('held',down);return;}
-    if(a==='trimUp')hold.up=down;
-    if(a==='trimDn')hold.dn=down;
-  }
-  document.getElementById('bMore').addEventListener('click',()=>drawer.classList.toggle('on'));
-  drawer.querySelectorAll('button').forEach(b=>{
-    const a=b.dataset.a;
-    if(a==='tilt')return;                                   // wired to click below
-    if(a==='brake'||a==='trimUp'||a==='trimDn'){            // held buttons stay put
-      b.addEventListener('pointerdown',e=>{e.preventDefault();doAction(a,b,true);});
-      const rel=()=>doAction(a,b,false);
-      b.addEventListener('pointerup',rel);b.addEventListener('pointerleave',rel);b.addEventListener('pointercancel',rel);
-    } else {
-      b.addEventListener('click',()=>{doAction(a,b,true);drawer.classList.remove('on');});
-    }
-  });
-  // click, not pointerdown: iOS only grants motion permission from a real click gesture
-  document.querySelectorAll('[data-a="tilt"]').forEach(b=>b.addEventListener('click',()=>{
-    setTilt(!tilt.on);drawer.classList.remove('on');
-    if(tilt.on){sid=null;touchIn.active=false;touchIn.ail=touchIn.elev=0;stick.classList.remove('on');}
-  }));
-  setInterval(()=>{if(hold.up)st.trim=clamp(st.trim+0.035,-1,1);if(hold.dn)st.trim=clamp(st.trim-0.035,-1,1);},100);
+  // ---- brake: hold ----
+  const bb=$('bBrake');
+  bb.addEventListener('pointerdown',e=>{e.preventDefault();touchIn.brake=true;bb.classList.add('held');try{bb.setPointerCapture(e.pointerId);}catch(_){}});
+  const brel=()=>{touchIn.brake=false;bb.classList.remove('held');};
+  bb.addEventListener('pointerup',brel);bb.addEventListener('pointercancel',brel);
 
-  // ---- context buttons: at most two, by state ----
-  function bindCtx(btn){
-    btn.addEventListener('pointerdown',e=>{e.preventDefault();const a=btn.dataset.a;
-      if(a==='brake'){touchIn.brake=true;btn.classList.add('held');}
-      else if(a==='fire'||a==='track'){strikeBtnPress(a);}
-      else if(a==='drop'){missDrop();}
-      else doAction(a,btn,true);});
-    const rel=()=>{if(btn.dataset.a==='brake'){touchIn.brake=false;btn.classList.remove('held');}};
-    btn.addEventListener('pointerup',rel);btn.addEventListener('pointerleave',rel);btn.addEventListener('pointercancel',rel);
-  }
-  bindCtx(ctxA);bindCtx(ctxB);
-  document.querySelectorAll('.fixb').forEach(b=>{const a=b.dataset.a;
-    if(a==='brake'){b.addEventListener('pointerdown',e=>{e.preventDefault();touchIn.brake=true;b.classList.add('held');});
-      const rel=()=>{touchIn.brake=false;b.classList.remove('held');};b.addEventListener('pointerup',rel);b.addEventListener('pointerleave',rel);b.addEventListener('pointercancel',rel);}
-    else b.addEventListener('pointerdown',e=>{e.preventDefault();if(!running||st.crashed)return;doAction(a,b,true);});});
+  // ---- weapon and mission buttons, lower right, only when there is something to press ----
+  const W=[$('wA'),$('wB'),$('wC')];
+  W.forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();const a=b.dataset.a;
+    if(a==='fire'||a==='track')strikeBtnPress(a);
+    else if(a==='drop')missDrop();
+    else if(a==='zoom'){SENSOR.zoom=SENSOR.zoom?0:1;toast(SENSOR.zoom?'Narrow field':'Wide field');}}));
   let ctxKey='';
   window.updateCtx=function(){
-    let a,b=null;
-    const bz=document.getElementById('bZoom');if(bz)bz.hidden=!sensorMode;
-    if(sensorMode){a=['fire','Fire'];b=['track','Track'];}
-    else if(MISS.on&&MISS.kind==='drop'&&!MISS.dropped){a=['drop','DROP'];b=['view','View'];}
-    else{a=['view','View'];}
-    const key=(a?a[0]:'')+'|'+(b?b[0]:'');
+    let L=[];
+    if(sensorMode)L=[['fire','FIRE'],['track','TRACK'],['zoom','ZOOM']];
+    else if(MISS.on&&MISS.kind==='drop'&&!MISS.dropped&&running)L=[['drop','DROP']];
+    const key=L.map(x=>x[0]).join('|');
     if(key===ctxKey)return;ctxKey=key;
-    ctxA.dataset.a=a[0];ctxA.textContent=a[1];ctxA.hidden=false;
-    if(b){ctxB.dataset.a=b[0];ctxB.textContent=b[1];ctxB.hidden=false;}else ctxB.hidden=true;
+    W.forEach((b,i)=>{const x=L[i];b.hidden=!x;if(x){b.dataset.a=x[0];b.textContent=x[1];}});
   };
   updateCtx();
 })();
-
+// ---------- icons, top right: gear, flaps, camera ----------
+(function(){
+  const pop=$('flapPop');let popT=0;
+  $('bGear').addEventListener('click',()=>toggleGear());
+  $('bCam').addEventListener('click',()=>cycleCam());
+  $('bFlaps').addEventListener('click',()=>{
+    if(pop.classList.contains('on')){pop.classList.remove('on');return;}
+    pop.innerHTML='';
+    FLAPS.forEach((f,i)=>{const b=document.createElement('button');b.textContent=f.deg+'°';b.classList.toggle('on',i===st.flapIdx);
+      b.addEventListener('click',()=>{if(running&&!st.crashed)setFlaps(i);pop.classList.remove('on');});pop.appendChild(b);});
+    pop.classList.add('on');clearTimeout(popT);popT=setTimeout(()=>pop.classList.remove('on'),4000);
+  });
+  let key='';
+  window.iconsUI=()=>{
+    const k=AC.id+'|'+st.flapIdx+'|'+(AC.retract?(st.gearPos>0.99?'D':st.gearPos<0.01?'U':'T'):'-');
+    if(k===key)return;key=k;
+    $('bGear').hidden=!AC.retract;
+    const gp=st.gearPos>0.99?'DOWN':st.gearPos<0.01?'UP':'MOVING';$('bGearT').textContent=gp;$('bGear').classList.toggle('lit',gp!=='DOWN');
+    $('bFlapsT').textContent=FLAPS[st.flapIdx].deg+'°';$('bFlaps').classList.toggle('lit',st.flapIdx>0);
+  };
+})();
 // ---------- audio ----------
 let actx=null,eng,eng2,eng2G,engF,engG,noiseG,noiseF,hornG,cheerG,whine,whineG;
 function toggleGear(){if(!running||st.crashed)return;if(!AC.retract){toast('Fixed gear on the '+(AC.id==='alpha'?'Alpha':'172'));return;}if(st.onGround){toast('Gear stays down on the ground');return;}st.gearDown=!st.gearDown;toast(st.gearDown?'Gear down':'Gear up');}
@@ -4814,7 +4707,7 @@ function start(mode){
   initAudio();
   setType(acType);useModel(acType);sizeShadow();radioQ.length=0;
   st=createState(mode,SPAWN_BASE);st.type=acType;st.easy=easy;st.noPF=isTouch||easy;document.body.classList.toggle('easy',easy);A={};running=true;paused=false;events.length=0;cfgReset();camBump=0;
-  menu.classList.remove('on');crashEl.classList.remove('on');resumeBtn.style.display='';document.getElementById('bPause').textContent='Pause';snapCamera=true;
+  menu.classList.remove('on');crashEl.classList.remove('on');resumeBtn.style.display='';pauseOv.classList.remove('on');snapCamera=true;
   if((mode==='ramp'&&camMode>2)||(camMode===2&&AC.id!=='reaper'))camMode=0;
   STRIKE.active=false;lesEnd();gradeOv.classList.remove('on');
   missReset();missOv.classList.remove('on');landOv.classList.remove('on');
@@ -4822,8 +4715,13 @@ function start(mode){
   if(mode==='range')strikeStart();
   if(mode==='drop'||mode==='short')missStart(mode==='drop'?'drop':'short');
 }
-function openMenu(){if(running&&!st.crashed){paused=true;document.getElementById('bPause').textContent='Resume';}menu.classList.add('on');tiltDiag();}
-function togglePause(){paused=!paused;document.getElementById('bPause').textContent=paused?'Resume':'Pause';}
+const pauseOv=$('pauseOv');
+function openMenu(){if(running&&!st.crashed)paused=true;pauseOv.classList.remove('on');menu.classList.add('on');}
+// the pause button, P and a backgrounded app all land here; the sheet shows while paused
+function togglePause(){paused=!paused;pauseOv.classList.toggle('on',paused);if(paused&&window.stickReset)stickReset();}
+$('pResume').onclick=()=>{paused=false;pauseOv.classList.remove('on');initAudio();};
+$('pRestart').onclick=()=>{pauseOv.classList.remove('on');start(st.mode==='final'||st.mode==='ramp'?st.mode:(MISS.on?MISS.kind:STRIKE.active?'range':'runway'));};
+$('pMenu').onclick=()=>openMenu();
 function freeStart(mode){pickType(savedType);try{localStorage.setItem('kgeuPos',mode);}catch(e){}start(mode);}
 document.getElementById('bRunway').onclick=()=>freeStart('runway');document.getElementById('bRamp').onclick=()=>freeStart('ramp');document.getElementById('bFinal').onclick=()=>freeStart('final');
 document.getElementById('bStrike').onclick=()=>{pickType('reaper',1);start('range');};
@@ -4832,10 +4730,10 @@ document.getElementById('bShort').onclick=()=>{pickType('c130',1);start('short')
 document.getElementById('mRetry').onclick=()=>{missOv.classList.remove('on');start(MISS.kind==='drop'?'drop':'short');};
 document.getElementById('mOther').onclick=()=>{missOv.classList.remove('on');start(MISS.kind==='drop'?'short':'drop');};
 document.getElementById('mFree').onclick=()=>{missOv.classList.remove('on');missReset();start('runway');};
-function landDetails(){if(!running||st.crashed||menu.classList.contains('on'))return;badgeHide();paused=true;document.getElementById('bPause').textContent='Resume';landOv.classList.add('on');}
+function landDetails(){if(!running||st.crashed||menu.classList.contains('on'))return;badgeHide();paused=true;landOv.classList.add('on');}
 gBadge.addEventListener('click',landDetails);
-bannerEl.addEventListener('click',()=>{if(!running||menu.classList.contains('on'))return;badgeHide();if(!st.crashed){paused=true;document.getElementById('bPause').textContent='Resume';}recOpen();});
-document.getElementById('lKeep').onclick=()=>{landOv.classList.remove('on');paused=false;document.getElementById('bPause').textContent='Pause';};
+bannerEl.addEventListener('click',()=>{if(!running||menu.classList.contains('on'))return;badgeHide();if(!st.crashed){paused=true;}recOpen();});
+document.getElementById('lKeep').onclick=()=>{landOv.classList.remove('on');paused=false;};
 document.getElementById('lAgain').onclick=()=>{landOv.classList.remove('on');start(st.mode==='final'?'final':'runway');};
 document.getElementById('lMenu').onclick=()=>{landOv.classList.remove('on');openMenu();};
 document.getElementById('lRec').onclick=()=>{landOv.classList.remove('on');recOpen();};
@@ -4847,19 +4745,17 @@ document.getElementById('recReset').onclick=e=>{
   scReset();resetArmed=0;e.target.textContent='Reset all records';e.target.classList.remove('arm');
   toast('All records and achievements erased');};
 document.getElementById('cRunway').onclick=()=>start('runway');document.getElementById('cRamp').onclick=()=>start('ramp');document.getElementById('cFinal').onclick=()=>start('final');
-resumeBtn.onclick=()=>{if(st.type!==acType){start('runway');return;}menu.classList.remove('on');paused=false;document.getElementById('bPause').textContent='Pause';initAudio();};
-document.getElementById('bView').onclick=cycleCam;
+resumeBtn.onclick=()=>{if(st.type!==acType){start('runway');return;}menu.classList.remove('on');paused=false;initAudio();};
 document.getElementById('bAuto').onclick=autoSmart;
 document.getElementById('bFull').onclick=()=>{const d=document.documentElement;if(document.fullscreenElement){document.exitFullscreen&&document.exitFullscreen();return;}
   const r=d.requestFullscreen||d.webkitRequestFullscreen;if(!r){toast('Full screen not available here');return;}try{const p=r.call(d);if(p&&p.catch)p.catch(()=>toast('Full screen is blocked in this view. Use Ctrl Cmd F'));}catch(e){toast('Full screen is blocked in this view');}};
 function easyUI(){const b=document.getElementById('oEasy');b.textContent='Easy flight: '+(easy?'On':'Off');b.classList.toggle('on',easy);document.body.classList.toggle('easy',easy);}
 document.getElementById('oEasy').onclick=()=>{easy=!easy;try{localStorage.setItem('kgeuEasy',easy?'1':'0');}catch(e){}easyUI();if(running){st.easy=easy;st.noPF=isTouch||easy;}};
-document.getElementById('oTilt').onclick=()=>setTilt(!tilt.on);
-document.getElementById('oInv').onclick=()=>{tilt.inv=!tilt.inv;try{localStorage.setItem('kgeuTiltInv',tilt.inv?'1':'0');}catch(e){}tiltUI();};
-document.getElementById('oSens').addEventListener('input',e=>{tilt.sens=+e.target.value;try{localStorage.setItem('kgeuTiltSens',String(tilt.sens));}catch(e2){}tiltUI();});
+document.querySelectorAll('.oInv').forEach(b=>b.onclick=()=>setInvPitch(!TOUCH.inv));
+document.querySelectorAll('.oSens').forEach(r=>r.addEventListener('input',e=>setStickSens(+e.target.value)));
 document.getElementById('oRadio').onclick=()=>{initAudio();setRadioOn(!RADIO.on);};
 document.getElementById('oRvol').addEventListener('input',e=>{initAudio();setRadioVol(+e.target.value/10);});
-easyUI();tiltUI();radioUI();
+easyUI();stickUI();radioUI();
 // Add to Home Screen tip. iOS has no install prompt a page can trigger, so the
 // best we can do is say exactly where the button is, and only when it applies.
 (function(){
@@ -4949,7 +4845,7 @@ function grade(score,title,lines,failWhy){
 }
 document.getElementById('gRetry').onclick=()=>startLesson(LES.last);
 document.getElementById('gSchool').onclick=()=>{gradeOv.classList.remove('on');openMenu();document.getElementById('school').classList.add('on');schoolList();};
-document.getElementById('gFree').onclick=()=>{gradeOv.classList.remove('on');paused=false;document.getElementById('bPause').textContent='Pause';};
+document.getElementById('gFree').onclick=()=>{gradeOv.classList.remove('on');paused=false;};
 document.getElementById('lesQuit').onclick=()=>{lesEnd();toast('Lesson ended. Free flight');};
 document.getElementById('bSchool').onclick=()=>{const el=document.getElementById('school');el.classList.toggle('on');schoolList();};
 function lessonEvent(ev){
@@ -5037,7 +4933,7 @@ function coachUpdate(dt){
     coachShow(isTouch?'Tap Auto T/O up top and keep your hands off. It flies the takeoff for you.':'Press O or click Auto T/O. Hands off, it flies the takeoff for you.');}
   else if(coachStep===1){if(s.onGround&&!ap)return;
     if(ap&&ap.mode!=='hold'){coachEl.classList.remove('on');return;}
-    coachShow(isTouch?'Your turn. Move the stick or tilt the phone to fly. Let go and it flies straight.':'Your turn. Use the arrow keys, or click and drag on the scene. Let go and it flies straight.');
+    coachShow(isTouch?'Your turn. Put your left thumb down and move the stick. Let go and it flies straight.':'Your turn. Use the arrow keys, or click and drag on the scene. Let go and it flies straight.');
     if(!ap&&(Math.abs(s.ail)>0.2||Math.abs(s.elev)>0.2)){coachSet(2);coachT=15;}}
   else if(coachStep===2){if(s.onGround||(ap&&ap.mode==='land')){coachSet(3);return;}coachT-=dt;
     if(coachT<=0)coachShow(isTouch?'Tap Auto Land to bring it home, or land it yourself.':'Press O or click Auto Land to bring it home, or land it yourself.');}
@@ -5058,8 +4954,7 @@ function pickType(id,temp){acType=TYPES[id]?id:'reaper';best=loadBest();
   best=loadBest();showBest();resumeBtn.style.display=(running&&!st.crashed&&st.type===acType)?'':'none';}
 document.querySelectorAll('.pick[data-t]').forEach(b=>b.onclick=()=>pickType(b.dataset.t));
 pickType(acType);setType(acType);useModel(acType);sizeShadow();st=createState('runway',SPAWN_BASE);st.type=acType;
-document.getElementById('bPause').onclick=()=>{if(running&&!st.crashed)togglePause();};
-document.getElementById('bMenu').onclick=openMenu;
+document.getElementById('bPause').onclick=()=>{if(running&&!st.crashed&&!paused)togglePause();};
 const toastEl=document.getElementById('toast');let toastT=0;
 function toast(msg){toastEl.textContent=msg;toastEl.classList.add('on');toastT=3;}
 
@@ -5164,8 +5059,8 @@ function drawSixPack(){
   // --- turn coordinator ---
   {const [cx,cy]=cell(0,1);spFace(x,cx,cy,R);
    const rate=st.w.y*180/Math.PI;                          // deg per second of yaw
-   const tilt=clamp(-rate/3,-2,2)*0.32;                    // a standard rate turn is 3 deg/s
-   x.save();x.translate(cx,cy-2);x.rotate(tilt);
+   const lean=clamp(-rate/3,-2,2)*0.32;                    // a standard rate turn is 3 deg/s
+   x.save();x.translate(cx,cy-2);x.rotate(lean);
    x.strokeStyle='#e8eaec';x.lineWidth=2.5;
    x.beginPath();x.moveTo(-22,0);x.lineTo(22,0);x.moveTo(0,-3);x.lineTo(0,4);
    x.moveTo(-7,9);x.lineTo(7,9);x.stroke();x.restore();
@@ -5665,8 +5560,7 @@ function sensorText(){
 // ---------- main loop ----------
 function resize(){const w=window.innerWidth,h=window.innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();sizeMap();}
 window.addEventListener('resize',resize);resize();
-const $=id=>document.getElementById(id);
-const mtsEl=$('mts'),mtsTxt=$('mtsTxt'),_mtsE=new THREE.Euler(),hIas=$('hIas'),hAlt=$('hAlt'),hWindT=$('hWindT'),hWindA=$('hWindA'),hAp=$('hAp'),bAuto=$('bAuto'),warnEl=$('warn'),thrFill=$('thrFill');
+const mtsEl=$('mts'),mtsTxt=$('mtsTxt'),_mtsE=new THREE.Euler(),hIas=$('hIas'),hAlt=$('hAlt'),hWindT=$('hWindT'),hWindA=$('hWindA'),hAp=$('hAp'),bAuto=$('bAuto'),warnEl=$('warn'),hVs=$('hVs'),hHdg=$('hHdg');
 const APN={to:'AUTO T/O',hold:'ALT HOLD',land:'AUTOLAND',orbit:'ORBIT'},APP={climb:'CLIMB',nav:'NAV',loc:'FINAL',orb:'DESCEND'};
 const _cf=new V3(),_cu=new V3(),_co=new V3(),_ct=new V3(),_cr=new V3(),_eu=new THREE.Euler(0,0,0,'YXZ'),_el=new THREE.Euler(0,0,0,'YXZ');
 const TOWER=new V3(wX(1290,-470),24.5,wZ(1290,-470)),CROWD=new V3(wX(1590,-196),2.8,wZ(1590,-196));
@@ -5694,9 +5588,6 @@ function frame(t){
     if(ev.type==='liftoff') clusters.forEach(c=>{if(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)<1500){c.cheer=4;}});
   }
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.classList.remove('on');}
-  tilt.rateT+=dt;if(tilt.rateT>=1){tilt.rate=tilt.rateN;tilt.rateN=0;tilt.rateT=0;
-    if(tilt.on&&tilt.rate===0&&!tilt.blocked&&performance.now()-tilt.onAt>1500)tiltBlockedMsg();
-    if(menu.classList.contains('on'))tiltDiag();}
   missUpdate(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);
   {const show=camMode===1&&(AC.id==='cessna'||AC.id==='alpha')&&running&&!st.crashed;
    if(spCan){spCan.classList.toggle('on',show);if(show)drawSixPack();}}
@@ -5769,8 +5660,8 @@ function frame(t){
     const orb=apm&&(apm.mode==='hold'||apm.mode==='orbit');
     const lbl=apm?(orb?'Auto Land':'Auto ON'):(s.onGround?'Auto T/O':(AC.id==='reaper'?'Orbit':'Auto Land'));
     if(bAuto.textContent!==lbl)bAuto.textContent=lbl;bAuto.classList.toggle('on',!!apm&&!orb);
-    coachUpdate(0.08);updateCtx();
-    thrFill.style.height=(s.throttle*100)+'%';}
+    {const vs=Math.round(s.vel.y*196.85/10)*10;hVs.textContent=(vs>0?'+':'')+vs.toLocaleString('en-US');hHdg.textContent=String(Math.round(hdgM)%360||360).padStart(3,'0');}
+    coachUpdate(0.08);updateCtx();iconsUI();thrUI();}
   const kias=s.ias*MS2KT;let w='';
   gearWarn=running&&!s.crashed&&AC.retract&&!s.onGround&&s.gearPos<0.99&&agl<120&&s.vel.y<-0.8;
   if(running&&!paused&&!s.crashed){if(s.aoaWarn)w='STALL';else if(gearWarn)w='GEAR UP';else if(kias>AC.vne)w='OVERSPEED';else if(s.flapIdx>0&&kias>AC.vfe)w='FLAP SPEED';}
@@ -5778,7 +5669,7 @@ function frame(t){
   updateAudio();renderer.render(scene,camera);
 }
 // test hook: headless UI checks need to reach a few internals
-window.__kgeu={tilt:tilt,setTilt:setTilt,state:()=>st,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},HD:()=>HD,
+window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},HD:()=>HD,
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
   setTOD:setTOD,isNight:isNight,TOD:()=>TOD,drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
