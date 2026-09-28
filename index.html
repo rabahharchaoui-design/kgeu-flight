@@ -151,6 +151,7 @@ body.hasDest #stickZone{ top:calc(var(--padT) + 178px); }
 #sensorHud .tgtMark .dm{ position:relative; display:block; width:11px; height:11px; margin:3px auto 5px; border:1.5px solid rgba(238,242,236,.9); transform:rotate(45deg); box-shadow:0 0 2px rgba(0,0,0,.8); }
 #sensorHud .tgtMark.lk{ color:#ffd66b; }
 #sensorHud .tgtMark.lk .dm{ width:15px; height:15px; margin:1px auto 3px; border:2px solid #ffd66b; background:rgba(255,214,107,.45); }
+#sensorHud .tgtMark.nl span{ display:none; }
 #sensorHud .tgtMark.dead .dm{ border:0; box-shadow:none; }
 #sensorHud .tgtMark.dead .dm::before,#sensorHud .tgtMark.dead .dm::after{ content:''; position:absolute; left:4.5px; top:-2px; width:2px; height:15px; background:rgba(238,242,236,.9); box-shadow:0 0 2px #000; }
 #sensorHud .tgtMark.dead .dm::after{ transform:rotate(90deg); }
@@ -6602,7 +6603,7 @@ function sensorHudUpdate(){
 }
 // ---- target markers: a diamond with name and distance on every live target in view, an
 // arrow on the edge for the ones outside it, an x for 3 s where one died. 8 of each, pooled.
-const TM={mk:[],ar:[],shown:false,W:0,H:0,R:0,mt:0};const _tmv=new V3();
+const TM={mk:[],ar:[],shown:false,W:0,H:0,R:0,mt:0,mid:[0,0,0,0]};const _tmv=new V3();
 (function(){const box=$('tgtMarks');
   for(let i=0;i<8;i++){
     const m=document.createElement('div');m.className='tgtMark';m.innerHTML='<b class="dm"></b><span></span>';box.appendChild(m);
@@ -6621,7 +6622,9 @@ function tgtMarkUpdate(dt){
   if(!STRIKE.active||!STRIKE.built){if(TM.shown)tgtMarkHide();return;}
   TM.shown=true;
   TM.mt-=dt;if(!TM.W||TM.mt<=0){TM.mt=1;TM.W=hudSens.clientWidth;TM.H=hudSens.clientHeight;
-    const dk=$('dock').getBoundingClientRect(),hr=hudSens.getBoundingClientRect();TM.R=Math.min(TM.W-44,(dk.width?dk.left-hr.left:TM.W)-18);}
+    const dk=$('dock').getBoundingClientRect(),hr=hudSens.getBoundingClientRect();TM.R=Math.min(TM.W-44,(dk.width?dk.left-hr.left:TM.W)-18);
+    // the centre text block, padded: labels that would land on it are dropped
+    const mr=shEl.Mid.getBoundingClientRect();TM.mid=[mr.left-hr.left-12,mr.top-hr.top-10,mr.right-hr.left+12,mr.bottom-hr.top+8];}
   const W=TM.W,H=TM.H,L=48,T=40,R=TM.R,B=H-54,cx=W/2,cy=H/2,r=rookie();
   camera.updateMatrixWorld();sensorOrigin(_so);
   const tY=Math.tan(camera.fov*Math.PI/360),tX=tY*camera.aspect;
@@ -6635,7 +6638,9 @@ function tgtMarkUpdate(dt){
       const sx=(nx/cz+1)/2*W,sy=(1-ny/cz)/2*H;
       if(t.dead){tmPut(TM.mk[mi++],'dead',sx,sy,'');continue;}
       const nm=r?t.name:t.name.toUpperCase(),lk=SENSOR.tgt===t,ds=fmtDist(_so.distanceTo(_tmv.set(t.x,t.y,t.z)));
-      tmPut(TM.mk[mi++],lk?'lk':'',sx,sy,(lk?'LOCK ':'')+nm+'\n'+ds);
+      // label box: about 90 px wide, from 8 to 36 px under the diamond
+      const M=TM.mid,hit=sx+45>M[0]&&sx-45<M[2]&&sy+36>M[1]&&sy+8<M[3];
+      tmPut(TM.mk[mi++],(lk?'lk':'')+(hit?' nl':''),sx,sy,(lk?'LOCK ':'')+nm+'\n'+ds);
     } else if(!t.dead&&ai<8){
       let dx=nx,dy=-ny;if(Math.abs(dx)+Math.abs(dy)<1e-6)dy=1;
       dx*=W/2;dy*=H/2;
@@ -6686,16 +6691,16 @@ const _fw=new V3();
 const fireTex=tex(64,64,(x,w,h)=>{const g=x.createRadialGradient(32,36,1,32,32,31);
   g.addColorStop(0,'rgba(255,240,180,1)');g.addColorStop(0.35,'rgba(255,150,40,.85)');
   g.addColorStop(1,'rgba(180,60,10,0)');x.fillStyle=g;x.fillRect(0,0,64,64);});
-const FIRE_MAX=28,fires=[];
+const FIRE_MAX=24,fires=[];
 for(let i=0;i<FIRE_MAX;i++){
-  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:i%4?puffTex:fireTex,
-    color:i%4?0x555552:0xffffff,transparent:true,opacity:0,depthWrite:false,fog:true}));
-  if(i%4)sp.layers.set(1);
-  sp.visible=false;scene.add(sp);fires.push({sp:sp,on:false,x:0,z:0,y0:0,t:i*0.37,fire:i%4===0,left:0});
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:i%3?puffTex:fireTex,
+    color:i%3?0x555552:0xffffff,transparent:true,opacity:0,depthWrite:false,fog:true}));
+  if(i%3)sp.layers.set(1);
+  sp.visible=false;scene.add(sp);fires.push({sp:sp,on:false,x:0,z:0,y0:0,t:i*0.37,fire:i%3===0,left:0});
 }
-// one flame and three smoke puffs; sec: how long it burns (default until the range resets)
+// one flame and two smoke puffs; sec: how long it burns (default until the range resets)
 function lightFire(x,z,y0,sec){let n=0;
-  for(const f of fires){if(f.on||n>=4)continue;f.on=true;f.x=x;f.z=z;f.y0=y0;f.left=sec||1e9;f.sp.visible=true;n++;}}
+  for(const f of fires){if(f.on||n>=3)continue;f.on=true;f.x=x;f.z=z;f.y0=y0;f.left=sec||1e9;f.sp.visible=true;n++;}}
 // how lit unlit smoke should look: full by day, dim at dusk, dark at night; flat grey in IR
 function fxLit(){return camMode===2&&SENSOR.mode!=='tv'?-1:TOD.night?0.16:TOD.id==='sunset'?0.6:1;}
 function fireUpdate(dt){
@@ -6732,30 +6737,37 @@ function debrisUpdate(dt){
 //   secondary: 0-3 smaller bursts 0.4-1.5 s later; debris: pieces thrown; smokeSec: how long
 //   the column lingers (60); fireSec: how long the wreck burns (0 none); glow: light the
 //   ground at night (true)}.
-// Three explosions at once, each 10 fireball sprites, 1 flash, 14 smoke sprites, a shock
-// ring, a dust ring, a scorch and a night ground glow; secondaries come from a pool of 4
-// three-sprite bursts. Everything is built here; explode() only moves and resets it.
-const FX_N=3,FX_FB=10,FX_SM=14,FX_CORE=4,FX_MINI=4;
-// hot core: white centre, yellow, orange rim
+// Three explosions at once, each 8 fireball sprites (3 hard additive cores, 5 textured
+// bodies), 1 flash, 18 column sprites, a shock ring, a dust ring, a scorch and a night
+// ground glow; secondaries come from a pool of 4 three-sprite bursts. 117 sprites at most
+// with the 24 wreck fires. Everything is built here; explode() only moves and resets it.
+const FX_N=3,FX_FB=8,FX_SM=18,FX_CORE=3,FX_MINI=4;
+// seeded value noise for the canvas textures
+function fxNoise(seed){let sd=seed;const rnd=()=>{sd=(sd*16807)%2147483647;return sd/2147483647;};
+  const G=[];for(let i=0;i<256;i++)G.push(rnd());
+  const v=(x,y)=>{const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,h=(a,b)=>G[((a&15)*16+(b&15))&255];
+    const u=xf*xf*(3-2*xf),w=yf*yf*(3-2*yf);
+    return (h(xi,yi)*(1-u)+h(xi+1,yi)*u)*(1-w)+(h(xi,yi+1)*(1-u)+h(xi+1,yi+1)*u)*w;};
+  return {rnd:rnd,f:(x,y)=>(v(x,y)*0.55+v(x*2.1+5,y*2.1+3)*0.3+v(x*4.3+9,y*4.3+1)*0.15)};}
+// hard core: a white plateau with a thin yellow rim
 const fxCoreTex=tex(64,64,(x,w,h)=>{const g=x.createRadialGradient(32,32,1,32,32,31);
-  g.addColorStop(0,'rgba(255,255,245,1)');g.addColorStop(0.3,'rgba(255,236,160,.95)');
-  g.addColorStop(0.62,'rgba(255,150,40,.5)');g.addColorStop(1,'rgba(200,60,10,0)');x.fillStyle=g;x.fillRect(0,0,64,64);});
-// fireball body: lumpy, a few overlapping blobs so it rolls rather than reads as a disc
-const fxBallTex=tex(64,64,(x,w,h)=>{
-  for(let i=0;i<9;i++){const a=i/9*6.283+(i%3)*0.4,r=i?9+(i%4)*2.5:0,cx=32+Math.cos(a)*r,cy=32+Math.sin(a)*r,R=i?13+(i%3)*3:20;
-    const g=x.createRadialGradient(cx,cy,1,cx,cy,R);g.addColorStop(0,'rgba(255,255,255,.85)');g.addColorStop(0.55,'rgba(255,255,255,.55)');g.addColorStop(1,'rgba(255,255,255,0)');
-    x.fillStyle=g;x.fillRect(0,0,64,64);}});
-// smoke: soft billows with some grain inside, alpha only (colour comes from the material)
-const fxSmokeTex=tex(128,128,(x,w,h)=>{
-  let sd=7;const rnd=()=>{sd=(sd*16807)%2147483647;return sd/2147483647;};
-  for(let i=0;i<22;i++){const a=rnd()*6.283,r=rnd()*30,cx=64+Math.cos(a)*r,cy=64+Math.sin(a)*r*0.85,R=18+rnd()*20;
-    const g=x.createRadialGradient(cx,cy,1,cx,cy,R);const v=200+rnd()*55|0;
-    g.addColorStop(0,`rgba(${v},${v},${v},.32)`);g.addColorStop(0.6,`rgba(${v},${v},${v},.16)`);g.addColorStop(1,`rgba(${v},${v},${v},0)`);
-    x.fillStyle=g;x.fillRect(0,0,128,128);}
-  // fade the square's corners so no edge ever shows
-  const id=x.getImageData(0,0,128,128),d=id.data;
-  for(let y=0;y<128;y++)for(let X=0;X<128;X++){const r=Math.hypot(X-64,y-64)/64,k=(y*128+X)*4;
-    d[k+3]=d[k+3]*clamp((1-r)*2.2,0,1)*(0.85+rnd()*0.3);}
+  g.addColorStop(0,'rgba(255,255,250,1)');g.addColorStop(0.42,'rgba(255,250,215,1)');g.addColorStop(0.62,'rgba(255,205,110,.7)');
+  g.addColorStop(0.82,'rgba(255,140,40,.22)');g.addColorStop(1,'rgba(220,80,10,0)');x.fillStyle=g;x.fillRect(0,0,64,64);});
+// fireball body: bright centre, mottled orange, ragged dark edge. The material colour
+// multiplies it down the cooling ramp, so the same texture ends as dark smoke.
+const fxBallTex=tex(128,128,(x,w,h)=>{const N=fxNoise(11),id=x.createImageData(128,128),d=id.data;
+  for(let y=0;y<128;y++)for(let X=0;X<128;X++){const dx=(X-64)/64,dy=(y-64)/64,r=Math.hypot(dx,dy),a=Math.atan2(dy,dx);
+    const n=N.f(X/13,y/13),rr=0.7+0.26*N.f(Math.cos(a)*2.2+7,Math.sin(a)*2.2+7),q=r/rr,k=(y*128+X)*4;
+    const lum=clamp(1.15-q*0.95+(n-0.5)*0.7,0,1);
+    const R=255*clamp(0.4+lum*1.1,0,1),G=255*clamp(lum*1.0+0.06,0,1)*(0.78+0.22*n),B=255*clamp(lum*lum*0.95-0.04,0,1);
+    d[k]=R;d[k+1]=G;d[k+2]=B;d[k+3]=255*clamp((1-q)*5,0,1)*clamp(0.75+n*0.5,0,1);}
+  x.putImageData(id,0,0);});
+// smoke: soft wispy edge, lumpy inside, alpha carries the shape (colour comes from the material)
+const fxSmokeTex=tex(128,128,(x,w,h)=>{const N=fxNoise(7),id=x.createImageData(128,128),d=id.data;
+  for(let y=0;y<128;y++)for(let X=0;X<128;X++){const dx=(X-64)/64,dy=(y-64)/64,r=Math.hypot(dx,dy),a=Math.atan2(dy,dx);
+    const n=N.f(X/11,y/11),rr=0.72+0.28*N.f(Math.cos(a)*1.8+3,Math.sin(a)*1.8+3),q=r/rr,k=(y*128+X)*4;
+    const v=200+55*n;d[k]=d[k+1]=d[k+2]=v;
+    d[k+3]=255*clamp((1-q)*1.7,0,1)**0.9*clamp(0.5+n*0.8,0,1);}
   x.putImageData(id,0,0);});
 // warm ground light under a fire at night, an additive decal like the landing light pool
 const fxGlowTex=tex(64,64,(x,w,h)=>{const g=x.createRadialGradient(32,32,1,32,32,32);
@@ -6774,10 +6786,11 @@ const FX=[],FX_M=[];
    side:THREE.DoubleSide,fog:!add,blending:add?THREE.AdditiveBlending:THREE.NormalBlending}));m.visible=false;m.renderOrder=ro;scene.add(m);return m;};
  for(let k=0;k<FX_N;k++){const o={on:false,t:0,end:0,x:0,y:0,z:0,gy:0,s:1,T:2.5,H:250,smokeSec:60,fireSec:0,glow:true,frames:0,fb:[],sm:[],sec:[],secN:0};
   for(let i=0;i<FX_FB;i++){const core=i<FX_CORE;
-    o.fb.push({sp:spr(core?fxCoreTex:fxBallTex,core,false,1),core:core,dx:0,dy:0,dz:0,sz:1,rot:0});}
+    const sp=spr(core?fxCoreTex:fxBallTex,core,false,1);if(core)sp.renderOrder=3;   // the hot core draws over the bodies
+    o.fb.push({sp:sp,core:core,dx:0,dy:0,dz:0,sz:1,rot:0});}
   o.flash=spr(fxCoreTex,true,false,1);
   for(let i=0;i<FX_SM;i++){const sp=spr(fxSmokeTex,false,true,0.3);
-    o.sm.push({sp:sp,live:false,age:0,life:0,gen:0,x:0,y:0,z:0,ox:0,oz:0,out:0,outMax:0,vb:0,burst:0,sz:1,spin:0,due:0,shade:0});}
+    o.sm.push({sp:sp,live:false,p:0,a:0,j:0,x:0,y:0,z:0,sz:1,spin:0,shade:0});}
   for(let i=0;i<3;i++)o.sec.push({t:0,dx:0,dz:0,done:true});
   o.ring=decal(ringG,0xfff0d0,false,1);o.dust=decal(dustG,0xc2ad88,false,1);
   o.scorch=decal(scG,0x1c1914,false,0);o.glowM=decal(glG,0xffffff,true,2);
@@ -6786,13 +6799,13 @@ const FX=[],FX_M=[];
   for(let i=0;i<3;i++)m.fb.push({sp:spr(i?fxBallTex:fxCoreTex,!i,false,1),dx:0,dy:0,dz:0,sz:1});
   FX_M.push(m);}}
 let fxLast=null;
-// fireball colour as it cools: white-yellow, orange, dark red
-const FX_RAMP=[[1,0.98,0.86],[1,0.78,0.36],[1,0.42,0.1],[0.3,0.12,0.07]];
+// fireball colour as it cools: white, yellow, orange, dark red, black smoke
+const FX_RAMP=[[1,1,0.95],[1,0.86,0.5],[1,0.5,0.16],[0.48,0.14,0.05],[0.08,0.07,0.065]];
 // fire colour: the cooling ramp in colour, white (or black) hot in IR
 function fxHot(sp,u){const m=sp.material,ir=camMode===2&&SENSOR.mode!=='tv';
   if(!ir){m.blending=sp.userData.add?THREE.AdditiveBlending:THREE.NormalBlending;fxRamp(u,m.color);return;}
   const inv=SENSOR.mode==='irb';m.blending=inv?THREE.NormalBlending:THREE.AdditiveBlending;m.color.setScalar(inv?0:1);}
-function fxRamp(u,c){u=clamp(u,0,1)*3;const i=Math.min(2,u|0),f=u-i,a=FX_RAMP[i],b=FX_RAMP[i+1];
+function fxRamp(u,c){u=clamp(u,0,1)*4;const i=Math.min(3,u|0),f=u-i,a=FX_RAMP[i],b=FX_RAMP[i+1];
   c.setRGB(a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f,a[2]+(b[2]-a[2])*f);}
 function fxFlashDom(x,y,z,s){
   const fl=document.getElementById('bigFlash'),d=camera.position.distanceTo(_st2.set(x,y,z));
@@ -6810,13 +6823,15 @@ function explode(x,y,z,opt){opt=opt||{};
   o.T=2.5*Math.sqrt(s);o.H=250*Math.sqrt(s);
   o.smokeSec=opt.smokeSec!==undefined?opt.smokeSec:60;o.fireSec=opt.fireSec||0;o.glow=opt.glow!==false;
   o.end=Math.max(o.smokeSec,o.fireSec,o.T)+2;fxLast=o;
-  const R=15*Math.pow(s,0.75),S=52*Math.pow(s,0.75);
+  // size goes with scale, so a bunker is plainly twice a truck
+  const R=13*s,S=44*s;
   for(const f of o.fb){
     const a=Math.random()*6.283,c=Math.random()*2-1,r=Math.sqrt(1-c*c);
-    f.dx=Math.cos(a)*r*R;f.dz=Math.sin(a)*r*R;f.dy=(Math.abs(c)*0.8+0.2)*R;
-    f.sz=(f.core?0.55:0.8+Math.random()*0.5)*S;f.rot=Math.random()*6.283;f.sp.material.rotation=f.rot;f.sp.visible=true;}
+    f.dx=Math.cos(a)*r*R*(f.core?0.4:1);f.dz=Math.sin(a)*r*R*(f.core?0.4:1);f.dy=(Math.abs(c)*0.8+0.2)*R;
+    f.sz=(f.core?0.45+Math.random()*0.2:0.6+Math.random()*0.7)*S;f.rot=Math.random()*6.283;f.sp.material.rotation=f.rot;f.sp.visible=true;}
   o.flash.visible=true;o.flash.position.set(x,o.y+3*Math.sqrt(s),z);
-  for(let i=0;i<FX_SM;i++){const m=o.sm[i];m.live=false;m.gen=0;m.due=i*3/FX_SM;m.sp.visible=false;}
+  // the column: phases spread evenly along it, so it is continuous from the base up
+  for(let i=0;i<FX_SM;i++){const m=o.sm[i];m.live=true;m.p=(i+Math.random()*0.6)/FX_SM;fxPuff(m);m.sp.visible=false;}
   o.ring.visible=o.dust.visible=true;o.ring.position.set(x,gy+0.6,z);o.dust.position.set(x,gy+0.45,z);
   o.ring.scale.setScalar(0.01);o.dust.scale.setScalar(0.01);
   o.scorch.visible=true;o.scorch.position.set(x,gy+0.15,z);o.scorch.scale.setScalar((13+Math.random()*4)*Math.pow(s,0.8));o.scorch.material.opacity=0.8;
@@ -6830,6 +6845,8 @@ function explode(x,y,z,opt){opt=opt||{};
   irDirty=true;
   return o;
 }
+function fxPuff(m){m.a=Math.random()*6.283;m.j=Math.random();m.sz=0.85+Math.random()*0.3;
+  m.spin=(Math.random()-0.5)*0.25;m.shade=Math.random()*0.06;m.sp.material.rotation=Math.random()*6.283;}
 // a smaller burst: a cooking-off secondary, or anything that wants a pop without a column
 function fxMini(x,y,z,s){
   let m=null;for(const e of FX_M)if(!e.on){m=e;break;}
@@ -6850,45 +6867,36 @@ function fxUpdate(dt){
     // flash: the first three frames only
     if(o.flash.visible){const k=o.frames<=3?1:0;fxHot(o.flash,0);o.flash.scale.setScalar(70*s*(1+0.3*o.frames));o.flash.material.opacity=k;if(!k)o.flash.visible=false;}
     // fireball: 2/3 of its size by 0.3 s, rising, cooling through orange to dark red
-    const e=1-Math.exp(-t*3.66),rise=t*(9+4*e)*rs;
+    // the core stays hard white for 0.3 s, the bodies roll up through the ramp into smoke
+    const e=1-Math.exp(-t*3.66),rise=t*(8+6*u)*rs;
     for(const f of o.fb){if(!f.sp.visible)continue;
       if(u>=1){f.sp.visible=false;continue;}
-      const m=f.sp.material,uu=f.core?u*1.35:u;
-      f.sp.position.set(o.x+f.dx*e+_fw.x*t,o.y+4*rs+f.dy*e+rise*(f.core?0.8:1),o.z+f.dz*e+_fw.z*t);
-      f.sp.scale.setScalar(f.sz*(0.15+0.85*e)*(1+0.25*u));
-      fxHot(f.sp,f.core?uu*1.2:0.2+0.8*uu);
-      m.opacity=f.core?clamp(1-uu,0,1):clamp((1-u)*1.8,0,1)*0.95;m.rotation=f.rot+t*0.25;}
-    // smoke column: 14 puffs let go over 3 s, then recycled at the base until the fire dies down
-    const H=o.H,thin=clamp(1-t/o.smokeSec,0,1),feed=t<o.smokeSec*0.6;
+      const m=f.sp.material;
+      f.sp.position.set(o.x+f.dx*e+_fw.x*t*u,o.y+3*rs+f.dy*e+rise*(f.core?0.5:1),o.z+f.dz*e+_fw.z*t*u);
+      f.sp.scale.setScalar(f.sz*(0.15+0.85*e)*(1+0.35*u));
+      if(f.core){const c=clamp((t-0.35)/0.8,0,1);fxHot(f.sp,c*0.35);m.opacity=1-c;if(c>=1)f.sp.visible=false;}
+      else{fxHot(f.sp,u);m.opacity=0.97*clamp((1-u)*2.5,0,1);}
+      m.rotation=f.rot+t*0.3;}
+    // smoke column: 18 sprites spread along it by phase. The top climbs to H in about 12 s;
+    // each sprite rises through the stem, rolls out into the cap past 0.7 and comes back in
+    // at the base, until the feed stops. The higher the smoke, the longer the wind has had it.
+    const H=o.H,top=H*(1-Math.exp(-t/3.5)),thin=clamp(1-t/o.smokeSec,0,1),feed=t<o.smokeSec*0.75,vr=9*rs,sz=Math.pow(s,0.6);
+    const fin=clamp((t-0.25)/1.2,0,1);
     for(const m of o.sm){
-      if(!m.live){
-        if(t<m.due||(m.gen>0&&!feed)){m.sp.visible=false;continue;}
-        m.live=true;m.age=0;m.gen++;
-        const a=Math.random()*6.283,r=Math.random()*4*rs;
-        m.x=o.x+Math.cos(a)*r;m.z=o.z+Math.sin(a)*r;m.y=o.y+2*rs;m.ox=Math.cos(a);m.oz=Math.sin(a);m.out=0;m.outMax=H*(0.18+0.2*Math.random());
-        m.vb=6+Math.random()*4;
-        // the first puffs ride the fireball up fast, so the cap forms early
-        m.burst=m.gen===1?H*(0.45+0.45*Math.random())*0.6:0;
-        m.life=m.gen===1?o.smokeSec*(0.55+0.35*Math.random()):(H/m.vb)*(0.8+Math.random()*0.5);
-        m.sz=(0.8+Math.random()*0.4)*rs;m.spin=(Math.random()-0.5)*0.3;m.shade=Math.random()*0.08;
-        m.sp.material.rotation=Math.random()*6.283;m.sp.visible=true;}
-      m.age+=dt;
-      if(m.age>=m.life){m.live=false;m.due=0;m.sp.visible=false;continue;}
-      const h=m.y-o.y,f=clamp(h/H,0,1);
-      // slows toward the top of the column; past 0.6 of it the puffs spread into a cap
-      let vy=(m.vb+m.burst*Math.exp(-m.age*0.6))*clamp((1-f)/0.25,0,1);
-      const cf=cap01(f);if(cf>0)m.out=Math.min(m.outMax,m.out+cf*(5+8*cf)*rs*dt);
-      const wk=0.6+0.6*f;
-      m.x+=_fw.x*wk*dt;m.z+=_fw.z*wk*dt;m.y+=vy*dt;
-      const grow=Math.min(1,m.age/7);
-      m.sp.position.set(m.x+m.ox*m.out,m.y,m.z+m.oz*m.out);
-      m.sp.scale.setScalar(m.sz*(20+40*grow+56*f));
+      if(!m.live)continue;
+      m.p+=dt*vr/H;
+      if(m.p>=1){if(feed){m.p-=1;fxPuff(m);}else{m.live=false;m.sp.visible=false;continue;}}
+      const p=m.p,cf=clamp((p-0.7)/0.3,0,1),drift=Math.min(t,p*H/vr)*(0.35+0.4*p);
+      const r=top*(0.04+0.05*m.j)+top*0.34*Math.pow(cf,0.7);
+      m.x=o.x+Math.cos(m.a)*r+_fw.x*drift;m.z=o.z+Math.sin(m.a)*r+_fw.z*drift;m.y=o.y+top*(p-0.1*cf*cf)+4*rs;
+      m.sp.position.set(m.x,m.y,m.z);m.sp.visible=true;
+      m.sp.scale.setScalar(m.sz*sz*(44+36*p+30*cf)*(0.55+0.45*clamp(top/(0.35*H),0,1)));
       m.sp.material.rotation+=m.spin*dt;
-      // low down the column still glows from the fire under it
-      const g=(0.14+m.shade+0.22*f+0.1*grow)*Math.max(lit,0),hot=clamp(1-t/(T*1.4),0,1)*clamp(1-f*3,0,1);
+      // near black at the base, lighter grey in the cap; the base glows while the fire is big
+      const g=(0.09+m.shade+0.22*p)*Math.max(lit,0),hot=clamp(1-t/(T*1.6),0,1)*clamp(1-p*4,0,1);
       if(lit<0)m.sp.material.color.setScalar(0.42);
-      else m.sp.material.color.setRGB(g+hot*0.55,g+hot*0.22,g*0.97+hot*0.05);
-      m.sp.material.opacity=0.7*clamp(m.age/0.6,0,1)*clamp((m.life-m.age)/(m.life*0.3),0,1)*(0.35+0.65*thin);}
+      else m.sp.material.color.setRGB(g+hot*0.6,g+hot*0.25,g*0.97+hot*0.06);
+      m.sp.material.opacity=(0.82-0.2*cf)*fin*clamp(p/0.04,0,1)*clamp((1-p)/0.08,0,1)*(0.3+0.7*thin);}
     // shock ring out to 120 m * scale in 0.8 s; a slower dust ring behind it
     o.ring.material.color.setRGB(rl,0.94*rl,0.82*rl);o.dust.material.color.setRGB(0.76*rl,0.68*rl,0.53*rl);
     {const k=clamp(t/0.8,0,1);o.ring.scale.setScalar(Math.max(0.01,120*s*(1-(1-k)*(1-k))));o.ring.material.opacity=0.75*(1-k);if(k>=1)o.ring.visible=false;
@@ -6909,7 +6917,6 @@ function fxUpdate(dt){
     m.fb.forEach((f,i)=>{const mt=f.sp.material;f.sp.position.set(m.x+f.dx*e,m.y+3+f.dy*e+m.t*5,m.z+f.dz*e);
       f.sp.scale.setScalar(f.sz*(0.2+0.8*e));fxHot(f.sp,i?0.2+0.8*u:u*1.3);mt.opacity=i?clamp((1-u)*2,0,1)*0.95:clamp(1-u*1.3,0,1);});}
 }
-function cap01(f){return clamp((f-0.6)/0.4,0,1);}
 function fxClear(){for(const o of FX){o.t=o.end;}fxUpdate(0);for(const m of FX_M){m.t=99;}fxUpdate(0);}
 
 // ---- the range itself ----
@@ -7490,7 +7497,7 @@ window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,tou
   sensor:()=>({mode:SENSOR.mode,zoomIdx:SENSOR.zoom,fov:SENSOR_FOV[SENSOR.zoom],lock:!!(SENSOR.tgt||SENSOR.track),
     az:+(SENSOR.az*180/Math.PI).toFixed(2),el:+(SENSOR.el*180/Math.PI).toFixed(2),ap:!!st.ap}),
   setSensorMode:setSensorMode,sensorZoom:()=>sensorZoomStep(0),sensorLock:()=>sensorLock(),
-  fire:()=>fireMissile(),trackHere:()=>sensorTrackHere(),nextTarget:()=>nextTarget(),explode:explode,
+  fire:()=>fireMissile(),trackHere:()=>sensorTrackHere(),nextTarget:()=>nextTarget(),explode:explode,fxClear:()=>fxClear(),
   // explosions: slots running, sprites showing (FX, secondaries and wreck fires), and for the
   // newest one the smoke top above its origin and the mean smoke offset against the wind
   fx:()=>{let act=0,spr=0;const vis=sp=>{if(sp.visible)spr++;};

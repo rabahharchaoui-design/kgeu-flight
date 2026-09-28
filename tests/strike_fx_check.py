@@ -61,6 +61,10 @@ async def main():
         print('  markers:', m['mk'][:4], 'arrows', len(m['ar']))
         dist = re.compile(r'\d+(\.\d)? (k)?m')
         chk('a diamond marker with a distance on a target in view', any(dist.search(x) for x in m['mk']), m['mk'][:2])
+        ov = await pg.evaluate("""()=>{const m=document.getElementById('shMid').getBoundingClientRect();
+          return [...document.querySelectorAll('#sensorHud .tgtMark.on span')].filter(e=>e.offsetParent!==null).some(e=>{const r=e.getBoundingClientRect();
+            return r.right>m.left&&r.left<m.right&&r.bottom>m.top&&r.top<m.bottom;});}""")
+        chk('no marker label overlaps the centre text', not ov)
         await shot(pg, 'markers_day.png')
         await pg.evaluate(f"()=>{K}.setSensorMode('irw')"); await step(pg, 0.3, render=True)
         heat = await pg.evaluate(f"()=>{K}.STRIKE.targets.map(t=>t.mesh.userData.heat)")
@@ -152,14 +156,20 @@ async def main():
         await step(pg, 0.6, render=True)
         await shot(pg, 'explosion_night.png')
         await pg.evaluate(f"()=>{K}.setTOD('day')")
-        await pg.evaluate(f"()=>{{const K={K},R=K.RANGE;K.explode(R.x+60,K.groundHeight(R.x+60,R.z+250),R.z+250,{{scale:2,secondary:1,debris:12}});}}")
+        await pg.evaluate(f"()=>{{const K={K},R=K.RANGE;K.fxClear();K.explode(R.x+60,K.groundHeight(R.x+60,R.z+250),R.z+250,{{scale:2,secondary:1,debris:12}});}}")
         await step(pg, 6)
         cam = await pg.evaluate("""()=>{const K=window.__kgeu,s=K.state(),R=K.RANGE;while(K.camMode()!==0)K.cycleCam();
           const v=new THREE.Vector3(R.x+60,K.groundHeight(R.x+60,R.z+250)+110,R.z+250).sub(s.pos).applyQuaternion(s.quat.clone().invert());
-          K.freeCam({p:[0,5,24],t:v.toArray(),fov:45});return Math.round(Math.hypot(R.x+60-s.pos.x,R.z+250-s.pos.z));}""")
+          window.__fxT=v.toArray();K.freeCam({p:[0,5,24],t:v.toArray(),fov:45});return Math.round(Math.hypot(R.x+60-s.pos.x,R.z+250-s.pos.z));}""")
         print(f'  chase camera {cam} m from the column')
         await step(pg, 0.05, render=True)
         await shot(pg, 'chase_explosion.png')
+        await step(pg, 6)
+        await pg.evaluate("""()=>{const K=window.__kgeu,s=K.state(),R=K.RANGE;
+          const v=new THREE.Vector3(R.x+60,K.groundHeight(R.x+60,R.z+250)+150,R.z+250).sub(s.pos).applyQuaternion(s.quat.clone().invert());
+          K.freeCam({p:[0,5,24],t:v.toArray(),fov:45});}""")
+        await step(pg, 0.05, render=True)
+        await shot(pg, 'chase_explosion_12s.png')
         await pg.evaluate(f"()=>{{{K}.freeCam(null);{K}.SENSOR.zoom=0;}}")
         await pg.evaluate(f"()=>{K}.stepFrame(0,true)")
         chk('no page errors', not pg.errs, pg.errs[:3])
