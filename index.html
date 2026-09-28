@@ -396,6 +396,14 @@ label.sens b{ color:var(--ink); min-width:74px; }
 #arcCards{ grid-template-columns:1fr 1fr; }
 #menu .mcard.feat{ grid-column:1 / -1; background:linear-gradient(90deg,var(--rust),var(--brown)); }
 #menu .mcard.feat .ac{ color:var(--sand); } #menu .mcard.feat .d{ color:#ffe9cc; }
+#photoOv{ background:transparent; padding:0; z-index:12; }
+#photoPad{ position:absolute; inset:0; touch-action:none; cursor:grab; }
+#photoOv button{ position:absolute; min-width:44px; min-height:44px; background:rgba(26,16,9,.8); color:var(--sand); border:1.5px solid rgba(246,193,119,.45); font-weight:800; }
+#phX{ top:var(--padT); right:var(--padR); font-size:18px; }
+#phSave{ bottom:var(--padB); left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:8px; padding:0 22px; min-height:52px !important; font-size:18px; letter-spacing:.08em; background:var(--rust) !important; color:#fff4e0 !important; }
+.phHint{ position:absolute; top:var(--padT); left:50%; transform:translateX(-50%); margin:0; font:700 13px var(--font); color:var(--sand); background:rgba(26,16,9,.6); padding:6px 12px; border-radius:10px; pointer-events:none; }
+#pauseOv .ph{ display:flex; align-items:center; justify-content:center; gap:8px; }
+body.photoOn #uiroot, body.photoOn #badges, body.photoOn #sixpack, body.photoOn #tutArrow, body.photoOn #miss, body.photoOn #lesson{ display:none !important; }
 .aStars{ margin:0; font-size:54px; line-height:1; color:var(--orange); letter-spacing:4px; } .aStars u{ text-decoration:none; color:rgba(246,193,119,.22); }
 #arcOv .sheet{ max-width:560px; } #arcOv #aLines{ margin:0 0 12px; font-size:15px; } #arcOv button{ min-height:44px; }
 .sc.soon{ color:var(--orange); letter-spacing:.08em; text-transform:uppercase; font-size:11px; }
@@ -602,7 +610,7 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
 <div class="overlay" id="pauseOv"><div class="pz">
   <div class="pzL">
    <p class="pzT">Paused</p>
-   <button class="primary" id="pResume">Resume</button><button id="pRestart">Restart</button><button id="pSet">Settings</button><button id="pMenu">Main menu</button>
+   <button class="primary" id="pResume">Resume</button><button id="pPhoto" class="ph"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>Photo</button><button id="pRestart">Restart</button><button id="pSet">Settings</button><button id="pMenu">Main menu</button>
   </div>
   <div class="pzR">
    <p class="pzT">Change flight</p>
@@ -623,6 +631,11 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
   <div class="mbar tr"><button id="mapX" aria-label="Close map">&#x2715;</button></div>
   <div class="mbar br"><button id="mapOut" aria-label="Zoom out">&minus;</button><button id="mapIn" aria-label="Zoom in">+</button></div>
   <div class="mbar bc"><span id="mapInfo"></span><button id="mapClear">Clear destination</button></div>
+</div>
+<div class="overlay" id="photoOv"><div id="photoPad"></div>
+  <p class="phHint">Drag to orbit, pinch to zoom</p>
+  <button id="phX" aria-label="Close photo mode">&#x2715;</button>
+  <button id="phSave"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>SAVE</button>
 </div>
 <div class="overlay" id="arcOv"><div class="sheet">
   <p class="aStars" id="aStars"></p>
@@ -5073,6 +5086,58 @@ function arcScore(id){
   if(id==='daily'){const r=SCORE.best['arc:daily:'+todayKey()];return r?[r.stars,r.pts+' pts today']:[0,''];}
   return [0,''];
 }
+// ================= photo mode =================
+// Freeze the frame, hide the HUD, orbit and zoom around the aircraft by finger, and
+// save a clean image with a small watermark through the iOS share sheet.
+const PHOTO={on:false,yaw:0,pitch:0.18,dist:0,ptrs:new Map(),pinch:null};
+const wmIcon=new Image();wmIcon.src='icons/icon-192.png';
+function photoOpen(){
+  if(!running||st.crashed)return;
+  pauseOv.classList.remove('on');paused=true;PHOTO.on=true;
+  _eu.setFromQuaternion(st.quat,'YXZ');PHOTO.yaw=_eu.y+Math.PI+0.6;PHOTO.pitch=0.16;PHOTO.dist=Math.max(14,AC.span*1.6);
+  document.body.classList.add('photoOn');$('photoOv').classList.add('on');
+}
+function photoClose(){PHOTO.on=false;document.body.classList.remove('photoOn');$('photoOv').classList.remove('on');pauseOv.classList.add('on');CARP.sync();snapCamera=true;}
+function photoCam(){
+  const d=PHOTO.dist,cp=Math.cos(PHOTO.pitch);
+  camera.position.set(st.pos.x+Math.sin(PHOTO.yaw)*cp*d,st.pos.y+Math.sin(PHOTO.pitch)*d,st.pos.z+Math.cos(PHOTO.yaw)*cp*d);
+  const g=groundHeight(camera.position.x,camera.position.z)+1.2;if(camera.position.y<g)camera.position.y=g;
+  camera.up.set(0,1,0);camera.lookAt(st.pos);camera.fov=50;
+}
+const pc=$('photoPad');
+pc.addEventListener('pointerdown',e=>{PHOTO.ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});try{pc.setPointerCapture(e.pointerId);}catch(_){}
+  if(PHOTO.ptrs.size===2){const [a,b]=[...PHOTO.ptrs.values()];PHOTO.pinch=Math.hypot(a.x-b.x,a.y-b.y);}});
+pc.addEventListener('pointermove',e=>{const p=PHOTO.ptrs.get(e.pointerId);if(!p)return;
+  if(PHOTO.ptrs.size===1){PHOTO.yaw-=(e.clientX-p.x)*0.008;PHOTO.pitch=clamp(PHOTO.pitch+(e.clientY-p.y)*0.006,-0.25,1.45);p.x=e.clientX;p.y=e.clientY;return;}
+  p.x=e.clientX;p.y=e.clientY;const [a,b]=[...PHOTO.ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y);
+  if(PHOTO.pinch&&d>10){PHOTO.dist=clamp(PHOTO.dist*PHOTO.pinch/d,AC.len*0.7,AC.span*6);PHOTO.pinch=d;}});
+const pUp=e=>{PHOTO.ptrs.delete(e.pointerId);if(PHOTO.ptrs.size<2)PHOTO.pinch=null;};
+pc.addEventListener('pointerup',pUp);pc.addEventListener('pointercancel',pUp);
+pc.addEventListener('wheel',e=>{e.preventDefault();PHOTO.dist=clamp(PHOTO.dist*Math.exp(e.deltaY*0.0012),AC.len*0.7,AC.span*6);},{passive:false});
+// Everything from the render to the share call happens synchronously inside the tap,
+// so Safari still treats it as a user gesture and opens the share sheet.
+function photoImage(){
+  photoCam();camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.render(scene,camera);
+  const W=glc.width,H=glc.height,c=document.createElement('canvas');c.width=W;c.height=H;
+  const x=c.getContext('2d');x.drawImage(glc,0,0);
+  const fs=Math.round(H*0.034),pad=Math.round(H*0.025),txt='Pocket Flight Sim';
+  x.font='800 '+fs+'px '+F;const tw=x.measureText(txt).width,ic=Math.round(fs*1.35);
+  x.globalAlpha=0.85;x.shadowColor='rgba(0,0,0,.55)';x.shadowBlur=fs*0.3;
+  if(wmIcon.complete&&wmIcon.naturalWidth){x.save();x.beginPath();const ix=W-pad-tw-ic-fs*0.4,iy=H-pad-ic;
+    if(x.roundRect)x.roundRect(ix,iy,ic,ic,ic*0.22);else x.rect(ix,iy,ic,ic);x.clip();x.drawImage(wmIcon,ix,iy,ic,ic);x.restore();}
+  x.fillStyle='#F6C177';x.textAlign='right';x.textBaseline='bottom';x.fillText(txt,W-pad,H-pad-(ic-fs)*0.35);
+  return c;
+}
+function photoSave(){
+  const c=photoImage(),url=c.toDataURL('image/png'),bin=atob(url.split(',')[1]),u8=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+  const name='pocket-flight-sim-'+Date.now()+'.png',file=new File([u8],name,{type:'image/png'});
+  window.__lastPhoto=file;
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    navigator.share({files:[file],title:'Pocket Flight Sim'}).then(()=>toast('Shared'),e=>{if(e&&e.name!=='AbortError')toast('Could not share: '+e.name);});return;}
+  const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();toast('Photo saved');
+}
+$('pPhoto').onclick=photoOpen;$('phX').onclick=photoClose;$('phSave').onclick=photoSave;
 // ---------- menus ----------
 const menu=document.getElementById('menu'),crashEl=document.getElementById('crash');
 function start(mode,base){
@@ -6324,8 +6389,9 @@ function frame(t){
   const wd=s.windDir*Math.PI/180,wkt=s.windKt*(1+s.gust);
   socks.forEach((p,i)=>{p.rotation.order='YXZ';p.rotation.y=Math.atan2(-(Math.cos(wd)),(-Math.sin(wd)))*1;p.rotation.z=-(1-clamp(wkt/15,0,1))*1.1+0.05*Math.sin(ts*3+i);});
   // cameras
-  mtsEl.classList.toggle('on',camMode===2);glc.style.filter=camMode===2?'grayscale(1) contrast(1.12) brightness(0.86)':'';
-  if(FREECAM){// test hook: camera at an offset in the aircraft frame, looking at an offset in the same frame
+  mtsEl.classList.toggle('on',camMode===2);glc.style.filter=camMode===2&&!PHOTO.on?'grayscale(1) contrast(1.12) brightness(0.86)':'';
+  if(PHOTO.on)photoCam();
+  else if(FREECAM){// test hook: camera at an offset in the aircraft frame, looking at an offset in the same frame
     _co.set(FREECAM.p[0],FREECAM.p[1],FREECAM.p[2]).applyQuaternion(q).add(s.pos);camera.position.copy(_co);
     _ct.set(FREECAM.t[0],FREECAM.t[1],FREECAM.t[2]).applyQuaternion(q).add(s.pos);camera.up.set(0,1,0);camera.lookAt(_ct);camera.fov=FREECAM.fov||30;}
   else if(camMode===0){_co.set(0,AC.chase[0],AC.chase[1]).applyQuaternion(q).add(s.pos);const cg=groundHeight(_co.x,_co.z)+1.5;if(_co.y<cg)_co.y=cg;
@@ -6384,7 +6450,7 @@ window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,tou
   setTOD:setTOD,isNight:isNight,TOD:()=>TOD,drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
   RADIO:RADIO,radioQ:()=>radioQ,radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,initAudio:initAudio,
-  ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,arcStart:arcStart,ARC:ARC,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&{apt:DEST.rwy.apt,num:DEST.num},fmOpen:fmOpen,fmClose:fmClose,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),arcStart:arcStart,ARC:ARC,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&{apt:DEST.rwy.apt,num:DEST.num},fmOpen:fmOpen,fmClose:fmClose,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   MISS:MISS,DROPZ:DROPZ,LZ:LZ,lzUV:lzUV,lzX:lzX,lzZ:lzZ,missDrop:missDrop,missTouchdown:missTouchdown,
   // step the mission clock without waiting on rAF: the pallet takes 50 s to come down
   missTick:(n,dt)=>{for(let i=0;i<n;i++)missUpdate(dt);},
