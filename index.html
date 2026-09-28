@@ -8117,12 +8117,12 @@ function frame(t){
 }
 function tick(t,skipRender){
   const rdt=(t-last)/1000,dt=Math.min(0.1,rdt);last=t;const ts=t/1000;
-  // a long gap (tab hidden): drop the time instead of simulating it, and snap the camera
+  // a long gap (stutter): snap the camera; dt is capped at 0.1 s so at most 12 substeps run (hidden tab pauses via visibilitychange)
   const gap=rdt>0.25;if(gap)snapCamera=true;
   sensorMode=camMode===2&&hasBall()&&!st.onGround&&!!st.ap&&running&&!paused&&!st.crashed;
   pollPad(dt);
   if(running&&!paused&&!st.crashed){
-    updateControls(dt);f16Flaps();lessonTick(dt);rookieAssist(dt,ts);if(!gap)acc+=dt;
+    updateControls(dt);f16Flaps();lessonTick(dt);rookieAssist(dt,ts);acc+=dt;
     if(_ipS!==st){_ipS=st;_ipPos.copy(st.pos);_ipQ.copy(st.quat);}
     while(acc>=DT){_ipPos.copy(st.pos);_ipQ.copy(st.quat);autopilot(st,DT,events);step(st,DT,events);acc-=DT;if(st.crashed)break;}
     if(st.crashed)onCrash();
