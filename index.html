@@ -3351,6 +3351,7 @@ function setTOD(id){
   if(starField){starField.visible=TOD.stars>0;starField.material.opacity=TOD.stars;}
   AL_MAT.uniforms.uLights.value=TOD.lights;
   for(const L of AL_LAYERS)if(L.pts)L.pts.visible=TOD.lights>0;
+  EGG.lit=TOD.lights>0;EGG.litMat.emissiveIntensity=TOD.night?1:TOD.lights*0.6;EGG.mat.emissiveIntensity=TOD.night?0:0.3*(1-TOD.lights);   // @OhRabah signs: off by day, dim at sunset
   if(cloudMat){const c=CLOUD_TOD[TOD.id]||CLOUD_TOD.day;cloudMat.color.setHex(c[0]);cloudMat.emissive.setHex(c[1]);}
   const b=document.getElementById('todV');if(b)b.textContent=TOD.name;
   hbSync(false);
@@ -4071,6 +4072,7 @@ function updateCars(dt){cars.forEach((c,k)=>{c.s+=c.dir*c.sp*dt;
   _cm.compose(_cp,_cq,_cs);carMesh.setMatrixAt(k,_cm);});carMesh.instanceMatrix.needsUpdate=true;}
 
 // ---------- landmarks ----------
+const DT_TOP={x:0,z:0,h:0,w:0,d:0};     // the tallest downtown Phoenix block, for the @OhRabah rooftop sign
 (function(){
   // State Farm Stadium and Westgate
   const lotT=tex(256,256,(x,w,h)=>{asphalt(x,w,h,'#505255');x.fillStyle='rgba(230,230,230,.8)';for(let r=0;r<256;r+=32)for(let i=0;i<w;i+=6)x.fillRect(i,r+4,1,20);},[12,10]);
@@ -4168,7 +4170,8 @@ function updateCars(dt){cars.forEach((c,k)=>{c.s+=c.dir*c.sp*dt;
   // Downtown Phoenix skyline, about 21 km ESE
   const win=tex(64,128,(x,w,h)=>{x.fillStyle='#5f7488';x.fillRect(0,0,w,h);for(let y=0;y<h;y+=8)for(let i=0;i<w;i+=8){x.fillStyle=Math.random()<0.5?'#8fa6ba':'#4a5d70';x.fillRect(i+1,y+1,6,5);}},[1,1]);
   for(let k=0;k<30;k++){const hgt=40+Math.pow(hash(k,9),1.6)*150,wd=25+hash(k,8)*25;const b=new THREE.Mesh(new THREE.BoxGeometry(wd,hgt,wd*(0.8+hash(k,6)*0.5)),lam(0xffffff,{map:win}));
-    b.position.set(21000+(hash(k,1)-0.5)*1600,hgt/2,7800+(hash(k,2)-0.5)*1300);scene.add(b);}
+    b.position.set(21000+(hash(k,1)-0.5)*1600,hgt/2,7800+(hash(k,2)-0.5)*1300);scene.add(b);
+    if(hgt>DT_TOP.h)Object.assign(DT_TOP,{x:b.position.x,z:b.position.z,h:hgt,w:wd,d:b.geometry.parameters.depth});}
 })();
 // palms, desert scrub, clouds
 (function(){
@@ -4666,9 +4669,111 @@ const v2=addTraffic({m:hdModel('f16')||buildF16(),kind:'',grp:'v',v:125,t:0,pts:
 const circ=(cx,cz,r,y,n)=>{const a=[];for(let i=0;i<n;i++){const t=i/n*Math.PI*2;a.push(new V3(cx+Math.cos(t)*r,y,cz+Math.sin(t)*r));}return a;};
 addTraffic({m:buildHeavy(),kind:'a C-17',grp:'h',v:115,t:0.3,pts:circ(-2000,-4000,14000,2130,14)});
 addTraffic({m:hdModel('reaper')||buildReaper('N12TH'),kind:'an MQ-9',grp:'r',v:42,t:0.6,pts:circ(9000,-9000,2600,1500,10)});
-TRAFFIC.forEach(o=>{o.m.g.userData.heat=0.8;if(o.m.gear)o.m.gear.visible=false;if(o.m.prop)trafficProps(o.m,o.grp==='c'?'cessna':'reaper');});
+// ---------- @OhRabah easter eggs (3.10) ----------
+// Five civilian spots, nothing at Luke: a hangar banner at Glendale, a lit billboard on the
+// west edge of the State Farm Stadium lot (faces the airport, seen on right downwind and on
+// final to runway 1), a lit rooftop sign on the tallest downtown block facing west, a flag
+// at the C-130 assault strip, and a Cessna towing a banner around Glendale. The YouTube
+// mark is drawn from the same path data as the credit link SVG, at 28:20, never recoloured.
+const EGG=(function(){
+  const YT_BOX='M27.4 3.1A3.5 3.5 0 0 0 24.9.6C22.7 0 14 0 14 0S5.3 0 3.1.6A3.5 3.5 0 0 0 .6 3.1C0 5.3 0 10 0 10s0 4.7.6 6.9a3.5 3.5 0 0 0 2.5 2.5C5.3 20 14 20 14 20s8.7 0 10.9-.6a3.5 3.5 0 0 0 2.5-2.5C28 14.7 28 10 28 10s0-4.7-.6-6.9Z',
+        YT_TRI='M11.2 14.3 18.4 10l-7.2-4.3v8.6Z';
+  const draw=dark=>(x,w,h)=>{
+    x.fillStyle=dark?'#0b0c0e':'#ffffff';x.fillRect(0,0,w,h);
+    const k=6,iw=28*k,ih=20*k,gap=34;let fs=176;
+    x.font='800 '+fs+'px '+F;let tw=x.measureText('@OhRabah').width;
+    if(iw+gap+tw>w-80){fs=Math.floor(fs*(w-80-iw-gap)/tw);x.font='800 '+fs+'px '+F;tw=x.measureText('@OhRabah').width;}
+    const x0=(w-iw-gap-tw)/2;
+    x.save();x.translate(x0,(h-ih)/2);x.scale(k,k);
+    x.fillStyle='#FF0000';x.fill(new Path2D(YT_BOX));x.fillStyle='#FFFFFF';x.fill(new Path2D(YT_TRI));x.restore();
+    x.fillStyle=dark?'#ffffff':'#0f0f0f';x.textAlign='left';x.textBaseline='middle';x.fillText('@OhRabah',x0+iw+gap,h/2+fs*0.06);};
+  const E={tex:tex(1024,256,draw(false)),texDk:tex(1024,256,draw(true)),lit:false,list:[],t:0,yaw:null,tow:null};
+  // the day boards get a touch of self light so the side away from the sun still reads; none at night
+  E.mat=new THREE.MeshLambertMaterial({map:E.tex,emissive:0xffffff,emissiveMap:E.tex,emissiveIntensity:0.3});
+  E.litMat=new THREE.MeshLambertMaterial({map:E.texDk,emissive:0xffffff,emissiveMap:E.texDk,emissiveIntensity:0});
+  return E;})();
+const EGG_TEX=EGG.tex;
+// indexed geometries with position, normal and uv, concatenated into one
+function eggMerge(gs){
+  const P=[],N=[],U=[],I=[];let o=0;
+  for(const g of gs){const p=g.attributes.position;P.push(...p.array);N.push(...g.attributes.normal.array);U.push(...g.attributes.uv.array);
+    g.index.array.forEach(i=>I.push(i+o));o+=p.count;}
+  const m=new THREE.BufferGeometry();m.setAttribute('position',new THREE.Float32BufferAttribute(P,3));
+  m.setAttribute('normal',new THREE.Float32BufferAttribute(N,3));m.setAttribute('uv',new THREE.Float32BufferAttribute(U,2));m.setIndex(I);return m;}
+// a W x H sign facing +Z. The 4:1 texture keeps its proportion: the board runs past it in
+// the plain board colour (clamped edge pixels), so the mark is never stretched.
+// both: a second sheet back to back, facing -Z, that reads the right way round from behind;
+// gap: the two sheets that far apart, for a board with its posts between them.
+function eggSheet(W,H,sx,sy,both,gap){
+  const f=new THREE.PlaneGeometry(W,H,sx||1,sy||1),uv=f.attributes.uv,a=W/H;
+  for(let i=0;i<uv.count;i++){if(a>4)uv.setX(i,0.5+(uv.getX(i)-0.5)*a/4);else uv.setY(i,0.5+(uv.getY(i)-0.5)*4/a);}
+  if(!both)return f;
+  const b=f.clone();b.rotateY(Math.PI);if(gap){f.translate(0,0,gap/2);b.translate(0,0,-gap/2);}return eggMerge([f,b]);}
+// a sign board's frame: top, bottom and both ends, closing the gap between its two faces
+const eggFrame=(W,H,y,d)=>[[W+0.4,0.2,d,0,y+H/2+0.1,0],[W+0.4,0.2,d,0,y-H/2-0.1,0],[0.2,H,d,-W/2-0.1,y,0],[0.2,H,d,W/2+0.1,y,0]];
+function eggBoxes(list){return eggMerge(list.map(b=>{const g=new THREE.BoxGeometry(b[0],b[1],b[2]);g.translate(b[3],b[4],b[5]);return g;}));}
+(function(){
+  const steel=lam(0x6b6e72),L=makeLightLayer('EGG'),WARM=0xffd49a;
+  const add=(o,name)=>{o.name=name;EGG.list.push(o);return o;};
+  // 1. hangar banner: on the door face (+v, toward the ramp and runway) of the box hangar at u=770
+  {const g=eggSheet(20,5);g.rotateY(Math.PI/2);
+   add(placeLocal(new THREE.Mesh(g,EGG.mat),770,-415+17+0.15,8),'egg_hangar');}
+  // 2. billboard: 18 x 5 m, 8 m up on two posts, between Loop 101 and the stadium lot's west
+  // edge, facing west to the airport; the back reads too
+  {const x=2830,z=-1000,y0=groundHeight(x,z),G=new THREE.Group();G.position.set(x,y0,z);G.rotation.y=-Math.PI/2;
+   const b=new THREE.Mesh(eggSheet(18,5,1,1,true,0.6),EGG.litMat);b.position.y=10.5;G.add(b);
+   G.add(new THREE.Mesh(eggBoxes([[0.45,13,0.45,-5.5,6.5,0],[0.45,13,0.45,5.5,6.5,0]].concat(eggFrame(18,5,10.5,0.7))),steel));
+   scene.add(G);add(G,'egg_billboard');
+   for(const s of [-1,1])for(const t of [-4.5,4.5])L.addLight(x+s*1.6,y0+7.9,z+t,WARM);
+   OBST.push({kind:'circ',x:x,z:z,r:9,h:13.5,name:'a billboard'});}
+  // 3. rooftop sign on the tallest downtown block, 30 x 7.5 m, facing west to the airports
+  {const T=DT_TOP,G=new THREE.Group();G.position.set(T.x-T.w/2+5,T.h,T.z);G.rotation.y=-Math.PI/2;
+   const b=new THREE.Mesh(eggSheet(30,7.5,1,1,true,0.6),EGG.litMat);b.position.y=2+3.75;G.add(b);
+   G.add(new THREE.Mesh(eggBoxes([[0.5,2,0.5,-12,1,0],[0.5,2,0.5,0,1,0],[0.5,2,0.5,12,1,0]].concat(eggFrame(30,7.5,5.75,0.7))),steel));
+   scene.add(G);add(G,'egg_rooftop');
+   for(const s of [-1,1])for(const t of [-10,0,10])L.addLight(G.position.x+s*1.8,T.h+1.9,T.z+t,WARM);}
+  L.build();
+  // 4. flag at the assault strip, 40 m off the centreline, flying downwind
+  {const x=lzX(0,40),z=lzZ(0,40),G=new THREE.Group();G.position.set(x,groundHeight(x,z),z);
+   const g=eggSheet(3,2,12,4,true);g.translate(1.5,5.1,0);
+   const cloth=new THREE.Mesh(g,EGG.mat);cloth.frustumCulled=false;G.add(cloth);
+   G.add(new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.07,6.2,6),lam(0xd8d4cc)).translateY(3.1));
+   scene.add(G);add(G,'egg_flag');EGG.flag={g:G,cloth:cloth,base:g.attributes.position.array.slice(),nb:g.attributes.normal.array.slice()};
+   OBST.push({kind:'circ',x:x,z:z,r:0.5,h:6.2,name:'a flagpole'});}
+  // 5. banner tow: a Cessna on a 3 km circle 2 km east of Glendale at 450 m, 32 m/s
+  {const m=buildPlane({stripe:0xf2a900,accent:0x1d3557,reg:'N742RB',regColor:'#222',full:false});
+   const o=addTraffic({m:m,kind:'a banner tow plane',grp:'b',v:32,t:0.2,pts:circ(wX(1090,0)+2000,wZ(1090,0),3000,450,12)});
+   add(m.g,'egg_tow');
+   // the rig hangs from the tail and lags the heading; the banner trails 40 m back and 8 m down
+   const rig=new THREE.Group(),g=eggSheet(24,4,24,3,true);g.rotateY(Math.PI/2);
+   const ban=new THREE.Mesh(g,EGG.mat);ban.position.set(0,-8,52);ban.frustumCulled=false;rig.add(ban);
+   const lg=new THREE.BufferGeometry();lg.setAttribute('position',new THREE.Float32BufferAttribute([0,0,0,0,-8,34, 0,-8,34,0,-6,40, 0,-8,34,0,-10,40],3));
+   rig.add(new THREE.LineSegments(lg,new THREE.LineBasicMaterial({color:0x2a2a2a})));
+   scene.add(rig);ban.name='egg_banner';
+   EGG.tow={o:o,rig:rig,ban:ban,base:g.attributes.position.array.slice(),nb:g.attributes.normal.array.slice()};}
+})();
+const _eP=new V3(),_eC=new V3();
+// flag and banner cloth: a CPU sine on the vertices, normals from its slope. Only near the camera.
+function eggUpdate(dt){
+  EGG.t+=dt;const t=EGG.t,F=EGG.flag,W=EGG.tow;
+  if(F&&F.g.position.distanceToSquared(camera.position)<4e6){
+    const wd=st.windDir*Math.PI/180;F.g.rotation.y=Math.atan2(-Math.cos(wd),-Math.sin(wd));
+    const a=F.cloth.geometry.attributes.position,n=F.cloth.geometry.attributes.normal,p=a.array,q=n.array,b=F.base,A=0.12+0.04*clamp(st.windKt/15,0,1);
+    for(let i=0;i<p.length;i+=3){const u=b[i],y=b[i+1],ph=2.6*u-5.5*t+0.4*y,e=u/3;
+      p[i+2]=A*Math.sin(ph)*e;const s=A*(2.6*Math.cos(ph)*e+Math.sin(ph)/3),l=Math.sqrt(1+s*s),k=F.nb[i+2];q[i]=-s*k/l;q[i+2]=k/l;}
+    a.needsUpdate=n.needsUpdate=true;}
+  if(W){const g=W.o.m.g;
+    if(W.o.yp!==null)EGG.yaw=EGG.yaw===null?W.o.yp:angLerp(EGG.yaw,W.o.yp,1-Math.exp(-dt/1.5));
+    _eP.set(0,0.25,4.3).applyQuaternion(g.quaternion).add(g.position);W.rig.position.copy(_eP);W.rig.rotation.y=EGG.yaw||0;
+    if(_eP.distanceToSquared(camera.position)<9e6){
+      const a=W.ban.geometry.attributes.position,n=W.ban.geometry.attributes.normal,p=a.array,q=n.array,b=W.base;
+      for(let i=0;i<p.length;i+=3){const z=b[i+2]+12,ph=0.55*z-6*t,e=0.15+z/24*0.85,A=0.55;   // z 0 at the leading edge
+        p[i]=A*Math.sin(ph)*e;const s=A*(0.55*Math.cos(ph)*e+Math.sin(ph)*0.85/24),l=Math.sqrt(1+s*s),k=W.nb[i];q[i]=k/l;q[i+2]=-s*k/l;}
+      a.needsUpdate=n.needsUpdate=true;}}
+}
+TRAFFIC.forEach(o=>{o.m.g.userData.heat=0.8;if(o.m.gear)o.m.gear.visible=false;if(o.m.prop)trafficProps(o.m,o.grp==='c'||o.grp==='b'?'cessna':'reaper');});
 // traffic lights: nav, strobes and beacon only, one shared material; the C-17 has no light table
-{const TL={c:['cessna',0.15],v:['f16',0],r:['reaper',0]};
+{const TL={c:['cessna',0.15],b:['cessna',0.15],v:['f16',0],r:['reaper',0]};
  TRAFFIC.forEach(o=>{const t=TL[o.grp];if(t)o.m.lights=makeAircraftLights(o.m.g,AC_LIGHTS[t[0]],{mat:ACL_MAT_T,only:['nav','strobe','beacon'],dy:t[1]});});}
 function updateTraffic(dt){
   TRAFFIC.forEach(o=>{o.t=(o.t+o.v*dt/o.len)%1;o.path.getPointAt(o.t,_ap);o.path.getTangentAt(o.t,_at);
@@ -5867,7 +5972,7 @@ function windTxt(){const w=windNow();return 'wind '+w[0]+' at '+w[1];}
 function ktC(k){return k===10?['t_n_10']:k<10?['t_n_'+k]:String(k).split('').map(d=>'t_n_'+d);}
 function windC(){const w=windNow();return ['t_wind'].concat(w[0].split('').map(d=>'t_n_'+d),['t_at'],ktC(w[1]));}
 const CLK=['','t_n_1','t_n_2','t_n_3','t_n_4','t_n_5','t_n_6','t_n_7','t_n_8','t_n_9','t_c_10','t_c_11','t_c_12'];
-const TFCC={'a Cessna':'t_tfc_cessna','a flight of two F-16s':'t_tfc_vipers','a C-17':'t_tfc_c17','an MQ-9':'t_tfc_reaper'};
+const TFCC={'a Cessna':'t_tfc_cessna','a flight of two F-16s':'t_tfc_vipers','a C-17':'t_tfc_c17','an MQ-9':'t_tfc_reaper','a banner tow plane':'t_tfc_banner'};
 function altC(ft){
   if(ft<100)return [];
   if(ft>=1000)return ['t_n_'+Math.min(9,Math.round(ft/1000)),'t_thousand_feet'];
@@ -8016,7 +8121,7 @@ function tick(t,skipRender){
   cheerLevel=0;clusters.forEach(c=>{c.cool-=dt;if(c.cheer>0)c.cheer-=dt;
     const d=Math.hypot(c.x-s.pos.x,c.z-s.pos.z);if(running&&!s.crashed&&!s.onGround&&d<280&&s.agl<160&&s.ias>25&&c.cool<=0){c.cheer=4;c.cool=12;}
     if(c.cheer>0){const cd=camera.position.distanceTo(_ct.set(c.x,2,c.z));cheerLevel=Math.max(cheerLevel,clamp(1/(1+cd/180),0,1)*Math.min(1,c.cheer));}});
-  if(running&&!paused){updateTraffic(dt);updateCars(dt);}
+  if(running&&!paused){updateTraffic(dt);updateCars(dt);eggUpdate(dt);}
   updatePeople(dt,ts);
   if(running&&!paused&&!st.crashed){
     if(STRIKE.built){rangeMoving(dt);targetsTick(dt);}
@@ -8118,6 +8223,9 @@ window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,tou
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
   stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&{apt:DEST.rwy.apt,num:DEST.num},fmOpen:fmOpen,fmClose:fmClose,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  // @OhRabah easter eggs (3.10): where each one is, whether its lights are on, and the tow banner
+  eggs:()=>EGG.list.map(o=>{const p=o.getWorldPosition(new V3()),r={name:o.name,x:p.x,y:p.y,z:p.z,ry:o.rotation.y,lit:(o.name==='egg_billboard'||o.name==='egg_rooftop')&&EGG.lit,visible:o.visible};
+    if(o.name==='egg_tow'){const b=EGG.tow.ban.getWorldPosition(new V3()),f=new V3(0,0,-1).applyQuaternion(o.quaternion);r.banner={x:b.x,y:b.y,z:b.z};r.fwd=[f.x,f.y,f.z];}return r;}),
   MISS:MISS,DROPZ:DROPZ,LZ:LZ,lzUV:lzUV,lzX:lzX,lzZ:lzZ,missDrop:missDrop,missTouchdown:missTouchdown,
   // step the mission clock without waiting on rAF: the pallet takes 50 s to come down
   missTick:(n,dt)=>{for(let i=0;i<n;i++)missUpdate(dt);},
