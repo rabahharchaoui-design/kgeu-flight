@@ -3136,24 +3136,16 @@ const TOD_SET={
           fog:[2200,30000], night:true, lights:1.0, stars:1}
 };
 let TOD=TOD_SET.day;
-let rwyLightMesh=null,rwyLightBase=null,lukeLightMesh=null,lukeLightBase=null,starField=null;
+let starField=null,cloudMat=null;
+// cloud colour and self-glow per preset: white by day, warm at sunset, dark
+// blue-grey at night so they never read as flat grey cutouts on the night sky
+const CLOUD_TOD={day:[0xffffff,0x6f7780],sunset:[0xffe2c8,0x5e4a48],night:[0x232a38,0x0d1119]};
 function skyPaint(){
   const p=sky.geometry.attributes.position,c=sky.geometry.attributes.color;
   const top=new THREE.Color(TOD.top),col=new THREE.Color();
   for(let i=0;i<p.count;i++){const t=clamp(p.getY(i)/80000,0,1);
     col.copy(HAZE).lerp(top,Math.pow(t,0.5));c.setXYZ(i,col.r,col.g,col.b);}
   c.needsUpdate=true;
-}
-// Runway lights are instanced boxes. Scaling the instances is what makes them
-// read as lights after dark instead of specks of paint.
-function lightScale(mesh,base,k){
-  if(!mesh||!base)return;
-  const m=new THREE.Matrix4();
-  for(let i=0;i<base.length;i++){
-    m.copy(base[i]).scale(new V3(k,k,k));
-    mesh.setMatrixAt(i,m);
-  }
-  mesh.instanceMatrix.needsUpdate=true;
 }
 function setTOD(id){
   TOD=TOD_SET[id]||TOD_SET.day;
@@ -3165,11 +3157,10 @@ function setTOD(id){
   sun.color.setHex(TOD.sun);sun.intensity=TOD.sunI;
   sun.position.set(TOD.sunPos[0],TOD.sunPos[1],TOD.sunPos[2]);
   hemi.color.setHex(TOD.hemiSky);hemi.groundColor.setHex(TOD.hemiGnd);hemi.intensity=TOD.hemiI;
-  const k=1+TOD.lights*2.2;
-  lightScale(rwyLightMesh,rwyLightBase,k);
-  lightScale(lukeLightMesh,lukeLightBase,k);
   if(starField){starField.visible=TOD.stars>0;starField.material.opacity=TOD.stars;}
-  for(const g of GLOWS){g.visible=TOD.lights>0;g.material.opacity=TOD.lights*0.85;}
+  AL_MAT.uniforms.uLights.value=TOD.lights;
+  for(const L of AL_LAYERS)if(L.pts)L.pts.visible=TOD.lights>0;
+  if(cloudMat){const c=CLOUD_TOD[TOD.id]||CLOUD_TOD.day;cloudMat.color.setHex(c[0]);cloudMat.emissive.setHex(c[1]);}
   const b=document.getElementById('todV');if(b)b.textContent=TOD.name;
   document.querySelectorAll('.pick[data-tod]').forEach(e=>e.classList.toggle('sel',e.dataset.tod===TOD.id));
 }
@@ -3245,40 +3236,142 @@ flatLocal(320,960,lam(0xffffff,{map:apronTex}),1120,-282,0.045);
 const signTex=tex(128,56,(x,w,h)=>{x.fillStyle='#c8102e';x.fillRect(0,0,w,h);x.strokeStyle='#fff';x.lineWidth=3;x.strokeRect(3,3,w-6,h-6);x.fillStyle='#fff';x.font='800 40px '+F;x.textAlign='center';x.textBaseline='middle';x.fillText('1-19',w/2,h/2+2);});
 const signM=[lam(0xc8102e),new THREE.MeshBasicMaterial({map:signTex}),lam(0x222222),lam(0x222222),lam(0xc8102e),lam(0xc8102e)];
 for(const c of CONNECT) boxLocal(0.25,0.9,2.2,signM,c+14,-62,0.3);
-const glowTex=tex(64,64,(x,w,h)=>{const g=x.createRadialGradient(32,32,2,32,32,31);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(0.35,'rgba(255,255,255,.7)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,64,64);});
-// A glow layer over the light fixtures. Geometry that small vanishes on a long
-// final, so the thing you actually see at night is an additive Points cloud at
-// the same positions: one draw call, and it scales with distance like a light.
-const GLOWS=[];
-function lightGlow(pts,xf,y){
-  const n=pts.length,pos=new Float32Array(n*3),col=new Float32Array(n*3),c=new THREE.Color();
-  pts.forEach((p,i)=>{const w=xf(p[0],p[1]);
-    pos[i*3]=w[0];pos[i*3+1]=y;pos[i*3+2]=w[1];
-    c.setHex(p[2]);col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b;});
-  const g=new THREE.BufferGeometry();
-  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
-  g.setAttribute('color',new THREE.BufferAttribute(col,3));
-  const m=new THREE.Points(g,new THREE.PointsMaterial({map:glowTex,vertexColors:true,size:26,
-    sizeAttenuation:true,transparent:true,opacity:0,depthWrite:false,fog:false,
-    blending:THREE.AdditiveBlending}));
-  m.visible=false;scene.add(m);GLOWS.push(m);return m;
+// ---------- airport lighting ----------
+// AirportLights: every runway, taxiway, approach and beacon light at a field is one
+// point in a single THREE.Points per airport, so a whole field is one draw call.
+// The point size is in screen pixels (K/w, clamped), not metres: lights stay small
+// sharp points at any distance instead of growing into blobs. There is no bloom
+// pass (a full-screen post pass costs too much on an iPhone): the short halo in
+// the fragment shader is the only bloom. uLights is TOD.lights, so the layer is
+// off by day, dim at sunset and full at night.
+// Directional lights (kind 1) fade out when the camera is outside their cone, so
+// one threshold bar shows green from the approach and red from the runway.
+// flash: 0 steady, 1 REIL (2 Hz, all together), 2 sequenced approach flasher
+// (runs toward the threshold twice a second, phase = order), 3 rotating beacon.
+const AL_K=700,AL_MIN=2.5,AL_MAX=7;       // CSS px: K/w clamped to [MIN,MAX], times pixel ratio
+const AL_LAYERS=[];
+const AL_MAT=new THREE.ShaderMaterial({
+  uniforms:{uLights:{value:0},uTime:{value:0},uCam:{value:new V3()},uPR:{value:1}},
+  vertexShader:`#include <common>
+#include <logdepthbuf_pars_vertex>
+attribute vec3 aCol;attribute float kind;attribute vec3 aDir;attribute float flash;attribute float phase;
+uniform float uLights,uTime,uPR;uniform vec3 uCam;
+varying vec3 vCol;varying float vI;
+void main(){
+  float I=uLights,sz=1.0;
+  if(kind>0.5){vec2 tc=uCam.xz-position.xz;float l=length(tc);float c=l>0.01?dot(tc/l,aDir.xy):1.0;I*=smoothstep(aDir.z-0.12,aDir.z+0.12,c);}
+  if(flash>0.5){
+    if(flash<1.5){I*=fract(uTime*2.0+phase)<0.07?1.6:0.0;sz=1.3;}
+    else if(flash<2.5){I*=fract(uTime*2.0-phase)<0.05?1.8:0.0;sz=1.3;}
+    else{I*=pow(max(cos(6.2831853*fract(uTime*0.5+phase)),0.0),6.0)*1.6;sz=1.5;}
+  }
+  gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);
+  float w=gl_Position.w;
+  I*=clamp(1.25-w/40000.0,0.35,1.0);
+  vCol=aCol;vI=I;
+  if(I<0.004){gl_Position=vec4(0.0,0.0,-2.0,1.0);gl_PointSize=0.0;}
+  else gl_PointSize=clamp(${AL_K.toFixed(1)}/w,${AL_MIN.toFixed(2)},${AL_MAX.toFixed(2)})*sz*uPR;
+  #include <logdepthbuf_vertex>
+}`,
+  fragmentShader:`#include <logdepthbuf_pars_fragment>
+varying vec3 vCol;varying float vI;
+void main(){
+  #include <logdepthbuf_fragment>
+  float r=length(gl_PointCoord-0.5);
+  if(r>0.5)discard;
+  float a=r<0.35?1.0:1.0-(r-0.35)/0.15;a*=a;
+  vec3 c=mix(vCol,vec3(1.0),0.35*clamp(1.0-r/0.3,0.0,1.0));
+  gl_FragColor=vec4(c*vI,a);
+}`,
+  transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false});
+function makeLightLayer(name){
+  const L={name:name,pos:[],col:[],kind:[],dir:[],flash:[],phase:[],fixt:[],pts:null};
+  const c=new THREE.Color();
+  function push(x,y,z,color,k,dx,dz,cosH,fl,ph,fix){
+    c.setHex(color);L.pos.push(x,y,z);L.col.push(c.r,c.g,c.b);L.kind.push(k);L.dir.push(dx,dz,cosH);
+    L.flash.push(fl||0);L.phase.push(ph||0);if(fix!==false)L.fixt.push(x,y,z,color);}
+  L.addLight=(x,y,z,color,fl,ph,fix)=>push(x,y,z,color,0,0,0,-1,fl,ph,fix);
+  L.addDirectional=(x,y,z,color,dx,dz,half,fl,ph,fix)=>{const l=Math.hypot(dx,dz)||1;push(x,y,z,color,1,dx/l,dz/l,Math.cos(half),fl,ph,fix);};
+  L.count=()=>L.pos.length/3;
+  L.build=()=>{
+    const g=new THREE.BufferGeometry();
+    g.setAttribute('position',new THREE.Float32BufferAttribute(L.pos,3));
+    g.setAttribute('aCol',new THREE.Float32BufferAttribute(L.col,3));
+    g.setAttribute('kind',new THREE.Float32BufferAttribute(L.kind,1));
+    g.setAttribute('aDir',new THREE.Float32BufferAttribute(L.dir,3));
+    g.setAttribute('flash',new THREE.Float32BufferAttribute(L.flash,1));
+    g.setAttribute('phase',new THREE.Float32BufferAttribute(L.phase,1));
+    g.computeBoundingSphere();
+    const p=new THREE.Points(g,AL_MAT);p.name='airportLights_'+L.name;p.renderOrder=2;
+    p.onBeforeRender=(r,sc,cam)=>{const u=AL_MAT.uniforms;u.uCam.value.setFromMatrixPosition(cam.matrixWorld);u.uTime.value=performance.now()/1000;u.uPR.value=r.getPixelRatio();};
+    scene.add(p);L.pts=p;
+    // the fixtures themselves, for daylight: one instanced mesh of tiny posts, one per distinct spot
+    const seen=new Set(),f=[];
+    for(let i=0;i<L.fixt.length;i+=4){const k=Math.round(L.fixt[i]*5)+','+Math.round(L.fixt[i+2]*5);if(!seen.has(k)){seen.add(k);f.push(i);}}
+    const fg=new THREE.CylinderGeometry(0.09,0.12,0.36,5,1,true);
+    const im=new THREE.InstancedMesh(fg,new THREE.MeshBasicMaterial({color:0xffffff,fog:false}),f.length),m=new THREE.Matrix4();
+    f.forEach((i,n)=>{m.makeTranslation(L.fixt[i],L.fixt[i+1]-0.12,L.fixt[i+2]);im.setMatrixAt(n,m);im.setColorAt(n,c.setHex(L.fixt[i+3]));});
+    im.name='airportFixtures_'+L.name;scene.add(im);L.fixMesh=im;
+    return L;};
+  AL_LAYERS.push(L);return L;
 }
-// edge lights, thresholds
-(function(){
-  const g=new THREE.CylinderGeometry(0.09,0.12,0.4,6),pts=[];
-  for(let u=0;u<=RWY_LEN;u+=61){pts.push([u,-17.5,0xfff6d8]);pts.push([u,17.5,0xfff6d8]);}
-  for(const s of [-1,1])for(let k=0;k<4;k++){pts.push([THR01,s*(12-k*3),0x3fe06a]);pts.push([THR19,s*(12-k*3),0x3fe06a]);pts.push([-1,s*(12-k*3),0xff3b30]);pts.push([RWY_LEN+1,s*(12-k*3),0xff3b30]);}
-  for(let u=-40;u<=RWY_LEN+40;u+=60){pts.push([u,-110.5,0x2d6cff]);pts.push([u,-129.5,0x2d6cff]);}
-  const im=new THREE.InstancedMesh(g,new THREE.MeshBasicMaterial({color:0xffffff,fog:false}),pts.length),m=new THREE.Matrix4(),col=new THREE.Color();
-  rwyLightBase=[];
-  pts.forEach((p,i)=>{m.makeTranslation(wX(p[0],p[1]),0.25,wZ(p[0],p[1]));im.setMatrixAt(i,m);im.setColorAt(i,col.setHex(p[2]));rwyLightBase.push(m.clone());});
-  scene.add(im);rwyLightMesh=im;
-  lightGlow(pts,(u,v)=>[wX(u,v),wZ(u,v)],0.5);
-})();
+const AL_C={white:0xfff2d6,yellow:0xffc23a,green:0x38ff78,red:0xff2a1e,blue:0x2f6dff,beacon:0x30ff64};
+const alY=(x,z)=>groundHeight(x,z)+0.3;
+// r: {x,z (centre), h (heading of the low end, radians), len, wid, ends[{x,z (threshold)}]} as in RUNWAYS
+function lightRunway(L,r){
+  const dx=Math.sin(r.h),dz=-Math.cos(r.h),rx=Math.cos(r.h),rz=Math.sin(r.h),H=r.len/2;
+  const P=(u,v)=>[r.x+dx*u+rx*v,r.z+dz*u+rz*v];
+  // edge lights every 60 m (200 ft); the last 610 m (2000 ft) toward each end shows
+  // yellow to a pilot rolling into it and white the other way
+  const ev=r.wid/2+2.5,n=Math.round(r.len/60);
+  for(let i=0;i<=n;i++){const u=-H+i*r.len/n;
+    for(const s of [-1,1]){const p=P(u,s*ev),y=alY(p[0],p[1]);
+      const lo=u<-H+610,hi=u>H-610;
+      if(!lo&&!hi)L.addLight(p[0],y,p[1],AL_C.white);
+      else{const sg=hi?-1:1;
+        L.addDirectional(p[0],y,p[1],AL_C.yellow,dx*sg,dz*sg,Math.PI/2);
+        L.addDirectional(p[0],y,p[1],AL_C.white,-dx*sg,-dz*sg,Math.PI/2,0,0,false);}}}
+  // threshold bars: green toward the approach, red (runway end) toward the runway.
+  // On a displaced threshold the green bar is at the threshold and the red at the pavement end.
+  r.ends.forEach((e,k)=>{const sg=k?1:-1,ut=(e.x-r.x)*dx+(e.z-r.z)*dz,ue=sg*H;
+    for(let j=0;j<8;j++){const v=-r.wid/2+j*r.wid/7,pt=P(ut,v),pe=P(ue,v);
+      L.addDirectional(pt[0],alY(pt[0],pt[1]),pt[1],AL_C.green,sg*dx,sg*dz,1.2);
+      L.addDirectional(pe[0],alY(pe[0],pe[1]),pe[1],AL_C.red,-sg*dx,-sg*dz,1.2);}});
+}
+// e: a runway end from RUNWAYS (x,z threshold, h landing heading, rwy). type 'REIL' or 'ALSF1'.
+function lightApproach(L,e,type){
+  const dx=Math.sin(e.h),dz=-Math.cos(e.h),rx=Math.cos(e.h),rz=Math.sin(e.h);
+  const P=(d,v)=>[e.x-dx*d+rx*v,e.z-dz*d+rz*v];   // d metres short of the threshold, v right of centreline
+  if(type==='REIL'){const w=e.rwy.wid/2+12;
+    for(const s of [-1,1]){const p=P(0,s*w);L.addDirectional(p[0],alY(p[0],p[1]),p[1],AL_C.white,-dx,-dz,1.4,1,0);}
+    return;}
+  if(type==='ALSF1'){
+    // 5-light white bars every 30 m out to 720 m, the 300 m bar a wide crossbar,
+    // red terminating bars at 60 m, and the rabbit on every bar from 330 m out
+    for(let i=1;i<=24;i++){const d=i*30;
+      for(let j=-2;j<=2;j++){const p=P(d,j);L.addDirectional(p[0],alY(p[0],p[1]),p[1],AL_C.white,-dx,-dz,1.2);}
+      if(d===300)for(const s of [-1,1])for(let j=0;j<8;j++){const p=P(d,s*(4+j*1.5));L.addDirectional(p[0],alY(p[0],p[1]),p[1],AL_C.white,-dx,-dz,1.2);}
+      if(d===60)for(const s of [-1,1])for(let j=0;j<3;j++){const p=P(d,s*(4.5+j*1.5));L.addDirectional(p[0],alY(p[0],p[1]),p[1],AL_C.red,-dx,-dz,1.2);}
+      if(d>=330){const p=P(d,0);L.addDirectional(p[0],alY(p[0],p[1])+0.4,p[1],AL_C.white,-dx,-dz,1.3,2,(720-d)/720*0.8,false);}
+    }}
+}
+// blue edge lights along both sides of a polyline pts [[x,z],...] of the given width
+// (width 0: one row on the line itself). skip(x,z) drops a light, e.g. across a runway.
+function lightTaxiway(L,pts,spacing,width,skip){
+  for(let k=0;k+1<pts.length;k++){const a=pts[k],b=pts[k+1],ex=b[0]-a[0],ez=b[1]-a[1],len=Math.hypot(ex,ez),n=Math.max(1,Math.round(len/spacing));
+    const nx=-ez/len,nz=ex/len;
+    for(let i=k?1:0;i<=n;i++){const t=i/n,x=a[0]+ex*t,z=a[1]+ez*t;
+      for(const s of width>0?[-1,1]:[0]){const qx=x+nx*s*width/2,qz=z+nz*s*width/2;
+        if(skip&&skip(qx,qz))continue;L.addLight(qx,alY(qx,qz),qz,AL_C.blue);}}}
+}
+// rotating beacon: white and green flashes alternating, one each per 2 s
+function lightBeacon(L,x,y,z){L.addLight(x,y,z,AL_C.white,3,0,false);L.addLight(x,y,z,AL_C.beacon,3,0.5,false);}
 // PAPI (P2L, 3.00 degrees) on the left of each runway
 const PAPI=[];
+// same tight core and short halo as the airport light points, so a PAPI box is no bigger than an edge light
+const papiTex=tex(32,32,(x,w,h)=>{const g=x.createRadialGradient(16,16,0,16,16,16);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(0.7,'rgba(255,255,255,1)');g.addColorStop(0.85,'rgba(255,255,255,.25)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,32,32);});
 function papiUnit(u,v,dir,setAng){boxLocal(1.6,0.9,1.0,lam(0x3a3d42),u,v,0,0);
-  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color:0xff2020,fog:false,depthWrite:false,blending:THREE.AdditiveBlending}));
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:papiTex,color:0xff2020,fog:false,depthWrite:false,blending:THREE.AdditiveBlending}));
   sp.position.set(wX(u,v),0.9,wZ(u,v));scene.add(sp);PAPI.push({sp:sp,u:u,v:v,dir:dir,ang:setAng});}
 papiUnit(THR01+300,-31.5,1,3.5);papiUnit(THR01+300,-39,1,2.5);
 papiUnit(THR19-300,31.5,-1,3.5);papiUnit(THR19-300,39,-1,2.5);
@@ -3518,22 +3611,6 @@ function updateCars(dt){cars.forEach((c,k)=>{c.s+=c.dir*c.sp*dt;
   const jetG=new THREE.Group();{const b=new THREE.Mesh(new THREE.BoxGeometry(1.6,1.4,15),lam(0x6b7280));jetG.add(b);const w=new THREE.Mesh(new THREE.BoxGeometry(10.5,0.3,5),lam(0x6b7280));w.position.set(0,0,1.5);jetG.add(w);
     for(const sx of [-1,1]){const t=new THREE.Mesh(new THREE.BoxGeometry(0.3,2.4,2.4),lam(0x6b7280));t.position.set(sx*1.2,1.4,6);t.rotation.z=sx*0.4;jetG.add(t);}}
   for(let k=0;k<10;k++){const j=jetG.clone();j.position.set(LKX(-600+k*60,300),1.4,LKZ(-600+k*60,300));j.rotation.y=-lh+Math.PI/2;scene.add(j);}
-  // runway lighting on both Luke runways, so a night landing there works too
-  (function(){
-    const g=new THREE.BoxGeometry(0.75,0.28,0.75),pts=[];
-    for(const r of LUKE_RWY){
-      const half=r.len/2;
-      for(let u=-half;u<=half;u+=76){pts.push([u,r.v-25,0xfff6d8]);pts.push([u,r.v+25,0xfff6d8]);}
-      for(let k=-3;k<=3;k++){pts.push([-half+2,r.v+k*6,0x3fe06a]);pts.push([half-2,r.v+k*6,0x3fe06a]);}
-      for(let k=-3;k<=3;k++){pts.push([-half-3,r.v+k*6,0xff3b30]);pts.push([half+3,r.v+k*6,0xff3b30]);}
-    }
-    const im=new THREE.InstancedMesh(g,new THREE.MeshBasicMaterial({color:0xffffff,fog:false}),pts.length);
-    const m=new THREE.Matrix4(),col=new THREE.Color();lukeLightBase=[];
-    pts.forEach((p,i)=>{m.makeTranslation(LKX(p[0],p[1]),0.3,LKZ(p[0],p[1]));im.setMatrixAt(i,m);im.setColorAt(i,col.setHex(p[2]));lukeLightBase.push(m.clone());});
-    scene.add(im);lukeLightMesh=im;
-    lightGlow(pts,(u,v)=>[LKX(u,v),LKZ(u,v)],0.55);
-  })();
-
   // Sky Harbor: three parallel runways east to west, the terminals between the
   // inner two, and the tower. 28.6 km out, so it is geometry and no textures.
   (function(){
@@ -3597,7 +3674,8 @@ function updateCars(dt){cars.forEach((c,k)=>{c.s+=c.dir*c.sp*dt;
   trunks.forEach((t,k)=>{p.set(t[0],0,t[1]);s.set(1,t[2],1);m.compose(p,q,s);tm.setMatrixAt(k,m);p.set(t[0],t[2]+0.4,t[1]);s.set(3.6,1.1,3.6);q.setFromAxisAngle(_yUp,hash(k,2)*6);m.compose(p,q,s);cm.setMatrixAt(k,m);q.identity();});
   shr.forEach((b,k)=>{p.set(b[0],groundHeight(b[0],b[1])+b[2]*0.35,b[1]);s.set(b[2]*1.3,b[2]*0.75,b[2]*1.3);q.setFromAxisAngle(_yUp,hash(k,3)*6);m.compose(p,q,s);sm.setMatrixAt(k,m);});
   scene.add(tm,cm,sm);
-  const cl=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,1),new THREE.MeshLambertMaterial({color:0xffffff,emissive:0x6f7780}),200);let i=0;q.identity();
+  cloudMat=new THREE.MeshLambertMaterial({color:0xffffff,emissive:0x6f7780});
+  const cl=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,1),cloudMat,200);let i=0;q.identity();
   for(let k=0;k<28;k++){const cx=APC.x+(hash(k,201)-0.5)*40000,cz=APC.z+(hash(k,202)-0.5)*40000,cy=2900+hash(k,203)*500;
     for(let j=0;j<7;j++){const r=160+hash(k*9+j,5)*200;s.set(r*1.7,r*0.5,r);p.set(cx+(hash(k*9+j,1)-0.5)*600,cy+hash(k*9+j,2)*70,cz+(hash(k*9+j,3)-0.5)*400);m.compose(p,q,s);cl.setMatrixAt(i++,m);}}
   cl.count=i;scene.add(cl);
@@ -4054,6 +4132,29 @@ const RUNWAYS=(function(){
   add('Assault strip','LZ','9-27',LZ.len,LZ.wid,LZ.x,LZ.z,LZ.h,'9','27',0,0);
   return out;})();
 const RWY_ENDS=[].concat(...RUNWAYS.map(r=>r.ends));
+// ---------- airport lights, laid out from the runway table ----------
+const AL={};
+(function(){
+  const G=makeLightLayer('KGEU'),K=makeLightLayer('KLUF');AL.KGEU=G;AL.KLUF=K;
+  for(const r of RUNWAYS){
+    if(r.code==='KGEU'){lightRunway(G,r);for(const e of r.ends)lightApproach(G,e,'REIL');}
+    if(r.code==='KLUF'){lightRunway(K,r);for(const e of r.ends)lightApproach(K,e,e.num==='03R'?'ALSF1':'REIL');}
+  }
+  // Glendale: parallel taxiway (15.2 m wide at v=-120) with gaps where the connectors
+  // join, and the five connectors up to the runway
+  const gw=(u,v)=>[wX(u,v),wZ(u,v)];
+  lightTaxiway(G,[gw(-60,-120),gw(2239,-120)],60,15.2,(x,z)=>{const u=toU(x,z),v=toV(x,z);return v>-120&&CONNECT.some(c=>Math.abs(u-c)<12);});
+  for(const c of CONNECT)lightTaxiway(G,[gw(c,-111),gw(c,-26)],30,18);
+  lightBeacon(G,wX(1290,-470),28.2,wZ(1290,-470));
+  // Luke: the crossing taxiway (26 m wide at u=-300), dark across both runways, and the ramp edge
+  const lw=(u,v)=>[lkX(u,v),lkZ(u,v)];
+  lightTaxiway(K,[lw(-300,-186),lw(-300,190)],45,26,(x,z)=>{const v=lukeUV(x,z)[1];return LUKE_RWY.some(r=>Math.abs(v-r.v)<30);});
+  lightTaxiway(K,[lw(-900,190),lw(900,190),lw(900,700),lw(-900,700),lw(-900,190)],60,0,(x,z)=>{const q=lukeUV(x,z);return Math.abs(q[1]-190)<2&&Math.abs(q[0]+300)<15;});
+  {const bx=lkX(-960,720),bz=lkZ(-960,720);
+   const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.35,16,6),new THREE.MeshLambertMaterial({color:0x8a8d90}));pole.position.set(bx,8,bz);scene.add(pole);
+   lightBeacon(K,bx,16.4,bz);}
+  G.build();K.build();
+})();
 // ---------- state & input ----------
 const $=id=>document.getElementById(id);
 let st=createState('runway'),running=false,paused=false,camMode=0,muted=false,FREECAM=null;
@@ -6531,7 +6632,9 @@ function tick(t,skipRender){
   camera.updateProjectionMatrix();sky.position.copy(camera.position);
   // PAPI
   PAPI.forEach(pp=>{const eye=camMode>=3?s.pos:camera.position,du=(toU(eye.x,eye.z)-pp.u)*pp.dir;const ang=du<0?Math.atan2(eye.y-0.9,-du)*180/Math.PI:10;
-    pp.sp.material.color.setHex(ang>pp.ang?0xffffff:0xff2a2a);const cd=camera.position.distanceTo(pp.sp.position);pp.sp.scale.setScalar(clamp(cd*0.009,1.4,60));pp.sp.visible=du<0;});
+    pp.sp.material.color.setHex(ang>pp.ang?0xffffff:0xff2a2a);const cd=camera.position.distanceTo(pp.sp.position);
+    // the same on-screen size as an airport light point: clamp(K/d) CSS px turned back into metres
+    pp.sp.scale.setScalar(clamp(AL_K/cd,AL_MIN,AL_MAX)*cd*2*Math.tan(camera.fov*Math.PI/360)/Math.max(1,glc.clientHeight));pp.sp.visible=du<0;});
   // instruments
   _eu.setFromQuaternion(q,'YXZ');const hdgT=((-_eu.y*180/Math.PI)%360+360)%360,hdgM=(hdgT-MAGVAR+360)%360;
   mapT-=dt;if(mapT<=0){mapT=0.1;drawMap(hdgT);}
@@ -6565,6 +6668,11 @@ function tick(t,skipRender){
 // test hook: headless UI checks need to reach a few internals
 window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},HD:()=>HD,
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
+  lights:()=>({KGEU:AL.KGEU.count(),KLUF:AL.KLUF.count(),uLights:AL_MAT.uniforms.uLights.value,
+    layers:AL_LAYERS.map(L=>({name:L.pts&&L.pts.name,visible:!!(L.pts&&L.pts.visible),inScene:!!(L.pts&&L.pts.parent)})),
+    oldGlow:scene.children.filter(o=>o.isPoints&&o.material.isPointsMaterial&&o.material.blending===THREE.AdditiveBlending).length,
+    hasGLOWS:typeof GLOWS!=='undefined'||typeof lightGlow!=='undefined'||typeof lightScale!=='undefined'}),
+  cloudMat:()=>({color:cloudMat.color.getHex(),emissive:cloudMat.emissive.getHex()}),
   setTOD:setTOD,isNight:isNight,TOD:()=>TOD,drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
   RADIO:RADIO,radioQ:()=>radioQ,radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,initAudio:initAudio,
