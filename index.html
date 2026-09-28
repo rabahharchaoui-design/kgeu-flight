@@ -312,52 +312,70 @@ label.sens b{ color:var(--ink); min-width:74px; }
 #menu .corner{ position:absolute; top:var(--padT); width:48px; height:48px; padding:0; display:grid; place-items:center; background:rgba(42,22,8,.12); color:var(--night); }
 #menu .corner svg{ width:24px; height:24px; }
 .corner.tl{ left:var(--padL); } .corner.tr{ right:var(--padR); }
-/* fly step 1: the carousel. The model is drawn by the game renderer behind it. */
-.car{ position:relative; flex:1; overflow:hidden; touch-action:pan-y; }
-.track{ position:absolute; inset:0; display:flex; will-change:transform; }
-.acard{ flex:0 0 100%; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; padding:0 54px; }
-.acard .info{ width:min(560px,100%); background:rgba(42,22,8,.88); color:var(--sand); border-radius:16px; padding:10px 14px; display:grid;
-  grid-template-columns:1fr auto; grid-template-rows:auto auto; gap:2px 12px; align-items:center; }
-.acard .nm{ font-size:22px; font-weight:800; line-height:1.05; }
-.acard .tail{ font-size:14px; font-weight:700; color:var(--orange); margin-left:8px; letter-spacing:.04em; }
-.acard p{ grid-column:1; margin:0; font-size:14px; line-height:1.25; color:#f3dcb8; }
-.acard .btns{ grid-column:2; grid-row:1 / span 2; display:flex; gap:8px; }
-#menu .acard .story{ background:transparent; border:1.5px solid rgba(246,193,119,.6); color:var(--sand); padding:0 12px; }
-#menu .acard .pickme{ background:var(--sand); color:var(--night); padding:0 18px; font-size:17px; }
-#menu .arrow{ position:absolute; top:42%; width:44px; height:56px; padding:0; display:grid; place-items:center; background:rgba(42,22,8,.55); }
-#menu .arrow svg{ width:24px; height:24px; }
-#menu .arrow.l{ left:var(--padL); } #menu .arrow.r{ right:var(--padR); } #menu .arrow.r svg{ transform:scaleX(-1); }
-#menu .arrow[disabled]{ opacity:.25; }
-.dots{ display:flex; gap:6px; justify-content:center; }
-/* fly step 2 */
-.rows{ flex:1; display:flex; flex-direction:column; justify-content:center; gap:clamp(6px,2.4vh,14px); }
-.prow{ display:flex; align-items:center; gap:12px; }
-.plbl{ width:64px; flex:none; font-size:15px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--brown); }
-.chips{ display:flex; gap:8px; flex:1; align-items:center; flex-wrap:nowrap; }
-.chips.four{ display:grid; grid-template-columns:repeat(4,1fr); }
-#menu .chip{ flex:1; min-height:clamp(48px,13vh,58px); background:rgba(42,22,8,.1); color:var(--night); border:2px solid rgba(42,22,8,.18); border-radius:14px; padding:4px 10px; line-height:1.1; }
-#menu .chip b{ display:block; font-size:18px; font-weight:800; }
-#menu .chip span{ font-size:12px; font-weight:700; color:var(--brown); }
-#menu .chip.sel{ background:var(--night); color:var(--sand); border-color:var(--night); }
-#menu .chip.sel span{ color:var(--orange); }
-#menu .chip.sk{ min-height:44px; } #menu .chip.sk b{ font-size:16px; }
+/* fly: one screen. The carousel window is drawn by the game renderer through a transparent hole. */
+#sFly{ gap:6px; }
+.carx{ position:relative; flex:1; min-height:0; display:flex; flex-direction:column; }
+.cwin{ position:relative; flex:1; min-height:60px; touch-action:pan-y; cursor:grab; }
+.cinfo{ position:absolute; left:50%; bottom:0; transform:translateX(-50%); width:min(560px,calc(100% - 120px)); display:flex; align-items:center; gap:10px;
+  background:rgba(42,22,8,.86); color:var(--sand); border-radius:14px; padding:5px 6px 5px 14px; }
+.cinfo .tx{ flex:1; min-width:0; }
+.cinfo .nm{ font-size:19px; font-weight:800; line-height:1.05; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cinfo .tail{ font-size:13px; font-weight:700; color:var(--orange); margin-left:8px; letter-spacing:.04em; }
+.cinfo .desc{ margin:1px 0 0; font-size:13px; line-height:1.2; color:#f3dcb8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.carx .story{ flex:none; background:transparent !important; border:1.5px solid rgba(246,193,119,.6) !important; color:var(--sand) !important; padding:0 12px; }
+.carx .arrow{ position:absolute; top:calc(50% - 44px); width:44px; height:56px; padding:0; display:grid; place-items:center; background:rgba(42,22,8,.6) !important; color:var(--sand) !important; border:none; border-radius:12px; }
+.carx .arrow svg{ width:24px; height:24px; }
+.carx .arrow.l{ left:0; } .carx .arrow.r{ right:0; } .carx .arrow.r svg{ transform:scaleX(-1); }
+.cdots{ position:absolute; left:0; right:0; top:2px; display:flex; justify-content:center; gap:7px; pointer-events:none; }
+.cdots span{ width:7px; height:7px; border-radius:50%; background:rgba(42,22,8,.28); pointer-events:auto; }
+.cdots span.sel{ background:var(--night); }
+.carx.compact .cinfo{ width:auto; max-width:calc(100% - 104px); padding:4px 12px; }
+.carx.compact .desc,.carx.compact .story,.carx.compact .cdots{ display:none; }
+.carx.compact .nm{ font-size:16px; }
+.carx.compact .cwin{ border-radius:12px; overflow:hidden; }
+/* chips under the carousel: two rows */
+.frows{ display:flex; flex-direction:column; gap:6px; flex:none; }
+.frow{ display:flex; gap:10px; align-items:stretch; }
+.grp{ display:flex; gap:6px; align-items:center; flex:1; min-width:0; }
+.grp.g4{ flex:1.9; } .grp.g2{ flex:1.1; } .grp.g3{ flex:1.8; }
+.glbl{ writing-mode:vertical-rl; transform:rotate(180deg); font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--brown); flex:none; }
+.frows .chip{ flex:1; min-width:0; min-height:44px; height:44px; border-radius:12px; padding:0 4px; line-height:1; white-space:nowrap; }
+.frows .chip b{ display:block; font-size:clamp(13px,2.2vw,17px); font-weight:800; overflow:hidden; text-overflow:ellipsis; }
+.frows .go{ flex:1; min-height:44px; border-radius:14px; font-size:26px; font-weight:900; letter-spacing:.08em; background:var(--rust) !important; color:#fff4e0 !important; box-shadow:0 5px 0 var(--brown); border:none; }
+.frows .go:active{ transform:translateY(3px); box-shadow:0 2px 0 var(--brown); }
+#menu .frows .chip{ background:rgba(42,22,8,.1); color:var(--night); border:2px solid rgba(42,22,8,.18); }
+#menu .frows .chip.sel{ background:var(--night); color:var(--sand); border-color:var(--night); }
 .chip.slot{ border-style:dashed !important; background:transparent !important; opacity:.35; }
-.foot{ display:flex; justify-content:flex-end; flex:none; }
-#menu .wide{ min-width:160px; }
-/* fly step 3 */
-.goC{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:clamp(10px,4vh,24px); }
-.sumLine{ margin:0; font-size:clamp(18px,5.4vh,26px); font-weight:700; text-align:center; max-width:90%; }
-#menu .go{ width:clamp(130px,34vh,170px); height:clamp(130px,34vh,170px); border-radius:50%; font-size:clamp(40px,11vh,56px); font-weight:900; letter-spacing:.06em;
-  background:var(--rust); color:#fff4e0; box-shadow:0 8px 0 var(--brown); }
-#menu .go:active{ transform:translateY(4px); box-shadow:0 4px 0 var(--brown); }
-/* cards: missions, school, arcade */
-.cards{ flex:1; display:grid; grid-template-columns:repeat(auto-fit,minmax(min(190px,29vw),1fr)); grid-auto-rows:1fr; gap:10px; min-height:0; }
-#menu .mcard{ position:relative; display:flex; flex-direction:column; justify-content:flex-end; align-items:flex-start; gap:2px; text-align:left;
-  padding:10px 14px; background:var(--night); color:var(--sand); border-radius:16px; min-height:0; overflow:hidden; }
-.mcard b{ font-size:19px; font-weight:800; line-height:1.1; }
-.mcard span{ font-size:13px; font-weight:500; color:#f0d6ad; line-height:1.25; }
-.mcard i{ position:absolute; right:12px; top:8px; font-style:normal; font-weight:900; font-size:22px; color:var(--orange); }
-.mcard .ac{ position:absolute; left:14px; top:9px; font-size:11px; font-weight:800; letter-spacing:.1em; color:var(--orange); text-transform:uppercase; }
+#sumLine{ font-weight:700; color:var(--brown); font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:55%; }
+/* the pause sheet: actions on the left, change flight on the right */
+#pauseOv{ background:transparent; }
+.pzR{ background:none !important; border:none !important; padding:0 !important; gap:6px !important; }
+.pzR .pzT{ background:rgba(26,16,9,.9); border-radius:12px; padding:6px 12px; }
+.pzR .frows{ background:rgba(26,16,9,.9); border-radius:12px; padding:6px 8px; }
+.pz{ display:flex; gap:14px; width:100%; height:100%; max-width:980px; max-height:560px; }
+.pzL,.pzR{ background:rgba(26,16,9,.9); border:1px solid rgba(246,193,119,.18); border-radius:16px; padding:10px 12px; display:flex; flex-direction:column; gap:8px; }
+.pzL{ flex:0 0 clamp(140px,22vw,200px); }
+.pzL button{ min-height:44px; font-size:16px; }
+.pzR{ flex:1; min-width:0; }
+.pzT{ margin:0; font-size:17px; font-weight:800; color:var(--sand); letter-spacing:.02em; }
+#pauseOv .primary{ background:var(--rust); color:#fff4e0; border:none; }
+#pauseOv .glbl{ color:var(--orange); }
+#pauseOv .frows .chip{ background:rgba(246,193,119,.1); color:var(--sand); border:2px solid rgba(246,193,119,.22); }
+#pauseOv .frows .chip.sel{ background:var(--sand); color:var(--night); border-color:var(--sand); }
+#pauseOv .cwin{ background:transparent; }
+#pauseOv .frows .chip b{ font-size:clamp(12px,2vw,16px); }
+/* cards: missions, school, arcade. Sized to their content, two or three to a row. */
+.cards{ flex:1; min-height:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(min(196px,30vw),1fr)); grid-auto-rows:min-content; align-content:center; gap:8px; }
+#menu .mcard{ display:flex; align-items:center; gap:10px; text-align:left; padding:8px 10px; background:var(--night); color:var(--sand); border-radius:14px; min-height:64px; }
+.mcard .ico{ width:58px; height:44px; flex:none; background:rgba(246,193,119,.08); border-radius:10px; }
+.mcard .mt{ display:flex; flex-direction:column; gap:1px; min-width:0; }
+.mcard .ac{ font-size:10px; font-weight:800; letter-spacing:.1em; color:var(--orange); text-transform:uppercase; }
+.mcard b{ font-size:16px; font-weight:800; line-height:1.1; }
+.mcard .d{ font-size:12px; font-weight:500; color:#f0d6ad; line-height:1.2; }
+.mcard .sc{ display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:var(--sand); margin-top:2px; }
+.mcard .sc em{ font-style:normal; color:#f0d6ad; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.stars{ font-style:normal; color:var(--orange); letter-spacing:1px; font-size:13px; } .stars u{ text-decoration:none; color:rgba(246,193,119,.22); }
+.sc.soon{ color:var(--orange); letter-spacing:.08em; text-transform:uppercase; font-size:11px; }
 .schAc{ flex:none; } #menu .schAc .chip{ min-height:44px; }
 /* settings */
 .setGrid{ flex:1; display:grid; grid-template-columns:1fr 1fr; gap:6px 20px; align-content:center; min-height:0; }
@@ -374,7 +392,7 @@ label.sens b{ color:var(--ink); min-width:74px; }
 .helpBody{ flex:1; min-height:0; display:flex; align-items:center; }
 #menu .keys{ font-size:14px; gap:2px 14px; margin:0; } #menu .keys dt{ color:var(--rust); }
 #menu .touchnote{ color:var(--night); font-size:clamp(14px,4.2vh,17px); line-height:1.4; margin:0; max-width:760px; }
-body.menuOn #uiroot, body.menuOn #badges, body.menuOn #sixpack, body.menuOn #miss, body.menuOn #lesson{ display:none !important; }
+body.pauseOn #uiroot, body.pauseOn #badges, body.pauseOn #sixpack, body.menuOn #uiroot, body.menuOn #badges, body.menuOn #sixpack, body.menuOn #miss, body.menuOn #lesson{ display:none !important; }
 #menu .pick.sel{ box-shadow:none; } .acard.pick.sel{ border:none; }
 #funnel{ background:var(--sand); color:var(--night); z-index:30; padding:var(--padT) var(--padR) var(--padB) var(--padL); }
 .fun{ display:flex; flex-direction:column; align-items:center; gap:clamp(10px,4vh,22px); width:100%; }
@@ -464,33 +482,18 @@ body.menuOn #uiroot, body.menuOn #badges, body.menuOn #sixpack, body.menuOn #mis
    </div>
   </div>
  </div>
- <div class="scr" id="sFly1">
-  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Pick your aircraft</h2><span class="steps">1 of 3</span></header>
-  <div class="car" id="car"><div class="track" id="track"></div></div>
-  <button class="arrow l" id="carL" aria-label="Previous aircraft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
-  <button class="arrow r" id="carR" aria-label="Next aircraft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
- </div>
- <div class="scr" id="sFly2">
-  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Where and when</h2><span class="steps">2 of 3</span></header>
-  <div class="rows">
-   <div class="prow"><span class="plbl">Base</span><div class="chips">
-    <button class="pick chip" data-b="kgeu"><b>Glendale</b><span>KGEU</span></button>
-    <button class="pick chip" data-b="luke"><b>Luke AFB</b><span>KLUF</span></button></div></div>
-   <div class="prow"><span class="plbl">Time</span><div class="chips four">
-    <button class="pick chip" data-tod="day"><b>Day</b></button>
-    <button class="pick chip" data-tod="sunset"><b>Sunset</b></button>
-    <button class="pick chip" data-tod="night"><b>Night</b></button>
-    <span class="chip slot" aria-hidden="true"></span></div></div>
-   <div class="prow"><span class="plbl">Start</span><div class="chips">
-    <button class="pick chip" data-pos="runway"><b>Runway</b></button>
-    <button class="pick chip" data-pos="ramp"><b>Ramp</b></button>
-    <button class="pick chip" data-pos="final"><b>3 mile final</b></button></div></div>
+ <div class="scr" id="sFly">
+  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Fly</h2><span class="steps" id="sumLine"></span></header>
+  <div class="carx" id="carMain"></div>
+  <div class="frows">
+   <div class="frow"><div class="grp g2"><span class="glbl">Base</span>
+     <button class="pick chip" data-b="kgeu"><b>Glendale</b></button><button class="pick chip" data-b="luke"><b>Luke AFB</b></button></div>
+    <div class="grp g4"><span class="glbl">Time</span>
+     <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><span class="chip slot" aria-hidden="true"></span></div></div>
+   <div class="frow"><div class="grp g3"><span class="glbl">Start</span>
+     <button class="pick chip" data-pos="runway"><b>Runway</b></button><button class="pick chip" data-pos="ramp"><b>Ramp</b></button><button class="pick chip" data-pos="final"><b>3 mi final</b></button></div>
+    <button class="go" id="bGo">GO</button></div>
   </div>
-  <div class="foot"><button class="primary wide" id="f2Next">Next</button></div>
- </div>
- <div class="scr" id="sFly3">
-  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Ready</h2><span class="steps">3 of 3</span></header>
-  <div class="goC"><p class="sumLine" id="sumLine"></p><button class="go" id="bGo">GO</button></div>
  </div>
  <div class="scr" id="sMis">
   <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Missions</h2><span class="steps"></span></header>
@@ -549,10 +552,25 @@ body.menuOn #uiroot, body.menuOn #badges, body.menuOn #sixpack, body.menuOn #mis
   <p>You can change this any time in Settings.</p>
  </div></div>
 <div class="overlay" id="storyOv"><div class="sheet"><p class="reg" id="storyH"></p><p class="sub" id="storyT"></p><div class="row"><button class="primary" id="storyX">Close</button></div></div></div>
-<div class="overlay" id="pauseOv"><div class="sheet">
-  <p class="reg">Paused</p>
-  <div class="row"><button class="primary" id="pResume">Resume</button><button id="pRestart">Restart</button><button id="pSet">Settings</button><button id="pMenu">Main menu</button></div>
-</div></div>
+<div class="overlay" id="pauseOv"><div class="pz">
+  <div class="pzL">
+   <p class="pzT">Paused</p>
+   <button class="primary" id="pResume">Resume</button><button id="pRestart">Restart</button><button id="pSet">Settings</button><button id="pMenu">Main menu</button>
+  </div>
+  <div class="pzR">
+   <p class="pzT">Change flight</p>
+   <div class="carx compact" id="carPause"></div>
+   <div class="frows">
+   <div class="frow"><div class="grp g2"><span class="glbl">Base</span>
+     <button class="pick chip" data-b="kgeu"><b>Glendale</b></button><button class="pick chip" data-b="luke"><b>Luke AFB</b></button></div>
+    <div class="grp g4"><span class="glbl">Time</span>
+     <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><span class="chip slot" aria-hidden="true"></span></div></div>
+   <div class="frow"><div class="grp g3"><span class="glbl">Start</span>
+     <button class="pick chip" data-pos="runway"><b>Runway</b></button><button class="pick chip" data-pos="ramp"><b>Ramp</b></button><button class="pick chip" data-pos="final"><b>3 mi final</b></button></div>
+    <button class="go apply" id="pApply">Apply</button></div>
+  </div>
+  </div>
+ </div></div>
 <div class="overlay" id="gradeOv"><div class="sheet">
   <p class="gLetter" id="gLetter">A</p>
   <p class="sub" id="gTitle"></p>
@@ -4954,7 +4972,7 @@ function start(mode,base){
 const pauseOv=$('pauseOv');
 function openMenu(scr){if(running&&!st.crashed)paused=true;pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
 // the pause button, P and a backgrounded app all land here; the sheet shows while paused
-function togglePause(){paused=!paused;pauseOv.classList.toggle('on',paused);if(paused&&window.stickReset)stickReset();}
+function togglePause(){paused=!paused;pauseOv.classList.toggle('on',paused);if(paused){CARP.sync();if(window.stickReset)stickReset();}}
 $('pResume').onclick=()=>{paused=false;pauseOv.classList.remove('on');initAudio();};
 $('pRestart').onclick=()=>{pauseOv.classList.remove('on');start(st.mode==='final'||st.mode==='ramp'?st.mode:(MISS.on?MISS.kind:STRIKE.active?'range':'runway'));};
 $('pMenu').onclick=()=>openMenu();
@@ -5053,8 +5071,9 @@ let schoolAc='cessna';try{if(localStorage.getItem('kgeuSchoolAc')==='alpha')scho
 function schoolList(){
   const el=document.getElementById('school');el.innerHTML='';
   document.querySelectorAll('[data-sch]').forEach(b=>b.classList.toggle('sel',b.dataset.sch===schoolAc));
-  LESSONS.forEach(l=>{const b=document.createElement('button');b.className='mcard';const g=schoolBest[schoolAc+':'+l.id];
-    b.innerHTML='<i>'+(g||'')+'</i><b></b><span></span>';b.querySelector('b').textContent=l.name;b.querySelector('span').textContent=l.desc;
+  LESSONS.forEach(l=>{const b=document.createElement('button');b.className='mcard les';const g=schoolBest[schoolAc+':'+l.id];
+    b.innerHTML='<div class="mt"><b></b><span class="d"></span><span class="sc">'+stars(g?L2S[g]||0:0)+'<em>'+(g?'Best grade '+g:'Not flown yet')+'</em></span></div>';
+    b.querySelector('b').textContent=l.name;b.querySelector('.d').textContent=l.desc;
     b.onclick=()=>startLesson(l.id);el.appendChild(b);});
 }
 document.querySelectorAll('[data-sch]').forEach(b=>b.onclick=()=>{schoolAc=b.dataset.sch;try{localStorage.setItem('kgeuSchoolAc',schoolAc);}catch(e){}schoolList();});
@@ -5205,20 +5224,20 @@ function pickType(id,temp){acType=TYPES[id]?id:'reaper';best=loadBest();
 const NAV=[];let curScr='sHome',fromPause=false;
 function showScr(id){
   curScr=id;document.body.classList.toggle('menuOn',menu.classList.contains('on'));document.querySelectorAll('#menu .scr').forEach(e=>e.classList.toggle('on',e.id===id));
-  menu.classList.toggle('see3d',id==='sFly1');SHOW.on=id==='sFly1'&&menu.classList.contains('on');
-  if(id==='sFly1'){const i=CAR.indexOf(savedType);carIdx=i<0?0:i;SHOW.pos=SHOW.target=carIdx;carUI();}
-  if(id==='sSchool')schoolList();if(id==='sArc')arcList();if(id==='sMis')misList();if(id==='sFly3'||id==='sFly2')sumUI();
+  menu.classList.toggle('see3d',id==='sFly');SHOW.on=id==='sFly'&&menu.classList.contains('on');
+  if(id==='sFly'){CARM.sync();sumUI();}
+  if(id==='sSchool')schoolList();if(id==='sArc')arcList();if(id==='sMis')misList();
 }
 function nav(id,reset){if(reset){NAV.length=0;fromPause=false;}else if(curScr!==id)NAV.push(curScr);showScr(id);}
 function navBack(){
-  if(fromPause&&!NAV.length){fromPause=false;menuClose();pauseOv.classList.add('on');return;}
+  if(fromPause&&!NAV.length){fromPause=false;menuClose();pauseOv.classList.add('on');CARP.sync();return;}
   showScr(NAV.pop()||'sHome');
 }
 function menuClose(){menu.classList.remove('on','see3d');SHOW.on=false;document.body.classList.remove('menuOn');}
 document.querySelectorAll('#menu .back').forEach(b=>b.onclick=navBack);
-$('hFly').onclick=()=>nav('sFly1');$('hMis').onclick=()=>nav('sMis');$('hArc').onclick=()=>nav('sArc');
+$('hFly').onclick=()=>nav('sFly');$('hMis').onclick=()=>nav('sMis');$('hArc').onclick=()=>nav('sArc');
 $('hRec').onclick=()=>recOpen();$('hSet').onclick=()=>nav('sSet');$('bHelp').onclick=()=>nav('sHelp');
-$('f2Next').onclick=()=>nav('sFly3');$('bGo').onclick=()=>freeStart();
+$('bGo').onclick=()=>freeStart();
 $('pSet').onclick=()=>{pauseOv.classList.remove('on');menu.classList.add('on');nav('sSet',true);fromPause=true;};
 $('storyX').onclick=()=>$('storyOv').classList.remove('on');
 
@@ -5231,35 +5250,46 @@ const AC_INFO={
   reaper:['MQ-9A Reaper','MQ-9A Reaper','A long winged drone that circles for hours and strikes from above.'],
   mq9b:['MQ-9B SkyGuardian','MQ-9B SkyGuardian','The bigger, longer winged Reaper built to fly over cities.'],
   c130:['C-130H Hercules','C-130 Hercules','A four engine cargo hauler that lands on dirt strips.']};
-const track=$('track'),car=$('car');let carIdx=0;
-CAR.forEach(t=>{const T=TYPES[t],I=AC_INFO[t],c=document.createElement('div');c.className='acard pick';c.dataset.t=t;
-  c.innerHTML='<div class="info"><div class="nm"></div><p></p><div class="btns"><button class="story">Story</button><button class="pickme">Next</button></div></div>';
-  c.querySelector('.nm').innerHTML=I[0]+'<span class="tail">'+T.title+'</span>';c.querySelector('p').textContent=I[2];
-  c.querySelector('.story').onclick=e=>{e.stopPropagation();$('storyH').textContent=I[0]+'  '+T.title;$('storyT').textContent=T.sub;$('storyOv').classList.add('on');};
-  c.querySelector('.pickme').onclick=e=>{e.stopPropagation();pickType(t);nav('sFly2');};
-  c.addEventListener('click',()=>{carGo(CAR.indexOf(t));});
-  track.appendChild(c);});
-function carUI(){$('carL').disabled=carIdx<=0;$('carR').disabled=carIdx>=CAR.length-1;}
-function carGo(i){carIdx=clamp(i,0,CAR.length-1);SHOW.target=carIdx;pickType(CAR[carIdx]);carUI();}
-$('carL').onclick=()=>carGo(carIdx-1);$('carR').onclick=()=>carGo(carIdx+1);
-// swipe: the cards and the models move together under the finger
-car.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;SHOW.drag={id:e.pointerId,x:e.clientX,p0:SHOW.pos,t:performance.now(),moved:false};});
-car.addEventListener('pointermove',e=>{const d=SHOW.drag;if(!d||e.pointerId!==d.id)return;const dx=e.clientX-d.x;if(Math.abs(dx)>6)d.moved=true;
-  SHOW.pos=clamp(d.p0-dx/car.clientWidth,-0.3,CAR.length-0.7);});
-const carUp=e=>{const d=SHOW.drag;if(!d||e.pointerId!==d.id)return;SHOW.drag=null;if(!d.moved)return;
-  const dx=e.clientX-d.x,v=dx/Math.max(1,performance.now()-d.t);
-  let i=Math.round(SHOW.pos);if(Math.abs(dx)>car.clientWidth*0.12||Math.abs(v)>0.5)i=Math.round(d.p0)-Math.sign(dx);
-  carGo(i);};
-car.addEventListener('pointerup',carUp);car.addEventListener('pointercancel',carUp);
+// ---- the carousel: loops forever both ways. The same component, compact, sits in
+// the pause sheet. Settling on an aircraft picks it, so both stay in sync. ----
+const wrapI=i=>((i%CAR.length)+CAR.length)%CAR.length;
+function Carousel(root){
+  const B='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>';
+  root.innerHTML='<div class="cwin"><div class="cdots"></div><button class="arrow l" aria-label="Previous aircraft">'+B+'</button><button class="arrow r" aria-label="Next aircraft">'+B+'</button>'+
+    '<div class="cinfo"><div class="tx"><div class="nm"></div><p class="desc"></p></div><button class="story">Story</button></div></div>';
+  const c={root:root,win:root.querySelector('.cwin'),pos:0,target:0,idx:0,drag:null,shown:-1};
+  const dots=root.querySelector('.cdots');
+  CAR.forEach((t,i)=>{const d=document.createElement('span');d.className='pick';d.dataset.t=t;d.onclick=e=>{e.stopPropagation();c.set(c.idx+((i-wrapI(c.idx)+CAR.length+2)%CAR.length)-2);};dots.appendChild(d);});
+  c.set=i=>{c.idx=i;c.target=i;pickType(CAR[wrapI(i)]);};
+  c.sync=()=>{const i=CAR.indexOf(savedType);c.idx=c.pos=c.target=i<0?0:i;c.info(true);};
+  c.info=force=>{const k=wrapI(Math.round(c.pos));if(k===c.shown&&!force)return;c.shown=k;const t=CAR[k],I=AC_INFO[t];
+    root.querySelector('.nm').innerHTML=I[0]+'<span class="tail">'+TYPES[t].title+'</span>';root.querySelector('.desc').textContent=I[2];
+    dots.querySelectorAll('span').forEach((d,j)=>d.classList.toggle('sel',j===k));};
+  root.querySelector('.arrow.l').onclick=e=>{e.stopPropagation();c.set(c.idx-1);};
+  root.querySelector('.arrow.r').onclick=e=>{e.stopPropagation();c.set(c.idx+1);};
+  root.querySelector('.story').onclick=e=>{e.stopPropagation();const t=CAR[wrapI(c.idx)],I=AC_INFO[t];
+    $('storyH').textContent=I[0]+'  '+TYPES[t].title;$('storyT').textContent=TYPES[t].sub;$('storyOv').classList.add('on');};
+  c.win.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;c.drag={id:e.pointerId,x:e.clientX,p0:c.pos,t:performance.now(),moved:false};});
+  c.win.addEventListener('pointermove',e=>{const d=c.drag;if(!d||e.pointerId!==d.id)return;const dx=e.clientX-d.x;if(Math.abs(dx)>6)d.moved=true;
+    c.pos=d.p0-dx/c.win.clientWidth;});
+  const up=e=>{const d=c.drag;if(!d||e.pointerId!==d.id)return;c.drag=null;if(!d.moved)return;
+    const dx=e.clientX-d.x,v=dx/Math.max(1,performance.now()-d.t);
+    let i=Math.round(c.pos);if(Math.abs(dx)>c.win.clientWidth*0.12||Math.abs(v)>0.5)i=Math.round(d.p0)-Math.sign(dx);
+    c.set(i);};
+  c.win.addEventListener('pointerup',up);c.win.addEventListener('pointercancel',up);
+  return c;
+}
+const CARM=Carousel($('carMain')),CARP=Carousel($('carPause'));
 
-// ---- the showroom: sand gradient, warm light, the model turning slowly ----
-const SHOW={on:false,pos:0,target:0,drag:null,items:{},t:0,scene:new THREE.Scene(),cam:new THREE.PerspectiveCamera(30,1,1,5000)};
-SHOW.scene.background=tex(8,512,(x,w,h)=>{const g=x.createLinearGradient(0,0,0,h);g.addColorStop(0,'#F9D39A');g.addColorStop(0.7,'#F6C177');g.addColorStop(1,'#E9A55C');x.fillStyle=g;x.fillRect(0,0,w,h);});
+// ---- the showroom: sand, warm light, the model turning slowly, drawn only into the
+// carousel window with a scissor, so the paused flight stays visible around it ----
+const SHOW={on:false,items:{},t:0,scene:new THREE.Scene(),cam:new THREE.PerspectiveCamera(30,1,1,5000)};
+SHOW.scene.background=new THREE.Color(0xF6C177);
 SHOW.scene.fog=new THREE.Fog(0xF6C177,1e6,2e6);SHOW.scene.environment=scene.environment;
 SHOW.scene.add(new THREE.HemisphereLight(0xfff4e2,0x8a5a3a,0.85));
 {const d=new THREE.DirectionalLight(0xffffff,0.95);d.position.set(-0.5,1,0.7);SHOW.scene.add(d);}
-function showItem(i){
-  const t=CAR[i];if(SHOW.items[t])return SHOW.items[t];
+function showItem(t){
+  if(SHOW.items[t])return SHOW.items[t];
   const m=getModel(t),c=m.g.clone(true);c.visible=true;c.position.set(0,0,0);c.quaternion.identity();
   const box=new THREE.Box3().setFromObject(c),sz=box.getSize(new V3()),ctr=box.getCenter(new V3());
   c.position.sub(ctr);const piv=new THREE.Group();piv.add(c);
@@ -5267,37 +5297,82 @@ function showItem(i){
   sh.position.y=-sz.y/2-0.05;sh.scale.set(sz.x*1.1,1,sz.z*1.1);piv.add(sh);
   piv.userData.dim=Math.max(sz.x,sz.z);SHOW.scene.add(piv);return SHOW.items[t]=piv;
 }
-function showRender(dt){
+function showRender(dt,c){
+  const r=c.win.getBoundingClientRect();if(r.width<10||r.height<10)return;
   SHOW.t+=dt;
-  if(!SHOW.drag)SHOW.pos+=(SHOW.target-SHOW.pos)*(1-Math.exp(-10*dt));
-  const W=innerWidth,H=innerHeight,cr=car.getBoundingClientRect(),cw=cr.width||W;
-  const card=track.children[Math.round(clamp(SHOW.pos,0,CAR.length-1))],inf=card&&card.querySelector('.info').getBoundingClientRect();
-  const top=cr.top,bot=inf&&inf.height?inf.top-6:cr.bottom,winH=Math.max(60,bot-top),cy=top+winH/2;
-  track.style.transform='translateX('+(-SHOW.pos*cw)+'px)';
-  const cam=SHOW.cam,dist=100,el=0.3,k=2*dist*Math.tan(cam.fov*Math.PI/360)/H,D=cw*k;
-  const S=Math.min(cw*0.5,winH*1.7)*k;
-  for(let i=Math.floor(SHOW.pos)-1;i<=Math.ceil(SHOW.pos)+1;i++){if(i<0||i>=CAR.length)continue;const p=showItem(i);
+  if(!c.drag)c.pos+=(c.target-c.pos)*(1-Math.exp(-10*dt));
+  c.info();
+  const cam=SHOW.cam,dist=100,el=0.3,H=innerHeight,k=2*dist*Math.tan(cam.fov*Math.PI/360)/r.height,D=r.width*k;
+  const S=Math.min(r.width*0.52,r.height*1.55)*k,used={};
+  for(let i=Math.floor(c.pos)-1;i<=Math.ceil(c.pos)+1;i++){const t=CAR[wrapI(i)];if(used[t])continue;used[t]=1;const p=showItem(t);
     p.visible=true;p.position.set(i*D,0,0);p.scale.setScalar(S/p.userData.dim);p.rotation.y=0.9+SHOW.t*0.35;}
-  for(const t in SHOW.items){const i=CAR.indexOf(t);if(Math.abs(i-SHOW.pos)>1.6)SHOW.items[t].visible=false;}
-  const x=SHOW.pos*D;cam.aspect=W/H;cam.position.set(x,dist*Math.sin(el),dist*Math.cos(el));cam.lookAt(x,0,0);
-  cam.setViewOffset(W,H,0,H/2-cy,W,H);cam.updateProjectionMatrix();
+  for(const t in SHOW.items)if(!used[t])SHOW.items[t].visible=false;
+  // lift the model clear of the name strip under it
+  const info=c.root.querySelector('.cinfo').getBoundingClientRect(),lift=info.height?(info.height*0.5)*k:0;
+  const x=c.pos*D;cam.aspect=r.width/r.height;cam.position.set(x,dist*Math.sin(el)-lift,dist*Math.cos(el));cam.lookAt(x,-lift,0);cam.updateProjectionMatrix();
+  renderer.setScissorTest(true);renderer.setScissor(r.left,H-r.bottom,r.width,r.height);renderer.setViewport(r.left,H-r.bottom,r.width,r.height);
   renderer.render(SHOW.scene,cam);
+  renderer.setScissorTest(false);renderer.setViewport(0,0,innerWidth,H);
 }
 
 // ---- where, when and go ----
 const POS_TXT={runway:'on the runway',ramp:'at the ramp',final:'on 3 mile final'};
+// the pause sheet's change flight panel: same picks, Apply restarts at once
+$('pApply').onclick=()=>{pauseOv.classList.remove('on');freeStart();};
 function sumUI(){const el=$('sumLine');if(!el)return;const I=AC_INFO[savedType]||AC_INFO.cessna;
   el.textContent=I[1]+' at '+(SPAWN_BASE==='luke'?'Luke AFB':'Glendale')+', '+TOD.name.toLowerCase()+', '+POS_TXT[SPAWN_POS];}
 
 // ---- missions: everything that is not an arcade game ----
-function cardHTML(o){return '<i>'+(o.best||'')+'</i><span class="ac">'+o.ac+'</span><b>'+o.name+'</b><span>'+o.desc+'</span>';}
-function fillCards(el,list){el.innerHTML='';list.forEach(o=>{const b=document.createElement('button');b.className='mcard';b.dataset.m=o.id;b.innerHTML=cardHTML(o);b.onclick=o.go;el.appendChild(b);});}
+// ---- card icons: simple silhouettes in the palette, inline SVG ----
+const SIL={
+  c130:'<g fill="#F6C177"><rect x="-2.6" y="-15" width="5.2" height="30" rx="2.6"/><rect x="-20" y="-7" width="40" height="4.6" rx="2"/><rect x="-8" y="11" width="16" height="3.4" rx="1.5"/>'+
+       '<rect x="-15.5" y="-10" width="2.6" height="6" rx="1"/><rect x="-9.5" y="-10" width="2.6" height="6" rx="1"/><rect x="6.9" y="-10" width="2.6" height="6" rx="1"/><rect x="12.9" y="-10" width="2.6" height="6" rx="1"/></g>',
+  f16:'<path fill="#F6C177" d="M0-16 L2.6-4 L14 6 L14 8.5 L2.6 6 L3.4 11 L7.5 14 L7.5 16 L0 14.5 L-7.5 16 L-7.5 14 L-3.4 11 L-2.6 6 L-14 8.5 L-14 6 L-2.6-4Z"/>',
+  cessna:'<g fill="#F6C177"><rect x="-18" y="-6" width="36" height="4.5" rx="1.6"/><rect x="-2.2" y="-13" width="4.4" height="25" rx="2.2"/><rect x="-7" y="10" width="14" height="3.2" rx="1.4"/><rect x="-4" y="-14.5" width="8" height="1.6" rx=".8" fill="#D98A3D"/></g>',
+  mq9:'<g fill="#F6C177"><rect x="-22" y="-3" width="44" height="2.8" rx="1.3"/><rect x="-2" y="-12" width="4" height="24" rx="2"/><path d="M0 10 L-7 16 L-6 17 L0 13 L6 17 L7 16Z"/></g>'};
+const ICO_PARTS={
+  chute:'<g><path d="M-9 0 A9 8 0 0 1 9 0 Z" fill="#D98A3D"/><path d="M-9 0 L-1.5 11 M9 0 L1.5 11 M0 0 L0 11" stroke="#F6C177" stroke-width=".9"/><rect x="-3" y="11" width="6" height="5" rx="1" fill="#A8592A" stroke="#F6C177" stroke-width=".8"/></g>',
+  watch:'<g><circle r="8" fill="none" stroke="#D98A3D" stroke-width="2.2"/><rect x="-1.6" y="-12" width="3.2" height="3" rx="1" fill="#D98A3D"/><path d="M0 0 L0-5.2 M0 0 L3.6 2" stroke="#F6C177" stroke-width="1.8" stroke-linecap="round"/></g>',
+  list:'<g><rect x="-7" y="-9" width="14" height="18" rx="2" fill="none" stroke="#D98A3D" stroke-width="2"/><path d="M-3.5-4 H4 M-3.5 0 H4 M-3.5 4 H1.5" stroke="#F6C177" stroke-width="1.5" stroke-linecap="round"/><path d="M1.5 5 L4 7.5 L9-1" stroke="#F6C177" stroke-width="2" fill="none" stroke-linecap="round"/></g>',
+  cross:'<g stroke="#D98A3D" stroke-width="2" fill="none"><circle r="9"/><path d="M0-13 V-5 M0 5 V13 M-13 0 H-5 M5 0 H13"/></g><circle r="1.6" fill="#F6C177"/>',
+  runway:'<g><path d="M-6 16 L6 16 L3.4-16 L-3.4-16Z" fill="#A8592A"/><path d="M0 12 V8 M0 3 V-1 M0-6 V-9 M0-13 V-15" stroke="#F6C177" stroke-width="1.3"/></g>',
+  strip:'<g><rect x="-20" y="-3" width="40" height="6" rx="1" fill="#A8592A"/><path d="M-16 0 H-11 M-6 0 H-1 M4 0 H9 M14 0 H18" stroke="#F6C177" stroke-width="1.1"/></g>'};
+const svgI=parts=>'<svg class="ico" viewBox="0 0 64 48" aria-hidden="true">'+parts.map(p=>'<g transform="'+p[1]+'">'+p[0]+'</g>').join('')+'</svg>';
+const ICONS={
+  drop:svgI([[SIL.c130,'translate(22 18) rotate(-90) scale(.78)'],[ICO_PARTS.chute,'translate(46 26) scale(.95)']]),
+  short:svgI([[ICO_PARTS.strip,'translate(32 40) scale(1.2 1)'],[SIL.c130,'translate(30 18) rotate(-90) scale(.82)']]),
+  dash:svgI([[SIL.f16,'translate(22 24) rotate(50) scale(1.05)'],[ICO_PARTS.watch,'translate(48 27) scale(1.05)']]),
+  school:svgI([[SIL.cessna,'translate(22 24) rotate(-30) scale(1.05)'],[ICO_PARTS.list,'translate(48 24) scale(1.05)']]),
+  range:svgI([[SIL.mq9,'translate(22 22) rotate(-20) scale(.9)'],[ICO_PARTS.cross,'translate(46 28) scale(.95)']]),
+  landing:svgI([[ICO_PARTS.runway,'translate(20 26) scale(1.1 1.35)'],[ICO_PARTS.watch,'translate(46 24) scale(1.1)']]),
+  daily:svgI([['<g><rect x="-12" y="-10" width="24" height="22" rx="3" fill="none" stroke="#D98A3D" stroke-width="2.2"/><path d="M-12-4 H12" stroke="#D98A3D" stroke-width="2.2"/><rect x="-7" y="-14" width="2.6" height="6" rx="1" fill="#F6C177"/><rect x="4.4" y="-14" width="2.6" height="6" rx="1" fill="#F6C177"/></g>','translate(20 25)'],[SIL.f16,'translate(46 26) rotate(30) scale(.75)']]),
+  dogfight:svgI([[SIL.f16,'translate(20 28) rotate(40) scale(.9)'],[SIL.f16,'translate(44 20) rotate(-140) scale(.9)']])};
+// ---- stars and best score, from the records store ----
+const stars=n=>'<i class="stars" aria-label="'+n+' of 3 stars">'+'★'.repeat(n)+'<u>'+'★'.repeat(3-n)+'</u></i>';
+const L2S={A:3,B:2,C:1,D:1,F:0};
+function scoreOf(id){
+  const B=SCORE.best;let r;
+  if(id==='short'){r=B['c130:short'];return r?[L2S[r.letter]||0,r.stopFt.toLocaleString('en-US')+' ft stop']:[0,''];}
+  if(id==='drop'){r=B['c130:drop'];return r?[L2S[r.letter]||0,r.dist+' m off centre']:[0,''];}
+  if(id==='dash'){r=B.f16;return r?[r.secs<180?3:r.secs<240?2:1,fmtT(r.secs)+' best']:[0,''];}
+  if(id==='range'){r=B.reaper||strikeBest;if(!r)return [0,''];const p=r.pts!==undefined?r.pts:null;
+    return [p===null?1:p>=80?3:p>=55?2:1,(p!==null?p+' pts':r.hits+'/4 hits')];}
+  if(id==='school'){const g=LESSONS.map(l=>schoolBest[schoolAc+':'+l.id]).filter(Boolean),pass=g.filter(x=>x!=='F').length,a=g.filter(x=>x==='A').length;
+    return g.length?[a>=5?3:a>=3?2:pass?1:0,pass+' of 5 passed']:[0,''];}
+  if(window.arcScore)return arcScore(id);
+  return [0,''];
+}
+function cardHTML(o){const sc=o.score||scoreOf(o.id);
+  return (ICONS[o.icon||o.id]||'')+'<div class="mt"><span class="ac">'+o.ac+'</span><b>'+o.name+'</b><span class="d">'+o.desc+'</span>'+
+    (o.soon?'<span class="sc soon">Coming soon</span>':'<span class="sc">'+stars(sc[0])+'<em>'+(sc[1]||'Not flown yet')+'</em></span>')+'</div>';}
+
+function fillCards(el,list){el.innerHTML='';list.forEach(o=>{const b=document.createElement('button');b.className='mcard'+(o.cls?' '+o.cls:'');b.dataset.m=o.id;b.innerHTML=cardHTML(o);b.onclick=o.go;if(o.soon)b.setAttribute('aria-disabled','true');el.appendChild(b);});}
 function misList(){
   const B=SCORE.best;
   fillCards($('misCards'),[
-    {id:'short',ac:'C-130H Hercules',name:'Short field landing',desc:'Stop a Hercules on a 3,000 ft dirt strip.',best:B['c130:short']&&B['c130:short'].letter,go:()=>{pickType('c130',1);start('short');}},
-    {id:'dash',ac:'F-16C Viper',name:'Luke to Glendale dash',desc:'Wheels up at Luke, wheels down at Glendale. Beat 3 minutes.',best:B.f16&&fmtT(B.f16.secs),go:()=>{pickType('f16',1);start('runway','luke');}},
-    {id:'school',ac:'Cessna or Alpha',name:'Flight school',desc:'Five graded lessons: steep turns, slow flight, stalls, engine out, the pattern.',go:()=>nav('sSchool')}]);
+    {id:'short',ac:'C-130H Hercules',name:'Short field landing',desc:'Stop a Hercules on a 3,000 ft dirt strip.',go:()=>{pickType('c130',1);start('short');}},
+    {id:'dash',ac:'F-16C Viper',name:'Luke to Glendale dash',desc:'Wheels up at Luke, down at Glendale. Beat 3 minutes.',go:()=>{pickType('f16',1);start('runway','luke');}},
+    {id:'school',ac:'Cessna or Alpha',name:'Flight school',desc:'Five graded lessons, steep turns to engine out.',go:()=>nav('sSchool')}]);
 }
 function arcList(){
   fillCards($('arcCards'),[
@@ -6027,8 +6102,9 @@ function frame(t){
   if(running&&!paused&&!s.crashed){if(s.aoaWarn)w='STALL';else if(gearWarn)w='GEAR UP';else if(kias>AC.vne)w='OVERSPEED';else if(s.flapIdx>0&&kias>AC.vfe)w='FLAP SPEED';}
   warnEl.textContent=w;warnEl.classList.toggle('on',!!w);
   updateAudio();frameN++;
-  if(SHOW.on)showRender(dt);
-  else if(!menu.classList.contains('on')||frameN<40)renderer.render(scene,camera);
+  if(SHOW.on){renderer.setClearColor(0xF6C177,1);renderer.clear();showRender(dt,CARM);}
+  else{if(!menu.classList.contains('on')||frameN<40)renderer.render(scene,camera);
+    const po=pauseOv.classList.contains('on');document.body.classList.toggle('pauseOn',po);if(po)showRender(dt,CARP);}
 }
 // test hook: headless UI checks need to reach a few internals
 window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},HD:()=>HD,
@@ -6036,7 +6112,7 @@ window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,tou
   setTOD:setTOD,isNight:isNight,TOD:()=>TOD,drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
   RADIO:RADIO,radioQ:()=>radioQ,radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,initAudio:initAudio,
-  ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly1');},nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   MISS:MISS,DROPZ:DROPZ,LZ:LZ,lzUV:lzUV,lzX:lzX,lzZ:lzZ,missDrop:missDrop,missTouchdown:missTouchdown,
   // step the mission clock without waiting on rAF: the pallet takes 50 s to come down
   missTick:(n,dt)=>{for(let i=0;i<n;i++)missUpdate(dt);},
