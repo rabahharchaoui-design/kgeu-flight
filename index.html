@@ -143,6 +143,7 @@ body.hasDest #stickZone{ top:calc(var(--padT) + 178px); }
 #mapInfo{ font:700 14px var(--font); color:#f4f1ea; background:rgba(14,16,20,.9); border:1px solid rgba(255,255,255,.12); padding:6px 12px; border-radius:10px; white-space:nowrap;
   max-width:calc(100vw - 2 * var(--padL) - 380px); overflow:hidden; text-overflow:ellipsis; display:flex; flex-direction:column; line-height:1.2; min-height:44px; justify-content:center; box-sizing:border-box; }
 #mapInfo b{ overflow:hidden; text-overflow:ellipsis; } #mapInfo span{ font-size:13px; color:#4de1ff; }
+#mapOv #mapCtr{ display:flex; align-items:center; justify-content:center; padding:0; }
 #mapOv #mapClear{ color:#4de1ff; border-color:rgba(77,225,255,.5); }
 #mapOv .mt{ position:absolute; top:var(--padT); left:var(--padL); font:800 18px var(--font); letter-spacing:.14em; text-transform:uppercase; color:#f4f1ea; background:rgba(14,16,20,.9); border:1px solid rgba(255,255,255,.12); padding:9px 14px; border-radius:10px; }
 
@@ -774,7 +775,7 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
   <div class="mt mkeep">Map</div>
   <div id="mapLeg" class="mkeep"><button id="mapLegT" aria-expanded="true"><span>Legend</span><i></i></button><div id="mapLegL"></div></div>
   <div class="mbar tr mkeep"><button id="mapX" aria-label="Close map">&#x2715;</button></div>
-  <div class="mbar br mkeep"><button id="mapOut" aria-label="Zoom out">&minus;</button><button id="mapIn" aria-label="Zoom in">+</button></div>
+  <div class="mbar br mkeep"><button id="mapCtr" aria-label="Recenter on the aircraft"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><path d="M12 2v3.5M12 18.5V22M2 12h3.5M18.5 12H22"/></svg></button><button id="mapOut" aria-label="Zoom out">&minus;</button><button id="mapIn" aria-label="Zoom in">+</button></div>
   <div class="mbar bc mkeep"><span id="mapInfo"></span><button id="mapClear">Clear</button></div>
 </div>
 <div class="overlay" id="photoOv"><div id="photoPad"></div>
@@ -7495,21 +7496,27 @@ function fmFrame(){
 }
 tapBtn($('mapLegT'),()=>{const m=$('mapLeg').classList.toggle('min');$('mapLegT').setAttribute('aria-expanded',String(!m));lblUI();fmDraw();});
 function fmZoom(f,X,Y){X=X===undefined?innerWidth/2:X;Y=Y===undefined?innerHeight/2:Y;const w=fmW(X,Y);
-  FM.scale=clamp(FM.scale*f,Math.min(innerWidth,innerHeight)/90000,0.35);const w2=fmW(X,Y);FM.cx+=w[0]-w2[0];FM.cz+=w[1]-w2[1];fmDraw();}
+  FM.scale=clamp(FM.scale*f,Math.min(innerWidth,innerHeight)/90000,0.35);const w2=fmW(X,Y);FM.cx+=w[0]-w2[0];FM.cz+=w[1]-w2[1];fmClampView();fmDraw();}
 fmc.addEventListener('pointerdown',e=>{FM.ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});FM.moved=false;try{fmc.setPointerCapture(e.pointerId);}catch(_){}
   if(FM.ptrs.size===2){const [a,b]=[...FM.ptrs.values()];FM.pinch={d:Math.hypot(a.x-b.x,a.y-b.y),mx:(a.x+b.x)/2,my:(a.y+b.y)/2};}});
 fmc.addEventListener('pointermove',e=>{const p=FM.ptrs.get(e.pointerId);if(!p)return;
   if(FM.ptrs.size===1){const dx=e.clientX-p.x,dy=e.clientY-p.y;if(Math.abs(dx)+Math.abs(dy)>4)FM.moved=true;
-    FM.cx-=dx/FM.scale;FM.cz-=dy/FM.scale;p.x=e.clientX;p.y=e.clientY;fmDraw();return;}
+    FM.cx-=dx/FM.scale;FM.cz-=dy/FM.scale;fmClampView();p.x=e.clientX;p.y=e.clientY;fmDraw();return;}
   p.x=e.clientX;p.y=e.clientY;FM.moved=true;const [a,b]=[...FM.ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y);
   if(FM.pinch&&d>10){fmZoom(d/FM.pinch.d,(a.x+b.x)/2,(a.y+b.y)/2);FM.pinch.d=d;}});
+// a tap drops a waypoint on whatever is under it; a second tap within 0.32 s zooms in there
 const fmUp=e=>{const had=FM.ptrs.has(e.pointerId);FM.ptrs.delete(e.pointerId);if(FM.ptrs.size<2)FM.pinch=null;
-  if(had&&!FM.moved&&FM.ptrs.size===0){const hit=fmHit(e.clientX,e.clientY);if(hit){setDest(hit);fmDraw();}}};
+  if(!had||FM.moved||FM.ptrs.size)return;const X=e.clientX,Y=e.clientY,now=performance.now(),L=FM.lastTap;
+  if(L&&now-L.t<320&&Math.hypot(X-L.x,Y-L.y)<32){FM.lastTap=null;const w=fmW(X,Y),s1=clamp(FM.scale*2,FM.scale,0.35);
+    fmFly(w[0]-(X-innerWidth/2)/s1,w[1]-(Y-innerHeight/2)/s1,s1);return;}
+  FM.lastTap={t:now,x:X,y:Y};const hit=fmHit(X,Y);if(hit){setDest(hit);fmDraw();}};
+// keep the view over the mapped area
+function fmClampView(){FM.cx=clamp(FM.cx,MBASE.x0,MBASE.x1);FM.cz=clamp(FM.cz,MBASE.z0,MBASE.z1);}
 fmc.addEventListener('pointerup',fmUp);fmc.addEventListener('pointercancel',e=>{FM.ptrs.delete(e.pointerId);FM.pinch=null;});
 fmc.addEventListener('wheel',e=>{e.preventDefault();fmZoom(Math.exp(-e.deltaY*0.0015),e.clientX,e.clientY);},{passive:false});
 tapBtn(mc,()=>fmOpen());
 $('mapX').onclick=fmClose;$('mapClear').onclick=()=>{setDest(null);fmDraw();};
-$('mapIn').onclick=()=>fmZoom(1.6);$('mapOut').onclick=()=>fmZoom(1/1.6);
+$('mapIn').onclick=()=>fmZoom(1.6);$('mapCtr').onclick=()=>fmFly(st.pos.x+legW()/2/FM.scale,st.pos.z,FM.scale);$('mapOut').onclick=()=>fmZoom(1/1.6);
 tapBtn($('hDest'),()=>{setDest(null);toast('Destination cleared');});
 // ---- destination readout: distance, bearing, time. Rookies get a big arrow. ----
 let destKey='';
