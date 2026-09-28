@@ -194,6 +194,17 @@ body.touch #sixpack{ width:216px; height:144px; }
 #banner b{ font-size:15px; letter-spacing:.18em; color:var(--caution); }
 #banner span{ font-size:20px; font-weight:800; }
 body.touch #banner{ padding:5px 16px; } body.touch #banner b{ font-size:10px; } body.touch #banner span{ font-size:14px; }
+/* ---------- landing grade and record badges: never pause, never take input unless tapped ---------- */
+#badges{ position:fixed; right:calc(var(--padR) + 76px); top:calc(var(--padT) + 56px); display:flex; flex-direction:column; align-items:flex-end; gap:6px; z-index:6; pointer-events:none; }
+.badge{ display:flex; align-items:center; gap:10px; max-width:min(300px,44vw); padding:6px 12px 6px 10px; border-radius:12px;
+  background:rgba(12,16,22,.84); border:1.5px solid rgba(255,255,255,.16); color:var(--ink); font:600 14px var(--font); line-height:1.15;
+  transform:translateX(24px); opacity:0; transition:transform .28s cubic-bezier(.2,.8,.2,1), opacity .28s; pointer-events:none; cursor:pointer; min-height:44px; }
+.badge.on{ transform:none; opacity:1; pointer-events:auto; }
+.badge.fade{ opacity:0; transition:opacity .6s; pointer-events:none; }
+.badge b{ font-size:26px; font-weight:900; line-height:1; min-width:22px; text-align:center; }
+.badge b.gA,.badge b.gB{ color:#4cd97b; } .badge b.gC{ color:var(--caution); } .badge b.gD,.badge b.gF{ color:var(--warn); }
+.badge.rec{ border-color:var(--caution); } .badge.rec b{ font-size:11px; letter-spacing:.14em; color:var(--caution); }
+@media (prefers-reduced-motion: reduce){ .badge{ transition:opacity .2s; transform:none; } }
 /* Records sits on top of the menu, so it needs its own opaque ground and a
    solid sheet, or the menu behind it reads straight through the text. */
 #recOv{ background:rgba(6,9,14,.94); }
@@ -211,6 +222,7 @@ body.touch .recSec{ margin:9px 0 2px; font-size:11px; }
 .gl i.pt{ display:inline-block; min-width:2.4em; text-align:right; margin-left:12px; font-style:normal; color:var(--soft); }
 .gl i.pt.good{ color:#4cd97b; } .gl i.pt.bad{ color:var(--warn); }
 .gl.got b{ color:#4cd97b; }
+.gl.sub2{ font-size:12px; border-bottom-color:rgba(255,255,255,.16); } .gl.sub2 b{ white-space:normal; text-align:right; font-weight:500; color:var(--soft); }
 button.danger{ color:var(--warn); } button.danger.arm{ background:var(--warn); color:#12161c; font-weight:800; }
 /* mission HUD and result card, sharing the grade card's letter styling */
 #mLines,#sLines{ margin:0 0 16px; font-size:16px; line-height:1.55; }
@@ -325,7 +337,7 @@ body.touch #tiltDiag{ display:block; }
 <div id="lesson" class="card"><div class="lesTop"><b id="lesT"></b><button id="lesQuit">End</button></div><div id="lesI"></div><div id="lesM"></div></div>
 </div>
 <div id="miss" class="card"><b id="missT"></b><span id="missS"></span></div>
-<div id="banner"></div>
+<div id="badges"><div class="badge" id="gBadge" role="button" aria-label="Landing grade, tap for details"><b id="gbL"></b><span id="gbT"></span></div><div class="badge rec" id="banner" role="button" aria-label="New record, tap for records"></div></div>
 <canvas id="sixpack" width="300" height="200"></canvas>
 <div id="yoke"><div id="yokeK"></div></div>
 <div id="rotate"><div>Turn your phone sideways</div><div style="font-size:16px;font-weight:500;color:var(--soft)">Landscape gives you the stick, throttle, and a wider view.</div><button id="rotOk">Play in portrait anyway</button></div>
@@ -404,7 +416,7 @@ body.touch #tiltDiag{ display:block; }
   <p class="gLetter" id="lLetter">A</p>
   <p class="sub" id="lTitle"></p>
   <div id="lLines"></div>
-  <div class="row"><button class="primary" id="lAgain">Fly again</button><button id="lRec">Records</button><button id="lMenu">Menu</button></div>
+  <div class="row"><button class="primary" id="lKeep">Keep flying</button><button id="lAgain">Fly again</button><button id="lRec">Records</button><button id="lMenu">Menu</button></div>
 </div></div>
 <div class="overlay" id="recOv"><div class="sheet">
   <p class="reg">Records</p>
@@ -4041,11 +4053,11 @@ function scLoad(){
   try{const j=JSON.parse(localStorage.getItem(SC_KEY)||'null');
     if(j&&typeof j==='object'){
       Object.assign(SCORE.log,j.log||{});
-      SCORE.best=j.best||{};SCORE.ach=j.ach||{};}
+      SCORE.best=j.best||{};SCORE.ach=j.ach||{};SCORE.recent=Array.isArray(j.recent)?j.recent:[];}
   }catch(e){}
 }
 function scSave(){try{localStorage.setItem(SC_KEY,JSON.stringify(SCORE));}catch(e){}}
-function scReset(){SCORE.log={time:0,landings:0,streak:0,bestStreak:0};SCORE.best={};SCORE.ach={};scSave();scUI();}
+function scReset(){SCORE.log={time:0,landings:0,streak:0,bestStreak:0};SCORE.best={};SCORE.ach={};SCORE.recent=[];scSave();scUI();}
 scLoad();
 
 const ACH={
@@ -4068,17 +4080,17 @@ function achGrant(id){
 function runwayFix(x,z){
   const u=toU(x,z),v=toV(x,z);
   if(u>-60&&u<RWY_LEN+60&&Math.abs(v)<60)
-    return {name:'Glendale runway 1',along:u-(THR01+300),off:Math.abs(v),hdg:26};
+    return {name:'Glendale runway 1',along:u-(THR01+300),off:Math.abs(v),lat:v,ax:[DX,DZ],hdg:26};
   const K=lukeUV(x,z);
   for(const r of LUKE_RWY){
     if(Math.abs(K[0])<r.len/2+60&&Math.abs(K[1]-r.v)<60){
       const thr=-r.len/2;
-      return {name:'Luke runway '+r.lo,along:K[0]-(thr+300),off:Math.abs(K[1]-r.v),hdg:42.6};
+      return {name:'Luke runway '+r.lo,along:K[0]-(thr+300),off:Math.abs(K[1]-r.v),lat:K[1]-r.v,ax:[Math.sin(LUKE.h),-Math.cos(LUKE.h)],hdg:42.6};
     }
   }
   const Z=lzUV(x,z);
   if(Math.abs(Z[0])<LZ.len/2+60&&Math.abs(Z[1])<40)
-    return {name:'the assault strip',along:Z[0]-(-LZ.len/2+91),off:Math.abs(Z[1]),hdg:90};
+    return {name:'the assault strip',along:Z[0]-(-LZ.len/2+91),off:Math.abs(Z[1]),lat:Z[1],ax:[LZs,-LZc],hdg:90};
   return null;
 }
 // crosswind component across the runway in knots
@@ -4109,8 +4121,15 @@ function gradeLanding(e){
   const sSpd =band(dv,[[0,100],[3,100],[8,76],[15,46],[25,12],[40,0]]);
   const pts=Math.round(sSink*0.35+sOff*0.2+sAim*0.25+sSpd*0.2);
   const xw=xwind(fix.hdg,e.wdir,e.wkt);
+  // which way we were rolling along the runway: the aim point and the left/right side follow it
+  const fwd=(e.vx===undefined?1:Math.sign(e.vx*fix.ax[0]+e.vz*fix.ax[1])||1);
+  const along=fix.along*fwd,side=fix.lat*fwd;
+  const sinkW=e.fpm<120?'Butter':e.fpm<300?'Smooth':e.fpm<500?'Firm':'Hard';
+  const notes=[[sOff,(side>0?'right':'left')+' of centerline'],[sAim,along<0?'short of the aim point':'long'],[sSpd,kt>tgt?'fast':'slow']]
+    .filter(n=>n[0]<80).sort((a,b)=>a[0]-b[0]);
+  const line=sinkW+', '+(notes.length?notes[0][1]:(sOff>=95?'on centerline':'on the numbers'));
   return {pts:pts,letter:letterFor(pts),fpm:e.fpm,off:fix.off,along:fix.along,kt:kt,tgt:tgt,
-          xw:xw,where:fix.name,
+          xw:xw,where:fix.name,line:line,
           parts:[['Sink rate',e.fpm+' fpm',Math.round(sSink)],
                  ['Off centreline',fix.off.toFixed(1)+' m',Math.round(sOff)],
                  ['From the aim point',Math.round(Math.abs(fix.along))+' m '+(fix.along<0?'short':'long'),Math.round(sAim)],
@@ -4137,12 +4156,22 @@ function scRecord(key,rec){
 }
 
 // ---- NEW RECORD banner ----
-const bannerEl=document.getElementById('banner');let bannerT=0;
+// Both badges slide in, stay about four seconds and fade. They never pause the game
+// and take no input except a deliberate tap, which opens the details and only then pauses.
+// Wall clock, not the frame clock, so four seconds is four seconds at any frame rate.
+const bannerEl=document.getElementById('banner'),gBadge=document.getElementById('gBadge');
+function badgeOn(el){clearTimeout(el._t1);clearTimeout(el._t2);el.classList.remove('fade');el.classList.add('on');
+  el._t1=setTimeout(()=>el.classList.add('fade'),4000);el._t2=setTimeout(()=>el.classList.remove('on','fade'),4600);}
+function badgeOff(el){clearTimeout(el._t1);clearTimeout(el._t2);el.classList.remove('on','fade');}
 function bannerShow(kind,text){
-  bannerEl.innerHTML='<b>'+kind+'</b><span>'+text+'</span>';
-  bannerEl.classList.add('on');bannerT=4.2;
+  bannerEl.innerHTML='<b>'+kind+'</b><span>'+text+'</span>';badgeOn(bannerEl);
 }
-function bannerUpdate(dt){if(bannerT>0){bannerT-=dt;if(bannerT<=0)bannerEl.classList.remove('on');}}
+function gradeBadge(g){
+  const L=document.getElementById('gbL');L.textContent=g.letter;L.className='g'+g.letter;
+  document.getElementById('gbT').textContent=g.line;badgeOn(gBadge);
+}
+function bannerUpdate(){}
+function badgeHide(){badgeOff(bannerEl);badgeOff(gBadge);}
 
 // ---- the pilot log ----
 function logLanding(g){
@@ -4210,7 +4239,10 @@ function onLanding(e){
   if(dash)rows.push('<div class="gl"><span>Luke to Glendale</span><b>'+fmtT(dash.secs)+
     ',  '+dash.g.toFixed(1)+' G peak</b></div>');
   document.getElementById('lLines').innerHTML=rows.join('');
-  landOv.classList.add('on');paused=true;
+  // the full breakdown also goes to Records; the flight carries on through the rollout
+  SCORE.recent=(SCORE.recent||[]);SCORE.recent.unshift({ac:AC.name,letter:g.letter,pts:g.pts,where:g.where,line:g.line,
+    parts:g.parts.map(p=>[p[0],p[1],p[2]]),when:Date.now()});SCORE.recent.length=Math.min(SCORE.recent.length,10);scSave();
+  gradeBadge(g);
   if(better)bannerShow('NEW RECORD',REC[AC.id]?REC[AC.id].fmt(SCORE.best[AC.id]||g):'');
 }
 // the C-130 missions feed the same record store
@@ -4248,6 +4280,9 @@ function scUI(){
     const r=SCORE.best[key];
     html+='<div class="gl"><span>'+label+'</span><b>'+(r?fmt(r):'<i class="none">none yet</i>')+'</b></div>';
   }
+  if(SCORE.recent&&SCORE.recent.length){html+='<div class="recSec">Recent landings</div>';
+    for(const r of SCORE.recent){html+='<div class="gl"><span>'+r.ac+', '+r.where+'</span><b>'+r.letter+'  '+r.pts+' pts</b></div>'+
+      '<div class="gl sub2"><span>'+r.line+'</span><b>'+r.parts.map(p=>p[0]+' '+p[1]).join(' · ')+'</b></div>';}}
   html+='<div class="recSec">Achievements</div>';
   for(const id in ACH){
     const got=SCORE.ach[id];
@@ -4783,7 +4818,7 @@ function start(mode){
   if((mode==='ramp'&&camMode>2)||(camMode===2&&AC.id!=='reaper'))camMode=0;
   STRIKE.active=false;lesEnd();gradeOv.classList.remove('on');
   missReset();missOv.classList.remove('on');landOv.classList.remove('on');
-  document.getElementById('recOv').classList.remove('on');DASH.on=false;
+  document.getElementById('recOv').classList.remove('on');DASH.on=false;badgeHide();
   if(mode==='range')strikeStart();
   if(mode==='drop'||mode==='short')missStart(mode==='drop'?'drop':'short');
 }
@@ -4797,6 +4832,10 @@ document.getElementById('bShort').onclick=()=>{pickType('c130',1);start('short')
 document.getElementById('mRetry').onclick=()=>{missOv.classList.remove('on');start(MISS.kind==='drop'?'drop':'short');};
 document.getElementById('mOther').onclick=()=>{missOv.classList.remove('on');start(MISS.kind==='drop'?'short':'drop');};
 document.getElementById('mFree').onclick=()=>{missOv.classList.remove('on');missReset();start('runway');};
+function landDetails(){if(!running||st.crashed||menu.classList.contains('on'))return;badgeHide();paused=true;document.getElementById('bPause').textContent='Resume';landOv.classList.add('on');}
+gBadge.addEventListener('click',landDetails);
+bannerEl.addEventListener('click',()=>{if(!running||menu.classList.contains('on'))return;badgeHide();if(!st.crashed){paused=true;document.getElementById('bPause').textContent='Resume';}recOpen();});
+document.getElementById('lKeep').onclick=()=>{landOv.classList.remove('on');paused=false;document.getElementById('bPause').textContent='Pause';};
 document.getElementById('lAgain').onclick=()=>{landOv.classList.remove('on');start(st.mode==='final'?'final':'runway');};
 document.getElementById('lMenu').onclick=()=>{landOv.classList.remove('on');openMenu();};
 document.getElementById('lRec').onclick=()=>{landOv.classList.remove('on');recOpen();};
@@ -5645,7 +5684,7 @@ function frame(t){
     else atcUpdate();
   }
   while(events.length){const ev=events.shift();if(LES.on)lessonEvent(ev);
-    if(ev.type==='touchdown'){const f=ev.fpm,g=f<120?'Butter':f<300?'Smooth':f<500?'Firm':'Hard';toast(`Touchdown ${f} fpm. ${g}.`);
+    if(ev.type==='touchdown'){ev.vx=st.vel.x;ev.vz=st.vel.z;const f=ev.fpm,g=f<120?'Butter':f<300?'Smooth':f<500?'Firm':'Hard';toast(`Touchdown ${f} fpm. ${g}.`);
       missTouchdown(ev);onLanding(ev);
       camBump=clamp(f/620,0.12,1);
       if(ev.paved&&(best===null||f<best)){best=f;try{localStorage.setItem(bestKey(),String(f));}catch(e){}showBest();}
@@ -5744,7 +5783,7 @@ window.__kgeu={tilt:tilt,setTilt:setTilt,state:()=>st,toast:toast,start:start,pl
   setTOD:setTOD,isNight:isNight,TOD:()=>TOD,drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
   RADIO:RADIO,radioQ:()=>radioQ,radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,initAudio:initAudio,
-  mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},pick:pickType,pickBase:pickBase,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},pick:pickType,pickBase:pickBase,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   MISS:MISS,DROPZ:DROPZ,LZ:LZ,lzUV:lzUV,lzX:lzX,lzZ:lzZ,missDrop:missDrop,missTouchdown:missTouchdown,
   // step the mission clock without waiting on rAF: the pallet takes 50 s to come down
   missTick:(n,dt)=>{for(let i=0;i<n;i++)missUpdate(dt);},

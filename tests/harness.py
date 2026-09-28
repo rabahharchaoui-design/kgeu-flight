@@ -50,3 +50,9 @@ class Checks:
     def done(self, label):
         print(f'\n{label}: ' + ('FAILED\n  ' + '\n  '.join(self.fails) if self.fails else 'all passed'))
         return 1 if self.fails else 0
+
+async def finger(pg, sel):
+    """Tap where the element really is, the way a finger would: no actionability retries."""
+    r = await pg.evaluate("(s)=>{const e=document.querySelector(s);if(!e)return null;const r=e.getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]}", sel)
+    if not r: raise RuntimeError('no element ' + sel)
+    await pg.touchscreen.tap(r[0], r[1])
