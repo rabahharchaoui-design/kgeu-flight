@@ -1439,6 +1439,68 @@ fontsReady.then(init,init);
 // if the game fails to start, do not leave the splash up forever
 setTimeout(()=>{const sp=document.getElementById('splash');if(sp&&!sp.classList.contains('done')){sp.classList.add('done');setTimeout(()=>sp.classList.add('gone'),480);}},8000);
 
+// ---- propellers ------------------------------------------------------------
+// One table per prop type: blade count and planform, paint by radius, the rpm
+// range (rad/s) and the rings the paint leaves on the blurred disc.
+// Blades are lofted, twisted, painted in vertex colours so a tip band costs nothing.
+const PROP_KIND={
+  cessna:{n:2,R:0.95,r0:0.10,cR:0.075,cM:0.155,cT:0.085,bR:0.95,bT:0.30,idle:73,max:251,
+    base:'#121314',rough:0.32,metal:0.35,bands:[[0.85,0.90,'#b8202a'],[0.90,1.01,'#eeeeea']],
+    rings:[[0.875,'rgba(200,40,45,0.35)',0.055],[0.95,'rgba(240,240,236,0.38)',0.10]]},
+  alpha:{n:2,R:0.80,r0:0.10,cR:0.07,cM:0.13,cT:0.07,bR:0.95,bT:0.30,idle:84,max:250,
+    base:'#26292c',rough:0.4,metal:0.2,bands:[[0.95,1.01,'#eeeeea']],
+    rings:[[0.965,'rgba(240,240,236,0.38)',0.07]]},
+  reaper:{n:3,R:1.30,r0:0.10,cR:0.12,cM:0.24,cT:0.13,bR:0.85,bT:0.30,idle:94,max:220,
+    base:'#17191b',rough:0.8,metal:0.1,bands:[[0.512,0.588,'#e2b519'],[0.977,1.01,'#e2b519']],
+    rings:[[0.55,'rgba(230,185,30,0.30)',0.085],[0.975,'rgba(230,185,30,0.28)',0.045]]},
+  c130:{n:4,R:2.05,r0:0.18,cR:0.32,cM:0.48,cT:0.40,bR:0.95,bT:0.45,idle:107,max:107,square:1,
+    base:'#141517',rough:0.6,metal:0.2,bands:[],rings:[]}
+};
+PROP_KIND.mq9b=Object.assign({},PROP_KIND.reaper,{R:1.32});
+// n twisted blades about +Z, blade 0 along +X; chord in the disc plane, pitch about the blade axis
+function propBladeGeo(K){
+  const R=K.R,r0=K.r0,E=0.002,col=new THREE.Color(),base=new THREE.Color(K.base);
+  const rs=[];for(let i=0;i<=7;i++)rs.push(r0+(R-r0)*(1-Math.pow(1-i/7,1.3))*(K.square?1:0.985));
+  if(!K.square)rs.push(R);
+  for(const b of K.bands){for(const e of [b[0],b[1]])if(e<1){rs.push(e*R-E,e*R+E);}}
+  rs.sort((a,b)=>a-b);
+  const paintAt=r=>{col.copy(base);for(const b of K.bands)if(r>=b[0]*R&&r<=b[1]*R)col.set(b[2]);return col;};
+  const S=[[-0.5,0],[-0.22,0.5],[0.2,0.42],[0.5,0],[0.2,-0.2],[-0.22,-0.3]],ns=S.length;
+  const pos=[],cl=[],idx=[];
+  for(let k=0;k<K.n;k++){
+    const a=k/K.n*Math.PI*2,ca=Math.cos(a),sa=Math.sin(a),v0=pos.length/3;
+    rs.forEach(r=>{
+      const t=(r-r0)/(R-r0);
+      let c=t<0.3?K.cR+(K.cM-K.cR)*t/0.3:K.cM+(K.cT-K.cM)*Math.pow((t-0.3)/0.7,1.5);
+      if(!K.square&&t>0.97)c*=0.35+0.65*Math.sqrt(Math.max(0,(1-t)/0.03));
+      const th=c*(0.34-0.24*Math.min(1,t*1.4)),b=K.bT+(K.bR-K.bT)*Math.pow(1-t,1.2),cb=Math.cos(b),sb=Math.sin(b);
+      const pc=paintAt(r);
+      for(const s of S){const y=s[0]*c,z=s[1]*th,yy=y*cb-z*sb,zz=y*sb+z*cb;
+        pos.push(r*ca-yy*sa,r*sa+yy*ca,zz);cl.push(pc.r,pc.g,pc.b);}
+    });
+    const m=rs.length;
+    for(let i=0;i<m-1;i++)for(let j=0;j<ns;j++){const A=v0+i*ns+j,B=v0+i*ns+(j+1)%ns,C=A+ns,D=B+ns;idx.push(A,C,B,B,C,D);}
+    for(let j=1;j<ns-1;j++){idx.push(v0,v0+j+1,v0+j);const t0=v0+(m-1)*ns;idx.push(t0,t0+j,t0+j+1);}
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('color',new THREE.Float32BufferAttribute(cl,3));
+  g.setAttribute('uv',new THREE.Float32BufferAttribute(new Float32Array(pos.length/3*2),2));
+  g.setIndex(idx);g.computeVertexNormals();return g;
+}
+// shared blade geometry and material per prop type (parked Cessnas all use the same pair)
+const PROP_PARTS={};
+function propParts(kind){
+  if(PROP_PARTS[kind])return PROP_PARTS[kind];
+  const K=PROP_KIND[kind];
+  return PROP_PARTS[kind]={geo:propBladeGeo(K),
+    mat:new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,metalness:K.metal,roughness:K.rough,side:THREE.DoubleSide})};
+}
+// a blade mesh, tagged so the game can fade the blades and keep the spinner
+function propBlades(kind,parent){
+  const P=propParts(kind),m=new THREE.Mesh(P.geo,P.mat);m.userData.blade=1;m.castShadow=false;if(parent)parent.add(m);return m;
+}
+
 // ---------- HD airframes (from the Hangar viewer, built to published dimensions) ----------
 // Wrapped in its own scope so its helpers never collide with the game's. The game renders
 // with linear output, so vertex colours and canvas maps are used as authored.
@@ -2462,19 +2524,7 @@ function buildMQ9HD(opt){
     sp.rotateX(-Math.PI/2);
     const spm=mesh(sp,MAT.mq9Skin,spin); AERO.paint(sp,(x,y,z,o)=>o.copy(C_BASE));
     spm.position.z=0.17;
-    for(let i=0;i<3;i++){
-      const sh=new THREE.Shape();
-      sh.moveTo(0.12,-0.115); sh.lineTo(1.26,-0.072);
-      sh.lineTo(1.30,0.058); sh.lineTo(0.12,0.128);
-      const bg=new THREE.ExtrudeGeometry(sh,{depth:0.028,bevelEnabled:true,bevelSize:0.009,
-        bevelThickness:0.008,bevelSegments:1,curveSegments:1,steps:1});
-      bg.translate(0,0,-0.014);
-      const piv=new THREE.Group();
-      const bm=mesh(bg,MAT.prop,piv);
-      bm.rotation.y=0.30;                       // blade pitch
-      piv.rotation.z=i/3*Math.PI*2;
-      spin.add(piv);
-    }
+    mesh(propParts('reaper').geo,propParts('reaper').mat,spin).userData.blade=1;   // 3 twisted blades, matte black, yellow mid band and tip
     prop.add(spin); prop.userData.spin=spin;
     prop.position.set(0,0.13,Z(10.62));
     g.add(prop);
@@ -2705,17 +2755,9 @@ function buildC130HD(opt){
     const spin=new THREE.Group(); spin.position.set(nx,ny,Z(8.85)); spin.name='prop';
     const prof=[new V2(0.001,-1.02),new V2(0.20,-0.86),new V2(0.36,-0.58),new V2(0.46,-0.28),new V2(0.50,0.0),new V2(0.50,0.10)];
     const sp=new THREE.LatheGeometry(prof,14); sp.rotateX(Math.PI/2);
-    const spm=mesh(sp,SK,spin); AERO.paint(sp,(x,y,z,o)=>o.copy(C_LOW));
-    {
-      const sh=new THREE.Shape();                  // broad paddle blade, square tip
-      sh.moveTo(0.36,-0.16); sh.lineTo(1.30,-0.24); sh.lineTo(2.02,-0.20);
-      sh.lineTo(2.05,0.16); sh.lineTo(1.30,0.24); sh.lineTo(0.36,0.17);
-      const bg=new THREE.ExtrudeGeometry(sh,{depth:0.045,bevelEnabled:true,bevelSize:0.012,
-        bevelThickness:0.010,bevelSegments:1,curveSegments:1,steps:1});
-      bg.translate(0,0,-0.022); bg.rotateY(0.55); bg.translate(0,0,-0.30);   // blade pitch, ahead of the spinner base
-      const blades=[];
-      for(let i=0;i<4;i++){const c=bg.clone();c.rotateZ(i/4*Math.PI*2);blades.push(c);}
-      mesh(AERO.merge(blades),MAT.prop,spin);
+    const spm=mesh(sp,SK,spin); AERO.paint(sp,(x,y,z,o)=>o.setRGB(0.07,0.075,0.08));   // black spinner (USAF)
+    { // four broad paddle blades, square black tips, ahead of the spinner base
+      const bm=mesh(propParts('c130').geo,propParts('c130').mat,spin);bm.userData.blade=1;bm.position.z=-0.30;
     }
     g.add(spin); props.push(spin);
     const disc=new THREE.Mesh(new THREE.CircleGeometry(2.05,28),MAT.propDisc.clone());
@@ -3043,16 +3085,7 @@ function buildMQ9BHD(opt){
     sp.rotateX(-Math.PI/2);
     const spm=mesh(sp,MAT.mq9Skin,spin); AERO.paint(sp,(x,y,z,o)=>o.copy(C_BASE));
     spm.position.z=0.18;
-    const blades=[];
-    for(let i=0;i<3;i++){
-      const sh=new THREE.Shape();
-      sh.moveTo(0.12,-0.115); sh.lineTo(1.28,-0.072);
-      sh.lineTo(1.32,0.058); sh.lineTo(0.12,0.128);
-      const bg=new THREE.ExtrudeGeometry(sh,{depth:0.028,bevelEnabled:true,bevelSize:0.009,
-        bevelThickness:0.008,bevelSegments:1,curveSegments:1,steps:1});
-      bg.translate(0,0,-0.014); bg.rotateY(0.30); bg.rotateZ(i/3*Math.PI*2); blades.push(bg);
-    }
-    mesh(AERO.merge(blades),MAT.prop,spin);
+    mesh(propParts('mq9b').geo,propParts('mq9b').mat,spin).userData.blade=1;     // 3 twisted blades, matte black, yellow mid band and tip
     prop.add(spin); prop.userData.spin=spin;
     prop.position.set(0,0.14,Z(11.30));
     g.add(prop);
@@ -3986,7 +4019,72 @@ function hdModel(which){
   }
   scene.add(m.g);return out;
 }
+// ---- propeller look: blades fade into a blurred disc as the rpm comes up ----
+// Disc texture per prop type, made once: translucent grey, a faint trace per blade and the tip paint as rings.
+const PROP_TEX={};
+function propDiscTex(kind){
+  if(PROP_TEX[kind])return PROP_TEX[kind];
+  const K=PROP_KIND[kind];
+  // built per pixel (once) so the blade traces have no wedge seams
+  return PROP_TEX[kind]=tex(256,256,(x,w)=>{
+    const c=w/2,ri=K.r0/K.R,sw=Math.PI*2/K.n*0.6,img=x.createImageData(w,w),d=img.data;
+    const sm=(a,b,v)=>{const t=clamp((v-a)/(b-a),0,1);return t*t*(3-2*t);};
+    const rings=K.rings.map(r=>{const m=r[1].match(/[\d.]+/g).map(Number);return [r[0],m,r[2]];});
+    for(let py=0;py<w;py++)for(let px=0;px<w;px++){
+      const dx=px+0.5-c,dy=py+0.5-c,rho=Math.hypot(dx,dy)/(c*0.985);
+      if(rho>1||rho<ri)continue;
+      const edge=sm(ri,ri+0.04,rho)*(1-sm(0.975,1,rho));
+      // haze: denser where the blades are widest
+      let a=rho<0.35?0.30+0.12*(rho-ri)/(0.35-ri):0.42-0.14*(rho-0.35)/0.65;
+      // one smeared trace per blade, sharpest at the leading edge
+      const th=Math.atan2(dy,dx);let tr=0;
+      for(let k=0;k<K.n;k++){let ph=(th-k/K.n*Math.PI*2)%(Math.PI*2);if(ph<0)ph+=Math.PI*2;const t=ph/sw;
+        if(t<1)tr=Math.max(tr,Math.min(1,t/0.05)*Math.pow(1-t,1.6));}
+      a+=0.20*tr;
+      let R=34-14*tr,G=37-14*tr,B=41-14*tr;
+      // the tip paint smeared into rings
+      for(const r of rings){const q=Math.max(0,1-Math.abs(rho-r[0])/(r[2]/2));if(q>0){const ra=r[1][3]*sm(0,0.4,q);
+        const f=ra/(a+ra);R+=(r[1][0]-R)*f;G+=(r[1][1]-G)*f;B+=(r[1][2]-B)*f;a+=ra*(1-a);}}
+      const o=(py*w+px)*4;d[o]=clamp(R,0,255);d[o+1]=clamp(G,0,255);d[o+2]=clamp(B,0,255);d[o+3]=255*clamp(a*edge,0,1);
+    }
+    x.putImageData(img,0,0);
+  });
+}
+// Called once per model: blade meshes get a material of their own (so fading the player's
+// prop does not touch the parked ones), the discs get the texture.
+function rigProps(m,kind){
+  const K=PROP_KIND[kind];if(!K||!(m.prop||m.props))return m;
+  const ps=m.props||[m.prop],ds=m.discs||[m.disc],blades=[];
+  ps.forEach(p=>p.traverse(o=>{if(o.isMesh&&o.userData.blade)blades.push(o);}));
+  const bm=blades.length?blades[0].material.clone():null;
+  blades.forEach(b=>{b.material=bm;b.userData.heat=0.45;});   // own heat: IR keeps them while they fade
+  const dm=new THREE.MeshBasicMaterial({map:propDiscTex(kind),transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide});
+  ds.forEach(d=>{d.material=dm;d.visible=false;d.castShadow=false;});
+  m.propRig={kind:kind,K:K,ps:ps,ds:ds,blades:blades,bm:bm,dm:dm};
+  return m;
+}
+// AI traffic: a fixed half-opaque disc, no blades, nothing to animate
+function trafficProps(m,kind){
+  rigProps(m,kind);const P=m.propRig;if(!P)return;
+  P.blades.forEach(b=>b.visible=false);P.dm.opacity=0.5;P.ds.forEach(d=>d.visible=true);
+}
+const PROPST={rate:0,bladeOpacity:1,discOpacity:0,blades:0};
+// p: engine power 0..1 (spooled), on: engine running. rate in rad/s.
+function propUpdate(m,on,p,dt){
+  const P=m.propRig;
+  if(!P){PROPST.rate=0;PROPST.bladeOpacity=0;PROPST.discOpacity=0;PROPST.blades=0;return;}
+  const K=P.K;
+  const rate=on?K.idle+p*(K.max-K.idle):0;
+  const bo=on?clamp(1-(p-0.25)/0.30,0,1):1;
+  const dop=!on||p<0.25?0:p<0.6?0.55*(p-0.25)/0.35:0.55+0.15*Math.min(1,(p-0.6)/0.4);
+  for(let i=0;i<P.ps.length;i++)P.ps[i].rotation.z+=rate*dt;
+  for(let i=0;i<P.ds.length;i++){const d=P.ds[i];d.rotation.z+=rate*0.02*dt;d.visible=dop>0.004;}
+  P.dm.opacity=dop;
+  if(P.bm){P.bm.opacity=bo;P.bm.transparent=bo<0.995;for(let i=0;i<P.blades.length;i++)P.blades[i].visible=bo>0.01;}
+  PROPST.rate=rate;PROPST.bladeOpacity=bo;PROPST.discOpacity=dop;PROPST.blades=K.n;
+}
 function regTex(reg,color){return tex(512,128,(x,w,h)=>{x.clearRect(0,0,w,h);x.fillStyle=color;x.font='800 108px '+F;x.textAlign='center';x.textBaseline='middle';x.fillText(reg,w/2,70);});}
+const SPIN_ALU=new THREE.MeshStandardMaterial({color:0xd6dade,metalness:0.85,roughness:0.22});
 function buildPlane(o){
   o=Object.assign({body:0xf5f4f0,stripe:0x1d3557,accent:0xd4a017,reg:'N8401L',regColor:'#1d3557',full:true},o);
   const g=new THREE.Group(),white=lam(o.body),stripe=lam(o.stripe),accent=lam(o.accent),dark=lam(0x1d2630),glass=lam(0x2f4d66),tire=lam(0x151515);
@@ -4006,8 +4104,8 @@ function buildPlane(o){
   add(new THREE.BoxGeometry(0.09,1.55,1.15),white,0,1.05,4.75);
   add(new THREE.BoxGeometry(0.1,0.3,1.16),stripe,0,1.5,4.75);
   const df=add(new THREE.BoxGeometry(0.08,0.35,1.4),white,0,0.6,3.6);df.rotation.x=-0.25;
-  const sp=new THREE.ConeGeometry(0.22,0.45,12);sp.rotateX(-Math.PI/2);add(sp,stripe,0,0.02,-3.37);
-  const prop=new THREE.Group();prop.position.set(0,0.02,-3.2);prop.add(new THREE.Mesh(new THREE.BoxGeometry(0.12,1.9,0.05),dark));g.add(prop);
+  const sp=new THREE.ConeGeometry(0.22,0.45,12);sp.rotateX(-Math.PI/2);add(sp,SPIN_ALU,0,0.02,-3.37);    // polished aluminium spinner
+  const prop=new THREE.Group();prop.position.set(0,0.02,-3.2);propBlades('cessna',prop).rotation.z=Math.PI/2;g.add(prop);   // McCauley 2 blade, red and white tips
   const disc=new THREE.Mesh(new THREE.CircleGeometry(0.95,24),new THREE.MeshBasicMaterial({color:0x2a2a2a,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));disc.position.set(0,0.02,-3.23);g.add(disc);
   const wheel=new THREE.CylinderGeometry(0.28,0.28,0.16,14);wheel.rotateZ(Math.PI/2);
   const pant=new THREE.SphereGeometry(1,12,8);
@@ -4021,7 +4119,7 @@ function buildPlane(o){
   const r2=new THREE.Mesh(new THREE.PlaneGeometry(1.9,0.48),tm);r2.rotation.y=-Math.PI/2;r2.position.set(-0.47,0.28,2.2);g.add(r2);
   scene.add(g);return {g:g,prop:prop,disc:disc};
 }
-function buildReaper(reg){
+function buildReaper(reg,kind){
   const g=new THREE.Group(),gray=lam(0x8e969c),dgray=lam(0x5d646a),tire=lam(0x151515),glass=lam(0x1c2a36);
   const add=(geo,mat,x,y,z,p)=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);(p||g).add(m);return m;};
   // fuselage (lathe along the aircraft axis, nose at -Z)
@@ -4044,9 +4142,9 @@ function buildReaper(reg){
   add(new THREE.BoxGeometry(0.1,1.05,0.9),gray,0,-0.62,4.5);
   // pusher prop, 3 blades
   const prop=new THREE.Group();prop.position.set(0,0.05,5.42);g.add(prop);
-  for(let k=0;k<3;k++){const b=add(new THREE.BoxGeometry(0.16,1.15,0.05),dgray,0,0.6,0,new THREE.Group());b.parent.rotation.z=k*2.094;prop.add(b.parent);}
+  propBlades(kind||'reaper',prop);
   const sp=new THREE.ConeGeometry(0.14,0.35,12);sp.rotateX(Math.PI/2);add(sp,dgray,0,0.05,5.55);
-  const disc=new THREE.Mesh(new THREE.CircleGeometry(1.2,28),new THREE.MeshBasicMaterial({color:0x222222,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));disc.position.set(0,0.05,5.44);g.add(disc);
+  const disc=new THREE.Mesh(new THREE.CircleGeometry(PROP_KIND[kind||'reaper'].R,28),new THREE.MeshBasicMaterial({color:0x222222,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));disc.position.set(0,0.05,5.44);g.add(disc);
   // retractable gear, pivots at the belly
   const gear=new THREE.Group();gear.position.set(0,-0.45,0);g.add(gear);
   const wheel=new THREE.CylinderGeometry(0.3,0.3,0.18,14);wheel.rotateZ(Math.PI/2);
@@ -4123,9 +4221,9 @@ function buildAlpha(){
   const tm=new THREE.MeshBasicMaterial({map:regTex('N502AT','#1f2a24'),transparent:true,depthWrite:false});
   for(const sx of [1,-1]){const r=new THREE.Mesh(new THREE.PlaneGeometry(1.1,0.26),tm);r.rotation.y=sx*Math.PI/2;r.position.set(sx*0.19,1.12,1.75);g.add(r);}
   // prop and spinner
-  const sp=new THREE.ConeGeometry(0.15,0.32,10);sp.rotateX(-Math.PI/2);add(sp,grey,0,0.98,-2.9);
+  const sp=new THREE.ConeGeometry(0.15,0.32,10);sp.rotateX(-Math.PI/2);add(sp,white,0,0.98,-2.9);          // white spinner
   const prop=new THREE.Group();prop.position.set(0,0.98,-2.82);g.add(prop);
-  add(new THREE.BoxGeometry(1.6,0.11,0.05),grey,0,0,0,prop);
+  propBlades('alpha',prop);                                                                                // 2 blade composite, white tips
   const disc=add(new THREE.CircleGeometry(0.8,20),new THREE.MeshBasicMaterial({color:0x222222,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false}),0,0.98,-2.86);
   // fixed tricycle gear on composite spring legs
   const wh=new THREE.CylinderGeometry(0.2,0.2,0.12,12);wh.rotateZ(Math.PI/2);
@@ -4172,21 +4270,14 @@ function buildC130(){
     const body=new THREE.CylinderGeometry(0.88,0.78,6.4,10);body.rotateX(Math.PI/2);
     add(body,grey,0,0,0,nac);
     const spin=new THREE.CylinderGeometry(0.42,0.86,1.5,10);spin.rotateX(-Math.PI/2);
-    add(spin,dgrey,0,0,-3.6,nac);
+    add(spin,blade,0,0,-3.6,nac);
     add(new THREE.BoxGeometry(1.5,0.5,2.2),dgrey,0,-0.75,1.6,nac);    // oil cooler scoop under
     const ex=new THREE.CylinderGeometry(0.2,0.24,1.1,8);ex.rotateX(Math.PI/2);
     add(ex,dark,0.5,0.35,3.3,nac);
     // four bladed constant speed prop, 4.11 m diameter
     const pr=new THREE.Group();pr.position.set(0,0,-4.5);nac.add(pr);
-    for(let i=0;i<4;i++){
-      const b=new THREE.Mesh(new THREE.BoxGeometry(0.30,2.06,0.10),blade);
-      b.position.set(0,1.03,0);b.rotation.z=i*Math.PI/2;
-      b.position.set(Math.sin(i*Math.PI/2)*1.03,Math.cos(i*Math.PI/2)*1.03,0);
-      pr.add(b);
-      const tip=new THREE.Mesh(new THREE.BoxGeometry(0.31,0.26,0.11),warn);
-      tip.position.set(Math.sin(i*Math.PI/2)*1.93,Math.cos(i*Math.PI/2)*1.93,0.01);pr.add(tip);
-    }
-    add(new THREE.SphereGeometry(0.34,10,7),dgrey,0,0,-0.1,pr);
+    propBlades('c130',pr);
+    add(new THREE.SphereGeometry(0.34,10,7),blade,0,0,-0.1,pr);
     const d=add(new THREE.CircleGeometry(2.05,22),new THREE.MeshBasicMaterial({color:0x1f1f1f,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}),0,0,-4.6,nac);
     props.push(pr);discs.push(d);
   }
@@ -4221,8 +4312,9 @@ function getModel(id){
   else if(id==='cessna'){const c=buildPlane({reg:'N8401L',stripe:0x1d3557,accent:0xd4a017,full:true}),w=new THREE.Group();scene.remove(c.g);c.g.position.y=-0.15;w.add(c.g);scene.add(w);m={g:w,prop:c.prop,disc:c.disc};}
   else if(id==='alpha')m=buildAlpha();
   else if(id==='c130')m=hdModel('c130')||buildC130();
-  else if(id==='mq9b')m=hdModel('mq9b')||buildReaper('N190TC');
+  else if(id==='mq9b')m=hdModel('mq9b')||buildReaper('N190TC','mq9b');
   else m=hdModel('reaper')||buildReaper();
+  rigProps(m,id);
   m.lights=AC_LIGHTS[id]?makeAircraftLights(m.g,AC_LIGHTS[id]):null;
   m.g.userData.heat=0.7;if(m.ab)m.ab.userData.heat=1.0;   // IR: warm airframe, white hot burner
   m.g.visible=false;return MODELS[id]=m;
@@ -4238,7 +4330,7 @@ let pk=0;
 for(let u=705;u<=1500;u+=66){const L=liveries[pk%liveries.length];const p=buildPlane({stripe:L[0],accent:L[1],reg:L[2],regColor:'#222',full:false});
   p.g.position.set(wX(u,-340),1.35,wZ(u,-340));p.g.rotation.y=-116*Math.PI/180;OBST.push({kind:'circ',x:wX(u,-340),z:wZ(u,-340),r:6,h:3,name:'a parked airplane'});pk++;}
 // ---------- traffic: KGEU Cessna, Luke F-16 pair, a C-17, another Reaper ----------
-const ai=buildPlane({stripe:0xc8102e,accent:0x222222,reg:'N5231G',regColor:'#222',full:false});ai.prop.visible=false;ai.disc.material.opacity=0.3;
+const ai=buildPlane({stripe:0xc8102e,accent:0x222222,reg:'N5231G',regColor:'#222',full:false});
 const TRAFFIC=[];const _ap=new V3(),_at=new V3(),_ae=new THREE.Euler(0,0,0,'YXZ');
 function wL(a,b,y){const sn=Math.sin(LUKE.h),cs=Math.cos(LUKE.h);return new V3(LUKE.x+a*sn+b*cs,y,LUKE.z-a*cs+b*sn);}
 function addTraffic(o){o.path=new THREE.CatmullRomCurve3(o.pts,true,'catmullrom',0.5);o.len=o.path.getLength();o.bank=0;o.yp=null;TRAFFIC.push(o);return o;}
@@ -4249,7 +4341,7 @@ const v2=addTraffic({m:hdModel('f16')||buildF16(),kind:'',grp:'v',v:125,t:0,pts:
 const circ=(cx,cz,r,y,n)=>{const a=[];for(let i=0;i<n;i++){const t=i/n*Math.PI*2;a.push(new V3(cx+Math.cos(t)*r,y,cz+Math.sin(t)*r));}return a;};
 addTraffic({m:buildHeavy(),kind:'a C-17',grp:'h',v:115,t:0.3,pts:circ(-2000,-4000,14000,2130,14)});
 addTraffic({m:hdModel('reaper')||buildReaper('N12TH'),kind:'an MQ-9',grp:'r',v:42,t:0.6,pts:circ(9000,-9000,2600,1500,10)});
-TRAFFIC.forEach(o=>{o.m.g.userData.heat=0.8;if(o.m.gear)o.m.gear.visible=false;if(o.m.prop){o.m.prop.visible=false;o.m.disc.material.opacity=0.3;}});
+TRAFFIC.forEach(o=>{o.m.g.userData.heat=0.8;if(o.m.gear)o.m.gear.visible=false;if(o.m.prop)trafficProps(o.m,o.grp==='c'?'cessna':'reaper');});
 // traffic lights: nav, strobes and beacon only, one shared material; the C-17 has no light table
 {const TL={c:['cessna',0.15],v:['f16',0],r:['reaper',0]};
  TRAFFIC.forEach(o=>{const t=TL[o.grp];if(t)o.m.lights=makeAircraftLights(o.m.g,AC_LIGHTS[t[0]],{mat:ACL_MAT_T,only:['nav','strobe','beacon'],dy:t[1]});});}
@@ -7396,9 +7488,8 @@ function tick(t,skipRender){
   }
   {const fdt=paused?0:dt;fireUpdate(fdt);smokeUpdate(fdt);debrisUpdate(fdt);fxUpdate(fdt);}
   plane.g.position.copy(dp);plane.g.quaternion.copy(q);
-  const on=running&&!s.crashed&&!FREECAM;   // the free camera is a model check, blades still
-  if(plane.props){const o=on?0.3:0;for(let i=0;i<plane.props.length;i++){plane.props[i].rotation.z+=(on?107:0)*dt;plane.props[i].visible=!on;plane.discs[i].material.opacity=o;}}
-  else if(plane.prop){plane.prop.rotation.z+=(on?199:0)*dt;plane.disc.material.opacity=on?0.3:0;plane.prop.visible=!on;}
+  const on=running&&!s.crashed;   // the free camera shows the live prop; pause and photo freeze it
+  propUpdate(plane,on,s.power,paused?0:dt);
   if(plane.canopy)plane.canopy.visible=camMode!==1;
   if(plane.gear){plane.gear.scale.y=Math.max(0.02,s.gearPos);plane.gear.visible=s.gearPos>0.03;}
   if(plane.ab){const a=on&&s.power>0.82;plane.ab.visible=a;if(a)plane.ab.scale.set(1,1,1.5+(s.power-0.82)*14+Math.random()*0.6);}
@@ -7469,7 +7560,7 @@ function tick(t,skipRender){
     const po=pauseOv.classList.contains('on');document.body.classList.toggle('pauseOn',po);if(po)showRender(dt,CARP);}
 }
 // test hook: headless UI checks need to reach a few internals
-window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},HD:()=>HD,
+window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),HD:()=>HD,
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
   lights:()=>({KGEU:AL.KGEU.count(),KLUF:AL.KLUF.count(),uLights:AL_MAT.uniforms.uLights.value,
     layers:AL_LAYERS.map(L=>({name:L.pts&&L.pts.name,visible:!!(L.pts&&L.pts.visible),inScene:!!(L.pts&&L.pts.parent)})),
