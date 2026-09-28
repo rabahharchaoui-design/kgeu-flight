@@ -1,4 +1,4 @@
-# KGEU Flight: handoff
+# Haboob (formerly KGEU Flight): handoff
 
 Single file game in `index.html`. Checkpoints after each task: `index_task1.html`
 through `index_task4.html`. Each task is one git commit.
