@@ -7223,7 +7223,8 @@ function mbaseBuild(){
     d[o+3]=255;}
   x.putImageData(im,0,0);MBASE.c=c;
 }
-const MT={cache:new Map(),max:40,queue:[],base:256/64000,d:1,pool:[]};
+// 32 tiles is 32 MB at 2x; closing the full map trims to the 10 the mini map is using, and at most 6 spare canvases are pooled
+const MT={cache:new Map(),max:32,keep:10,queue:[],base:256/64000,d:1,pool:[],poolMax:6};
 const mtLevel=sc=>clamp(Math.ceil(Math.log2(sc/MT.base)-1e-6),0,9);
 function mtTile(L,i,j){const k=L+':'+i+':'+j,t=MT.cache.get(k);if(t){MT.cache.delete(k);MT.cache.set(k,t);}return t;}
 function mtRender(L,i,j){
@@ -7238,7 +7239,8 @@ function mtRender(L,i,j){
     ex=Math.min(MBASE.c.width,(x0+span-MBASE.x0)/R+1),ey=Math.min(MBASE.c.height,(z0+span-MBASE.z0)/R+1);
     if(ex>sx&&ey>sy){x.imageSmoothingEnabled=true;x.drawImage(MBASE.c,sx,sy,ex-sx,ey-sy,MBASE.x0+sx*R,MBASE.z0+sy*R,(ex-sx)*R,(ey-sy)*R);}}
   const buckets={};
-  mapQuery(x0-200,z0-200,x0+span+200,z0+span+200,(n,f)=>{(buckets[n]||(buckets[n]=[])).push(f);});
+  const skip={r5:sc<0.03,r4:sc<0.012,r3:sc<0.012,w1:sc<=0.004,taxi:sc<=0.012,apron:sc<=0.004};   // layers this zoom does not draw
+  mapQuery(x0-200,z0-200,x0+span+200,z0+span+200,(n,f)=>{if(skip[n])return;(buckets[n]||(buckets[n]=[])).push(f);});
   const path=(fs,close)=>{x.beginPath();for(const f of fs){const p=f.p;x.moveTo(p[0],p[1]);for(let q=2;q<p.length;q+=2)x.lineTo(p[q],p[q+1]);if(close)x.closePath();}};
   const minA=(fs,a)=>fs?fs.filter(f=>(f.b[2]-f.b[0])*(f.b[3]-f.b[1])*sc*sc>a):[];
   path(minA(buckets.p1,6),true);x.fillStyle=MPAL.park;x.fill();
@@ -7259,9 +7261,11 @@ function mtRender(L,i,j){
   if(buckets.apron&&sc>0.004){path(buckets.apron,true);x.fillStyle=MPAL.apron;x.fill();}
   if(buckets.taxi&&sc>0.012){path(buckets.taxi);x.strokeStyle=MPAL.taxi;x.lineWidth=Math.max(18,px(0.8));x.globalAlpha=smooth(0.012,0.03,sc);x.stroke();x.globalAlpha=1;}
   MT.cache.set(L+':'+i+':'+j,c);
-  while(MT.cache.size>MT.max){const k=MT.cache.keys().next().value;MT.pool.push(MT.cache.get(k));MT.cache.delete(k);}
+  mtTrim(MT.max);
   return c;
 }
+function mtTrim(n){while(MT.cache.size>n){const k=MT.cache.keys().next().value,c=MT.cache.get(k);MT.cache.delete(k);
+  if(MT.pool.length<MT.poolMax)MT.pool.push(c);else c.width=c.height=0;}}   // a zero sized canvas hands its memory back at once on iOS
 // draw the tiles under a view. P maps world to screen px; returns true when every tile was cached
 function mtDraw(ctx,sc,wx0,wz0,wx1,wz1,P,lsc){
   const L=mtLevel(lsc||sc),span=256/(MT.base*Math.pow(2,L));let full=true;
@@ -7296,7 +7300,7 @@ function fmOpen(){
   FM.cx=(x0+x1)/2+legW()/2/FM.scale;FM.cz=(z0+z1)/2;
   FM.infoK=null;fmSize();lblUI();fmDraw();
 }
-function fmClose(){FM.on=false;$('mapOv').classList.remove('on');document.body.classList.remove('mapOn');paused=FM.wasPaused;}
+function fmClose(){FM.on=false;MT.queue.length=0;mtTrim(MT.keep);$('mapOv').classList.remove('on');document.body.classList.remove('mapOn');paused=FM.wasPaused;}
 function fmSize(){const d=Math.min(window.devicePixelRatio||1,2);fmc.width=innerWidth*d;fmc.height=innerHeight*d;fmc.style.width=innerWidth+'px';fmc.style.height=innerHeight+'px';FM.d=d;}
 const fmP=(x,z)=>[innerWidth/2+(x-FM.cx)*FM.scale,innerHeight/2+(z-FM.cz)*FM.scale];
 const fmW=(X,Y)=>[FM.cx+(X-innerWidth/2)/FM.scale,FM.cz+(Y-innerHeight/2)/FM.scale];
