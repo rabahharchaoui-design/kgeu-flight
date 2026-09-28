@@ -1501,6 +1501,7 @@ function propBlades(kind,parent){
   const P=propParts(kind),m=new THREE.Mesh(P.geo,P.mat);m.userData.blade=1;m.castShadow=false;if(parent)parent.add(m);return m;
 }
 
+const AB_PETAL_MAX=12;                 // F-16 nozzle petals open this far (deg) at full burner
 // ---------- HD airframes (from the Hangar viewer, built to published dimensions) ----------
 // Wrapped in its own scope so its helpers never collide with the game's. The game renders
 // with linear output, so vertex colours and canvas maps are used as authored.
@@ -1927,6 +1928,84 @@ function mesh(geo,mat,parent){
   if(parent)parent.add(m);
   return m;
 }
+// ---- afterburner flame ----------------------------------------------------
+// Layers on one group, all additive with no depth write: a heat haze (military power
+// only), the orange outer flame, a blue-white core, the shock diamonds (one merged
+// mesh, flickered in the vertex shader) and a glow sprite at the nozzle. Every layer
+// is built one unit long along +z from the nozzle exit; abUpdate scales them.
+function abFlameMat(c0,c1,op,fres){
+  return new THREE.ShaderMaterial({
+    uniforms:{uC0:{value:new THREE.Color(c0)},uC1:{value:new THREE.Color(c1)},uOp:{value:op},uT:{value:0},uF:{value:fres}},
+    vertexShader:`#include <common>
+#include <logdepthbuf_pars_vertex>
+varying vec2 vUv;varying float vF;
+void main(){vUv=uv;vec4 mv=modelViewMatrix*vec4(position,1.0);
+  vF=abs(dot(normalize(normalMatrix*normal),normalize(-mv.xyz)));gl_Position=projectionMatrix*mv;
+  #include <logdepthbuf_vertex>
+}`,
+    fragmentShader:`#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform vec3 uC0,uC1;uniform float uOp,uT,uF;varying vec2 vUv;varying float vF;
+void main(){
+  #include <logdepthbuf_fragment>
+  float a=vUv.y;vec3 c=mix(uC0,uC1,smoothstep(0.0,0.6,a));
+  float k=uOp*pow(vF,uF)*pow(1.0-a,1.3)*smoothstep(0.0,0.04,a+0.02)*(0.84+0.16*sin(a*34.0-uT*50.0+vUv.x*18.85));
+  gl_FragColor=vec4(c,clamp(k,0.0,1.0));
+}`,
+    transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,fog:false});
+}
+function buildABFlame(){
+  const g=new THREE.Group();
+  // bulges just behind the exit, then tapers to a point: radius 1 is the nozzle exit
+  const prof=[[1.0,0],[1.07,0.05],[1.04,0.14],[0.92,0.3],[0.72,0.5],[0.48,0.7],[0.24,0.87],[0.08,0.97],[0.0,1.0]]
+    .map(p=>new THREE.Vector2(p[0],p[1]));
+  const lg=new THREE.LatheGeometry(prof,16);lg.rotateX(Math.PI/2);
+  const part=(mat,ro)=>{const m=new THREE.Mesh(lg,mat);m.renderOrder=ro;m.frustumCulled=false;g.add(m);return m;};
+  const haze=part(abFlameMat(0xd8dde2,0x9aa2aa,0.08,1.0),3);
+  const outer=part(abFlameMat(0xff9a3c,0xff5a14,0.5,1.4),4);
+  const core=part(abFlameMat(0xf2f6ff,0x3f7cff,0.9,0.8),5);
+  // shock diamonds: N small ellipsoids along the core, one draw call
+  const N=8,sg=new THREE.SphereGeometry(1,10,6),n=sg.attributes.position.count,ix=sg.index.array;
+  const pos=new Float32Array(N*n*3),nor=new Float32Array(N*n*3),aC=new Float32Array(N*n),aI=new Float32Array(N*n),idx=[];
+  for(let k=0;k<N;k++){const R=0.068*(1-k*0.05),zc=0.5+k*0.55;
+    for(let i=0;i<n;i++){const j=k*n+i;
+      pos[j*3]=sg.attributes.position.getX(i)*R;pos[j*3+1]=sg.attributes.position.getY(i)*R;pos[j*3+2]=zc+sg.attributes.position.getZ(i)*R*2.5;
+      nor[j*3]=sg.attributes.normal.getX(i);nor[j*3+1]=sg.attributes.normal.getY(i);nor[j*3+2]=sg.attributes.normal.getZ(i);
+      aC[j]=zc;aI[j]=k;}
+    for(let i=0;i<ix.length;i++)idx.push(ix[i]+k*n);}
+  const dg=new THREE.BufferGeometry();dg.setAttribute('position',new THREE.BufferAttribute(pos,3));dg.setAttribute('normal',new THREE.BufferAttribute(nor,3));
+  dg.setAttribute('aC',new THREE.BufferAttribute(aC,1));dg.setAttribute('aI',new THREE.BufferAttribute(aI,1));dg.setIndex(idx);
+  const dm=new THREE.ShaderMaterial({uniforms:{uT:{value:0},uAb:{value:0},uLen:{value:1},uOp:{value:1}},
+    vertexShader:`#include <common>
+#include <logdepthbuf_pars_vertex>
+attribute float aC;attribute float aI;uniform float uT,uAb,uLen,uOp;varying float vA;
+void main(){
+  float sc=(0.55+0.45*uAb)*(1.0+0.15*sin(uT*157.08+aI*2.39));
+  vec3 p=vec3(position.xy*sc,aC+(position.z-aC)*sc);
+  vec4 mv=modelViewMatrix*vec4(p,1.0);
+  float f=abs(dot(normalize(normalMatrix*normal),normalize(-mv.xyz)));
+  vA=uOp*uAb*(1.0-aI*0.08)*pow(f,1.2)*(1.0-smoothstep(uLen*0.7,uLen*0.95,aC))*(0.85+0.15*sin(uT*131.0+aI*4.1));
+  gl_Position=projectionMatrix*mv;
+  #include <logdepthbuf_vertex>
+}`,
+    fragmentShader:`#include <common>
+#include <logdepthbuf_pars_fragment>
+varying float vA;
+void main(){
+  #include <logdepthbuf_fragment>
+  gl_FragColor=vec4(1.0,0.93,0.78,clamp(vA,0.0,1.0));
+}`,
+    transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false});
+  const diam=new THREE.Mesh(dg,dm);diam.renderOrder=6;diam.frustumCulled=false;g.add(diam);
+  // glow at the exit: lights the tail cone and the petals at night
+  const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d'),gr=x.createRadialGradient(32,32,1,32,32,31);
+  gr.addColorStop(0,'rgba(255,214,150,1)');gr.addColorStop(0.2,'rgba(255,160,70,0.5)');gr.addColorStop(0.55,'rgba(255,120,40,0.1)');gr.addColorStop(1,'rgba(255,110,30,0)');
+  x.fillStyle=gr;x.fillRect(0,0,64,64);
+  const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,opacity:0}));
+  glow.position.z=0.15;glow.renderOrder=7;g.add(glow);
+  g.userData.fx={haze:haze,outer:outer,core:core,diam:diam,glow:glow};
+  return g;
+}
 // A flat marking laid on a surface. r bends it around the fuselage so it sits
 // on the skin instead of slicing through it.
 function decal(w,h,map,opacity,r){
@@ -2170,35 +2249,42 @@ function buildF16HD(opt){
   }
 
   // ---- exhaust nozzle with petals --------------------------------------
+  let nzMat,ptMat,petalMesh;
   {
     const NZ=[[14.15,0.558],[14.45,0.512],[14.72,0.470],[15.00,0.452],[15.06,0.448]];
     const nSec=NZ.map(f=>AERO.ring(Z(f[0]),f[1],f[1],f[1],0.02,2.4,20));
-    mesh(AERO.loft(nSec,{uScale:1.2,vScale:1.2,capEnd:false}),MAT.nozzle,g);
+    const nozLoft=mesh(AERO.loft(nSec,{uScale:1.2,vScale:1.2,capEnd:false}),MAT.nozzle,g);
     // individual petals around the exit
     const petal=new THREE.Shape();
     petal.moveTo(-0.075,0); petal.lineTo(0.075,0);
     petal.lineTo(0.060,0.62); petal.lineTo(-0.060,0.62);
     const pg=new THREE.ExtrudeGeometry(petal,{depth:0.022,bevelEnabled:false,steps:1,curveSegments:1});
     pg.translate(0,0,-0.011);
-    const petals=[],m4=new THREE.Matrix4(),mr=new THREE.Matrix4();
+    // closed and open (12 deg, hinged at the front edge) as one mesh with a morph target:
+    // morphTargetInfluences[0] opens the nozzle for the afterburner in one draw call
+    const petals=[],open=[],m4=new THREE.Matrix4(),mr=new THREE.Matrix4(),mo=new THREE.Matrix4();
     for(let i=0;i<16;i++){
-      const c=pg.clone();
+      const c=pg.clone(),o=pg.clone();
       m4.makeRotationZ(i/16*Math.PI*2)
-        .multiply(new THREE.Matrix4().makeTranslation(0,0.50,Z(14.55)))
-        .multiply(mr.makeRotationX(Math.PI/2));
-      c.applyMatrix4(m4); petals.push(c);
+        .multiply(new THREE.Matrix4().makeTranslation(0,0.50,Z(14.55)));
+      mo.copy(m4).multiply(new THREE.Matrix4().makeRotationX(-AB_PETAL_MAX*Math.PI/180)).multiply(mr.makeRotationX(Math.PI/2));
+      m4.multiply(mr.makeRotationX(Math.PI/2));
+      c.applyMatrix4(m4); petals.push(c); o.applyMatrix4(mo); open.push(o);
     }
-    mesh(AERO.merge(petals),MAT.nozzle,g);
+    // own nozzle materials so the burner can warm this airframe's tail at night and no other
+    nzMat=MAT.nozzle.clone();ptMat=MAT.nozzle.clone();ptMat.morphTargets=true;
+    nozLoft.material=nzMat;
+    const pgm=AERO.merge(petals);pgm.morphAttributes.position=[AERO.merge(open).attributes.position];
+    petalMesh=mesh(pgm,ptMat,g);
     // dark interior and the heat stained area just ahead of the exit
     const inner=new THREE.CylinderGeometry(0.40,0.34,0.9,18,1,true);
     inner.rotateX(Math.PI/2);
     const im=mesh(inner,MAT.hotDark,g); im.position.z=Z(14.7); im.material.side=THREE.DoubleSide;
   }
-  // afterburner glow, off until the game turns it on
-  const abGeo=new THREE.ConeGeometry(0.34,2.6,14,1,true);
-  abGeo.rotateX(-Math.PI/2); abGeo.translate(0,0,1.3);
-  const ab=new THREE.Mesh(abGeo,MAT.ab);
-  ab.position.set(0,0.02,Z(15.02)); ab.visible=false; ab.name='ab'; g.add(ab);
+  // afterburner: layered flame, off until the game turns it on (abUpdate drives it)
+  const ab=buildABFlame();
+  ab.position.set(0,0.02,Z(15.08)); ab.visible=false; ab.name='ab'; g.add(ab);
+  ab.userData.nzMat=nzMat;ab.userData.ptMat=ptMat;ab.userData.petals=petalMesh;
 
   // ---- canopy, cockpit, seat, HUD --------------------------------------
   const CAN=[[3.00,0.095,0.40,0.32],[3.32,0.292,0.665,0.305],[3.72,0.405,0.830,0.30],
@@ -4009,7 +4095,7 @@ function hdModel(which){
   // the world is lit by a hemisphere and a sun already: keep the sky reflection to a sheen
   m.g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false;
     const mt=o.material;if(mt&&mt.isMeshStandardMaterial&&!mt.userData.envSet){mt.userData.envSet=1;mt.envMapIntensity*=mt.metalness>0.5?0.7:0.3;}}});
-  if(m.ab){m.ab.geometry.scale(1,1,1/2.6);out.ab=m.ab;}          // 1 m long, the game stretches it with power
+  if(m.ab)out.ab=m.ab;                                           // layered flame and nozzle petals, abUpdate drives them
   if(m.props){out.props=m.props;out.discs=m.discs;}              // four engines: the game spins each and fades in its disc
   if(m.prop){
     // the game spins prop about its own Z and swaps the blades for a blur disc in flight
@@ -4067,6 +4153,63 @@ function rigProps(m,kind){
 function trafficProps(m,kind){
   rigProps(m,kind);const P=m.propRig;if(!P)return;
   P.blades.forEach(b=>b.visible=false);P.dm.opacity=0.5;P.ds.forEach(d=>d.visible=true);
+}
+// ---- F-16 afterburner: throttle above 0.82 is the burner (visual and sound only) ----
+// ab 0..1 from the spooled power. The nozzle petals follow it with a 0.25 s lag, the flame
+// grows 2.5 m + 5 m, and at night it is 35% bigger, warms the nozzle and lights the
+// ground behind on the takeoff roll (one decal, gone by 60 m AGL).
+const ABST={ab:0,petalDeg:0,flameLen:0,glow:0};
+// A 14 x 40 m pool on the ground along the flame axis: local +z runs aft from the nozzle
+// exit (near edge at z 0). Brightest ~6 m behind, zero at the near edge, the sides and the far end.
+const AB_GLOW=(function(){
+  const t=tex(32,128,(x,w,h)=>{const d=x.createImageData(w,h),sm=(a,b,v)=>{v=clamp((v-a)/(b-a),0,1);return v*v*(3-2*v);};
+    for(let j=0;j<h;j++){const z=(j+0.5)/h,L=z<0.15?sm(0,0.15,z):Math.pow(1-sm(0.15,1,z),1.6),hw=0.3+0.2*sm(0,0.5,z);
+      for(let i=0;i<w;i++){const s=Math.abs((i+0.5)/w-0.5)/hw,W=s<1?Math.pow(1-s*s,2):0,o=(j*w+i)*4;
+        d.data[o]=255;d.data[o+1]=128;d.data[o+2]=50;d.data[o+3]=Math.round(255*L*W);}}
+    x.putImageData(d,0,0);});
+  t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;
+  const geo=new THREE.PlaneGeometry(1,1);geo.rotateX(-Math.PI/2);geo.translate(0,0,0.5);   // canvas top (v 1) is the near edge
+  const m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,opacity:0}));
+  m.name='abGround';m.renderOrder=1;m.visible=false;m.scale.set(14,1,40);scene.add(m);return m;})();
+const _abP=new V3(),_abF=new V3();
+function abUpdate(m,on,p,dt,dp,q,agl){
+  const A=m.ab;
+  if(!A){ABST.ab=ABST.petalDeg=ABST.flameLen=ABST.glow=0;AB_GLOW.visible=false;return;}
+  const ab=on?clamp((p-0.82)/0.18,0,1):0,nt=TOD.lights,ns=1+0.35*nt,u=A.userData,F=u.fx;
+  m.abOpen=(m.abOpen||0)+(ab-(m.abOpen||0))*(1-Math.exp(-dt/0.25));
+  const op=m.abOpen;let len=0;
+  if(u.petals)u.petals.morphTargetInfluences[0]=op;
+  else if(m.nz)m.nz.scale.set(1+0.12*op,1+0.12*op,1);
+  if(F){
+    const t=performance.now()/1000,j=dt>0?Math.random():0.5,fl=ab>0.004;
+    const hz=on&&!fl&&p>0.6?clamp((p-0.6)/0.1,0,1):0;
+    F.haze.visible=hz>0;
+    if(hz>0){const w=1+0.08*Math.sin(t*23)+0.05*j;F.haze.scale.set(0.4*w,0.4*w,1.7+0.4*j);F.haze.material.uniforms.uOp.value=0.07*hz;F.haze.material.uniforms.uT.value=t;}
+    F.outer.visible=F.core.visible=F.diam.visible=F.glow.visible=fl;
+    if(fl){
+      const wr=0.42*(0.92+0.22*op)*ns;len=(2.5+ab*5)*ns*(0.96+0.08*j);
+      F.outer.scale.set(wr*(0.97+0.06*j),wr*(0.97+0.06*j),len);
+      const uo=F.outer.material.uniforms;uo.uOp.value=(0.26+0.22*ab)*(1+0.3*nt);uo.uT.value=t;
+      const lc=(1.4+ab*4.2)*ns*(0.97+0.06*j);F.core.scale.set(wr*0.47,wr*0.47,lc);
+      const uc=F.core.material.uniforms;uc.uOp.value=(0.4+0.45*ab)*(1+0.6*nt);uc.uT.value=t;
+      F.diam.scale.setScalar(ns);const ud=F.diam.material.uniforms;ud.uT.value=t;ud.uAb.value=ab;ud.uLen.value=lc/ns;ud.uOp.value=0.55+0.15*nt;
+      F.glow.scale.setScalar(2.4*ns*(0.6+0.4*ab));F.glow.material.opacity=ab*(0.3+0.5*nt);
+    }
+    A.visible=fl||hz>0;
+  }else{
+    A.visible=ab>0.004;if(A.visible){len=1.5+ab*2.5+Math.random()*0.6;A.scale.set(1,1,len);}
+  }
+  // the nozzle and petals warm slightly at night; the light comes from the flame, not the metal
+  if(u.nzMat){const e=ab*nt*0.1;u.nzMat.emissive.setRGB(e,0.3*e,0.06*e);u.ptMat.emissive.setRGB(e,0.3*e,0.06*e);}
+  // ground glow behind and below on the takeoff roll
+  let g=0;
+  if(ab>0&&nt>0&&agl<60){
+    g=ab*nt*clamp((60-agl)/45,0,1)*0.45;
+    _abP.copy(A.position).applyQuaternion(q).add(dp);_abF.set(0,0,1).applyQuaternion(q);
+    AB_GLOW.position.set(_abP.x,groundHeight(_abP.x,_abP.z)+0.3,_abP.z);AB_GLOW.rotation.y=Math.atan2(_abF.x,_abF.z);
+  }
+  AB_GLOW.material.opacity=g;AB_GLOW.visible=g>0.003;
+  ABST.ab=ab;ABST.petalDeg=op*AB_PETAL_MAX;ABST.flameLen=A.visible&&ab>0.004?len:0;ABST.glow=AB_GLOW.visible?g:0;
 }
 const PROPST={rate:0,bladeOpacity:1,discOpacity:0,blades:0};
 // p: engine power 0..1 (spooled), on: engine running. rate in rad/s.
@@ -4174,13 +4317,13 @@ function buildF16(){
   const vt=mkShape([[3.4,0.6],[5.7,3.6],[6.5,3.6],[6.7,0.6]]);vt.rotateY(-Math.PI/2);add(vt,skin,0,0,0);
   const tm=new THREE.MeshBasicMaterial({map:regTex('LF','#2d3238'),transparent:true,depthWrite:false});
   for(const sx of [1,-1]){const r=new THREE.Mesh(new THREE.PlaneGeometry(1.3,0.33),tm);r.rotation.y=sx*Math.PI/2;r.position.set(sx*0.04,2.1,5.5);g.add(r);}
-  const nz=new THREE.CylinderGeometry(0.5,0.6,1.2,12);nz.rotateX(Math.PI/2);add(nz,dg,0,0,7.2);
+  const nzG=new THREE.CylinderGeometry(0.5,0.6,1.2,12);nzG.rotateX(Math.PI/2);const nz=add(nzG,dg,0,0,7.2);
   const abG=new THREE.ConeGeometry(0.42,1,10);abG.rotateX(Math.PI/2);abG.translate(0,0,0.5);
   const ab=add(abG,new THREE.MeshBasicMaterial({color:0xffa040,transparent:true,opacity:0.75,depthWrite:false,blending:THREE.AdditiveBlending}),0,0,7.8);ab.visible=false;
   const gear=new THREE.Group();g.add(gear);const wheel=new THREE.CylinderGeometry(0.35,0.35,0.22,12);wheel.rotateZ(Math.PI/2);
   for(const x of [1.15,-1.15]){add(wheel,tire,x,-1.15,0.8,gear);add(new THREE.BoxGeometry(0.1,0.7,0.12),dg,x*0.85,-0.75,0.8,gear);}
   add(new THREE.CylinderGeometry(0.28,0.28,0.18,12).rotateZ(Math.PI/2),tire,0,-1.22,-4.2,gear);add(new THREE.BoxGeometry(0.09,0.9,0.09),dg,0,-0.75,-4.2,gear);
-  scene.add(g);return {g:g,gear:gear,ab:ab};
+  scene.add(g);return {g:g,gear:gear,ab:ab,nz:nz};
 }
 function buildHeavy(){
   const g=new THREE.Group(),m=lam(0x707a80),d=lam(0x454c52);
@@ -4316,7 +4459,7 @@ function getModel(id){
   else m=hdModel('reaper')||buildReaper();
   rigProps(m,id);
   m.lights=AC_LIGHTS[id]?makeAircraftLights(m.g,AC_LIGHTS[id]):null;
-  m.g.userData.heat=0.7;if(m.ab)m.ab.userData.heat=1.0;   // IR: warm airframe, white hot burner
+  m.g.userData.heat=0.7;if(m.ab)m.ab.traverse(o=>o.userData.heat=1.0);   // IR: warm airframe, white hot burner (every flame layer)
   m.g.visible=false;return MODELS[id]=m;
 }
 let plane=getModel('reaper');plane.g.visible=true;
@@ -5346,7 +5489,7 @@ function sensorView(){if(!running||st.crashed||!hasBall())return;
   };
 })();
 // ---------- audio ----------
-let actx=null,eng,eng2,eng2G,engF,engG,noiseG,noiseF,hornG,cheerG,whine,whineG;
+let actx=null,eng,eng2,eng2G,engF,engG,noiseG,noiseF,hornG,cheerG,whine,whineG,abG=null,crackG,crackEnv,crackT=0;
 function toggleGear(){if(!running||st.crashed)return;if(!AC.retract){toast('Fixed gear on the '+(AC.id==='alpha'?'Alpha':'172'));return;}if(st.onGround){toast('Gear stays down on the ground');return;}st.gearDown=!st.gearDown;toast(st.gearDown?'Gear down':'Gear up');}
 function initAudio(){
   if(actx){actx.resume&&actx.resume();return;}
@@ -5360,6 +5503,12 @@ function initAudio(){
     const ns=actx.createBufferSource();ns.buffer=buf;ns.loop=true;noiseF=actx.createBiquadFilter();noiseF.type='lowpass';noiseF.frequency.value=900;noiseG=actx.createGain();noiseG.gain.value=0;ns.connect(noiseF).connect(noiseG).connect(actx.destination);ns.start();
     const wb=actx.createBuffer(1,actx.sampleRate*2,actx.sampleRate),wd=wb.getChannelData(0);for(let i=0;i<wd.length;i++)wd[i]=Math.random()*2-1;
     const cs=actx.createBufferSource();cs.buffer=wb;cs.loop=true;const bp=actx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1300;bp.Q.value=0.7;cheerG=actx.createGain();cheerG.gain.value=0;cs.connect(bp).connect(cheerG).connect(actx.destination);cs.start();
+    // F-16 afterburner: a deep low passed rumble, and a crackle (high passed noise whose
+    // gain updateAudio steps at random every 40 ms). Both silent below the burner.
+    const ar=actx.createBufferSource();ar.buffer=buf;ar.loop=true;ar.playbackRate.value=0.8;const arF=actx.createBiquadFilter();arF.type='lowpass';arF.frequency.value=160;
+    abG=actx.createGain();abG.gain.value=0;ar.connect(arF).connect(abG).connect(actx.destination);ar.start(0,0.7);
+    const cr=actx.createBufferSource();cr.buffer=wb;cr.loop=true;const crF=actx.createBiquadFilter();crF.type='highpass';crF.frequency.value=2000;
+    crackEnv=actx.createGain();crackEnv.gain.value=0;crackG=actx.createGain();crackG.gain.value=0;cr.connect(crF).connect(crackEnv).connect(crackG).connect(actx.destination);cr.start(0,1.1);
     whine=actx.createOscillator();whine.type='sine';whine.frequency.value=2600;whineG=actx.createGain();whineG.gain.value=0;whine.connect(whineG).connect(actx.destination);whine.start();
     const horn=actx.createOscillator();horn.type='square';horn.frequency.value=640;hornG=actx.createGain();hornG.gain.value=0;horn.connect(hornG).connect(actx.destination);horn.start();
   }catch(e){actx=null;}
@@ -5373,9 +5522,10 @@ let cheerLevel=0;
 function updateAudio(){
   if(!actx)return;const t=actx.currentTime,on=running&&!paused&&!muted,V=st.ias,alive=on&&!st.crashed;
   const p=st.power,S=AC.snd;let ef,eg,wf,wg,ng=Math.min(0.25,V*V/10000),nq=900,lp=camMode===1||camMode===2?360:300;
-  let e2f=0,e2g=0;
+  let e2f=0,e2g=0,abv=0;
   if(S==='piston'){ef=36+p*40;eg=0.05+p*0.08;wf=2000;wg=0;lp=520;}
-  else if(S==='jet'){ef=58+p*30;eg=0.01+p*0.02;wf=1400+p*2600;wg=0.004+p*0.014;ng=Math.max(ng,0.03+p*0.22);nq=650+p*1000;}
+  else if(S==='jet'){ef=58+p*30;eg=0.01+p*0.02;wf=1400+p*2600;wg=0.004+p*0.014;ng=Math.max(ng,0.03+p*0.22);nq=650+p*1000;
+    if(AC.id==='f16'){abv=clamp((p-0.82)/0.18,0,1);lp-=70*abv;nq-=250*abv;eg*=1+0.1*abv;ng*=1+0.1*abv;}}
   else if(S==='turboprop4'){
     // T56s are constant speed: 1,020 prop rpm, four blades, so blade pass sits at
     // 68 Hz whatever the power lever does. Power moves loudness and turbine whine,
@@ -5391,6 +5541,10 @@ function updateAudio(){
   whine.frequency.setTargetAtTime(wf,t,0.4);whineG.gain.setTargetAtTime(alive?wg*far:0,t,0.3);
   noiseF.frequency.setTargetAtTime(nq,t,0.3);noiseG.gain.setTargetAtTime(alive?ng*far:0,t,0.2);
   hornG.gain.setTargetAtTime(alive&&(st.aoaWarn||gearWarn)?0.03:0,t,0.03);
+  if(abG){const a=alive?abv:0;abG.gain.setTargetAtTime(a*0.35,t,0.1);crackG.gain.setTargetAtTime(a*0.12,t,0.1);
+    // crackle: a random burst envelope, one step every ~40 ms while the burner is lit
+    if(a>0&&t>=crackT){crackT=t+0.03+Math.random()*0.02;const r=Math.random();crackEnv.gain.setTargetAtTime(r<0.3?0.6+Math.random()*0.8:r*0.25,t,0.006);}
+    else if(a<=0&&crackT>0){crackT=0;crackEnv.gain.setTargetAtTime(0,t,0.05);}}
   cheerG.gain.setTargetAtTime(on?cheerLevel*0.35:0,t,0.25);
   if(on&&cheerLevel>0.15&&Math.random()<cheerLevel*0.04)whistle(cheerLevel);
 }
@@ -7492,8 +7646,8 @@ function tick(t,skipRender){
   propUpdate(plane,on,s.power,paused?0:dt);
   if(plane.canopy)plane.canopy.visible=camMode!==1;
   if(plane.gear){plane.gear.scale.y=Math.max(0.02,s.gearPos);plane.gear.visible=s.gearPos>0.03;}
-  if(plane.ab){const a=on&&s.power>0.82;plane.ab.visible=a;if(a)plane.ab.scale.set(1,1,1.5+(s.power-0.82)*14+Math.random()*0.6);}
   const gh=groundHeight(dp.x,dp.z),agl=dp.y-GEAR-gh;
+  abUpdate(plane,on,s.power,paused?0:dt,dp,q,agl);
   _cf.set(0,0,-1).applyQuaternion(q);_cu.set(0,1,0).applyQuaternion(q);
   shadow.position.set(dp.x,gh+0.13,dp.z);shadow.rotation.y=Math.atan2(-_cf.x,-_cf.z);shadow.material.opacity=clamp(1-agl/120,0,1);shadow.visible=agl<120;
   aclUpdate(plane.lights,dp,q,agl,s);
@@ -7560,7 +7714,7 @@ function tick(t,skipRender){
     const po=pauseOv.classList.contains('on');document.body.classList.toggle('pauseOn',po);if(po)showRender(dt,CARP);}
 }
 // test hook: headless UI checks need to reach a few internals
-window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),HD:()=>HD,
+window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
   lights:()=>({KGEU:AL.KGEU.count(),KLUF:AL.KLUF.count(),uLights:AL_MAT.uniforms.uLights.value,
     layers:AL_LAYERS.map(L=>({name:L.pts&&L.pts.name,visible:!!(L.pts&&L.pts.visible),inScene:!!(L.pts&&L.pts.parent)})),
