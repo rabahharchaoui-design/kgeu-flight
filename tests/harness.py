@@ -15,6 +15,7 @@ def serve():
     h = functools.partial(Quiet, directory=ROOT)
     class Q(socketserver.ThreadingTCPServer):
         allow_reuse_address = True; daemon_threads = True
+        def handle_error(self, request, client_address): pass   # a closed browser drops its sockets
     srv = Q(('127.0.0.1', 0), h)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     return srv, f'http://127.0.0.1:{srv.server_address[1]}/index.html'

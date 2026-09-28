@@ -16,14 +16,15 @@ GROUPS = [
     ('stick',   '#stickZone, #stick.on',           True),
     ('slider',  '#thr, input[type=range]',         True),
     ('hudcard', '#hud .card',                      False),
-    ('minimap', '#map',                            False),
+    ('minimap', '#map',                            True),
+    ('dest',    '#hDest:not([hidden])',            True),
     ('radio',   '#atc.on',                         False),
     ('mission', '#miss.on',                        False),
     ('lesson',  '#lesson.on',                      False),
     ('sixpack', '#sixpack.on',                     False),
     ('warn',    '#warn.on',                        False),
 ]
-COVERS = ('minimap', 'hudcard', 'radio', 'mission', 'sixpack')
+COVERS = ('hudcard', 'radio', 'mission', 'sixpack')
 
 COLLECT = """(groups)=>{
   const out=[];
@@ -99,7 +100,9 @@ async def main():
         await go("document.getElementById('bFlaps').click()", 300)
         await audit(pg, f'{skill}, flap selector open', w, h)
         await go("document.getElementById('bFlaps').click()", 200)
-      await go(f"{K}.gradeBadge({{letter:'B',line:'Firm, left of centerline'}})", 1500)
+      await go(f"{K}.setDest({K}.RWY_ENDS[3])", 600)
+      await audit(pg, 'destination set', w, h)
+      await go(f"{K}.setDest(null);{K}.gradeBadge({{letter:'B',line:'Firm, left of centerline'}})", 1500)
       await audit(pg, 'grade badge showing', w, h)
       await pg.screenshot(path=f'tests/shot_{w}x{h}_air.png')
 
