@@ -34,6 +34,8 @@ BOTH = {
     'cs_reaper':        'Reaper eight four zero one lima',
     'cs_reaper_s':      'Reaper zero one lima',
     'cs_herky':         'Herky seven one',
+    'cs_skyguardian':   'Sky Guardian one niner zero tango charlie',
+    'cs_skyguardian_s': 'Sky Guardian zero tango charlie',
     'cs_pipistrel':     'Pipistrel five zero two alpha tango',
     'cs_pipistrel_s':   'Pipistrel two alpha tango',
 }
