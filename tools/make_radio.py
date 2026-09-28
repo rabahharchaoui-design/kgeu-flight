@@ -86,6 +86,11 @@ TOWER = {
     'cleared_hot': 'you are cleared hot. Range is clear, four targets.',
     'range_cold':  'range is cold.',
     'of_four':     'of four.',
+    'good_hit':    'good hit, good hit, target destroyed.',
+    'miss':        'miss,',
+    'meters':      'meters.',
+    'long':        'long.',
+    'reset_again': 'reset and try again.',
 
     'n_0': 'zero',  'n_1': 'one',   'n_2': 'two',    'n_3': 'three',
     'n_4': 'four',  'n_5': 'five',  'n_6': 'six',    'n_7': 'seven',
@@ -101,6 +106,7 @@ PILOT = {
     'rb_roger':        'Roger,',
     'rb_traffic':      'Looking for the traffic,',
     'load_away':       'load away, one bundle.',
+    'rifle':           'Rifle,',
 }
 
 # ---- background chatter, recorded whole because these lines never change ----

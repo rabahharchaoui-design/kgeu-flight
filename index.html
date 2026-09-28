@@ -5731,7 +5731,7 @@ function updateAudio(){
 // end of the transmission and a faint carrier hiss underneath it.
 const atcEl=document.getElementById('atc');
 let atcT=0,radioQ=[],radioBusy=0,chatT=9,chatI=0,advT=4;
-const RADIO={vol:0.7,on:true,buf:Object.create(null),want:0,got:0,err:0,loaded:false};
+const RADIO={vol:0.7,on:true,buf:Object.create(null),want:0,got:0,err:0,loaded:false,log:[],src:[]};   // log: the last 200 lines played, for tests/callsign_check.py
 try{const v=localStorage.getItem('kgeuRadioVol');if(v!==null)RADIO.vol=Math.max(0,Math.min(1,+v));
     const o=localStorage.getItem('kgeuRadioOn');if(o!==null)RADIO.on=o==='1';}catch(e){}
 let radioIn=null,radioGain=null,staticG=null;
@@ -5791,14 +5791,18 @@ function radioSquelch(t){
   s.connect(g);g.connect(radioIn);s.start(t);
 }
 // returns how long the radio is busy, so the queue paces itself either way
+// one transmission at a time: a new one (a call to us cutting in, or a new flight)
+// stops whatever clips of the last one are still scheduled, so two never overlap
+function radioHush(){for(const s of RADIO.src){try{s.stop();}catch(e){}}RADIO.src.length=0;}
 function radioSpeak(clips,textLen){
   const est=Math.max(1.6,textLen*0.052)+0.5;
+  radioHush();
   if(!actx||!radioIn||muted||!RADIO.on)return est;
   const t0=actx.currentTime+0.04;
   radioSquelch(t0);
   let t=t0+0.10,any=false;
   for(const id of clips||[]){const b=RADIO.buf[id];if(!b)continue;any=true;
-    const s=actx.createBufferSource();s.buffer=b;s.connect(radioIn);s.start(t);t+=b.duration+0.025;}
+    const s=actx.createBufferSource();s.buffer=b;s.connect(radioIn);s.start(t);RADIO.src.push(s);t+=b.duration+0.025;}
   if(!any)return est;
   const end=t+0.05;
   radioSquelch(end);
@@ -5829,6 +5833,8 @@ function plainOf(l){
   return who==='Range'?'Range control is talking to you.':'';
 }
 function playLine(l){
+  RADIO.log.push({who:l.who,kind:l.kind,text:l.text,clips:Array.isArray(l.clips)?l.clips.slice():l.clips,t:st?+st.time.toFixed(2):0,amb:CHAT.some(p=>p.indexOf(l)>=0),type:AC.id});
+  if(RADIO.log.length>200)RADIO.log.shift();
   atcEl.innerHTML='';const b=document.createElement('b');b.textContent=l.who;atcEl.appendChild(b);
   atcEl.appendChild(document.createTextNode(l.text));
   const pl=rookie()?plainOf(l):'';atcEl.classList.toggle('hasPlain',!!pl);
@@ -5845,6 +5851,7 @@ const CSCS={cessna:'cs_skyhawk_s',alpha:'cs_pipistrel_s',reaper:'cs_reaper_s',f1
 const csT =()=>'t_'+(CSC[AC.id] ||'cs_skyhawk');
 const csTs=()=>'t_'+(CSCS[AC.id]||'cs_skyhawk_s');
 const csP =()=>'p_'+(CSC[AC.id] ||'cs_skyhawk');
+const csPs=()=>'p_'+(CSCS[AC.id]||'cs_skyhawk_s');
 const DIG=['zero','one','two','three','four','five','six','seven','eight','niner'];
 function windNow(){const d=Math.round(st.windDir/10)*10||360,k=Math.max(1,Math.round(st.windKt));return [String(d).padStart(3,'0'),k];}
 function windTxt(){const w=windNow();return 'wind '+w[0]+' at '+w[1];}
@@ -5889,7 +5896,9 @@ function radioUpdate(dt){
   if(radioBusy>0)radioBusy-=dt;
   if(!running||paused)return;
   if(radioBusy<=0&&radioQ.length){playLine(radioQ.shift());return;}
-  chatT-=dt;if(chatT<=0&&!radioQ.length&&radioBusy<=0){chatT=16+Math.random()*16;CHAT[chatI++%CHAT.length].forEach(l=>radioQ.push(l));}
+  // other traffic waits until the tower has made its opening call to us and we have read it back
+  const opened=st.mode==='runway'?A.tko:st.mode==='ramp'?A.taxi:st.mode==='final'?A.land:1;
+  chatT-=dt;if(chatT<=0&&opened&&!radioQ.length&&radioBusy<=0){chatT=16+Math.random()*16;CHAT[chatI++%CHAT.length].forEach(l=>radioQ.push(l));}
   advT-=dt;if(advT<=0&&!st.onGround&&!st.crashed){advT=2;
     const hdg=-new THREE.Euler().setFromQuaternion(st.quat,'YXZ').y;const seen={};
     for(const o of TRAFFIC){if(seen[o.grp]||(o.cool=(o.cool||0)-2)>0||!o.kind)continue;
@@ -5938,18 +5947,21 @@ function atcUpdate(){
   if(!A.pattern&&A.ground&&!s.onGround&&s.agl>240){A.pattern=1;
     say(B.twr,AC.csS+', make right closed traffic, runway '+B.rwy+'.',[csTs(),'t_closed_traffic',rwyC]);}
   const hdg=((-new THREE.Euler().setFromQuaternion(s.quat,'YXZ').y*180/Math.PI)%360+360)%360;
-  if(!A.land&&A.pattern&&!s.onGround&&s.agl<420&&u<THR01+150&&u>-7000&&Math.abs(v)<450&&Math.abs(((hdg-26+540)%360)-180)<35){A.land=1;
-    say('Glendale Tower 121.0',AC.csS+', runway 1, check wheels down, cleared to land.',
-        [csTs(),'t_glendale_tower','t_rwy_1','t_wheels_down','t_cleared_land']);readback('land');}
+  // lined up on the home base's runway, u from its threshold (Glendale 1 or Luke 03L)
+  const lk=s.base==='luke',K=lk?lukeUV(s.pos.x,s.pos.z):null,pu=lk?K[0]+1510.5:u-THR01,pv=lk?K[1]+152.5:v;
+  if(!A.land&&A.pattern&&!s.onGround&&s.agl<420&&pu<150&&pu>-7000-THR01&&Math.abs(pv)<450&&Math.abs(((hdg-B.hdg+540)%360)-180)<35){A.land=1;
+    say(B.twr,AC.csS+', runway '+B.rwy+', check wheels down, cleared to land.',
+        [csTs(),twrC,rwyC,'t_wheels_down','t_cleared_land']);readback('land');}
 }
 function atcTouchdown(e){
   const u=toU(e.x,e.z),v=toV(e.x,e.z),K=lukeUV(e.x,e.z);
-  if(Math.abs(K[0])<1700&&Math.abs(K[1])<400)
-    say('Luke Tower 133.45',AC.cs+', you just landed at Luke Air Force Base. Hold position, security is on the way.',
-        [csT(),'t_luke_tower','t_luke_security']);
-  else if(Math.abs(v)<17&&u>-5&&u<RWY_LEN+5){
-    say('Glendale Tower 121.0',AC.csS+', nice landing. Turn left next taxiway, contact ground 118.0.',
-        [csTs(),'t_nice_landing']);A.land=0;A.pattern=0;}
+  const nice=B=>{say(B.twr,AC.csS+', nice landing. Turn left next taxiway, contact ground '+B.gnd.split(' ').pop()+'.',
+        [csTs(),'t_nice_landing']);A.land=0;A.pattern=0;};
+  if(Math.abs(K[0])<1700&&Math.abs(K[1])<400){
+    if(st.base==='luke')nice(BASES.luke);       // home at Luke: a normal landing
+    else say('Luke Tower 133.45',AC.cs+', you just landed at Luke Air Force Base. Hold position, security is on the way.',
+        [csT(),'t_luke_tower','t_luke_security']);}
+  else if(Math.abs(v)<17&&u>-5&&u<RWY_LEN+5)nice(BASES.kgeu);
 }
 
 // ---------- guide path: glowing hoops down a 3 degree glideslope to one runway end ----------
@@ -6110,7 +6122,7 @@ $('pPhoto').onclick=photoOpen;$('phX').onclick=photoClose;$('phSave').onclick=ph
 const menu=document.getElementById('menu'),crashEl=document.getElementById('crash');
 function start(mode,base){
   initAudio();
-  setType(acType);useModel(acType);sizeShadow();radioQ.length=0;atcT=0;atcEl.classList.remove('on');
+  setType(acType);useModel(acType);sizeShadow();radioQ.length=0;radioHush();radioBusy=0;chatT=9;atcT=0;atcEl.classList.remove('on');
   st=createState(mode,base||SPAWN_BASE);st.type=acType;ROOK.to=false;guideShow(null);st.easy=easy;st.noPF=isTouch||easy;document.body.classList.toggle('easy',easy);A={};running=true;paused=false;events.length=0;cfgReset();camBump=0;
   menuClose();crashEl.classList.remove('on');pauseOv.classList.remove('on');$('storyOv').classList.remove('on');snapCamera=true;
   if(camMode>1)camMode=0;   // the ball view is entered in flight, where its autopilot can take over
@@ -7563,7 +7575,7 @@ function fireMissile(){
   m.dir.set(0,0,-1).applyQuaternion(st.quat);
   STRIKE.missiles.push(m);
   m.mesh.g.visible=true;m.mesh.g.position.copy(m.pos);
-  radioQ.push(L(AC.cs,'uav','Rifle.','Rifle.'));
+  radioQ.push(L(AC.cs,'uav','Rifle, '+AC.csS+'.',['p_rifle',csPs()]));
   toast('Rifle. Hold the laser on it');
 }
 function missileUpdate(dt){
@@ -7630,8 +7642,8 @@ function impact(m,gh){
   const md=miss<999?Math.round(miss)+' m':'long';
   toast(killed?('Good hit. '+hit.name+' destroyed'):('Miss by '+md+(m.trackLost?'. Track broke':'')));
   radioQ.push(killed
-    ?L('Gila Range Control','tower','Good hit, good hit, target destroyed.','Good hit, good hit. Target destroyed.')
-    :L('Gila Range Control','tower','Miss, '+md+'. Reset and try again.','Miss, '+md+'. Reset and try again.'));
+    ?L('Gila Range Control','tower',AC.csS+', good hit, good hit, target destroyed.',[csTs(),'t_good_hit'])
+    :L('Gila Range Control','tower',AC.csS+', miss, '+md+'. Reset and try again.',[csTs(),'t_miss'].concat(miss<999?ktC(Math.round(miss)).concat(['t_meters']):['t_long'],['t_reset_again'])));
   strikeScore();
 }
 // s: blast scale. Bigger is louder, lower and carries further; 2 and up crackle after
@@ -7903,7 +7915,7 @@ window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,tou
     wallVisible:!!(HB.g&&HB.g.visible),C:[HB.C.x,HB.C.z],T:[HB.T.x,HB.T.z],sunDisc:!!(HB.sun&&HB.sun.visible),dustDir:st.dustDir,windDir:st.windDir}),
   haboobJump:(m)=>{if(HB.on){hbPlace(m);hbUpdate(0);}},drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
-  RADIO:RADIO,radioQ:()=>radioQ,radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,initAudio:initAudio,
+  RADIO:RADIO,radioQ:()=>radioQ,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
   stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&{apt:DEST.rwy.apt,num:DEST.num},fmOpen:fmOpen,fmClose:fmClose,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
