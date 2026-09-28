@@ -70,7 +70,12 @@ async def main():
     sw=await pg.evaluate("async()=>{if(!navigator.serviceWorker)return 0;const rs=await navigator.serviceWorker.getRegistrations();return rs.length;}")
     chk('no service worker registered',sw==0,str(sw)+' registrations')
     # actually play it
-    await pg.tap('#bRunway'); await pg.wait_for_timeout(1800)
+    # home -> FLY -> Next -> Next -> GO, by finger
+    await pg.evaluate("()=>{__kgeu.pick('reaper');__kgeu.pickPos('runway');}")
+    await pg.tap('#hFly'); await pg.wait_for_timeout(800)
+    await pg.tap('.acard[data-t="reaper"] .pickme'); await pg.wait_for_timeout(400)
+    await pg.tap('#f2Next'); await pg.wait_for_timeout(400)
+    await pg.tap('#bGo'); await pg.wait_for_timeout(1800)
     st=await pg.evaluate("()=>{const s=__kgeu.state();return {running:!!s,type:s.type,ias:Math.round(s.ias*1.944)};}")
     chk('a flight starts from the runway',st['type']=='reaper',str(st))
     await pg.tap('#bAuto'); await pg.wait_for_timeout(6000)
@@ -84,13 +89,17 @@ async def main():
     await pg.evaluate("()=>window.__kgeu.openMenu()")
     await pg.wait_for_timeout(600)
     for t in ['cessna','alpha','f16','reaper','mq9b','c130']:
-        ok = await pg.is_visible(f'.pick[data-t="{t}"]')
-        chk(f'{t} is offered in the menu', ok)
+        ok = await pg.query_selector(f'.acard[data-t="{t}"]') is not None
+        chk(f'{t} is offered in the carousel', ok)
+    await pg.evaluate("()=>window.__kgeu.nav('sFly2')")
     chk('spawn picker is there', await pg.is_visible('.pick[data-b="luke"]'))
     chk('time of day picker is there', await pg.is_visible('.pick[data-tod="night"]'))
+    await pg.evaluate("()=>window.__kgeu.nav('sSet')")
     chk('radio controls are there', await pg.is_visible('#oRadio') and await pg.is_visible('#oRvol'))
-    chk('records screen is reachable', await pg.is_visible('#bRecords'))
-    chk('C-130 missions are offered', await pg.is_visible('#bDrop') and await pg.is_visible('#bShort'))
+    await pg.evaluate("()=>window.__kgeu.nav('sHome',true)")
+    chk('records screen is reachable', await pg.is_visible('#hRec'))
+    await pg.evaluate("()=>window.__kgeu.nav('sMis')")
+    chk('C-130 short field is offered', await pg.is_visible('#misCards [data-m="short"]'))
     n0=len(errs)
     for t in ['cessna','f16','reaper','mq9b','c130']:
         await pg.evaluate(f"()=>{{window.__kgeu.pick('{t}');window.__kgeu.start('runway');}}")
