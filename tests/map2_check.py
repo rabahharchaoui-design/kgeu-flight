@@ -49,6 +49,16 @@ async def main():
             if name == 'luke':
                 ok('close in, runway numbers show', 'rwy' in o['kinds'], o['kinds'])
             await shot(pg, f'full_{name}')
+        # the legend: every icon type, a tap lights them up and flies to the nearest
+        await pg.evaluate(f"()=>{K}.fmOpen()")
+        leg = await pg.evaluate("()=>[...document.querySelectorAll('#mapLegL .lrow')].map(b=>b.dataset.kind)")
+        ok('legend lists every icon type', leg == ['airport', 'airbase', 'landmark', 'drop', 'range', 'race', 'school', 'egg'], leg)
+        await finger(pg, '#mapLegL .lrow[data-kind="drop"]'); await pg.wait_for_timeout(2500)
+        await pg.evaluate(f"()=>{K}.fmFlush()")
+        r = await pg.evaluate(f"""()=>{{const L={K}.LBL(),d=L.placed.find(p=>p.kind==='drop'),W=innerWidth,H=innerHeight;
+          return {{on:document.querySelector('#mapLegL .lrow[data-kind=drop]').classList.contains('on'),drop:d?[(d.box[0]+d.box[2])/2,(d.box[1]+d.box[3])/2]:null,W:W,H:H}}}}""")
+        ok('tapping Airdrop highlights it and pans the airdrop icon on screen', r['on'] and r['drop'] and 0 < r['drop'][0] < r['W'] and 0 < r['drop'][1] < r['H'], r)
+        await shot(pg, 'legend_drop')
         ok('no page errors', not pg.errs, pg.errs[:3])
         await b.close()
     sys.exit(ok.done('map2_check'))

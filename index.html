@@ -126,10 +126,22 @@ body.hasDest #stickZone{ top:calc(var(--padT) + 178px); }
 #fmap{ position:absolute; inset:0; touch-action:none; }
 #mapOv .mbar{ position:absolute; display:flex; gap:8px; }
 #mapOv .mbar.tr{ top:var(--padT); right:var(--padR); } #mapOv .mbar.br{ bottom:var(--padB); right:var(--padR); } #mapOv .mbar.bc{ bottom:var(--padB); left:50%; transform:translateX(-50%); align-items:center; }
-#mapOv button{ min-width:44px; min-height:44px; background:rgba(26,16,9,.85); color:var(--sand); border:1.5px solid rgba(246,193,119,.4); font-size:18px; font-weight:800; }
+#mapOv button{ min-width:44px; min-height:44px; background:rgba(14,16,20,.9); color:#f4f1ea; border:1px solid rgba(255,255,255,.16); font-size:18px; font-weight:800; }
+#mapLeg{ position:absolute; right:var(--padR); top:calc(var(--padT) + 54px); width:164px; max-height:calc(100% - var(--padT) - var(--padB) - 112px); display:flex; flex-direction:column;
+  background:rgba(14,16,20,.9); border:1px solid rgba(255,255,255,.12); border-radius:12px; overflow:hidden; }
+#mapOv #mapLegT{ min-height:30px; display:flex; align-items:center; justify-content:space-between; width:100%; padding:0 10px; border:0; border-radius:0; background:transparent;
+  font:800 12px var(--font); letter-spacing:.12em; text-transform:uppercase; color:#b9b3a8; flex:none; }
+#mapLegT i{ width:8px; height:8px; border-right:2px solid #b9b3a8; border-bottom:2px solid #b9b3a8; transform:rotate(45deg) translate(-2px,-2px); transition:transform .2s; }
+#mapLeg.min #mapLegT i{ transform:rotate(-135deg); }
+#mapLegL{ overflow-y:auto; padding:0 4px 4px; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
+#mapLeg.min #mapLegL{ display:none; }
+#mapOv .lrow{ display:flex; align-items:center; gap:8px; width:100%; min-height:27px; min-width:0; padding:2px 6px; border:0; border-radius:8px; background:transparent;
+  font:600 12.5px var(--font); color:#ebe6dc; text-align:left; white-space:nowrap; }
+#mapOv .lrow img{ width:22px; height:22px; flex:none; }
+#mapOv .lrow.on{ background:rgba(77,225,255,.18); color:#fff; }
 #mapOv #mapClear{ font-size:14px; padding:0 14px; } #mapOv #mapClear[hidden]{ display:none; }
-#mapInfo{ font:700 14px var(--font); color:var(--sand); background:rgba(26,16,9,.8); padding:8px 12px; border-radius:10px; white-space:nowrap; }
-#mapOv .mt{ position:absolute; top:var(--padT); left:var(--padL); font:800 20px var(--font); color:var(--sand); background:rgba(26,16,9,.8); padding:8px 14px; border-radius:10px; }
+#mapInfo{ font:700 14px var(--font); color:#f4f1ea; background:rgba(14,16,20,.9); border:1px solid rgba(255,255,255,.12); padding:8px 12px; border-radius:10px; white-space:nowrap; }
+#mapOv .mt{ position:absolute; top:var(--padT); left:var(--padL); font:800 18px var(--font); letter-spacing:.14em; text-transform:uppercase; color:#f4f1ea; background:rgba(14,16,20,.9); border:1px solid rgba(255,255,255,.12); padding:9px 14px; border-radius:10px; }
 
 /* ---------- sensor ball overlay: thin mono readouts in the four corners of the view ---------- */
 #sensorHud{ position:absolute; inset:0; display:none; font:500 12px/1.35 ui-monospace,Menlo,"SF Mono",monospace; color:rgba(238,242,236,.85); letter-spacing:.03em; text-shadow:0 0 1px #000,0 0 3px rgba(0,0,0,.85),0 1px 4px rgba(0,0,0,.6); white-space:pre; }
@@ -757,6 +769,7 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
  </div></div>
 <div class="overlay" id="mapOv"><canvas id="fmap"></canvas>
   <div class="mt mkeep">Map</div>
+  <div id="mapLeg" class="mkeep"><button id="mapLegT" aria-expanded="true"><span>Legend</span><i></i></button><div id="mapLegL"></div></div>
   <div class="mbar tr mkeep"><button id="mapX" aria-label="Close map">&#x2715;</button></div>
   <div class="mbar br mkeep"><button id="mapOut" aria-label="Zoom out">&minus;</button><button id="mapIn" aria-label="Zoom in">+</button></div>
   <div class="mbar bc mkeep"><span id="mapInfo"></span><button id="mapClear">Clear destination</button></div>
@@ -7163,7 +7176,7 @@ function drawMap(hdgT){
 // own terrain as hillshade so the White Tanks, the Estrellas and Camelback read as real
 // hills. Everything under the labels is drawn once into 256 px tiles and kept (LRU),
 // so panning and pinching only composite cached canvases.
-const MPAL={city:[34,36,40],desert:[82,70,56],out:'#4a3f33',water:'#0c1a2e',waterLine:'#143054',
+const MPAL={city:[34,36,40],desert:[82,70,56],out:'#524638',water:'#0c1a2e',waterLine:'#143054',
   park:'rgba(88,150,96,.34)',golf:'rgba(104,172,108,.44)',local:'#5c5a57',local2:'#77736c',major:'#bdb5a8',major2:'#9c968d',fwy:'#F6C177',fwyCase:'#26170b',fwyLink:'#c99a5c',
   apron:'rgba(210,214,220,.10)',taxi:'rgba(220,224,230,.30)'};
 const MBASE={x0:-34000,z0:-28000,x1:38000,z1:30000,res:125,c:null};
@@ -7258,10 +7271,12 @@ const FM={on:false,cx:0,cz:0,scale:0.02,ptrs:new Map(),moved:false,wasPaused:fal
 function fmOpen(){
   if(!running||st.crashed||menu.classList.contains('on'))return;
   FM.on=true;FM.wasPaused=paused;paused=true;if(window.stickReset)stickReset();
-  // open on every airport at once, with the aircraft somewhere on screen
+  $('mapOv').classList.add('on');document.body.classList.add('mapOn');legBuild();FM.hl=null;FM.anim=null;for(const b of $('mapLegL').children)b.classList.remove('on');
+  // open on every airport at once, with the aircraft somewhere on screen, in the part the legend leaves free
   let x0=Math.min(st.pos.x,...AIRPORTS.map(a=>a[2])),x1=Math.max(st.pos.x,...AIRPORTS.map(a=>a[2])),z0=Math.min(st.pos.z,...AIRPORTS.map(a=>a[3])),z1=Math.max(st.pos.z,...AIRPORTS.map(a=>a[3]));
-  FM.cx=(x0+x1)/2;FM.cz=(z0+z1)/2;FM.scale=Math.min((innerWidth-150)/(x1-x0+4000),(innerHeight-170)/(z1-z0+4000));
-  $('mapOv').classList.add('on');document.body.classList.add('mapOn');fmSize();lblUI();fmDraw();
+  FM.scale=Math.min((innerWidth-150-legW())/(x1-x0+4000),(innerHeight-170)/(z1-z0+4000));
+  FM.cx=(x0+x1)/2+legW()/2/FM.scale;FM.cz=(z0+z1)/2;
+  fmSize();lblUI();fmDraw();
 }
 function fmClose(){FM.on=false;$('mapOv').classList.remove('on');document.body.classList.remove('mapOn');paused=FM.wasPaused;}
 function fmSize(){const d=Math.min(window.devicePixelRatio||1,2);fmc.width=innerWidth*d;fmc.height=innerHeight*d;fmc.style.width=innerWidth+'px';fmc.style.height=innerHeight+'px';FM.d=d;}
@@ -7319,8 +7334,8 @@ function lblFree(b){if(b[0]<2||b[1]<2||b[2]>LBL.W-2||b[3]>LBL.H-2)return false;
 // cands: [{pri, x, y, w, h, spots:[[dx,dy],...] (box centre offsets), draw(ctx,cx,cy), hit}]
 function lblPlace(cands){
   cands.sort((a,b)=>b.pri-a.pri);
-  for(const c of cands){for(const sp of c.spots||[[0,0]]){const cx=c.x+sp[0],cy=c.y+sp[1],b=[cx-c.w/2,cy-c.h/2,cx+c.w/2,cy+c.h/2];
-    if(!lblFree(b))continue;LBL.boxes.push(b);LBL.placed.push({box:b,cx:cx,cy:cy,c:c});break;}}
+  for(const c of cands){c.ok=false;if(c.req&&!c.req.ok)continue;for(const sp of c.spots||[[0,0]]){const cx=c.x+sp[0],cy=c.y+sp[1],b=[cx-c.w/2,cy-c.h/2,cx+c.w/2,cy+c.h/2];
+    if(!lblFree(b))continue;LBL.boxes.push(b);LBL.placed.push({box:b,cx:cx,cy:cy,c:c});c.ok=true;break;}}
   // lowest first, so a halo never paints over a neighbour's glyphs
   for(let i=LBL.placed.length-1;i>=0;i--){const P=LBL.placed[i];P.c.draw(fx,P.cx,P.cy);}
 }
@@ -7346,6 +7361,21 @@ const APTS=[{code:'KGEU',name:'Glendale',kind:'airport',pri:810},{code:'KLUF',na
 for(const A of APTS){const rs=RUNWAYS.filter(r=>r.code===A.code);A.x=rs.reduce((s,r)=>s+r.x,0)/rs.length;A.z=rs.reduce((s,r)=>s+r.z,0)/rs.length;
   A.r=Math.max(...rs.map(r=>Math.hypot(r.x-A.x,r.z-A.z)+r.len/2));A.label=A.name+' · '+A.code;}
 const SHIELD_STYLE={'I-10':'i','I-17':'i','101':'l','202':'l','303':'l'};
+// everything on the map with an icon, where it is right now
+const EGG_NAMES={egg_hangar:'@OhRabah hangar',egg_billboard:'@OhRabah billboard',egg_rooftop:'@OhRabah rooftop sign',egg_flag:'@OhRabah flag',egg_tow:'@OhRabah banner tow'};
+const MPRI={haboob:760,school:700,drop:690,range:690,race:680,landmark:650,egg:600};
+const _poiV=new V3();
+function raceStart(dist,off,e){const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h))+off;return {x:e.x+Math.sin(back)*dist,z:e.z-Math.cos(back)*dist};}
+function mapPOIs(){
+  const out=[{kind:'landmark',x:3480,z:-979,name:'State Farm Stadium'},{kind:'landmark',x:31400,z:350,name:'Camelback Mountain'},
+    {kind:'landmark',x:21000,z:7800,name:'Downtown Phoenix'},{kind:'drop',x:DROPZ.x,z:DROPZ.z,name:'C-130 airdrop zone'},
+    {kind:'range',x:RANGE.x,z:RANGE.z,name:'Strike range'},{kind:'school',x:APC.x,z:APC.z,name:'Flight school'}];
+  {const e=RWY_ENDS.find(e=>e.rwy.code==='KGEU'&&e.num==='1');out.push(Object.assign(raceStart(9000,0.9,e),{kind:'race',name:'Landing challenge start'}));
+   const D=dailySpec();out.push(Object.assign(raceStart(D.dist,D.off,D.end),{kind:'race',name:'Daily challenge start'}));}
+  if(HB.on)out.push({kind:'haboob',x:HB.C.x,z:HB.C.z,name:'Haboob'});
+  for(const o of EGG.list){o.getWorldPosition(_poiV);out.push({kind:'egg',x:_poiV.x,z:_poiV.z,name:EGG_NAMES[o.name]||'@OhRabah'});}
+  return out;
+}
 function fmDraw(){
   if(!FM.on)return;const d=FM.d,W=innerWidth,H=innerHeight,sc=FM.scale;
   fx.setTransform(d,0,0,d,0,0);fx.fillStyle=MPAL.out;fx.fillRect(0,0,W,H);
@@ -7359,7 +7389,7 @@ function fmDraw(){
   for(const v of steps)if(v*unit*sc<=140)n=v;const bw=n*unit*sc,bx=FM.padL+8,by=H-FM.padB-10;
   LBL.W=W;LBL.H=H;LBL.boxes=LBL.ui.slice();LBL.boxes.push([bx-12,by-28,bx+bw+12,by+12]);LBL.placed=[];
   const C=[],inView=(q,m)=>q[0]>-m&&q[1]>-m&&q[0]<W+m&&q[1]<H+m;
-  fmCands(C,sc,inView);
+  FM.pois=mapPOIs();fmCands(C,sc,inView);
   lblPlace(C);
   fx.fillStyle='rgba(14,16,20,.82)';rrect(fx,bx-8,by-24,bw+16,32,8);fx.fill();
   fx.strokeStyle='#f4f1ea';fx.lineWidth=2;fx.lineCap='butt';fx.beginPath();fx.moveTo(bx,by-5);fx.lineTo(bx,by);fx.lineTo(bx+bw,by);fx.lineTo(bx+bw,by-5);fx.stroke();
@@ -7369,21 +7399,31 @@ function fmDraw(){
 }
 // every label and icon that could show at this zoom
 function fmCands(C,sc,inView){
+  const now=performance.now(),hl=FM.hl&&now-FM.hl.t0<4500?FM.hl.kind:null;
   // the aircraft: always wins
   {const p=fmP(st.pos.x,st.pos.z),yaw=-new THREE.Euler().setFromQuaternion(st.quat,'YXZ').y;
    C.push({pri:1000,x:p[0],y:p[1],w:30,h:30,kind:'player',draw:(x,cx,cy)=>{x.save();x.translate(cx,cy);x.rotate(yaw);
      x.fillStyle='rgba(255,214,64,.22)';x.beginPath();x.arc(0,0,14,0,TAU);x.fill();
      x.fillStyle='#ffd640';x.strokeStyle='#15110a';x.lineWidth=2;x.lineJoin='round';x.beginPath();x.moveTo(0,-12);x.lineTo(8.5,9);x.lineTo(0,4.5);x.lineTo(-8.5,9);x.closePath();x.stroke();x.fill();x.restore();}});}
   // airport cards
-  for(const A of APTS){const q=fmP(A.x,A.z),fr=A.r*sc;if(!inView(q,fr+160))continue;
+  for(const A of APTS){const q=fmP(A.x,A.z),fr=A.r*sc;if(!inView(q,fr+160))continue;const hlA=hl===A.kind;
     const font='700 12px '+F,tw=lblMeasure(font,A.label),w=tw+34,h=24,g=fr+6;
-    C.push({pri:A.pri,x:q[0],y:q[1],w:w,h:h,kind:A.kind,hit:{x:A.x,z:A.z,name:A.name+' ('+A.code+')',short:A.code,kind:A.kind},
+    C.push({pri:A.pri+(hlA?400:0),x:q[0],y:q[1],w:w,h:h,kind:A.kind,hit:{x:A.x,z:A.z,name:A.name+' ('+A.code+')',short:A.code,kind:A.kind},
       spots:[[0,-g-h/2],[0,g+h/2],[g+w/2,0],[-g-w/2,0],[g*0.7+w/2,-g*0.7-h/2],[-g*0.7-w/2,-g*0.7-h/2],[g*0.7+w/2,g*0.7+h/2],[-g*0.7-w/2,g*0.7+h/2]],
       draw:(x,cx,cy)=>{x.fillStyle='rgba(16,18,22,.93)';rrect(x,cx-w/2,cy-h/2,w,h,7);x.fill();
-        x.strokeStyle=A.kind==='airbase'?'rgba(184,196,106,.8)':'rgba(127,212,255,.8)';x.lineWidth=1.2;x.stroke();
+        x.strokeStyle=hlA?'#4de1ff':A.kind==='airbase'?'rgba(184,196,106,.8)':'rgba(127,212,255,.8)';x.lineWidth=hlA?2.5:1.2;x.stroke();
         mIcon(x,A.kind,cx-w/2+13,cy,18);x.font=font;x.textAlign='left';x.textBaseline='middle';
         x.fillStyle='#f4f1ea';x.fillText(A.name,cx-w/2+26,cy+0.5);const nw=lblMeasure(font,A.name+' · ');
         x.fillStyle=A.kind==='airbase'?'#c9d27e':'#8fdcff';x.fillText(A.code,cx-w/2+26+nw,cy+0.5);}});}
+  // icons, then their names beside them once there is room
+  for(const P of FM.pois){const q=fmP(P.x,P.z);if(!inView(q,20))continue;const on=hl===P.kind,sz=on?28:24;
+    const ic={pri:MPRI[P.kind]+(on?400:0),x:q[0],y:q[1],w:sz,h:sz,kind:P.kind,hit:{x:P.x,z:P.z,name:P.name,kind:P.kind},
+      draw:(x,cx,cy)=>{if(on){const k=((now-FM.hl.t0)%1100)/1100;x.strokeStyle='rgba(77,225,255,'+(1-k).toFixed(2)+')';x.lineWidth=3;
+        x.beginPath();x.arc(cx,cy,sz/2+3+k*14,0,TAU);x.stroke();}mIcon(x,P.kind,cx,cy,sz);}};
+    C.push(ic);
+    if(sc>0.02||on){const font='600 11px '+F,w=lblMeasure(font,P.name)+6,g=sz/2+4;
+      C.push({pri:360+(on?400:0),req:ic,x:q[0],y:q[1],w:w,h:15,kind:'name',spots:[[g+w/2,0],[-g-w/2,0],[0,g+8],[0,-g-8]],
+        draw:(x,cx,cy)=>haloText(x,P.name,cx,cy,font,'#f4f1ea','rgba(16,17,20,.92)',3)});}}
   // runway numbers: close in only, one at each end, out along the extended centre line
   if(sc>0.028)for(const e of RWY_ENDS){const font='800 11px '+F,tw=lblMeasure(font,e.num),w=Math.max(20,tw+10),h=17,on=DEST===e;
     const q=fmP(e.x,e.z);if(!inView(q,60))continue;const ux=-Math.sin(e.h),uy=Math.cos(e.h),g=w/2+6;
@@ -7409,6 +7449,32 @@ function fmHit(X,Y){let best=null,bd=26;for(const e of RWY_ENDS){const q=fmP(e.x
     if(Math.abs(X-P.cx)>hw||Math.abs(Y-P.cy)>hh)continue;const dd=Math.hypot(X-P.cx,Y-P.cy)*0.8;
     if(dd<bd||!best){bd=dd;best=h.end||h;}}
   return best;}
+// ---- the legend: one row per icon type. A tap lights those icons up and flies to the nearest ----
+const LEG_KINDS=['airport','airbase','landmark','drop','range','race','school','haboob','egg'];
+function legBuild(){
+  const L=$('mapLegL'),kinds=LEG_KINDS.filter(k=>k!=='haboob'||HB.on),key=kinds.join();if(L.dataset.k===key)return;L.dataset.k=key;L.innerHTML='';
+  for(const k of kinds){const b=document.createElement('button');b.className='lrow';b.dataset.kind=k;
+    const im=document.createElement('img');im.alt='';im.src=mIconSprite(k,22).toDataURL();b.appendChild(im);b.appendChild(document.createTextNode(MICON[k].n));
+    tapBtn(b,()=>legPick(k));L.appendChild(b);}
+}
+function legPick(kind){
+  FM.hl={kind:kind,t0:performance.now()};for(const b of $('mapLegL').children)b.classList.toggle('on',b.dataset.kind===kind);
+  const list=kind==='airport'||kind==='airbase'?APTS.filter(A=>A.kind===kind):mapPOIs().filter(P=>P.kind===kind);if(!list.length){fmDraw();return;}
+  let best=list[0],bd=1e18;for(const P of list){const dd=Math.hypot(P.x-st.pos.x,P.z-st.pos.z);if(dd<bd){bd=dd;best=P;}}
+  // centre it in the part of the screen the legend leaves free, close enough in for its name
+  const s1=Math.max(FM.scale,0.012),off=legW()/2/s1;fmFly(best.x+off,best.z,s1);
+}
+const legW=()=>{const r=$('mapLeg').getBoundingClientRect();return r.width?r.width+12:0;};
+function fmFly(x,z,s){FM.anim={x0:FM.cx,z0:FM.cz,s0:FM.scale,x1:x,z1:z,s1:s,t0:performance.now(),dur:650};}
+// called every frame the map is open: fly animations, highlight pulses, tiles still to render
+function fmFrame(){
+  let redraw=mtPump(10);
+  if(FM.anim){const A=FM.anim,t=Math.min(1,(performance.now()-A.t0)/A.dur),e=t*t*(3-2*t);
+    FM.cx=A.x0+(A.x1-A.x0)*e;FM.cz=A.z0+(A.z1-A.z0)*e;FM.scale=Math.exp(Math.log(A.s0)+(Math.log(A.s1)-Math.log(A.s0))*e);if(t>=1)FM.anim=null;redraw=true;}
+  if(FM.hl){if(performance.now()-FM.hl.t0<4500)redraw=true;else{FM.hl=null;for(const b of $('mapLegL').children)b.classList.remove('on');redraw=true;}}
+  if(redraw)fmDraw();
+}
+tapBtn($('mapLegT'),()=>{const m=$('mapLeg').classList.toggle('min');$('mapLegT').setAttribute('aria-expanded',String(!m));lblUI();fmDraw();});
 function fmZoom(f,X,Y){X=X===undefined?innerWidth/2:X;Y=Y===undefined?innerHeight/2:Y;const w=fmW(X,Y);
   FM.scale=clamp(FM.scale*f,Math.min(innerWidth,innerHeight)/90000,0.35);const w2=fmW(X,Y);FM.cx+=w[0]-w2[0];FM.cz+=w[1]-w2[1];fmDraw();}
 fmc.addEventListener('pointerdown',e=>{FM.ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});FM.moved=false;try{fmc.setPointerCapture(e.pointerId);}catch(_){}
@@ -8634,7 +8700,7 @@ function tick(t,skipRender){
   // instruments
   _eu.setFromQuaternion(q,'YXZ');const hdgT=((-_eu.y*180/Math.PI)%360+360)%360,hdgM=(hdgT-MAGVAR+360)%360;
   mapT-=dt;if(mapT<=0){mapT=0.1;drawMap(hdgT);}
-  if(FM.on&&mtPump(10))fmDraw();
+  if(FM.on)fmFrame();
   hudT-=dt;
   if(hudT<=0){hudT=0.08;
     {const wn=windNow();hWindT.textContent=wn[0]+'\u00b0 '+wn[1]+' KT';   // the same wind the tower reads out
@@ -8689,7 +8755,7 @@ window.__kgeu={MAPD:MAPD,TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setIn
   RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicLoad:musicLoadList,musicTick:musicTick,MUSIC:MUSIC,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
-  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&{apt:DEST.rwy.apt,num:DEST.num},fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&{apt:DEST.rwy.apt,num:DEST.num},fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   // @OhRabah easter eggs (3.10): where each one is, whether its lights are on, and the tow banner
   eggs:()=>EGG.list.map(o=>{const p=o.getWorldPosition(new V3()),r={name:o.name,x:p.x,y:p.y,z:p.z,ry:o.rotation.y,lit:(o.name==='egg_billboard'||o.name==='egg_rooftop')&&EGG.lit,visible:o.visible};
     if(o.name==='egg_tow'){const b=EGG.tow.ban.getWorldPosition(new V3()),f=new V3(0,0,-1).applyQuaternion(o.quaternion);r.banner={x:b.x,y:b.y,z:b.z};r.fwd=[f.x,f.y,f.z];}return r;}),
