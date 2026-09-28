@@ -73,6 +73,7 @@ async def main():
   async with async_playwright() as p:
     b=await p.chromium.launch(args=['--use-gl=swiftshader','--enable-unsafe-swiftshader'])
     pg=await (await b.new_context(viewport={'width':844,'height':390},is_mobile=True,has_touch=True)).new_page()
+    await pg.add_init_script("localStorage.setItem('kgeuOnboard','pilot');localStorage.setItem('kgeuTut','1')")  # past the first launch screen; the six pack is a Pilot feature
     errs=[]
     pg.on('pageerror',lambda e:errs.append(str(e)))
     await pg.route('**/three.min.js',lambda r:r.fulfill(body=THREE,content_type='application/javascript'))
@@ -83,7 +84,8 @@ async def main():
     await pg.wait_for_timeout(900)
     await pg.evaluate("()=>window.__kgeu.cycleCam()")        # chase -> cockpit
     await pg.wait_for_timeout(600)
-    await pg.evaluate("()=>window.__kgeu.togglePause()")
+    # pause only to freeze the frame; close the pause sheet, which hides the flight UI
+    await pg.evaluate("()=>{window.__kgeu.togglePause();document.getElementById('pauseOv').classList.remove('on')}")
     await pg.wait_for_timeout(300)
     chk('the panel shows in the cockpit view', await pg.is_visible('#sixpack'))
 
