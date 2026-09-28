@@ -3316,6 +3316,164 @@ function makeLightLayer(name){
   AL_LAYERS.push(L);return L;
 }
 const AL_C={white:0xfff2d6,yellow:0xffc23a,green:0x38ff78,red:0xff2a1e,blue:0x2f6dff,beacon:0x30ff64};
+// ---------- aircraft exterior lights ----------
+// AC_LIGHTS[type]: every exterior light on an airframe, in that model's own units
+// (nose -Z, right wing +X, up +Y). kind: nav (steady), strobe (white flash), beacon
+// (red, rotating look), landing / taxi (forward, only with the landing lights on),
+// form (faint steady formation light). dir + cone (half angle, deg) make a light
+// directional: it fades out when the camera leaves the cone. fl:'single' is a single
+// flash strobe (default double). on:'gear' only with the gear down, 'air' only
+// airborne, 'ground' only on the ground.
+const ACL_C={red:0xff2a1e,green:0x38ff78,white:0xffffff,strobe:0xf2f6ff,beacon:0xff2414,land:0xfff0d6,form:0xe6eeff};
+const ACL_NL=[-0.82,0,-0.57],ACL_NR=[0.82,0,-0.57],ACL_AFT=[0,0,1],ACL_FWD=[0,-0.087,-1];
+const acNav=(x,y,z)=>({x,y,z,color:x<0?ACL_C.red:ACL_C.green,kind:'nav',dir:x<0?ACL_NL:ACL_NR,cone:62});
+const acAft=(x,y,z)=>({x,y,z,color:ACL_C.white,kind:'nav',dir:ACL_AFT,cone:70});
+const acStrobe=(x,y,z,o)=>Object.assign({x,y,z,color:ACL_C.strobe,kind:'strobe'},o);
+const acBeacon=(x,y,z)=>({x,y,z,color:ACL_C.beacon,kind:'beacon'});
+const acLand=(x,y,z,o)=>Object.assign({x,y,z,color:ACL_C.land,kind:'landing',dir:ACL_FWD,cone:30},o);
+const acTaxi=(x,y,z,o)=>Object.assign({x,y,z,color:ACL_C.land,kind:'taxi',dir:ACL_FWD,cone:40},o);
+const acForm=(x,y,z)=>({x,y,z,color:ACL_C.form,kind:'form'});
+const AC_LIGHTS={
+  // 172: nav at the tip leading edges, strobes just aft, white on the rudder trailing edge,
+  // red beacon on the fin top, landing + taxi side by side in the left wing leading edge
+  cessna:[acNav(-5.58,0.78,-1.45),acNav(5.58,0.78,-1.45),acStrobe(-5.58,0.78,-1.1),acStrobe(5.58,0.78,-1.1),
+    acAft(0,1.58,5.38),acBeacon(0,1.73,4.5),acLand(-2.35,0.74,-1.6),acTaxi(-2.7,0.74,-1.6)],
+  // Alpha: combined nav + strobe at each tip, tail light at the rudder tip, one landing light in the lower cowl
+  alpha:[acNav(-5.36,0.46,-0.78),acNav(5.36,0.46,-0.78),acStrobe(-5.36,0.46,-0.6),acStrobe(5.36,0.46,-0.6),
+    acAft(0,0.47,3.68),acLand(0,-0.74,-2.93)],
+  // F-16C: nav on the tip rails, tail light under the rudder base, one anticollision strobe on
+  // the fin top, six faint formation lights, landing/taxi light on the nose gear door
+  f16:[acNav(-4.76,-0.1,1.56),acNav(4.76,-0.1,1.56),acAft(0,0.62,5.58),acStrobe(0,3.45,4.2,{fl:'single'}),
+    acForm(0,0.72,-1.4),acForm(0,-0.69,0.2),acForm(-3.0,-0.14,1.0),acForm(3.0,-0.14,1.0),acForm(-0.98,-0.12,-1.5),acForm(0.98,-0.12,-1.5),
+    acLand(0,-1.04,-3.86,{on:'gear'})],
+  // MQ-9A: nav + strobe at each tip, white aft on the tail cone, red beacon aft of the SATCOM
+  // bulge, a dim taxi lamp on the nose gear on the ground only
+  reaper:[acNav(-10.12,0.97,-0.8),acNav(10.12,0.97,-0.8),acStrobe(-10.12,0.97,-0.45),acStrobe(10.12,0.97,-0.45),
+    acAft(0,0.27,5.84),acBeacon(0,0.72,1.2),acTaxi(0,-0.95,-3.02,{on:'ground',dim:1})],
+  // MQ-9B: the same on the winglets
+  mq9b:[acNav(-11.68,1.11,-0.8),acNav(11.68,1.11,-0.8),acStrobe(-11.68,1.11,-0.5),acStrobe(11.68,1.11,-0.5),
+    acAft(0,0.28,6.53),acBeacon(0,0.77,1.5),acTaxi(0,-0.95,-3.17,{on:'ground',dim:1})],
+  // C-130H: tips, two white on the tail cone, white on the top forward of the wing, beacon over the
+  // wing centre, strobes on the fin top and belly (belly off on the ground), landing lights under
+  // the wings inboard of the tanks, taxi lights on the sponson fronts, 3 formation lights a wing
+  c130:[acNav(-20.25,3.05,-2.8),acNav(20.25,3.05,-2.8),acAft(-0.25,3.07,15.48),acAft(0.25,3.07,15.48),
+    {x:0,y:3.7,z:-5.5,color:ACL_C.white,kind:'nav'},acBeacon(0,4.16,-1.0),
+    acStrobe(0,10.24,12.2),acStrobe(0,-0.61,-7.5,{on:'air'}),
+    acLand(-6.3,3.08,-2.0),acLand(6.3,3.08,-2.0),acTaxi(-2.6,-0.2,-2.32,{on:'gear'}),acTaxi(2.6,-0.2,-2.32,{on:'gear'}),
+    acForm(-12,3.7,-1.85),acForm(-15,3.52,-2.0),acForm(-18,3.35,-2.2),acForm(12,3.7,-1.85),acForm(15,3.52,-2.0),acForm(18,3.35,-2.2)]
+};
+// One THREE.Points per airframe, a child of the aircraft group, so positions never
+// change and the whole set is one draw call. Same point sprite as the airport layer,
+// but directional cones are evaluated in view space (modelViewMatrix) because the
+// lights turn with the aircraft. All flashing runs off uTime in the vertex shader.
+// Day floor: strobes and beacon stay at 0.5, nav at 0.25, the rest follow uLights.
+// uLand: landing lights switched on; uGear: gear down; uAir: airborne.
+const ACL_KIND={nav:0,strobe:1,beacon:2,landing:3,taxi:4,form:5},ACL_ON={gear:1,air:2,ground:3};
+function aclMat(land,gear,air){
+  const u=AL_MAT.uniforms;
+  return new THREE.ShaderMaterial({
+  uniforms:{uLights:u.uLights,uTime:u.uTime,uPR:u.uPR,uLand:{value:land},uGear:{value:gear},uAir:{value:air}},
+  vertexShader:`#include <common>
+#include <logdepthbuf_pars_vertex>
+attribute vec3 aCol;attribute float kind;attribute vec4 aDir;attribute float flash;attribute float phase;attribute float cond;
+uniform float uLights,uTime,uPR,uLand,uGear,uAir;
+varying vec3 vCol;varying float vI;
+void main(){
+  vec4 mv=modelViewMatrix*vec4(position,1.0);
+  float I,sz=1.0;
+  if(kind<0.5)I=max(uLights,0.25);
+  else if(kind<2.5)I=max(uLights,0.5);
+  else if(kind<4.5){I=uLights*uLand*(kind<3.5?2.2:1.6);sz=kind<3.5?1.5:1.3;}
+  else{I=uLights*0.3;sz=0.75;}
+  if(aDir.w>-1.5){vec3 d=normalize(mat3(modelViewMatrix)*aDir.xyz);float c=dot(d,normalize(-mv.xyz));I*=smoothstep(aDir.w-0.1,aDir.w+0.1,c);}
+  if(flash>0.5){
+    if(flash<1.5){float p=fract(uTime/1.2+phase)*1.2;I*=(p<0.06||(p>0.18&&p<0.24))?1.8:0.0;}
+    else if(flash<2.5){float p=fract(uTime/1.2+phase)*1.2;I*=p<0.07?1.8:0.0;}
+    else{float p=fract(uTime/0.75+phase);I*=max(0.0,1.0-abs(p-0.1)/0.1)*1.7;sz=1.3;}
+  }
+  if(cond>0.5){if(cond<1.5)I*=step(0.5,uGear);else if(cond<2.5)I*=uAir;else I*=1.0-uAir;}
+  gl_Position=projectionMatrix*mv;
+  float w=gl_Position.w;
+  I*=clamp(1.25-w/40000.0,0.35,1.0);
+  vCol=aCol;vI=I;
+  if(I<0.004){gl_Position=vec4(0.0,0.0,-2.0,1.0);gl_PointSize=0.0;}
+  else gl_PointSize=clamp(${AL_K.toFixed(1)}/w,${AL_MIN.toFixed(2)},6.0)*sz*uPR;
+  #include <logdepthbuf_vertex>
+}`,
+  fragmentShader:AL_MAT.fragmentShader,
+  transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false});
+}
+const ACL_MAT=aclMat(0,1,0);          // the flown aircraft: tick sets uLand / uGear / uAir
+const ACL_MAT_T=aclMat(0,0,1);        // AI traffic: airborne, gear up, landing lights off
+// spec: an AC_LIGHTS entry list; opt.only: kinds to keep (cheap traffic variant); opt.dy: y offset
+function makeAircraftLights(group,spec,opt){
+  opt=opt||{};
+  const pos=[],col=[],kind=[],dir=[],flash=[],phase=[],cond=[],c=new THREE.Color();
+  let land=0,pool=0;
+  for(const l of spec){
+    if(opt.only&&opt.only.indexOf(l.kind)<0)continue;
+    const k=ACL_KIND[l.kind];
+    pos.push(l.x,l.y+(opt.dy||0),l.z);c.setHex(l.color);if(l.dim)c.multiplyScalar(0.45);col.push(c.r,c.g,c.b);kind.push(k);
+    if(l.dir){const n=Math.hypot(l.dir[0],l.dir[1],l.dir[2]);dir.push(l.dir[0]/n,l.dir[1]/n,l.dir[2]/n,Math.cos(l.cone*Math.PI/180));}
+    else dir.push(0,0,0,-2);
+    flash.push(l.kind==='strobe'?(l.fl==='single'?2:1):l.kind==='beacon'?3:0);
+    phase.push(0);cond.push(ACL_ON[l.on]||0);
+    if(k===3||k===4){land++;pool=Math.max(pool,l.dim?0.5:1);}
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('aCol',new THREE.Float32BufferAttribute(col,3));
+  g.setAttribute('kind',new THREE.Float32BufferAttribute(kind,1));
+  g.setAttribute('aDir',new THREE.Float32BufferAttribute(dir,4));
+  g.setAttribute('flash',new THREE.Float32BufferAttribute(flash,1));
+  g.setAttribute('phase',new THREE.Float32BufferAttribute(phase,1));
+  g.setAttribute('cond',new THREE.Float32BufferAttribute(cond,1));
+  g.computeBoundingSphere();
+  const mat=opt.mat||ACL_MAT;
+  const p=new THREE.Points(g,mat);p.name='aircraftLights';p.renderOrder=3;
+  p.onBeforeRender=(r)=>{const u=mat.uniforms;u.uTime.value=performance.now()/1000;u.uPR.value=r.getPixelRatio();};
+  group.add(p);
+  // pool: how bright the ground pool is for this airframe (0 none, 0.5 the MQ-9 taxi lamp)
+  // gearPool: the lamp making the pool rides on the gear
+  const gearPool=spec.some(l=>(l.kind==='landing'||l.kind==='taxi')&&l.on==='gear')&&!spec.some(l=>(l.kind==='landing'||l.kind==='taxi')&&!l.on);
+  const groundPool=spec.some(l=>(l.kind==='landing'||l.kind==='taxi')&&l.on==='ground');
+  return {pts:p,count:pos.length/3,land:land,pool:pool,gearPool:gearPool,groundPool:groundPool};
+}
+// Landing light pool: one additive warm ellipse on the ground where the landing light
+// beam (5 deg below the nose) meets it. Stretches with height, fades out by 100 m AGL.
+const ACL_POOL=(function(){
+  // a round gradient; the mesh scale stretches it into the ellipse
+  const t=tex(64,64,(x,w,h)=>{const gr=x.createRadialGradient(w/2,h/2,1,w/2,h/2,w/2);
+    gr.addColorStop(0,'rgba(255,238,208,1)');gr.addColorStop(0.4,'rgba(255,228,190,0.5)');gr.addColorStop(1,'rgba(255,220,180,0)');
+    x.fillStyle=gr;x.fillRect(0,0,w,h);});
+  const geo=new THREE.PlaneGeometry(1,1);geo.rotateX(-Math.PI/2);
+  const m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,opacity:0}));
+  m.name='landingPool';m.renderOrder=1;m.visible=false;scene.add(m);return m;})();
+const ACL_STATE={on:false,pool:0};
+const _aclF=new V3();
+// per frame for the flown aircraft: switch logic, uniforms and the ground pool
+function aclUpdate(L,dp,q,agl,s){
+  const air=!s.onGround,gear=AC.retract?s.gearPos:1;
+  const on=!air||agl<305;
+  ACL_STATE.on=on;
+  const u=ACL_MAT.uniforms;u.uLand.value=on?1:0;u.uGear.value=gear>0.98?1:0;u.uAir.value=air?1:0;
+  let op=0;
+  if(L&&L.pool&&on&&TOD.lights>0&&!(L.gearPool&&gear<0.98)&&!(L.groundPool&&air)){
+    const h=Math.max(0,agl);
+    op=clamp((100-h)/90,0,1)*TOD.lights*L.pool*0.8;
+    if(op>0.003){
+      // beam: the nose axis pitched 5 deg down, from about 1.5 m above the wheels
+      _aclF.set(0,-0.087,-1).applyQuaternion(q).normalize();
+      const hz=Math.hypot(_aclF.x,_aclF.z)||1,dn=-_aclF.y;
+      let d=dn>0.01?(h+1.5)/dn*hz:900;d=Math.min(d,900);
+      const len=Math.min(25+h*1.5,120),wid=Math.min(9+h*0.6,45),fx=_aclF.x/hz,fz=_aclF.z/hz;
+      const cx=dp.x+fx*(d+len*0.3),cz=dp.z+fz*(d+len*0.3);
+      ACL_POOL.position.set(cx,groundHeight(cx,cz)+0.3,cz);ACL_POOL.rotation.set(0,Math.atan2(-fx,-fz),0);
+      ACL_POOL.scale.set(wid,1,len);
+    }
+  }
+  ACL_POOL.material.opacity=op;ACL_POOL.visible=op>0.003;ACL_STATE.pool=ACL_POOL.visible?op:0;
+}
 const alY=(x,z)=>groundHeight(x,z)+0.3;
 // r: {x,z (centre), h (heading of the low end, radians), len, wid, ends[{x,z (threshold)}]} as in RUNWAYS
 function lightRunway(L,r){
@@ -4008,6 +4166,7 @@ function getModel(id){
   else if(id==='c130')m=hdModel('c130')||buildC130();
   else if(id==='mq9b')m=hdModel('mq9b')||buildReaper('N190TC');
   else m=hdModel('reaper')||buildReaper();
+  m.lights=AC_LIGHTS[id]?makeAircraftLights(m.g,AC_LIGHTS[id]):null;
   m.g.visible=false;return MODELS[id]=m;
 }
 let plane=getModel('reaper');plane.g.visible=true;
@@ -4033,6 +4192,9 @@ const circ=(cx,cz,r,y,n)=>{const a=[];for(let i=0;i<n;i++){const t=i/n*Math.PI*2
 addTraffic({m:buildHeavy(),kind:'a C-17',grp:'h',v:115,t:0.3,pts:circ(-2000,-4000,14000,2130,14)});
 addTraffic({m:hdModel('reaper')||buildReaper('N12TH'),kind:'an MQ-9',grp:'r',v:42,t:0.6,pts:circ(9000,-9000,2600,1500,10)});
 TRAFFIC.forEach(o=>{if(o.m.gear)o.m.gear.visible=false;if(o.m.prop){o.m.prop.visible=false;o.m.disc.material.opacity=0.3;}});
+// traffic lights: nav, strobes and beacon only, one shared material; the C-17 has no light table
+{const TL={c:['cessna',0.15],v:['f16',0],r:['reaper',0]};
+ TRAFFIC.forEach(o=>{const t=TL[o.grp];if(t)o.m.lights=makeAircraftLights(o.m.g,AC_LIGHTS[t[0]],{mat:ACL_MAT_T,only:['nav','strobe','beacon'],dy:t[1]});});}
 function updateTraffic(dt){
   TRAFFIC.forEach(o=>{o.t=(o.t+o.v*dt/o.len)%1;o.path.getPointAt(o.t,_ap);o.path.getTangentAt(o.t,_at);
     const yaw=Math.atan2(-_at.x,-_at.z);let yr=0;if(o.yp!==null){let d=yaw-o.yp;d=Math.atan2(Math.sin(d),Math.cos(d));yr=d/Math.max(dt,1e-3);}o.yp=yaw;
@@ -6601,6 +6763,7 @@ function tick(t,skipRender){
   const gh=groundHeight(dp.x,dp.z),agl=dp.y-GEAR-gh;
   _cf.set(0,0,-1).applyQuaternion(q);_cu.set(0,1,0).applyQuaternion(q);
   shadow.position.set(dp.x,gh+0.13,dp.z);shadow.rotation.y=Math.atan2(-_cf.x,-_cf.z);shadow.material.opacity=clamp(1-agl/120,0,1);shadow.visible=agl<120;
+  aclUpdate(plane.lights,dp,q,agl,s);
   rebuildTerrain(s.pos.x,s.pos.z);
   // windsocks
   const wd=s.windDir*Math.PI/180,wkt=s.windKt*(1+s.gust);
@@ -6672,6 +6835,8 @@ window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,tou
     layers:AL_LAYERS.map(L=>({name:L.pts&&L.pts.name,visible:!!(L.pts&&L.pts.visible),inScene:!!(L.pts&&L.pts.parent)})),
     oldGlow:scene.children.filter(o=>o.isPoints&&o.material.isPointsMaterial&&o.material.blending===THREE.AdditiveBlending).length,
     hasGLOWS:typeof GLOWS!=='undefined'||typeof lightGlow!=='undefined'||typeof lightScale!=='undefined'}),
+  acLights:()=>({count:plane.lights?plane.lights.count:0,landingOn:ACL_STATE.on,poolOpacity:ACL_STATE.pool,
+    inGroup:!!(plane.lights&&plane.lights.pts.parent===plane.g),traffic:TRAFFIC.map(o=>o.m.lights?o.m.lights.count:0)}),
   cloudMat:()=>({color:cloudMat.color.getHex(),emissive:cloudMat.emissive.getHex()}),
   setTOD:setTOD,isNight:isNight,TOD:()=>TOD,drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
