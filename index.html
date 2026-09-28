@@ -7107,7 +7107,7 @@ function mapQuery(x0,z0,x1,z1,cb){
 }
 function mapLoad(){
   fetch('assets/map/phx.bin?v=1').then(r=>r.ok?r.arrayBuffer():null).then(b=>{
-    if(!b||!mapParse(b))return;return mapInflate().then(()=>{mapIndex();MAPD.ready=true;if(window.mapDataReady)mapDataReady();});
+    if(!b||!mapParse(b))return;return mapInflate().then(()=>{mapIndex();MAPD.ready=true;if(typeof mapDataReady==="function")mapDataReady();});
   }).catch(()=>{});
 }
 mapLoad();
@@ -7158,6 +7158,88 @@ function drawMap(hdgT){
   const nx=C+Math.sin(-h)*(C-8*dpr),ny=C-Math.cos(-h)*(C-8*dpr);mx.fillStyle='#eef2f6';mx.font=`700 ${9*dpr}px ${F}`;mx.textAlign='center';mx.textBaseline='middle';mx.fillText('N',nx,ny);
   mx.fillStyle='rgba(246,193,119,.8)';mx.font=`700 ${8*dpr}px ${F}`;mx.textAlign='left';mx.fillText('2 NM',4*dpr,W-7*dpr);
 }
+// ---- the map look: an opaque base (land cover and hillshade), cached as tiles ----
+// Charcoal city, muted desert, deep blue black water, faint green parks, and the game's
+// own terrain as hillshade so the White Tanks, the Estrellas and Camelback read as real
+// hills. Everything under the labels is drawn once into 256 px tiles and kept (LRU),
+// so panning and pinching only composite cached canvases.
+const MPAL={city:[34,36,40],desert:[82,70,56],out:'#4a3f33',water:'#0c1a2e',waterLine:'#143054',
+  park:'rgba(88,150,96,.34)',golf:'rgba(104,172,108,.44)',apron:'rgba(210,214,220,.10)',taxi:'rgba(220,224,230,.30)'};
+const MBASE={x0:-34000,z0:-28000,x1:38000,z1:30000,res:125,c:null};
+function mbaseBuild(){
+  const R=MBASE.res,W=Math.round((MBASE.x1-MBASE.x0)/R),H=Math.round((MBASE.z1-MBASE.z0)/R);
+  const hgt=new Float32Array(W*H);
+  for(let j=0;j<H;j++)for(let i=0;i<W;i++)hgt[j*W+i]=Math.max(0,groundHeight(MBASE.x0+(i+0.5)*R,MBASE.z0+(j+0.5)*R));
+  const U=MAPD.urban,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),im=x.createImageData(W,H),d=im.data;
+  // city density: the 250 m street length grid, box blurred twice over 750 m, then bilinear
+  let G=null;
+  if(U&&U.data){G=new Float32Array(U.W*U.H);for(let q=0;q<G.length;q++)G[q]=U.data[q]/255;
+    const tmp=new Float32Array(G.length);
+    for(let pass=0;pass<2;pass++){
+      for(let j=0;j<U.H;j++)for(let i=0;i<U.W;i++){let s=0;for(let a=-1;a<=1;a++)s+=G[j*U.W+clamp(i+a,0,U.W-1)];tmp[j*U.W+i]=s/3;}
+      for(let j=0;j<U.H;j++)for(let i=0;i<U.W;i++){let s=0;for(let b=-1;b<=1;b++)s+=tmp[clamp(j+b,0,U.H-1)*U.W+i];G[j*U.W+i]=s/3;}}}
+  const dens=(wx,wz)=>{if(!G)return 0;const gx=clamp((wx-U.x0)/U.G-0.5,0,U.W-1.001),gz=clamp((wz-U.z0)/U.G-0.5,0,U.H-1.001),i=Math.floor(gx),j=Math.floor(gz),fx=gx-i,fz=gz-j;
+    return (G[j*U.W+i]*(1-fx)+G[j*U.W+i+1]*fx)*(1-fz)+(G[(j+1)*U.W+i]*(1-fx)+G[(j+1)*U.W+i+1]*fx)*fz;};
+  const Lx=-0.62,Lz=-0.62,Ly=0.48;   // sun from the north west, 29 degrees up
+  for(let j=0;j<H;j++)for(let i=0;i<W;i++){
+    const h=hgt[j*W+i],hx=hgt[j*W+Math.min(W-1,i+1)]-hgt[j*W+Math.max(0,i-1)],hz=hgt[Math.min(H-1,j+1)*W+i]-hgt[Math.max(0,j-1)*W+i];
+    // surface normal from the slopes; relief a little exaggerated so low ranges still read
+    const nx=-hx/(2*R)*2.2,nz=-hz/(2*R)*2.2,nl=Math.hypot(nx,1,nz),sh=(nx*Lx+Ly+nz*Lz)/nl/Ly;
+    const t=smooth(0.12,0.34,dens(MBASE.x0+(i+0.5)*R,MBASE.z0+(j+0.5)*R)),lift=Math.min(1,h/900)*0.18;
+    const k=Math.max(0.45,Math.min(1.6,1+(sh-1)*0.9))+lift,o=(j*W+i)*4;
+    for(let ch=0;ch<3;ch++)d[o+ch]=Math.min(255,(MPAL.desert[ch]*(1-t)+MPAL.city[ch]*t)*k);
+    d[o+3]=255;}
+  x.putImageData(im,0,0);MBASE.c=c;
+}
+const MT={cache:new Map(),max:40,queue:[],base:256/64000,d:1,pool:[]};
+const mtLevel=sc=>clamp(Math.ceil(Math.log2(sc/MT.base)-1e-6),0,9);
+function mtTile(L,i,j){const k=L+':'+i+':'+j,t=MT.cache.get(k);if(t){MT.cache.delete(k);MT.cache.set(k,t);}return t;}
+function mtRender(L,i,j){
+  const sc=MT.base*Math.pow(2,L),span=256/sc,x0=i*span,z0=j*span,d=MT.d;
+  let c=MT.pool.pop();if(!c){c=document.createElement('canvas');}
+  if(c.width!==256*d){c.width=c.height=256*d;}
+  const x=c.getContext('2d'),k=sc*d;x.setTransform(1,0,0,1,0,0);x.fillStyle=MPAL.out;x.fillRect(0,0,c.width,c.height);
+  x.setTransform(k,0,0,k,-x0*k,-z0*k);x.lineJoin='round';x.lineCap='round';
+  const px=v=>v/(sc*0.72);            // a width in screen px, for tiles shown at 0.5 to 1x
+  // base raster, only the part under this tile
+  if(MBASE.c){const R=MBASE.res,sx=Math.max(0,(x0-MBASE.x0)/R-1),sy=Math.max(0,(z0-MBASE.z0)/R-1),
+    ex=Math.min(MBASE.c.width,(x0+span-MBASE.x0)/R+1),ey=Math.min(MBASE.c.height,(z0+span-MBASE.z0)/R+1);
+    if(ex>sx&&ey>sy){x.imageSmoothingEnabled=true;x.drawImage(MBASE.c,sx,sy,ex-sx,ey-sy,MBASE.x0+sx*R,MBASE.z0+sy*R,(ex-sx)*R,(ey-sy)*R);}}
+  const buckets={};
+  mapQuery(x0-200,z0-200,x0+span+200,z0+span+200,(n,f)=>{(buckets[n]||(buckets[n]=[])).push(f);});
+  const path=(fs,close)=>{x.beginPath();for(const f of fs){const p=f.p;x.moveTo(p[0],p[1]);for(let q=2;q<p.length;q+=2)x.lineTo(p[q],p[q+1]);if(close)x.closePath();}};
+  const minA=(fs,a)=>fs?fs.filter(f=>(f.b[2]-f.b[0])*(f.b[3]-f.b[1])*sc*sc>a):[];
+  path(minA(buckets.p1,6),true);x.fillStyle=MPAL.park;x.fill();
+  path(minA(buckets.p2,6),true);x.fillStyle=MPAL.golf;x.fill();
+  if(buckets.w0){path(buckets.w0);x.strokeStyle=MPAL.water;x.lineWidth=Math.max(70,px(1.6));x.stroke();}
+  if(buckets.w1&&sc>0.004){path(buckets.w1);x.strokeStyle=MPAL.waterLine;x.lineWidth=Math.max(24,px(sc>0.02?1.4:0.8));x.stroke();}
+  path(minA(buckets.p0,2),true);x.fillStyle=MPAL.water;x.fill();
+  MT.cache.set(L+':'+i+':'+j,c);
+  while(MT.cache.size>MT.max){const k=MT.cache.keys().next().value;MT.pool.push(MT.cache.get(k));MT.cache.delete(k);}
+  return c;
+}
+// draw the tiles under a view. P maps world to screen px; returns true when every tile was cached
+function mtDraw(ctx,sc,wx0,wz0,wx1,wz1,P){
+  const L=mtLevel(sc),span=256/(MT.base*Math.pow(2,L));let full=true;
+  for(let i=Math.floor(wx0/span);i<=Math.floor(wx1/span);i++)for(let j=Math.floor(wz0/span);j<=Math.floor(wz1/span);j++){
+    const a=P(i*span,j*span),w=span*sc;let t=mtTile(L,i,j);
+    if(t){ctx.drawImage(t,a[0],a[1],w+0.5,w+0.5);continue;}
+    full=false;const k=L+':'+i+':'+j;if(!MT.queue.includes(k))MT.queue.push(k);
+    // meanwhile the nearest coarser tile that is cached, cut down to this square
+    let drawn=false;for(let up=1;up<=L&&!drawn;up++){const f=Math.pow(2,up),pi=Math.floor(i/f),pj=Math.floor(j/f),pt=mtTile(L-up,pi,pj);
+      if(pt){const s=pt.width/f;ctx.drawImage(pt,(i-pi*f)*s,(j-pj*f)*s,s,s,a[0],a[1],w+0.5,w+0.5);drawn=true;}}
+    if(!drawn&&MBASE.c){const R=MBASE.res;ctx.drawImage(MBASE.c,(i*span-MBASE.x0)/R,(j*span-MBASE.z0)/R,span/R,span/R,a[0],a[1],w+0.5,w+0.5);}
+  }
+  return full;
+}
+// render queued tiles for up to ms milliseconds, nearest first; true if any were made
+function mtPump(ms,need){
+  if(!MAPD.ready||!MT.queue.length)return false;const t0=performance.now();let n=0;
+  while(MT.queue.length&&(performance.now()-t0<ms||n===0)){const k=MT.queue.shift();if(MT.cache.has(k))continue;
+    if(need&&!need(k))continue;const [L,i,j]=k.split(':').map(Number);mtRender(L,i,j);n++;}
+  return n>0;
+}
+function mapDataReady(){mbaseBuild();MT.cache.clear();if(FM.on)fmDraw();}
 // ---- the full map: north up, pinch to zoom, drag to pan, tap a runway end to fly there ----
 const FM={on:false,cx:0,cz:0,scale:0.02,ptrs:new Map(),moved:false,wasPaused:false,pinch:null},fmc=$('fmap'),fx=fmc.getContext('2d');
 function fmOpen(){
@@ -7174,16 +7256,14 @@ const fmP=(x,z)=>[innerWidth/2+(x-FM.cx)*FM.scale,innerHeight/2+(z-FM.cz)*FM.sca
 const fmW=(X,Y)=>[FM.cx+(X-innerWidth/2)/FM.scale,FM.cz+(Y-innerHeight/2)/FM.scale];
 function fmDraw(){
   if(!FM.on)return;const d=FM.d,W=innerWidth,H=innerHeight,sc=FM.scale;
-  fx.setTransform(d,0,0,d,0,0);fx.clearRect(0,0,W,H);
-  fx.fillStyle='rgba(42,22,8,.62)';fx.fillRect(0,0,W,H);
+  fx.setTransform(d,0,0,d,0,0);fx.fillStyle=MPAL.out;fx.fillRect(0,0,W,H);
+  MT.d=d;MT.queue.length=0;const w0=fmW(0,0),w1=fmW(W,H);FM.full=mtDraw(fx,sc,w0[0],w0[1],w1[0],w1[1],fmP);
   // landmarks
   for(const L of LANDMARKS){const q=fmP(L.x,L.z);fx.save();fx.translate(q[0],q[1]);fx.rotate(L.rot);
-    fx.fillStyle=L.kind==='mtn'?'rgba(168,89,42,.55)':'rgba(246,193,119,.55)';fx.beginPath();fx.ellipse(0,0,Math.max(4,L.rx*sc),Math.max(3,L.rz*sc),0,0,TAU);fx.fill();fx.restore();
+    fx.restore();
     fx.fillStyle='#F6C177';fx.font='700 12px '+F;fx.textAlign='center';fx.textBaseline='middle';
     fx.fillText(L.name,q[0],q[1]+(L.kind==='mtn'?0:Math.max(3,L.rz*sc)+10));}
   // river and the two freeways
-  fx.strokeStyle='rgba(127,212,255,.5)';fx.lineWidth=2;fx.beginPath();
-  const zs=fmW(0,0)[1]-2000,ze=fmW(0,H)[1]+2000;for(let z=zs;z<=ze;z+=250){const q=fmP(riverX(z),z);z===zs?fx.moveTo(q[0],q[1]):fx.lineTo(q[0],q[1]);}fx.stroke();
   fx.strokeStyle='rgba(230,230,230,.3)';fx.lineWidth=2;fx.beginPath();let a=fmP(FWY_X,I10_Z),b=fmP(FWY_X,-17000);fx.moveTo(a[0],a[1]);fx.lineTo(b[0],b[1]);
   a=fmP(-30000,I10_Z);b=fmP(40000,I10_Z);fx.moveTo(a[0],a[1]);fx.lineTo(b[0],b[1]);fx.stroke();
   const dz=fmP(DROPZ.x,DROPZ.z);fx.strokeStyle='rgba(246,193,119,.6)';fx.beginPath();fx.arc(dz[0],dz[1],Math.max(3,DROPZ.r*sc),0,TAU);fx.stroke();
@@ -8436,6 +8516,7 @@ function tick(t,skipRender){
   // instruments
   _eu.setFromQuaternion(q,'YXZ');const hdgT=((-_eu.y*180/Math.PI)%360+360)%360,hdgM=(hdgT-MAGVAR+360)%360;
   mapT-=dt;if(mapT<=0){mapT=0.1;drawMap(hdgT);}
+  if(FM.on&&mtPump(10))fmDraw();
   hudT-=dt;
   if(hudT<=0){hudT=0.08;
     {const wn=windNow();hWindT.textContent=wn[0]+'\u00b0 '+wn[1]+' KT';   // the same wind the tower reads out
@@ -8460,7 +8541,7 @@ function tick(t,skipRender){
   updateAudio();frameN++;if(frameN===4)splashDone();
   if(skipRender){}
   else if(SHOW.on){renderer.setClearColor(0xF6C177,1);renderer.clear();showRender(dt,CARM);}
-  else{if(!menu.classList.contains('on')||frameN<40){
+  else{if((!menu.classList.contains('on')||frameN<40)&&!FM.on){   // the open map is opaque: no 3D frame under it
       if(camMode===2&&SENSOR.mode!=='tv'&&!PHOTO.on&&!FREECAM)renderIR();else renderer.render(scene,camera);}
     const po=pauseOv.classList.contains('on');document.body.classList.toggle('pauseOn',po);if(po)showRender(dt,CARP);}
 }
@@ -8490,7 +8571,7 @@ window.__kgeu={MAPD:MAPD,TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setIn
   RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicLoad:musicLoadList,musicTick:musicTick,MUSIC:MUSIC,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
-  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&{apt:DEST.rwy.apt,num:DEST.num},fmOpen:fmOpen,fmClose:fmClose,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&{apt:DEST.rwy.apt,num:DEST.num},fmOpen:fmOpen,fmClose:fmClose,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   // @OhRabah easter eggs (3.10): where each one is, whether its lights are on, and the tow banner
   eggs:()=>EGG.list.map(o=>{const p=o.getWorldPosition(new V3()),r={name:o.name,x:p.x,y:p.y,z:p.z,ry:o.rotation.y,lit:(o.name==='egg_billboard'||o.name==='egg_rooftop')&&EGG.lit,visible:o.visible};
     if(o.name==='egg_tow'){const b=EGG.tow.ban.getWorldPosition(new V3()),f=new V3(0,0,-1).applyQuaternion(o.quaternion);r.banner={x:b.x,y:b.y,z:b.z};r.fwd=[f.x,f.y,f.z];}return r;}),

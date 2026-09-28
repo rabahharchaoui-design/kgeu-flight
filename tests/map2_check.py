@@ -28,8 +28,12 @@ async def main():
         ok('shields for I-10, I-17, 101, 202 and 303', d['shields'] == ['101', '202', '303', 'I-10', 'I-17'], d['shields'])
         await pg.evaluate(f"()=>{{{K}.pick('cessna');{K}.pickBase('kgeu');{K}.start('final')}}"); await pg.wait_for_timeout(1500)
         await shot(pg, 'flight_minimap')
-        await finger(pg, '#map'); await pg.wait_for_timeout(1500)
+        await finger(pg, '#map'); await pg.wait_for_timeout(300)
+        await pg.evaluate(f"()=>{K}.fmFlush()"); await pg.wait_for_timeout(200)
         await shot(pg, 'full_open')
+        for i, z in enumerate((2.5, 2.5, 2.5)):
+            await pg.evaluate(f"()=>{{const e={K}.RWY_ENDS.find(e=>e.num==='21R');{K}.FM.cx=e.x;{K}.FM.cz=e.z;{K}.FM.scale*={z};{K}.fmFlush()}}")
+            await pg.wait_for_timeout(200); await shot(pg, f'full_zoom{i+1}')
         ok('no page errors', not pg.errs, pg.errs[:3])
         await b.close()
     sys.exit(ok.done('map2_check'))
