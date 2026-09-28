@@ -642,7 +642,7 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
    <div class="frow"><div class="grp g2"><span class="glbl">Base</span>
      <button class="pick chip" data-b="kgeu"><b>Glendale</b></button><button class="pick chip" data-b="luke"><b>Luke AFB</b></button></div>
     <div class="grp g4"><span class="glbl">Time</span>
-     <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><span class="chip slot" aria-hidden="true"></span></div></div>
+     <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><button class="pick chip" data-tod="haboob"><b>Haboob</b></button></div></div>
    <div class="frow"><div class="grp g3"><span class="glbl">Start</span>
      <button class="pick chip" data-pos="runway"><b>Runway</b></button><button class="pick chip" data-pos="ramp"><b>Ramp</b></button><button class="pick chip" data-pos="final"><b>3 mi final</b></button></div>
     <button class="go" id="bGo">GO</button></div>
@@ -718,7 +718,7 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
    <div class="frow"><div class="grp g2"><span class="glbl">Base</span>
      <button class="pick chip" data-b="kgeu"><b>Glendale</b></button><button class="pick chip" data-b="luke"><b>Luke AFB</b></button></div>
     <div class="grp g4"><span class="glbl">Time</span>
-     <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><span class="chip slot" aria-hidden="true"></span></div></div>
+     <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><button class="pick chip" data-tod="haboob"><b>Haboob</b></button></div></div>
    <div class="frow"><div class="grp g3"><span class="glbl">Start</span>
      <button class="pick chip" data-pos="runway"><b>Runway</b></button><button class="pick chip" data-pos="ramp"><b>Ramp</b></button><button class="pick chip" data-pos="final"><b>3 mi final</b></button></div>
     <button class="go apply" id="pApply">Apply</button></div>
@@ -947,7 +947,7 @@ function liftCoef(a,fl){
 function createState(mode,base){
   const st={pos:new V3(),vel:new V3(),quat:new Q4(),w:new V3(),throttle:0,flapIdx:0,trim:0.5,elev:0,ail:0,rud:0,steer:0,brake:false,
     onGround:true,crashed:false,crashReason:'',airTime:0,alpha:0,beta:0,aoaWarn:false,stalled:false,dropDir:1,gload:1,time:0,
-    ias:0,agl:0,ap:null,apW:null,apPI:0,apTI:0,sfR:0,sfU:1,rpm:700,power:0,gearDown:true,gearPos:1,windDir:50,windKt:5,windBase:50,windPh:0,gust:0,gustT:0,gustTarget:0,gustAmp:0.35,noPF:false,mode:mode};
+    ias:0,agl:0,ap:null,apW:null,apPI:0,apTI:0,sfR:0,sfU:1,rpm:700,power:0,gearDown:true,gearPos:1,windDir:50,windKt:5,windBase:50,windPh:0,gust:0,gustT:0,gustTarget:0,gustAmp:0.35,dust:0,dustDir:150,tv:0,tvT:0,tvTarget:0,bp:0,br:0,noPF:false,mode:mode};
   const yaw=h=>new THREE.Euler(0,-h*Math.PI/180,0,'YXZ');
   st.base=BASES[base]?base:'kgeu';
   st.flapIdx=1;
@@ -999,6 +999,10 @@ function step(st,dt,ev){
   st.gust+=(st.gustTarget-st.gust)*Math.min(1,dt*1.2);
   const wd=st.windDir*Math.PI/180, ws=Math.max(0,st.windKt*0.5144*(1+st.gust))*clamp(0.55+0.45*agl/30,0.55,1);
   _w.set(-Math.sin(wd)*ws,0,Math.cos(wd)*ws);
+  // haboob turbulence: a slow random vertical gust and a roll/pitch buffet, both scaled by
+  // how deep in the dust we are (st.dust, set by hbUpdate; 0 everywhere else)
+  if(st.dust>0){st.tvT-=dt;if(st.tvT<=0){st.tvT=0.5+Math.random();st.tvTarget=(Math.random()*2-1)*3;st.bp=Math.random()*2-1;st.br=Math.random()*2-1;}
+    st.tv+=(st.tvTarget-st.tv)*Math.min(1,dt*1.5);_w.y+=st.tv*st.dust;}
   _air.copy(st.vel).sub(_w);
   const Va=_air.length(), rho=1.097*Math.exp(-st.pos.y/9200), rr=rho/1.225, qd=0.5*rho*Va*Va;
   st.ias=Va*Math.sqrt(rr);
@@ -1040,6 +1044,7 @@ function step(st,dt,ev){
   if(AC.pf&&!st.noPF&&!st.onGround) ay+=st.power*(0.015+0.05*(1-clamp(Va/60,0,1)));
   if(stalled) az+=qn*1.1*st.dropDir;
   if(st.apW) st.w.copy(st.apW); else {st.w.x+=ax*dt; st.w.y+=ay*dt; st.w.z+=az*dt;}
+  if(st.dust>0&&!st.onGround){const k=st.dust*clamp(qn,0.3,1.5)*dt;st.w.x+=(st.bp*0.3+0.12*Math.sin(st.time*7.3))*k;st.w.z+=(st.br*0.5+0.2*Math.sin(st.time*9.1+1))*k;}
   const ang=st.w.length()*dt;
   if(ang>1e-9){_ax.copy(st.w).normalize();_dq.setFromAxisAngle(_ax,ang);q.multiply(_dq);q.normalize();}
   const hit=hitObstacle(st.pos.x,st.pos.z,st.pos.y);
@@ -1082,6 +1087,8 @@ function step(st,dt,ev){
   st.time+=dt;
   // variable wind: the direction wanders about 25 degrees either side of the base, slowly
   st.windDir=((st.windBase+17*Math.sin(st.time*0.011+st.windPh)+8*Math.sin(st.time*0.037+st.windPh*2.3))%360+360)%360;
+  // in a haboob the wind swings round to blow from where the wall comes from
+  if(st.dust>0){const dd=((st.dustDir-st.windDir)%360+540)%360-180;st.windDir=((st.windDir+dd*st.dust)%360+360)%360;}
 }
 
 // ---------- autopilot: attitude-command inner loop, speed/path outer loops ----------
@@ -3302,16 +3309,23 @@ const TOD_SET={
           fog:[3000,38000], night:false, lights:0.55, stars:0.15},
   night: {id:'night', name:'Night',  haze:0x0d1220, top:0x05070f, sun:0x9ab4e8, sunI:0.14,
           sunPos:[0.42,0.52,-0.55], hemiSky:0x1d2740, hemiGnd:0x0e0c14, hemiI:0.26,
-          fog:[2200,30000], night:true, lights:1.0, stars:1}
+          fog:[2200,30000], night:true, lights:1.0, stars:1},
+  // late afternoon with a haboob coming: these are the clear air values ahead of the
+  // wall; hbUpdate pulls fog, haze, sun and wind toward the storm as you get into it
+  haboob:{id:'haboob',name:'Haboob', haze:0xd9b48a, top:0x6d84a2, sun:0xffc07a, sunI:0.85,
+          sunPos:[-0.8,0.3,0.4], hemiSky:0xf2d4ae, hemiGnd:0x7e5e44, hemiI:0.62,
+          fog:[5000,45000], night:false, lights:0.4, stars:0}
 };
 let TOD=TOD_SET.day;
 let starField=null,cloudMat=null;
 // cloud colour and self-glow per preset: white by day, warm at sunset, dark
 // blue-grey at night so they never read as flat grey cutouts on the night sky
-const CLOUD_TOD={day:[0xffffff,0x6f7780],sunset:[0xffe2c8,0x5e4a48],night:[0x232a38,0x0d1119]};
-function skyPaint(){
+const CLOUD_TOD={day:[0xffffff,0x6f7780],sunset:[0xffe2c8,0x5e4a48],night:[0x232a38,0x0d1119],haboob:[0xf0e2d0,0x6a5c50]};
+const _skyTop=new THREE.Color(),_skyCol=new THREE.Color(),HB_DUST=new THREE.Color(0xb8722e);
+// k pulls the zenith toward the dust colour (the haboob): 0 is the plain preset
+function skyPaint(k){
   const p=sky.geometry.attributes.position,c=sky.geometry.attributes.color;
-  const top=new THREE.Color(TOD.top),col=new THREE.Color();
+  const top=_skyTop.setHex(TOD.top),col=_skyCol;if(k)top.lerp(HB_DUST,k);
   for(let i=0;i<p.count;i++){const t=clamp(p.getY(i)/80000,0,1);
     col.copy(HAZE).lerp(top,Math.pow(t,0.5));c.setXYZ(i,col.r,col.g,col.b);}
   c.needsUpdate=true;
@@ -3331,7 +3345,167 @@ function setTOD(id){
   for(const L of AL_LAYERS)if(L.pts)L.pts.visible=TOD.lights>0;
   if(cloudMat){const c=CLOUD_TOD[TOD.id]||CLOUD_TOD.day;cloudMat.color.setHex(c[0]);cloudMat.emissive.setHex(c[1]);}
   const b=document.getElementById('todV');if(b)b.textContent=TOD.name;
+  hbSync(false);
   document.querySelectorAll('.pick[data-tod]').forEach(e=>e.classList.toggle('sel',e.dataset.tod===TOD.id));
+}
+
+// ---------- haboob ----------
+// The Haboob preset brings a dust storm in from the south-east: a wall about 24 km
+// wide (tapering away over the last 3 km each side) and 2 km tall on a shallow arc, moving north-west at 18 m/s. The face is two
+// staggered layers of curtain panels (one merged mesh each) with a scrolling canvas
+// noise texture and a lobed, boiling top edge done in the fragment shader; a ground
+// skirt runs ahead of it, and a backdrop, side walls and a lid close the 15 km deep
+// body so you never see clear sky through it. Seven draw calls in all. How deep the
+// player is in the dust (HB.d, 0..1) drives fog, haze, light, wind and turbulence.
+// The wall materials skip scene fog (it would wash the wall out at distance) and do
+// their own, which only closes in once you are in the dust.
+const HB={on:false,built:false,st:null,g:null,sun:null,U:null,C:new V3(),T:new V3(),Lat:new V3(),
+  hdg:330,spd:18,W:24000,TAPER:3000,H:2000,R:150000,DEPTH:15000,kt0:8,ktPrev:5,
+  dist:1e9,d:0,t:0,snap:false,called:false,t6:false,paintD:-1,dirty:false};
+const _hbV=new V3();
+// n panels on the arc; heights fall off over the last HB.TAPER metres at each end
+function hbStrip(n,off,h0,h1,jit,ov,out){
+  const W=HB.W,R=HB.R,tap=s=>{const t=clamp((W/2-Math.abs(s))/HB.TAPER,0,1);return 0.12+0.88*t*(2-t);};
+  for(let i=0;i<n;i++){
+    const sc=-W/2+(i+0.5)*W/n+(jit?(Math.random()-0.5)*W/n*0.15:0),hw=W/n*ov/2,
+      H=h0+Math.random()*(h1-h0),z0=off+(jit?(Math.random()-0.5)*jit:0),seed=Math.random()*6.28,k=out.P.length/3,
+      lh=0.75+Math.random()*0.5,lw=0.75+Math.random()*0.5;   // this panel's lobe height and width
+    for(const e of [-1,1]){const s=sc+e*hw,z=s*s/(2*R)+z0;
+      const Hs=H*tap(s);for(const vy of [0,1]){out.P.push(s,vy*Hs,z);out.UV.push(s/1000,vy*Hs/1000);out.E.push(clamp((s+W/2)/W,0,1),vy,seed);out.L.push(e,lh,lw);}}
+    out.I.push(k,k+2,k+1,k+1,k+2,k+3);
+  }
+  return out;
+}
+function hbGeo(o){const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(o.P,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(o.UV,2));
+  g.setAttribute('aE',new THREE.Float32BufferAttribute(o.E,3));g.setAttribute('aL',new THREE.Float32BufferAttribute(o.L,3));g.setIndex(o.I);g.computeBoundingSphere();return g;}
+function hbBuild(){
+  if(HB.built)return;HB.built=true;
+  // tileable turbulence: soft light and dark puffs, each drawn wrapped around the edges
+  const nt=tex(256,256,(x,w,h)=>{x.fillStyle='#808080';x.fillRect(0,0,w,h);
+    for(let i=0;i<320;i++){const r=6+Math.pow(Math.random(),2)*60,cx=Math.random()*w,cy=Math.random()*h,a=0.08+Math.random()*0.16,c=Math.random()<0.55?'255,255,255':'0,0,0';
+      const gr=x.createRadialGradient(0,0,0,0,0,r);gr.addColorStop(0,'rgba('+c+','+a+')');gr.addColorStop(1,'rgba('+c+',0)');x.fillStyle=gr;
+      for(let ox=-1;ox<=1;ox++)for(let oy=-1;oy<=1;oy++){const px=cx+ox*w,py=cy+oy*h;if(px+r<0||px-r>w||py+r<0||py-r>h)continue;
+        x.setTransform(1,0,0,1,px,py);x.fillRect(-r,-r,2*r,2*r);}
+      x.setTransform(1,0,0,1,0,0);}},[1,1]);
+  const U={uTex:{value:nt},uT:{value:0},uFN:{value:3e4},uFF:{value:1.2e5},uFogC:{value:HAZE.clone()},uVis:{value:1}};HB.U=U;
+  const vs=`#include <common>
+#include <logdepthbuf_pars_vertex>
+attribute vec3 aE;attribute vec3 aL;varying vec2 vUv;varying vec3 vE;varying vec3 vMv;varying vec3 vL;
+void main(){vUv=uv;vE=aE;vL=aL;vec4 mv=modelViewMatrix*vec4(position,1.0);vMv=mv.xyz;gl_Position=projectionMatrix*mv;
+  #include <logdepthbuf_vertex>
+}`;
+  const fs=`#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform sampler2D uTex;uniform float uT,uSpd,uOpa,uLobe,uFN,uFF,uSkirt,uSc,uVis,uPan,uPh,uEnd;uniform vec3 uLit,uMid,uDark,uFogC;
+varying vec2 vUv;varying vec3 vE;varying vec3 vMv;varying vec3 vL;
+void main(){
+  #include <logdepthbuf_fragment>
+  vec2 p=vUv*uSc+vec2(uPh*0.37,uPh*0.61);
+  float n1=texture2D(uTex,p+vec2(uT*0.004,-uT*0.011)*uSpd).r;
+  float n2=texture2D(uTex,p*2.3+vec2(-uT*0.009,-uT*0.019)*uSpd+0.37).r;
+  float n=n1*0.6+n2*0.4,u=vE.x,v=vE.y,x=vUv.x;
+  float ne=texture2D(uTex,vec2(x*0.35+uT*0.002*uSpd+uPh,0.5+uPh*0.3)).r,lw=vL.z,ph=vE.z+uPh;
+  float edge=0.72+uLobe*vL.y*(0.13*abs(sin(x*2.4/lw+uT*0.03*uSpd+ph))+0.06*abs(sin(x*6.3/lw-uT*0.05*uSpd+ph*2.0))+(ne-0.5)*0.25+(n-0.5)*0.06);
+  float a=1.0-smoothstep(edge-0.1,edge+0.02,v);
+  a*=smoothstep(0.0,uEnd,u)*smoothstep(1.0,1.0-uEnd,u)*(1.0-uPan*smoothstep(0.62,1.0,abs(vL.x)));
+  vec3 c=mix(uDark,uMid,smoothstep(0.02,0.5,v));
+  c=mix(c,uLit,smoothstep(0.45,0.95,v)*(0.3+0.8*n));
+  c*=0.7+0.6*n;
+  c=mix(c,uDark*0.75,(1.0-smoothstep(0.0,0.22,v))*uSkirt);
+  float f=smoothstep(uFN,uFF,length(vMv));c=mix(c,uFogC,f);
+  gl_FragColor=vec4(c,clamp(a*uOpa*uVis*(1.0-0.8*f*f),0.0,1.0));   // far parts melt into the haze
+}`;
+  const mat=(o)=>new THREE.ShaderMaterial({uniforms:Object.assign({uPan:{value:o.pan||0},uPh:{value:o.ph||0},uEnd:{value:o.end||HB.TAPER/HB.W},uSpd:{value:o.spd},uOpa:{value:o.opa},uLobe:{value:o.lobe},uSkirt:{value:o.skirt},uSc:{value:o.sc},
+      uLit:{value:new THREE.Color(o.lit)},uMid:{value:new THREE.Color(o.mid)},uDark:{value:new THREE.Color(o.dark)}},U),
+    vertexShader:vs,fragmentShader:fs,transparent:true,depthWrite:false,side:THREE.DoubleSide,fog:false});
+  const g=new THREE.Group();g.name='haboob';g.visible=false;
+  const E=()=>({P:[],UV:[],E:[],I:[],L:[]});
+  const add=(o,m,ro)=>{const me=new THREE.Mesh(hbGeo(o),m);me.renderOrder=ro;me.frustumCulled=false;g.add(me);return me;};
+  // back to front, so the transparent layers blend in the right order from outside
+  {const o=E();   // lid: flat over the body
+   const w=HB.W-2*HB.TAPER,L=HB.DEPTH,y=1250;const nx=4,nz=6;
+   for(let j=0;j<=nz;j++)for(let i=0;i<=nx;i++){const s=-w/2+w*i/nx,z=L*j/nz+s*s/(2*HB.R)+300;
+     o.P.push(s,y,z);o.UV.push(s/1000,z/1000);o.E.push(i/nx,0.45,0);o.L.push(j/nz,1,1);}
+   for(let j=0;j<nz;j++)for(let i=0;i<nx;i++){const k=j*(nx+1)+i;o.I.push(k,k+nx+1,k+1,k+1,k+nx+1,k+nx+2);}
+   add(o,mat({pan:1,end:0.3,spd:0.5,opa:1,lobe:0,skirt:0,sc:0.5,lit:0xc49060,mid:0xa87044,dark:0x7a4e2c}),1);}
+  {const o=E();   // side walls down the length of the body, fading at the far end
+   for(const sd of [-1,1]){const s=sd*(HB.W/2-HB.TAPER*1.2);const ZS=[0,3500,HB.DEPTH*0.5,HB.DEPTH*0.75,HB.DEPTH];for(let j=0;j<4;j++){const z0=ZS[j]+s*s/(2*HB.R)+200,z1=ZS[j+1]+s*s/(2*HB.R)+200+(j<3?300:0),H=1500+Math.random()*250,k=o.P.length/3,seed=Math.random()*6;
+     for(const z of [z0,z1])for(const vy of [0,1]){o.P.push(s,vy*H,z);o.UV.push(z/1000,vy*H/1000);const zr=z-s*s/(2*HB.R)-200;o.E.push(zr<HB.DEPTH*0.5?0.02+0.48*clamp(zr/3500,0,1):0.5+0.5*clamp((zr-HB.DEPTH*0.7)/(HB.DEPTH*0.3),0,0.99),vy,seed);o.L.push(0,0.8+Math.random()*0.4,0.8+Math.random()*0.4);}
+     o.I.push(k,k+2,k+1,k+1,k+2,k+3);}}
+   add(o,mat({end:0.25,spd:0.7,opa:1,lobe:1,skirt:0.8,sc:0.8,lit:0xc88a50,mid:0xa2622c,dark:0x5a3618}),2);}
+  add(hbStrip(16,1500,1800,1800,0,1,E()),mat({ph:3.1,spd:0.5,opa:1,lobe:0.6,skirt:0.6,sc:0.7,lit:0xb67c48,mid:0x94582a,dark:0x5a3618}),3);   // backdrop
+  add(hbStrip(16,380,2000,2400,260,1.4,E()),mat({pan:1,ph:1.7,spd:0.55,opa:1,lobe:1.2,skirt:1,sc:0.8,lit:0xcf9258,mid:0xa2602a,dark:0x5c3718}),4);  // back layer
+  add(hbStrip(16,0,1650,2100,220,1.35,E()),mat({pan:1,spd:1,opa:1,lobe:1.1,skirt:1,sc:0.9,lit:0xdca068,mid:0xb46e34,dark:0x66401e}),5);    // front layer
+  add(hbStrip(14,-380,160,260,160,1.5,E()),mat({pan:1,ph:0.8,spd:3,opa:0.72,lobe:1.5,skirt:0.3,sc:1.6,lit:0xd8aa78,mid:0xc0884e,dark:0x946236}),6);  // ground skirt ahead
+  scene.add(g);HB.g=g;
+  const sg=tex(64,64,(x,w,h)=>{const gr=x.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2);
+    gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(0.32,'rgba(255,255,255,0.95)');gr.addColorStop(0.42,'rgba(255,255,255,0.3)');gr.addColorStop(1,'rgba(255,255,255,0)');
+    x.fillStyle=gr;x.fillRect(0,0,w,h);});
+  HB.sun=new THREE.Sprite(new THREE.SpriteMaterial({map:sg,color:0xffe2bc,transparent:true,opacity:0,depthWrite:false,fog:false}));
+  HB.sun.scale.setScalar(4000);HB.sun.renderOrder=7;HB.sun.visible=false;scene.add(HB.sun);
+}
+// the wall's centre goes m metres upwind of the player (the front m metres ahead of them)
+function hbPlace(m){HB.C.copy(st.pos).addScaledVector(HB.T,-m);HB.C.y=0;HB.snap=true;}
+function hbSpawn(){
+  hbBuild();
+  const h=HB.hdg*Math.PI/180;HB.T.set(Math.sin(h),0,-Math.cos(h));HB.Lat.set(Math.cos(h),0,Math.sin(h));
+  HB.g.rotation.y=-h;
+  HB.on=true;HB.st=st;HB.called=false;HB.t6=false;HB.d=0;HB.paintD=-1;
+  HB.ktPrev=st.windKt;st.windKt=HB.kt0;st.dustDir=(HB.hdg+180)%360;
+  hbPlace(4500);hbUpdate(0);
+}
+// put back the clear air values the storm pulled on
+function hbRestore(){
+  if(!HB.dirty)return;HB.dirty=false;
+  HAZE.setHex(TOD.haze);scene.fog.color.copy(HAZE);scene.fog.near=TOD.fog[0];scene.fog.far=TOD.fog[1];skyPaint();
+  sun.intensity=TOD.sunI;hemi.intensity=TOD.hemiI;
+}
+function hbClear(){
+  if(HB.st===st&&HB.on){st.dust=0;st.gustAmp=0.35;st.windKt=HB.ktPrev;}
+  HB.on=false;HB.st=null;HB.d=0;HB.dist=1e9;
+  if(HB.built){HB.g.visible=false;HB.sun.visible=false;}
+  hbRestore();
+}
+function hbSync(force){
+  const want=TOD.id==='haboob'&&running;HB.paintD=-1;if(!force)HB.dirty=false;   // setTOD has just put the clear values back
+  if(want&&(force||!HB.on||HB.st!==st))hbSpawn();
+  else if(!want&&HB.on)hbClear();
+}
+function hbUpdate(dt){
+  if(!HB.on)return;
+  if(HB.st!==st){hbSpawn();return;}
+  if(running&&!paused&&!st.crashed)HB.C.addScaledVector(HB.T,HB.spd*dt);
+  if(!paused)HB.t+=dt;
+  const px=st.pos.x-HB.C.x,pz=st.pos.z-HB.C.z,al=px*HB.T.x+pz*HB.T.z,s=px*HB.Lat.x+pz*HB.Lat.z,sc=clamp(s,-HB.W/2,HB.W/2);
+  const dist=al+sc*sc/(2*HB.R);HB.dist=dist;
+  // dust blows ahead of the wall; thick from 500 m behind the front, thin above it and past the sides
+  let tgt=clamp((1500-dist)/2000,0,1);
+  tgt*=1-clamp((-dist-(HB.DEPTH-500))/1000,0,1);
+  tgt*=1-clamp((Math.abs(s)-(HB.W/2-HB.TAPER))/HB.TAPER,0,1);
+  tgt*=1-clamp((st.agl-1900)/600,0,1);
+  let d=HB.snap?tgt:HB.d+(tgt-HB.d)*Math.min(1,dt*1.5);HB.snap=false;
+  if(tgt===0&&d<0.003)d=0;
+  HB.d=d;st.dust=d;st.dustDir=(HB.hdg+180)%360;
+  st.windKt=HB.kt0+(35-HB.kt0)*Math.sqrt(d);st.gustAmp=0.35+0.65*d;   // the outflow wind runs ahead of the dust
+  const fn=5000+(150-5000)*d,ff=45000+(1200-45000)*Math.sqrt(d);
+  scene.fog.near=fn;scene.fog.far=ff;
+  HAZE.setHex(TOD.haze).lerp(HB_DUST,d);scene.fog.color.copy(HAZE);HB.dirty=true;
+  if(Math.abs(d-HB.paintD)>0.02||(d===0&&HB.paintD!==0)){HB.paintD=d;skyPaint(d);}
+  sun.intensity=TOD.sunI+(0.35-TOD.sunI)*d;hemi.intensity=TOD.hemiI*(1-0.45*d);
+  // the dim sun disc, only there when the dust is
+  const sp=HB.sun;sp.visible=d>0.01;
+  if(sp.visible){_hbV.copy(sun.position).normalize();sp.position.copy(camera.position).addScaledVector(_hbV,30000);sp.material.opacity=0.75*d;}
+  // the wall hands over to the fog once you are into it
+  const vis=1-clamp((d-0.55)/0.35,0,1);HB.g.visible=vis>0.001;
+  if(HB.g.visible){const U=HB.U;HB.g.position.set(HB.C.x,groundHeight(HB.C.x,HB.C.z)-200,HB.C.z);
+    U.uT.value=HB.t;U.uVis.value=vis;U.uFogC.value.copy(HAZE);U.uFN.value=4000+(fn-4000)*d;U.uFF.value=26000+(ff-26000)*d;}
+  if(running&&!st.crashed){
+    if(!HB.t6&&dist<6000&&dist>-500){HB.t6=true;toast('Haboob approaching from the south-east',4);}
+    if(!HB.called&&dist<3000&&dist>-HB.DEPTH){HB.called=true;const lk=st.base==='luke',B=BASES[st.base]||BASES.kgeu;
+      say(B.twr,'Attention all aircraft, '+(lk?'Luke':'Glendale')+' Tower, visibility one half mile in blowing dust, wind gusting five zero knots, use caution.',['t_haboob_'+(lk?'luke':'glendale')]);
+      if(rookie())toast('Dust storm! Land now or fly away from it',5);}
+  }
 }
 
 // ---------- terrain ----------
@@ -5936,7 +6110,7 @@ $('pPhoto').onclick=photoOpen;$('phX').onclick=photoClose;$('phSave').onclick=ph
 const menu=document.getElementById('menu'),crashEl=document.getElementById('crash');
 function start(mode,base){
   initAudio();
-  setType(acType);useModel(acType);sizeShadow();radioQ.length=0;
+  setType(acType);useModel(acType);sizeShadow();radioQ.length=0;atcT=0;atcEl.classList.remove('on');
   st=createState(mode,base||SPAWN_BASE);st.type=acType;ROOK.to=false;guideShow(null);st.easy=easy;st.noPF=isTouch||easy;document.body.classList.toggle('easy',easy);A={};running=true;paused=false;events.length=0;cfgReset();camBump=0;
   menuClose();crashEl.classList.remove('on');pauseOv.classList.remove('on');$('storyOv').classList.remove('on');snapCamera=true;
   if(camMode>1)camMode=0;   // the ball view is entered in flight, where its autopilot can take over
@@ -5945,6 +6119,7 @@ function start(mode,base){
   document.getElementById('recOv').classList.remove('on');DASH.on=false;badgeHide();
   if(mode==='range')strikeStart();
   if(mode==='drop'||mode==='short')missStart(mode==='drop'?'drop':'short');
+  hbSync(true);
   layoutCtl();
 }
 const pauseOv=$('pauseOv');
@@ -6789,7 +6964,7 @@ function renderIR(){
   if(irDirty||performance.now()-IR.t>1000)irTag();
   const inv=SENSOR.mode==='irb',u=IR_MAT.uniforms,night=TOD.night;
   u.uInvert.value=inv?1:0;u.uTime.value=(performance.now()/1000)%97;
-  u.uAmb.value=night?0.06:TOD.id==='sunset'?0.1:0.13;u.uShade.value=night?0.05:0.14;
+  u.uAmb.value=night?0.06:TOD.id==='sunset'||TOD.id==='haboob'?0.1:0.13;u.uShade.value=night?0.05:0.14;
   camera.updateMatrixWorld();
   _irSun.copy(sun.position).normalize().transformDirection(camera.matrixWorldInverse);u.uSun.value.copy(_irSun);
   // the sky is cold; the haze fades to it
@@ -6948,7 +7123,7 @@ for(let i=0;i<FIRE_MAX;i++){
 function lightFire(x,z,y0,sec){let n=0;
   for(const f of fires){if(f.on||n>=3)continue;f.on=true;f.x=x;f.z=z;f.y0=y0;f.left=sec||1e9;f.sp.visible=true;n++;}}
 // how lit unlit smoke should look: full by day, dim at dusk, dark at night; flat grey in IR
-function fxLit(){return camMode===2&&SENSOR.mode!=='tv'?-1:TOD.night?0.16:TOD.id==='sunset'?0.6:1;}
+function fxLit(){return camMode===2&&SENSOR.mode!=='tv'?-1:TOD.night?0.16:TOD.id==='sunset'||TOD.id==='haboob'?0.6:1;}
 function fireUpdate(dt){
   windVec(_fw);const lit=fxLit();
   for(const f of fires){if(!f.on)continue;f.t+=dt;f.left-=dt;
@@ -7675,7 +7850,7 @@ function tick(t,skipRender){
     sensorHudUpdate();}
   if(camBump>0){camBump=Math.max(0,camBump-dt*2.4);const k=camBump*camBump*1.3;
     camera.position.x+=(Math.random()-0.5)*k;camera.position.y+=(Math.random()-0.5)*k*1.5;camera.position.z+=(Math.random()-0.5)*k;}
-  camera.updateProjectionMatrix();sky.position.copy(camera.position);
+  camera.updateProjectionMatrix();sky.position.copy(camera.position);hbUpdate(paused?0:dt);
   if(sensOn)tgtMarkUpdate(dt);else if(TM.shown)tgtMarkHide();
   // PAPI
   PAPI.forEach(pp=>{const eye=camera.position,du=(toU(eye.x,eye.z)-pp.u)*pp.dir;const ang=du<0?Math.atan2(eye.y-0.9,-du)*180/Math.PI:10;
@@ -7687,7 +7862,7 @@ function tick(t,skipRender){
   mapT-=dt;if(mapT<=0){mapT=0.1;drawMap(hdgT);}
   hudT-=dt;
   if(hudT<=0){hudT=0.08;
-    {const wd=Math.round(s.windDir/10)*10||360,wk=Math.round(s.windKt*(1+s.gust));hWindT.textContent=String(wd).padStart(3,'0')+'\u00b0 '+Math.max(1,wk)+' KT';
+    {const wn=windNow();hWindT.textContent=wn[0]+'\u00b0 '+wn[1]+' KT';   // the same wind the tower reads out
      // the arrow shows which way the wind is blowing, relative to your nose
      const rel=(s.windDir+180)-(-new THREE.Euler().setFromQuaternion(s.quat,'YXZ').y*180/Math.PI);hWindA.parentNode.style.transform='rotate('+rel.toFixed(0)+'deg)';}
     if(rookie()){hIas.innerHTML=Math.round(s.ias*MS2KT*1.15078)+'<small>mph</small>';
@@ -7723,7 +7898,10 @@ window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,tou
   acLights:()=>({count:plane.lights?plane.lights.count:0,landingOn:ACL_STATE.on,poolOpacity:ACL_STATE.pool,
     inGroup:!!(plane.lights&&plane.lights.pts.parent===plane.g),traffic:TRAFFIC.map(o=>o.m.lights?o.m.lights.count:0)}),
   cloudMat:()=>({color:cloudMat.color.getHex(),emissive:cloudMat.emissive.getHex()}),
-  setTOD:setTOD,isNight:isNight,TOD:()=>TOD,drawSixPack:drawSixPack,SP_CELL:SP_CELL,
+  setTOD:setTOD,isNight:isNight,TOD:()=>TOD,
+  haboob:()=>({on:HB.on,dist:HB.on?HB.dist:null,d:HB.d,windKt:st.windKt,gustAmp:st.gustAmp,fogNear:scene.fog.near,called:HB.called,
+    wallVisible:!!(HB.g&&HB.g.visible),C:[HB.C.x,HB.C.z],T:[HB.T.x,HB.T.z],sunDisc:!!(HB.sun&&HB.sun.visible),dustDir:st.dustDir,windDir:st.windDir}),
+  haboobJump:(m)=>{if(HB.on){hbPlace(m);hbUpdate(0);}},drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
   RADIO:RADIO,radioQ:()=>radioQ,radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},

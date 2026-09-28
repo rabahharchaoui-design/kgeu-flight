@@ -61,6 +61,8 @@ TOWER = {
     'report_initial': 'report initial.',
     'crash':          'Crash, crash, crash. Emergency vehicles are rolling.',
     'luke_security':  'you just landed at Luke Air Force Base. Hold position, security is on the way.',
+    'haboob_luke':     'Attention all aircraft, Luke Tower, visibility one half mile in blowing dust, wind gusting five zero knots, use caution.',
+    'haboob_glendale': 'Attention all aircraft, Glendale Tower, visibility one half mile in blowing dust, wind gusting five zero knots, use caution.',
 
     'wind':   'wind',
     'at':     'at',
