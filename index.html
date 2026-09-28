@@ -469,6 +469,13 @@ label.sens b{ color:var(--ink); min-width:74px; }
 #phSave{ bottom:var(--padB); left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:8px; padding:0 22px; min-height:52px !important; font-size:18px; letter-spacing:.08em; background:var(--rust) !important; color:#fff4e0 !important; }
 .phHint{ position:absolute; top:var(--padT); left:50%; transform:translateX(-50%); margin:0; font:700 13px var(--font); color:var(--sand); background:rgba(26,16,9,.6); padding:6px 12px; border-radius:10px; pointer-events:none; }
 #pauseOv .ph{ display:flex; align-items:center; justify-content:center; gap:8px; }
+/* music in the pause sheet: on/off, volume and next song beside the Change flight title */
+.pzR .pzH{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:3px 4px 3px 12px; }
+.pzH > span{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.pzMus{ display:flex; align-items:center; gap:6px; flex:none; }
+.pzMus button{ min-height:44px; min-width:44px; padding:0 10px; font-size:14px; font-weight:800; white-space:nowrap; touch-action:none; background:rgba(246,193,119,.1); color:var(--sand); border:2px solid rgba(246,193,119,.22); border-radius:12px; }
+#pauseOv .pzMus .tog.on{ background:var(--sand); color:var(--night); border-color:var(--sand); box-shadow:none; }
+.pzMus input[type=range]{ width:clamp(70px,12vw,130px); height:44px; accent-color:var(--orange); margin:0; }
 body.photoOn #uiroot, body.photoOn #badges, body.photoOn #sixpack, body.photoOn #tutArrow, body.photoOn #miss, body.photoOn #lesson{ display:none !important; }
 .aStars{ margin:0; font-size:54px; line-height:1; color:var(--orange); letter-spacing:4px; } .aStars u{ text-decoration:none; color:rgba(246,193,119,.22); }
 #arcOv .sheet{ max-width:560px; } #arcOv #aLines{ margin:0 0 12px; font-size:15px; } #arcOv button{ min-height:44px; }
@@ -685,11 +692,14 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
     <div class="srow"><span>Skill</span><div class="chips"><button class="pick chip sk" data-skill="rookie"><b>Rookie</b></button><button class="pick chip sk" data-skill="pilot"><b>Pilot</b></button></div></div>
     <div class="srow"><span>Radio</span><div class="chips"><button class="tog" id="oRadio">Radio: On</button>
       <label class="sens"><input type="range" id="oRvol" min="0" max="10" step="1" value="7" aria-label="Radio volume"><b id="oRvolV">70%</b></label></div></div>
-    <div class="srow"><span>Sound</span><div class="chips"><button class="tog" id="oSound">Sound: On</button></div></div>
+    <div class="srow"><span>Music</span><div class="chips"><button class="tog oMusic" id="oMusic">Music: On</button>
+      <label class="sens"><input type="range" class="oMvol" id="oMvol" min="0" max="10" step="1" value="6" aria-label="Music volume"><b class="oMvolV" id="oMvolV">60%</b></label></div></div>
+    <div class="srow"><span></span><div class="chips"><button class="oMnext" id="oMnext">Next song</button><button class="tog" id="oMfree">In free flight: Off</button></div></div>
    </div>
    <div class="setCol">
     <div class="srow"><span>Stick</span><div class="chips"><label class="sens"><input type="range" class="oSens" min="0" max="4" step="1" value="2" aria-label="Stick sensitivity"><b class="oSensV">Medium</b></label></div></div>
     <div class="srow"><span>Pitch</span><div class="chips"><button class="tog oInv">Invert pitch: Off</button></div></div>
+    <div class="srow"><span>Sound</span><div class="chips"><button class="tog" id="oSound">Sound: On</button></div></div>
     <div class="srow"><span>Help</span><div class="chips" id="helpRow"><button id="bHelp">Controls help</button><button id="bReplay">Replay first flight</button></div></div>
    </div>
   </div>
@@ -730,7 +740,7 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
    <button class="primary" id="pResume">Resume</button><button id="pPhoto" class="ph"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>Photo</button><button id="pRestart">Restart</button><button id="pSet">Settings</button><button id="pMenu">Main menu</button>
   </div>
   <div class="pzR">
-   <p class="pzT">Change flight</p>
+   <div class="pzT pzH"><span>Change flight</span><div class="pzMus"><button class="tog oMusic" id="pMusic">Music: On</button><input type="range" class="oMvol" id="pMvol" min="0" max="10" step="1" value="6" aria-label="Music volume"><button class="oMnext" id="pMnext">Next song</button></div></div>
    <div class="carx compact" id="carPause"></div>
    <div class="frows">
    <div class="frow"><div class="grp g2"><span class="glbl">Base</span>
@@ -5067,7 +5077,7 @@ function pollPad(dt){
   } else if(crashEl.classList.contains('on')&&edge(0))crashRetry();
   touchIn.padBrake=B(1)>0.5;padPrev=g.buttons.map(b=>b.value||(b.pressed?1:0));
 }
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&running&&!paused&&!st.crashed){togglePause();try{speechSynthesis.cancel();}catch(e){}}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&running&&!paused&&!st.crashed){togglePause();try{speechSynthesis.cancel();}catch(e){}}if(typeof musicTick==='function')musicTick();});
 document.addEventListener('gesturestart',e=>e.preventDefault());document.addEventListener('dblclick',e=>e.preventDefault());
 // No document wide touch handlers: a second finger must always reach its button. Zoom is
 // off through the viewport meta and touch-action:none on the scene and the controls.
@@ -5814,6 +5824,7 @@ function initAudio(){
     const horn=actx.createOscillator();horn.type='square';horn.frequency.value=640;hornG=actx.createGain();hornG.gain.value=0;horn.connect(hornG).connect(actx.destination);horn.start();
   }catch(e){actx=null;}
   try{radioBuild();radioLoad();}catch(e){}
+  try{musicBuild();musicTick();}catch(e){}
 }
 function squelch(){if(!actx||muted)return;try{const t=actx.currentTime,n=actx.sampleRate*0.07|0,b=actx.createBuffer(1,n,actx.sampleRate),d=b.getChannelData(0);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);
   const sr=actx.createBufferSource(),f=actx.createBiquadFilter(),g=actx.createGain();sr.buffer=b;f.type='bandpass';f.frequency.value=1900;g.gain.value=0.06;sr.connect(f).connect(g).connect(actx.destination);sr.start(t);}catch(e){}}
@@ -5897,6 +5908,156 @@ function radioUI(){
   const v=document.getElementById('oRvolV');if(v)v.textContent=Math.round(RADIO.vol*100)+'%';
 }
 
+// ---------- music (3.13) ----------
+// A shuffled playlist from assets/music/playlist.json, like a radio station: every
+// track once before any repeats, a 1.5 s equal power crossfade between songs, and a
+// dip under the tower's voice. It plays on the home screen, the menus, school,
+// missions and arcade; in free flight only when the player asks for it. Nothing is
+// fetched until music would actually play, one track at a time (plus the next one),
+// and a missing or broken file is skipped quietly: no errors, one try per session.
+// MUSIC.forced (the Red Flag Dogfight, when that mode exists) loops one file instead.
+const MUSIC={on:true,vol:0.6,free:false,forced:null,list:null,urls:Object.create(null),bad:Object.create(null),queue:[],last:null,
+  played:0,errors:0,hist:[],cache:Object.create(null),slots:[null,null],cur:-1,busy:false,tok:0,offAt:-1,tgt:-1,want:null,duckE:0,loading:false};
+try{const v=localStorage.getItem('kgeuMusicVol');if(v!==null&&v!==''&&isFinite(+v))MUSIC.vol=Math.max(0,Math.min(1,+v));
+    const o=localStorage.getItem('kgeuMusicOn');if(o!==null)MUSIC.on=o==='1';
+    MUSIC.free=localStorage.getItem('kgeuMusicFree')==='1';}catch(e){}
+const MUSIC_DIR='assets/music/',MUSIC_XF=1.5,MUSIC_DUCK=0.35;
+let musicGain=null,musicDuckG=null;
+// built from initAudio, so never before the first tap
+function musicBuild(){
+  if(!actx||musicGain)return;
+  try{musicDuckG=actx.createGain();musicDuckG.connect(actx.destination);
+    musicGain=actx.createGain();musicGain.gain.value=0;musicGain.connect(musicDuckG);
+    setInterval(musicTick,200);}catch(e){musicGain=null;}
+}
+// freeze a param where it is right now, then schedule from there
+function aHold(p,t){if(p.cancelAndHoldAtTime){try{p.cancelAndHoldAtTime(t);return;}catch(e){}}const v=p.value;p.cancelScheduledValues(t);p.setValueAtTime(v,t);}
+// equal power: sin in, cos out, as short linear segments (no setValueCurve overlap errors)
+function musicRamp(p,from,up,T){
+  p.setValueAtTime(up?0:from,T);
+  for(let k=1;k<=8;k++){const a=k/8*Math.PI/2;p.linearRampToValueAtTime(up?Math.sin(a):from*Math.cos(a),T+k/8*MUSIC_XF);}
+}
+function musicWanted(){
+  if(!MUSIC.on||muted||document.hidden)return false;
+  if(!running||menu.classList.contains('on'))return true;          // home and every menu screen
+  if(LES.on||MISS.on||STRIKE.active||ARC.on||MUSIC.forced)return true;
+  return MUSIC.free;                                                  // free flight: the player's choice
+}
+function musicManifest(){
+  if(MUSIC.loading)return;MUSIC.loading=true;
+  fetch(MUSIC_DIR+'playlist.json',{cache:'no-cache'}).then(r=>r.ok?r.json():[]).then(l=>{
+    if(MUSIC.list===null)MUSIC.list=Array.isArray(l)?l.filter(n=>typeof n==='string'&&n):[];
+  }).catch(()=>{if(MUSIC.list===null)MUSIC.list=[];});
+}
+function musicLoadBuf(name){
+  if(MUSIC.cache[name])return MUSIC.cache[name];
+  const url=MUSIC.urls[name]||MUSIC_DIR+encodeURI(name);
+  const p=fetch(url).then(r=>{if(!r.ok)throw new Error('missing');return r.arrayBuffer();})
+    .then(a=>new Promise((res,rej)=>{try{const q=actx.decodeAudioData(a,res,rej);if(q&&q.catch)q.catch(rej);}catch(e){rej(e);}}))
+    .catch(()=>{MUSIC.bad[name]=1;MUSIC.errors++;delete MUSIC.cache[name];
+      const i=MUSIC.queue.indexOf(name);if(i>=0)MUSIC.queue.splice(i,1);return null;});
+  MUSIC.cache[name]=p;return p;
+}
+function musicForcedName(){return MUSIC.forced&&!MUSIC.bad[MUSIC.forced]?MUSIC.forced:null;}
+// the next track: the forced loop, else the head of the shuffle (dealt again when empty,
+// never starting a new round with the song that just played)
+function musicNextName(){
+  const f=musicForcedName();if(f)return f;
+  if(!MUSIC.list)return null;
+  if(!MUSIC.queue.length){
+    const q=MUSIC.list.filter(n=>!MUSIC.bad[n]);if(!q.length)return null;
+    for(let i=q.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)),t=q[i];q[i]=q[j];q[j]=t;}
+    if(q.length>1&&q[0]===MUSIC.last){const j=1+Math.floor(Math.random()*(q.length-1)),t=q[0];q[0]=q[j];q[j]=t;}
+    MUSIC.queue=q;
+  }
+  return MUSIC.queue[0];
+}
+function musicKill(i){const s=MUSIC.slots[i];if(!s)return;MUSIC.slots[i]=null;try{s.src.stop();}catch(e){}try{s.src.disconnect();s.g.disconnect();}catch(e){}}
+function musicStop(){MUSIC.tok++;MUSIC.busy=false;musicKill(0);musicKill(1);MUSIC.cur=-1;}
+// start a track at audio time T in the free slot, crossfading out whatever is playing
+function musicStart(name,buf,loop,T){
+  const old=MUSIC.cur>=0?MUSIC.slots[MUSIC.cur]:null,i=MUSIC.cur===0?1:0,now=actx.currentTime;
+  musicKill(i);
+  const g=actx.createGain(),s=actx.createBufferSource();s.buffer=buf;s.loop=!!loop;s.connect(g);g.connect(musicGain);
+  g.gain.setValueAtTime(0,now);musicRamp(g.gain,1,true,T);s.start(T);
+  MUSIC.slots[i]={src:s,g:g,name:name,t0:T,end:loop?Infinity:T+buf.duration,loop:!!loop};MUSIC.cur=i;
+  if(old){const v=old.g.gain.value;aHold(old.g.gain,now);musicRamp(old.g.gain,v,false,T);
+    try{old.src.stop(T+MUSIC_XF+0.05);}catch(e){}old.end=Math.min(old.end,T+MUSIC_XF);}
+  MUSIC.played++;MUSIC.last=name;MUSIC.hist.push(name);if(MUSIC.hist.length>40)MUSIC.hist.shift();
+}
+function musicAdvance(T){
+  const name=musicNextName();if(!name)return;
+  const loop=name===musicForcedName(),tok=MUSIC.tok;MUSIC.busy=true;
+  musicLoadBuf(name).then(buf=>{
+    if(tok!==MUSIC.tok)return;MUSIC.busy=false;
+    if(!buf||!musicWanted())return;                    // a bad file: the next tick tries the next one
+    if(!loop){const k=MUSIC.queue.indexOf(name);if(k>=0)MUSIC.queue.splice(k,1);}
+    musicStart(name,buf,loop,Math.max(actx.currentTime+0.03,T));
+    // keep only what is playing and the next one decoded; songs are big
+    const nx=musicNextName(),keep={};MUSIC.slots.forEach(s=>{if(s)keep[s.name]=1;});if(nx)keep[nx]=1;
+    for(const k in MUSIC.cache)if(!keep[k])delete MUSIC.cache[k];
+    if(nx)musicLoadBuf(nx);
+  }).catch(()=>{if(tok===MUSIC.tok)MUSIC.busy=false;});
+}
+// five times a second: the level for this screen, song changes, the forced loop
+function musicTick(){
+  if(!actx||!musicGain)return;
+  try{
+    const now=actx.currentTime,want=musicWanted(),tgt=want?MUSIC.vol:0;
+    if(Math.abs(tgt-MUSIC.tgt)>1e-4){
+      const tc=want===MUSIC.want?0.03:muted?0.05:MUSIC_XF/4;      // a slider drag follows at once, a context change fades
+      aHold(musicGain.gain,now);musicGain.gain.setTargetAtTime(tgt,now,tc);MUSIC.tgt=tgt;}
+    MUSIC.want=want;
+    if(!want){if(MUSIC.offAt<0)MUSIC.offAt=now;else if(now-MUSIC.offAt>MUSIC_XF+0.1&&(MUSIC.cur>=0||MUSIC.busy))musicStop();return;}
+    MUSIC.offAt=-1;
+    if(MUSIC.list===null){musicManifest();return;}
+    if(MUSIC.busy)return;
+    const s=MUSIC.cur>=0?MUSIC.slots[MUSIC.cur]:null,f=musicForcedName();
+    if(!s||now>=s.end){musicAdvance(now);return;}
+    if((f&&s.name!==f)||(!f&&s.loop)){musicAdvance(now);return;}   // into or out of the dogfight loop
+    if(!s.loop&&now>=s.end-MUSIC_XF-0.3)musicAdvance(Math.max(now,s.end-MUSIC_XF));
+  }catch(e){}
+}
+function musicNext(){
+  if(!actx||!musicGain||MUSIC.busy||MUSIC.cur<0||!MUSIC.slots[MUSIC.cur]||!musicWanted())return;
+  musicAdvance(actx.currentTime+0.03);                 // the forced loop just starts again
+}
+// the tower's voice: down to 35% over a quarter second, back up over 0.8 s after
+function musicDuck(t0,end){
+  if(!musicDuckG)return;MUSIC.duckE=end;const p=musicDuckG.gain;
+  try{aHold(p,actx.currentTime);p.setTargetAtTime(MUSIC_DUCK,t0,0.25/3);p.setTargetAtTime(1,end,0.8/3);}catch(e){}
+}
+function musicUnduck(){
+  if(!musicDuckG||!actx||MUSIC.duckE<=actx.currentTime)return;MUSIC.duckE=0;const p=musicDuckG.gain,n=actx.currentTime;
+  try{aHold(p,n);p.setTargetAtTime(1,n,0.8/3);}catch(e){}
+}
+function setMusicOn(v){MUSIC.on=!!v;try{localStorage.setItem('kgeuMusicOn',MUSIC.on?'1':'0');}catch(e){}musicUI();musicTick();}
+function setMusicVol(v){MUSIC.vol=Math.max(0,Math.min(1,v));try{localStorage.setItem('kgeuMusicVol',String(MUSIC.vol));}catch(e){}musicUI();musicTick();}
+function setMusicFree(v){MUSIC.free=!!v;try{localStorage.setItem('kgeuMusicFree',MUSIC.free?'1':'0');}catch(e){}musicUI();musicTick();}
+function musicUI(){
+  document.querySelectorAll('.oMusic').forEach(b=>{b.textContent='Music: '+(MUSIC.on?'On':'Off');b.classList.toggle('on',MUSIC.on);});
+  document.querySelectorAll('.oMvol').forEach(r=>r.value=String(Math.round(MUSIC.vol*10)));
+  document.querySelectorAll('.oMvolV').forEach(v=>v.textContent=Math.round(MUSIC.vol*100)+'%');
+  const f=document.getElementById('oMfree');if(f){f.textContent='In free flight: '+(MUSIC.free?'On':'Off');f.classList.toggle('on',MUSIC.free);}
+}
+function musicState(){
+  const s=MUSIC.cur>=0?MUSIC.slots[MUSIC.cur]:null,m=musicGain?musicGain.gain.value:0,d=musicDuckG?musicDuckG.gain.value:1;
+  return {on:MUSIC.on,vol:MUSIC.vol,free:MUSIC.free,playing:s?s.name:null,queueLen:MUSIC.queue.length,played:MUSIC.played,forced:MUSIC.forced,
+    gain:m*d,master:m,duck:d,ducked:!!(actx&&MUSIC.duckE>actx.currentTime),errors:MUSIC.errors,want:musicWanted(),hist:MUSIC.hist.slice(),
+    xf:MUSIC.slots.map(x=>x?{name:x.name,g:x.g.gain.value}:null),list:MUSIC.list&&MUSIC.list.slice()};
+}
+// The first tap anywhere, the home screen included, unlocks audio so the music can start
+// there. Passive and capture only: it never prevents, captures or blocks another control.
+(function(){const ev=['pointerup','click','keydown'],f=()=>{initAudio();
+  if(actx&&actx.state==='running')ev.forEach(e=>window.removeEventListener(e,f,true));};
+  ev.forEach(e=>window.addEventListener(e,f,{capture:true,passive:true}));})();
+// tests: swap the manifest for a given list of {name,url} (or plain names)
+function musicLoadList(list){
+  musicStop();MUSIC.urls=Object.create(null);MUSIC.bad=Object.create(null);MUSIC.cache=Object.create(null);MUSIC.queue=[];MUSIC.last=null;MUSIC.errors=0;MUSIC.loading=true;
+  MUSIC.list=(list||[]).map(o=>{if(typeof o==='string')return o;MUSIC.urls[o.name]=o.url;return o.name;});
+  musicTick();
+}
+
 // clips load in the background once the context exists; a line with nothing loaded
 // still shows its text and clicks the squelch, which is a fine degraded mode
 function radioLoad(){
@@ -5920,7 +6081,7 @@ function radioSquelch(t){
 // returns how long the radio is busy, so the queue paces itself either way
 // one transmission at a time: a new one (a call to us cutting in, or a new flight)
 // stops whatever clips of the last one are still scheduled, so two never overlap
-function radioHush(){for(const s of RADIO.src){try{s.stop();}catch(e){}}RADIO.src.length=0;}
+function radioHush(){for(const s of RADIO.src){try{s.stop();}catch(e){}}RADIO.src.length=0;musicUnduck();}
 // Radio only talks while we are actually flying: never on the home screen, a menu,
 // the pause sheet or an end screen. The queue survives; it just waits.
 function radioLive(){return running&&!paused&&!menu.classList.contains('on');}
@@ -5948,7 +6109,7 @@ function radioSpeak(clips,textLen){
     s.onended=()=>{const i=RADIO.src.indexOf(s);if(i>=0)RADIO.src.splice(i,1);};t+=b.duration+0.025;}
   if(!any)return est;
   const end=t+0.05;
-  radioSquelch(end);
+  radioSquelch(end);musicDuck(t0,end+0.07);
   const g=staticG.gain;
   g.cancelScheduledValues(t0);g.setValueAtTime(0,t0);
   g.linearRampToValueAtTime(0.011,t0+0.06);
@@ -6272,6 +6433,7 @@ function start(mode,base){
   menuClose();crashClear();pauseOv.classList.remove('on');$('storyOv').classList.remove('on');snapCamera=true;
   if(camMode>1)camMode=0;   // the ball view is entered in flight, where its autopilot can take over
   STRIKE.active=false;lesEnd();gradeOv.classList.remove('on');arcStop();$('arcOv').classList.remove('on');
+  MUSIC.forced=null;   // a mode with its own song (the Red Flag Dogfight: MUSIC.forced='dogfight.m4a') sets it after start()
   missReset();missOv.classList.remove('on');landOv.classList.remove('on');
   document.getElementById('recOv').classList.remove('on');DASH.on=false;badgeHide();
   if(mode==='range')strikeStart();
@@ -6280,7 +6442,7 @@ function start(mode,base){
   layoutCtl();
 }
 const pauseOv=$('pauseOv');
-function openMenu(scr){if(running&&!st.crashed)paused=true;radioFade(120);pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
+function openMenu(scr){if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.forced=null;pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
 // the pause button, P and a backgrounded app all land here; the sheet shows while paused
 function togglePause(){paused=!paused;pauseOv.classList.toggle('on',paused);if(paused){radioFade(120);CARP.sync();if(window.stickReset)stickReset();}}
 $('pResume').onclick=()=>{paused=false;pauseOv.classList.remove('on');initAudio();radioVolApply();};
@@ -6325,7 +6487,13 @@ function soundUI(){const b=$('oSound');b.textContent='Sound: '+(muted?'Off':'On'
 try{muted=localStorage.getItem('kgeuMuted')==='1';}catch(e){}
 function setMuted(v){muted=!!v;if(muted&&window.speechSynthesis)speechSynthesis.cancel();try{localStorage.setItem('kgeuMuted',muted?'1':'0');}catch(e){}soundUI();}
 $('oSound').onclick=()=>{initAudio();setMuted(!muted);};
-easyUI();stickUI();radioUI();soundUI();
+$('oMusic').onclick=()=>{initAudio();setMusicOn(!MUSIC.on);};
+$('oMfree').onclick=()=>{initAudio();setMusicFree(!MUSIC.free);};
+$('oMnext').onclick=()=>{initAudio();musicNext();};
+tapBtn($('pMusic'),()=>{initAudio();setMusicOn(!MUSIC.on);});
+tapBtn($('pMnext'),()=>{initAudio();musicNext();});
+document.querySelectorAll('.oMvol').forEach(r=>r.addEventListener('input',e=>{initAudio();setMusicVol(+e.target.value/10);}));
+easyUI();stickUI();radioUI();soundUI();musicUI();
 // Add to Home Screen tip. iOS has no install prompt a page can trigger, so the
 // best we can do is say exactly where the button is, and only when it applies.
 (function(){
@@ -8258,7 +8426,7 @@ window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,tou
     wallVisible:!!(HB.g&&HB.g.visible),C:[HB.C.x,HB.C.z],T:[HB.T.x,HB.T.z],sunDisc:!!(HB.sun&&HB.sun.visible),dustDir:st.dustDir,windDir:st.windDir}),
   haboobJump:(m)=>{if(HB.on){hbPlace(m);hbUpdate(0);}},drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
-  RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
+  RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicLoad:musicLoadList,musicTick:musicTick,MUSIC:MUSIC,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
   stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&{apt:DEST.rwy.apt,num:DEST.num},fmOpen:fmOpen,fmClose:fmClose,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
