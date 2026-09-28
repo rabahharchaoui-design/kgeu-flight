@@ -3604,6 +3604,7 @@ for(const c of CONNECT) boxLocal(0.25,0.9,2.2,signM,c+14,-62,0.3);
 // (runs toward the threshold twice a second, phase = order), 3 rotating beacon.
 const AL_K=700,AL_MIN=2.5,AL_MAX=7;       // CSS px: K/w clamped to [MIN,MAX], times pixel ratio
 const AL_LAYERS=[];
+let AL_TFREEZE=null;                     // test hook: a fixed light clock (s), null = real time
 const AL_MAT=new THREE.ShaderMaterial({
   uniforms:{uLights:{value:0},uTime:{value:0},uCam:{value:new V3()},uPR:{value:1},uMono:{value:0}},
   vertexShader:`#include <common>
@@ -3635,12 +3636,13 @@ void main(){
   #include <logdepthbuf_fragment>
   float r=length(gl_PointCoord-0.5);
   if(r>0.5)discard;
-  float a=r<0.35?1.0:1.0-(r-0.35)/0.15;a*=a;
-  vec3 c=mix(vCol,vec3(1.0),0.35*clamp(1.0-r/0.3,0.0,1.0));
-  if(uMono>0.5){float g=clamp(max(c.r,max(c.g,c.b))*vI,0.0,1.0);
+  float I=abs(vI),a;vec3 c;
+  if(vI<0.0){a=r<0.14?1.0:exp(-(r-0.14)*9.0)*(1.0-smoothstep(0.4,0.5,r));c=mix(vCol,vec3(1.0),0.4*clamp(1.0-r/0.14,0.0,1.0));}
+  else{a=r<0.35?1.0:1.0-(r-0.35)/0.15;a*=a;c=mix(vCol,vec3(1.0),0.35*clamp(1.0-r/0.3,0.0,1.0));}
+  if(uMono>0.5){float g=clamp(max(c.r,max(c.g,c.b))*I,0.0,1.0);
     if(uMono>1.5){gl_FragColor=vec4(vec3(1.0-g*a),1.0);return;}
     c=vec3(g);gl_FragColor=vec4(c,a);return;}
-  gl_FragColor=vec4(c*vI,a);
+  gl_FragColor=vec4(c*I,a);
 }`,
   transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false});
 function makeLightLayer(name){
@@ -3662,7 +3664,7 @@ function makeLightLayer(name){
     g.setAttribute('phase',new THREE.Float32BufferAttribute(L.phase,1));
     g.computeBoundingSphere();
     const p=new THREE.Points(g,AL_MAT);p.name='airportLights_'+L.name;p.renderOrder=2;
-    p.onBeforeRender=(r,sc,cam)=>{const u=AL_MAT.uniforms;u.uCam.value.setFromMatrixPosition(cam.matrixWorld);u.uTime.value=performance.now()/1000;u.uPR.value=r.getPixelRatio();};
+    p.onBeforeRender=(r,sc,cam)=>{const u=AL_MAT.uniforms;u.uCam.value.setFromMatrixPosition(cam.matrixWorld);u.uTime.value=AL_TFREEZE!==null?AL_TFREEZE:performance.now()/1000;u.uPR.value=r.getPixelRatio();};
     scene.add(p);L.pts=p;
     // the fixtures themselves, for daylight: one instanced mesh of tiny posts, one per distinct spot
     const seen=new Set(),f=[];
@@ -3679,14 +3681,16 @@ const AL_C={white:0xfff2d6,yellow:0xffc23a,green:0x38ff78,red:0xff2a1e,blue:0x2f
 // AC_LIGHTS[type]: every exterior light on an airframe, in that model's own units
 // (nose -Z, right wing +X, up +Y). kind: nav (steady), strobe (white flash), beacon
 // (red, rotating look), landing / taxi (forward, only with the landing lights on),
-// form (faint steady formation light). dir + cone (half angle, deg) make a light
+// form (faint steady formation light), glow (faint all-round colour on the wingtip itself, added
+// for every coloured nav light below, so red and green still read from behind). tail:1 marks
+// the white tail nav light (brighter, it is the one seen from behind). dir + cone (half angle, deg) make a light
 // directional: it fades out when the camera leaves the cone. fl:'single' is a single
 // flash strobe (default double). on:'gear' only with the gear down, 'air' only
 // airborne, 'ground' only on the ground.
 const ACL_C={red:0xff2a1e,green:0x38ff78,white:0xffffff,strobe:0xf2f6ff,beacon:0xff2414,land:0xfff0d6,form:0xe6eeff};
 const ACL_NL=[-0.82,0,-0.57],ACL_NR=[0.82,0,-0.57],ACL_AFT=[0,0,1],ACL_FWD=[0,-0.087,-1];
 const acNav=(x,y,z)=>({x,y,z,color:x<0?ACL_C.red:ACL_C.green,kind:'nav',dir:x<0?ACL_NL:ACL_NR,cone:62});
-const acAft=(x,y,z)=>({x,y,z,color:ACL_C.white,kind:'nav',dir:ACL_AFT,cone:70});
+const acAft=(x,y,z)=>({x,y,z,color:ACL_C.white,kind:'nav',dir:ACL_AFT,cone:70,tail:1});
 const acStrobe=(x,y,z,o)=>Object.assign({x,y,z,color:ACL_C.strobe,kind:'strobe'},o);
 const acBeacon=(x,y,z)=>({x,y,z,color:ACL_C.beacon,kind:'beacon'});
 const acLand=(x,y,z,o)=>Object.assign({x,y,z,color:ACL_C.land,kind:'landing',dir:ACL_FWD,cone:30},o);
@@ -3721,13 +3725,18 @@ const AC_LIGHTS={
     acLand(-6.3,3.08,-2.0),acLand(6.3,3.08,-2.0),acTaxi(-2.6,-0.2,-2.32,{on:'gear'}),acTaxi(2.6,-0.2,-2.32,{on:'gear'}),
     acForm(-12,3.7,-1.85),acForm(-15,3.52,-2.0),acForm(-18,3.35,-2.2),acForm(12,3.7,-1.85),acForm(15,3.52,-2.0),acForm(18,3.35,-2.2)]
 };
+// wingtip glow: one per red / green nav light, same spot, no cone
+for(const k in AC_LIGHTS)AC_LIGHTS[k].push(...AC_LIGHTS[k].filter(l=>l.kind==='nav'&&l.color!==ACL_C.white).map(l=>({x:l.x,y:l.y,z:l.z,color:l.color,kind:'glow'})));
 // One THREE.Points per airframe, a child of the aircraft group, so positions never
 // change and the whole set is one draw call. Same point sprite as the airport layer,
 // but directional cones are evaluated in view space (modelViewMatrix) because the
 // lights turn with the aircraft. All flashing runs off uTime in the vertex shader.
-// Day floor: strobes and beacon stay at 0.5, nav at 0.25, the rest follow uLights.
+// Day floor: strobes and beacon stay at 0.5, the rest follow uLights. Nav, tail and glow use
+// uLights*1.4 (so sunset is ~0.77) with a 0.25 floor, a 3.5 px minimum size (readable at
+// distance) and the soft halo (negative vI tells the shared fragment shader); the red / green
+// cones fade out gradually past their edge instead of snapping off.
 // uLand: landing lights switched on; uGear: gear down; uAir: airborne.
-const ACL_KIND={nav:0,strobe:1,beacon:2,landing:3,taxi:4,form:5},ACL_ON={gear:1,air:2,ground:3};
+const ACL_KIND={nav:0,strobe:1,beacon:2,landing:3,taxi:4,form:5,glow:6,tail:7},ACL_ON={gear:1,air:2,ground:3};
 function aclMat(land,gear,air){
   const u=AL_MAT.uniforms;
   return new THREE.ShaderMaterial({
@@ -3739,12 +3748,16 @@ uniform float uLights,uTime,uPR,uLand,uGear,uAir;
 varying vec3 vCol;varying float vI;
 void main(){
   vec4 mv=modelViewMatrix*vec4(position,1.0);
-  float I,sz=1.0;
-  if(kind<0.5)I=max(uLights,0.25);
+  float I,sz=1.0,Ln=min(max(uLights*1.4,0.25),1.0);
+  bool soft=kind<0.5||kind>5.5;
+  if(kind<0.5){I=Ln*0.95;sz=1.35;}
   else if(kind<2.5)I=max(uLights,0.5);
   else if(kind<4.5){I=uLights*uLand*(kind<3.5?2.2:1.6);sz=kind<3.5?1.5:1.3;}
-  else{I=uLights*0.3;sz=0.75;}
-  if(aDir.w>-1.5){vec3 d=normalize(mat3(modelViewMatrix)*aDir.xyz);float c=dot(d,normalize(-mv.xyz));I*=smoothstep(aDir.w-0.1,aDir.w+0.1,c);}
+  else if(kind<5.5){I=uLights*0.3;sz=0.75;}
+  else if(kind<6.5){I=Ln*0.35;sz=2.2;}
+  else{I=Ln*1.14;sz=1.5;}
+  if(aDir.w>-1.5){vec3 d=normalize(mat3(modelViewMatrix)*aDir.xyz);float c=dot(d,normalize(-mv.xyz));
+    I*=soft?smoothstep(aDir.w-0.35,aDir.w+0.05,c):smoothstep(aDir.w-0.1,aDir.w+0.1,c);}
   if(flash>0.5){
     if(flash<1.5){float p=fract(uTime/1.2+phase)*1.2;I*=(p<0.06||(p>0.18&&p<0.24))?1.8:0.0;}
     else if(flash<2.5){float p=fract(uTime/1.2+phase)*1.2;I*=p<0.07?1.8:0.0;}
@@ -3754,9 +3767,9 @@ void main(){
   gl_Position=projectionMatrix*mv;
   float w=gl_Position.w;
   I*=clamp(1.25-w/40000.0,0.35,1.0);
-  vCol=aCol;vI=I;
+  vCol=aCol;vI=soft?-I:I;
   if(I<0.004){gl_Position=vec4(0.0,0.0,-2.0,1.0);gl_PointSize=0.0;}
-  else gl_PointSize=clamp(${AL_K.toFixed(1)}/w,${AL_MIN.toFixed(2)},6.0)*sz*uPR;
+  else gl_PointSize=(soft?clamp(${AL_K.toFixed(1)}/w,3.5,7.0):clamp(${AL_K.toFixed(1)}/w,${AL_MIN.toFixed(2)},6.0))*sz*uPR;
   #include <logdepthbuf_vertex>
 }`,
   fragmentShader:AL_MAT.fragmentShader,
@@ -3771,7 +3784,7 @@ function makeAircraftLights(group,spec,opt){
   let land=0,pool=0;
   for(const l of spec){
     if(opt.only&&opt.only.indexOf(l.kind)<0)continue;
-    const k=ACL_KIND[l.kind];
+    const k=l.tail?ACL_KIND.tail:ACL_KIND[l.kind];
     pos.push(l.x,l.y+(opt.dy||0),l.z);c.setHex(l.color);if(l.dim)c.multiplyScalar(0.45);col.push(c.r,c.g,c.b);kind.push(k);
     if(l.dir){const n=Math.hypot(l.dir[0],l.dir[1],l.dir[2]);dir.push(l.dir[0]/n,l.dir[1]/n,l.dir[2]/n,Math.cos(l.cone*Math.PI/180));}
     else dir.push(0,0,0,-2);
@@ -3790,7 +3803,7 @@ function makeAircraftLights(group,spec,opt){
   g.computeBoundingSphere();
   const mat=opt.mat||ACL_MAT;
   const p=new THREE.Points(g,mat);p.name='aircraftLights';p.renderOrder=3;
-  p.onBeforeRender=(r)=>{const u=mat.uniforms;u.uTime.value=performance.now()/1000;u.uPR.value=r.getPixelRatio();};
+  p.onBeforeRender=(r)=>{const u=mat.uniforms;u.uTime.value=AL_TFREEZE!==null?AL_TFREEZE:performance.now()/1000;u.uPR.value=r.getPixelRatio();};
   group.add(p);
   // pool: how bright the ground pool is for this airframe (0 none, 0.5 the MQ-9 taxi lamp)
   // gearPool: the lamp making the pool rides on the gear
@@ -4774,7 +4787,7 @@ function eggUpdate(dt){
 TRAFFIC.forEach(o=>{o.m.g.userData.heat=0.8;if(o.m.gear)o.m.gear.visible=false;if(o.m.prop)trafficProps(o.m,o.grp==='c'||o.grp==='b'?'cessna':'reaper');});
 // traffic lights: nav, strobes and beacon only, one shared material; the C-17 has no light table
 {const TL={c:['cessna',0.15],b:['cessna',0.15],v:['f16',0],r:['reaper',0]};
- TRAFFIC.forEach(o=>{const t=TL[o.grp];if(t)o.m.lights=makeAircraftLights(o.m.g,AC_LIGHTS[t[0]],{mat:ACL_MAT_T,only:['nav','strobe','beacon'],dy:t[1]});});}
+ TRAFFIC.forEach(o=>{const t=TL[o.grp];if(t)o.m.lights=makeAircraftLights(o.m.g,AC_LIGHTS[t[0]],{mat:ACL_MAT_T,only:['nav','strobe','beacon','glow'],dy:t[1]});});}
 function updateTraffic(dt){
   TRAFFIC.forEach(o=>{o.t=(o.t+o.v*dt/o.len)%1;o.path.getPointAt(o.t,_ap);o.path.getTangentAt(o.t,_at);
     const yaw=Math.atan2(-_at.x,-_at.z);let yr=0;if(o.yp!==null){let d=yaw-o.yp;d=Math.atan2(Math.sin(d),Math.cos(d));yr=d/Math.max(dt,1e-3);}o.yp=yaw;
@@ -8213,6 +8226,14 @@ window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,tou
     hasGLOWS:typeof GLOWS!=='undefined'||typeof lightGlow!=='undefined'||typeof lightScale!=='undefined'}),
   acLights:()=>({count:plane.lights?plane.lights.count:0,landingOn:ACL_STATE.on,poolOpacity:ACL_STATE.pool,
     inGroup:!!(plane.lights&&plane.lights.pts.parent===plane.g),traffic:TRAFFIC.map(o=>o.m.lights?o.m.lights.count:0)}),
+  lightClock:t=>{AL_TFREEZE=t==null?null:t;},
+  // screen position (CSS px, page coordinates) of each of the flown aircraft's lights
+  acLightScreen:()=>{if(!plane.lights)return [];const P=plane.lights.pts,g=P.geometry.attributes,r=glc.getBoundingClientRect(),v=new V3(),out=[];
+    P.updateWorldMatrix(true,false);const names=Object.keys(ACL_KIND);
+    for(let i=0;i<g.position.count;i++){v.fromBufferAttribute(g.position,i);const lx=v.x;P.localToWorld(v).project(camera);
+      out.push({kind:names[g.kind.getX(i)],lx:lx,x:r.left+(v.x+1)/2*r.width,y:r.top+(1-v.y)/2*r.height,front:v.z<1,
+        col:[g.aCol.getX(i),g.aCol.getY(i),g.aCol.getZ(i)]});}
+    return out;},
   cloudMat:()=>({color:cloudMat.color.getHex(),emissive:cloudMat.emissive.getHex()}),
   setTOD:setTOD,isNight:isNight,TOD:()=>TOD,
   haboob:()=>({on:HB.on,dist:HB.on?HB.dist:null,d:HB.d,windKt:st.windKt,gustAmp:st.gustAmp,fogNear:scene.fog.near,called:HB.called,
