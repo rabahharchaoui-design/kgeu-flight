@@ -16,12 +16,13 @@ async def main():
     await pg.route('**/three.min.js', lambda r: r.fulfill(body=THREE, content_type='application/javascript'))
     await pg.route('**/fonts.googleapis.com/**', lambda r: r.abort())
     await pg.goto(URL); await pg.wait_for_timeout(2200)
+    if await pg.is_visible('#funnel'): await pg.click('#fPilot')
     chk('desktop is not in touch mode', not await pg.evaluate("()=>document.body.classList.contains('touch')"))
     chk('phone only controls stay hidden',
         not await pg.is_visible('#stickZone') and not await pg.is_visible('#thr'))
+    await pg.evaluate("()=>window.__kgeu.start('runway')"); await pg.wait_for_timeout(1200)
     chk('desktop camera and Full screen are shown',
         await pg.is_visible('#bCam') and await pg.is_visible('#bFull'))
-    await pg.evaluate("()=>window.__kgeu.start('runway')"); await pg.wait_for_timeout(1200)
     # mouse yoke
     await pg.mouse.move(700,500); await pg.mouse.down()
     await pg.mouse.move(820,560, steps=6); await pg.wait_for_timeout(120)

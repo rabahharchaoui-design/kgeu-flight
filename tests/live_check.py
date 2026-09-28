@@ -71,6 +71,7 @@ async def main():
     chk('no service worker registered',sw==0,str(sw)+' registrations')
     # actually play it
     # home -> FLY -> Next -> Next -> GO, by finger
+    if await pg.is_visible('#funnel'): await pg.tap('#fPilot'); await pg.wait_for_timeout(300)
     await pg.evaluate("()=>{__kgeu.pick('reaper');__kgeu.pickPos('runway');}")
     await pg.tap('#hFly'); await pg.wait_for_timeout(800)
     await pg.tap('.acard[data-t="reaper"] .pickme'); await pg.wait_for_timeout(400)
