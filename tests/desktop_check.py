@@ -16,12 +16,14 @@ async def main():
     await pg.route('**/three.min.js', lambda r: r.fulfill(body=THREE, content_type='application/javascript'))
     await pg.route('**/fonts.googleapis.com/**', lambda r: r.abort())
     await pg.goto(URL); await pg.wait_for_timeout(2200)
+    await pg.wait_for_function("()=>{const s=document.getElementById('splash');return !s||s.classList.contains('gone')}", timeout=30000)
+    if await pg.is_visible('#funnel'): await pg.click('#fPilot')
     chk('desktop is not in touch mode', not await pg.evaluate("()=>document.body.classList.contains('touch')"))
     chk('phone only controls stay hidden',
-        not await pg.is_visible('#stickZone') and not await pg.is_visible('#bMore'))
-    chk('desktop View and Full screen are shown',
-        await pg.is_visible('#bView') and await pg.is_visible('#bFull'))
-    await pg.click('#bRunway'); await pg.wait_for_timeout(1200)
+        not await pg.is_visible('#stickZone') and not await pg.is_visible('#thr'))
+    await pg.evaluate("()=>window.__kgeu.start('runway')"); await pg.wait_for_timeout(1200)
+    chk('desktop camera and Full screen are shown',
+        await pg.is_visible('#bCam') and await pg.is_visible('#bFull'))
     # mouse yoke
     await pg.mouse.move(700,500); await pg.mouse.down()
     await pg.mouse.move(820,560, steps=6); await pg.wait_for_timeout(120)
@@ -35,8 +37,8 @@ async def main():
     chk('flaps line under the altitude card updates',
         'FLAPS' in await pg.inner_text('#hFlap'), await pg.inner_text('#hFlap'))
     # strike mode on desktop: click to track, space to fire
-    await pg.click('#bMenu'); await pg.wait_for_timeout(300)
-    await pg.click('#bStrike'); await pg.wait_for_timeout(1500)
+    await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300)
+    await pg.evaluate("()=>window.__kgeu.mission('range')"); await pg.wait_for_timeout(1500)
     chk('sensor mode active on desktop', await pg.evaluate("()=>window.__kgeu.sensorMode()"))
     i=await pg.evaluate("()=>window.__kgeu.STRIKE.targets.findIndex(t=>t.kind==='bunker')")
     await pg.evaluate("(i)=>window.__kgeu.pointAt(i)", i); await pg.wait_for_timeout(200)

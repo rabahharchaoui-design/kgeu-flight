@@ -16,7 +16,8 @@ async def main():
     pg.on('pageerror',lambda e:errs.append(str(e)))
     pg.on('requestfailed',lambda r:reqfail.append(r.url+' '+str(r.failure)))
     await pg.goto(URL,wait_until='load'); await pg.wait_for_timeout(5000)
-    chk('page loads over https',(await pg.title()).startswith('KGEU'),await pg.title())
+    await pg.wait_for_function("()=>{const s=document.getElementById('splash');return !s||s.classList.contains('gone')}", timeout=30000)
+    chk('page loads over https',(await pg.title()).startswith('Pocket Flight Sim'),await pg.title())
     chk('no page errors',not errs,str(errs[:2]))
     chk('no failed requests',not reqfail,str(reqfail[:3]))
     # three.js came from the CDN and the scene is alive
@@ -28,7 +29,7 @@ async def main():
       if(!l)return null;const r=await fetch(l.href);return await r.json();}""")
     chk('manifest is linked and fetchable',m is not None)
     if m:
-        chk('manifest name is KGEU Flight',m.get('name')=='KGEU Flight',str(m.get('name')))
+        chk('manifest name is Pocket Flight Sim',m.get('name')=='Pocket Flight Sim' and m.get('short_name')=='Pocket Sim',str(m.get('name')))
         chk('display is fullscreen',m.get('display')=='fullscreen',str(m.get('display')))
         chk('orientation is landscape',m.get('orientation')=='landscape',str(m.get('orientation')))
         sizes=[i.get('sizes') for i in m.get('icons',[])]
@@ -46,7 +47,7 @@ async def main():
       vp:(document.querySelector('meta[name=viewport]')||{}).content})""")
     chk('apple-mobile-web-app-capable is yes',tags['cap']=='yes',str(tags['cap']))
     chk('status bar is black-translucent',tags['bar']=='black-translucent',str(tags['bar']))
-    chk('home screen title set',tags['title']=='KGEU Flight',str(tags['title']))
+    chk('home screen title set',tags['title']=='Pocket Sim',str(tags['title']))
     chk('viewport-fit=cover for the notch','viewport-fit=cover' in (tags['vp'] or ''),str(tags['vp']))
     r=await pg.evaluate("async(u)=>{const r=await fetch(u);return r.status;}",tags['icon'])
     chk('apple-touch-icon resolves',r==200,str(r))
@@ -56,7 +57,7 @@ async def main():
       title:(document.querySelector('meta[property="og:title"]')||{}).content,
       card:(document.querySelector('meta[name="twitter:card"]')||{}).content})""")
     chk('og:image is present',bool(og['img']),str(og['img']))
-    chk('og:title is present',og['title']=='KGEU Flight',str(og['title']))
+    chk('og:title is present',og['title']=='Pocket Flight Sim',str(og['title']))
     chk('twitter card is the large image kind',og['card']=='summary_large_image',str(og['card']))
     if og['img']:
         r=await pg.evaluate("async(u)=>{const r=await fetch(u);return r.status;}",og['img'])
@@ -70,7 +71,11 @@ async def main():
     sw=await pg.evaluate("async()=>{if(!navigator.serviceWorker)return 0;const rs=await navigator.serviceWorker.getRegistrations();return rs.length;}")
     chk('no service worker registered',sw==0,str(sw)+' registrations')
     # actually play it
-    await pg.tap('#bRunway'); await pg.wait_for_timeout(1800)
+    # home -> FLY -> GO: two taps, by finger
+    if await pg.is_visible('#funnel'): await pg.tap('#fPilot'); await pg.wait_for_timeout(300)
+    await pg.evaluate("()=>{__kgeu.pick('reaper');__kgeu.pickPos('runway');}")
+    await pg.tap('#hFly'); await pg.wait_for_timeout(800)
+    await pg.tap('#bGo'); await pg.wait_for_timeout(1800)
     st=await pg.evaluate("()=>{const s=__kgeu.state();return {running:!!s,type:s.type,ias:Math.round(s.ias*1.944)};}")
     chk('a flight starts from the runway',st['type']=='reaper',str(st))
     await pg.tap('#bAuto'); await pg.wait_for_timeout(6000)
@@ -84,13 +89,21 @@ async def main():
     await pg.evaluate("()=>window.__kgeu.openMenu()")
     await pg.wait_for_timeout(600)
     for t in ['cessna','alpha','f16','reaper','mq9b','c130']:
-        ok = await pg.is_visible(f'.pick[data-t="{t}"]')
-        chk(f'{t} is offered in the menu', ok)
+        ok = await pg.query_selector(f'#carMain .pick[data-t="{t}"]') is not None
+        chk(f'{t} is offered in the carousel', ok)
+    await pg.evaluate("()=>window.__kgeu.nav('sFly')")
     chk('spawn picker is there', await pg.is_visible('.pick[data-b="luke"]'))
     chk('time of day picker is there', await pg.is_visible('.pick[data-tod="night"]'))
+    await pg.evaluate("()=>window.__kgeu.nav('sSet')")
     chk('radio controls are there', await pg.is_visible('#oRadio') and await pg.is_visible('#oRvol'))
-    chk('records screen is reachable', await pg.is_visible('#bRecords'))
-    chk('C-130 missions are offered', await pg.is_visible('#bDrop') and await pg.is_visible('#bShort'))
+    await pg.evaluate("()=>window.__kgeu.nav('sHome',true)")
+    chk('records screen is reachable', await pg.is_visible('#hRec'))
+    await pg.evaluate("()=>window.__kgeu.nav('sMis')")
+    chk('C-130 short field is offered', await pg.is_visible('#misCards [data-m="short"]'))
+    await pg.evaluate("()=>window.__kgeu.nav('sArc')")
+    chk('arcade hub has the landing challenge', await pg.is_visible('#arcCards [data-m="landing"]'))
+    chk('creator credit links to the channel', await pg.evaluate("()=>document.querySelector('#sSet .credit').href")=='https://www.youtube.com/@OhRabah')
+    chk('no tilt anywhere', await pg.evaluate("()=>!/tilt/i.test(document.body.innerText)&&!document.querySelector('[data-a=tilt]')"))
     n0=len(errs)
     for t in ['cessna','f16','reaper','mq9b','c130']:
         await pg.evaluate(f"()=>{{window.__kgeu.pick('{t}');window.__kgeu.start('runway');}}")

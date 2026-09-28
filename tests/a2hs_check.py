@@ -17,12 +17,16 @@ async def load(b,ua,standalone=False):
     await pg.route('**/three.min.js',lambda r:r.fulfill(body=THREE,content_type='application/javascript'))
     await pg.route('**/fonts.googleapis.com/**',lambda r:r.abort())
     await pg.goto(URL); await pg.wait_for_timeout(2500)
+    await pg.wait_for_function("()=>{const s=document.getElementById('splash');return !s||s.classList.contains('gone')}", timeout=30000)
+    # the tip lives in Settings, and on the first launch screen
+    await pg.evaluate("()=>{document.getElementById('funnel').classList.remove('on');window.__kgeu.nav('sSet',true)}")
     return pg
 async def main():
   async with async_playwright() as p:
     b=await p.chromium.launch(args=['--use-gl=swiftshader','--enable-unsafe-swiftshader'])
     pg=await load(b,IOS)
-    chk('tip shows on iPhone Safari',await pg.is_visible('#a2hs'))
+    chk('tip shows on iPhone Safari, in Settings',await pg.is_visible('#a2hs'))
+    chk('and on the first launch screen',await pg.evaluate("()=>getComputedStyle(document.getElementById('a2hsF')).display==='block'"))
     t=await pg.inner_text('#a2hs')
     chk('tip names Share and Add to Home Screen','Share' in t and 'Add to Home Screen' in t,repr(t[:70]))
     await pg.close()

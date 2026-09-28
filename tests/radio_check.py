@@ -22,6 +22,7 @@ async def main():
     b=await p.chromium.launch(args=['--use-gl=swiftshader','--enable-unsafe-swiftshader',
                                     '--autoplay-policy=no-user-gesture-required'])
     pg=await (await b.new_context(viewport={'width':844,'height':390},is_mobile=True,has_touch=True)).new_page()
+    await pg.add_init_script("localStorage.setItem('kgeuOnboard','pilot');localStorage.setItem('kgeuTut','1')")  # past the first launch screen; the six pack is a Pilot feature
     errs=[]
     pg.on('pageerror',lambda e:errs.append(str(e)))
     await pg.route('**/three.min.js',lambda r:r.fulfill(body=THREE,content_type='application/javascript'))
@@ -105,7 +106,8 @@ async def main():
     await pg.evaluate("()=>window.__kgeu.setRadioOn(true)")
     await pg.evaluate("()=>window.__kgeu.openMenu()")
     await pg.wait_for_timeout(500)
-    chk('controls are in the menu', await pg.is_visible('#oRadio') and await pg.is_visible('#oRvol'))
+    await pg.evaluate("()=>window.__kgeu.openMenu('sSet')"); await pg.wait_for_timeout(300)
+    chk('controls are in Settings', await pg.is_visible('#oRadio') and await pg.is_visible('#oRvol'))
     await pg.screenshot(path=f'{SHOTS}/radio_menu.png')
 
     chk('no console errors', not errs, ' | '.join(errs[:2]))

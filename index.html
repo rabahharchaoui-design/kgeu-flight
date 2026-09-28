@@ -6,32 +6,37 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="KGEU Flight">
-<meta name="theme-color" content="#1a2a3a">
+<meta name="apple-mobile-web-app-title" content="Pocket Sim">
+<meta name="application-name" content="Pocket Sim">
+<meta name="theme-color" content="#2A1608">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="KGEU Flight">
-<meta property="og:title" content="KGEU Flight">
-<meta property="og:description" content="Fly an F-16C, an MQ-9A Reaper or a Cessna 172 out of Glendale, Arizona. Add to Home Screen to play full screen.">
+<meta property="og:site_name" content="Pocket Flight Sim">
+<meta property="og:title" content="Pocket Flight Sim">
+<meta property="og:description" content="Fly an F-16, an MQ-9 Reaper, a C-130 or a Cessna over the Arizona desert. Add to Home Screen to play full screen.">
 <meta property="og:url" content="https://rabahharchaoui-design.github.io/kgeu-flight/">
 <meta property="og:image" content="https://rabahharchaoui-design.github.io/kgeu-flight/icons/share-card.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="KGEU Flight">
-<meta name="twitter:description" content="F-16C, MQ-9A Reaper and Cessna 172 out of Glendale, Arizona.">
+<meta name="twitter:title" content="Pocket Flight Sim">
+<meta name="twitter:description" content="F-16, MQ-9 Reaper, C-130 and Cessna over the Arizona desert.">
 <meta name="twitter:image" content="https://rabahharchaoui-design.github.io/kgeu-flight/icons/share-card.png">
-<title>KGEU Flight: F-16, MQ-9, C172</title>
-<meta name="description" content="Fly an F-16C, an MQ-9A Reaper or a Cessna 172 out of Glendale, KGEU.">
+<title>Pocket Flight Sim</title>
+<meta name="description" content="Pocket Flight Sim: fly an F-16, an MQ-9 Reaper, a C-130 or a Cessna over the Arizona desert, out of Glendale and Luke AFB.">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --sky:#2f6db5; --glass:rgba(20,24,30,.74); --ink:#eef2f6; --soft:#a7b3c0;
-  --caution:#f2a900; --warn:#d8342c; --radio:#7fd4ff; --page:#1a2a3a;
+  --sky:#2f6db5; --glass:rgba(26,16,9,.72); --ink:#eef2f6; --soft:#a7b3c0;
+  /* palette, taken from the app icon: sand, orange, rust, dark brown, near black */
+  --sand:#F6C177; --orange:#D98A3D; --rust:#A8592A; --brown:#6B3517; --night:#2A1608; --sun:#FCE5B1;
+  --caution:#F6C177; --warn:#d8342c; --radio:#7fd4ff; --page:#2A1608;
   --font:"Saira Condensed","Arial Narrow","Roboto Condensed",system-ui,sans-serif;
   /* visual viewport rect, kept up to date from JS */
   --vvl:0px; --vvt:0px; --vvw:100vw; --vvh:100vh;
@@ -43,8 +48,8 @@
   --tap:48px;
   box-sizing:border-box;
 }
-@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --glass:rgba(14,17,22,.8); --page:#10202e; } }
-:root[data-theme="dark"]{ --glass:rgba(14,17,22,.8); --page:#10202e; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --glass:rgba(22,14,8,.8); } }
+:root[data-theme="dark"]{ --glass:rgba(22,14,8,.8); }
 html{ height:100%; }
 *,*::before,*::after{ box-sizing:inherit; }
 html,body{ margin:0; height:100%; overflow:hidden; background:var(--page); color:var(--ink); font-family:var(--font); -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; overscroll-behavior:none; }
@@ -53,7 +58,7 @@ html,body{ margin:0; height:100%; overflow:hidden; background:var(--page); color
 /* ---------- the UI lives inside the visual viewport ---------- */
 #uiroot{ position:fixed; left:var(--vvl); top:var(--vvt); width:var(--vvw); height:var(--vvh); pointer-events:none; overflow:hidden; }
 #uiroot > *{ pointer-events:auto; }
-#warn,#atc,#toast,#bigcfg,#map,#mts{ pointer-events:none; }
+#warn,#atc,#toast,#bigcfg,#mts{ pointer-events:none; }
 
 .card{ background:var(--glass); border:1px solid rgba(255,255,255,.08); border-radius:10px; padding:8px 12px; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
 button{ font:600 15px var(--font); color:var(--ink); background:var(--glass); border:1px solid rgba(255,255,255,.14); border-radius:8px; padding:7px 12px; cursor:pointer; touch-action:manipulation; }
@@ -61,54 +66,76 @@ button:hover{ border-color:rgba(255,255,255,.35); }
 button:focus-visible{ outline:2px solid var(--caution); outline-offset:2px; }
 button.on{ background:var(--caution); color:#15110a; border-color:transparent; }
 
-/* ---------- HUD, top left ---------- */
-#hud{ position:absolute; top:var(--padT); left:var(--padL); display:flex; flex-direction:column; gap:5px; align-items:flex-start; pointer-events:none; }
-#hud .card{ padding:4px 11px 5px; min-width:118px; }
-.big{ font-size:32px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; }
-.big small{ font-size:13px; font-weight:600; color:var(--soft); margin-left:4px; }
-.lbl{ font-size:11px; color:var(--soft); letter-spacing:.08em; text-transform:uppercase; }
-#hCfg{ display:flex; gap:10px; font-size:12px; font-weight:700; letter-spacing:.05em; padding:3px 11px; color:var(--soft); }
-#hCfg span{ white-space:nowrap; }
-#hCfg .lit{ color:var(--caution); }
-#hWind{ display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; letter-spacing:.05em; padding:3px 11px; color:#bfe3ff; }
+/* ---------- in flight layout, iPhone landscape ----------
+   top left: mini map, then the four readouts. top centre: pause. top right: auto,
+   gear, flaps, camera. right edge: brake over the throttle. left 36%: the stick.
+   lower right, left of the throttle: kept clear for weapon buttons and a look pad. */
+:root{ --map:92px; --col:66px; --icon:44px; }
+#hud{ position:absolute; top:var(--padT); left:calc(var(--padL) + var(--map) + 8px); display:flex; flex-direction:column; gap:4px; align-items:flex-start; pointer-events:none; }
+#hGrid{ display:grid; grid-template-columns:repeat(2,auto); gap:4px; }
+#hud .card{ padding:3px 8px 4px; min-width:62px; border-radius:8px; }
+.big{ font-size:20px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.big small{ font-size:11px; font-weight:600; color:var(--soft); margin-left:3px; }
+.lbl{ font-size:10px; color:var(--soft); letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
+#hLine{ display:flex; gap:8px; align-items:center; font-size:10px; font-weight:700; letter-spacing:.05em; padding:2px 8px !important; color:var(--soft); }
+#hLine span{ white-space:nowrap; }
+#hLine .lit{ color:var(--caution); }
+#hWind{ display:flex; align-items:center; gap:4px; color:#bfe3ff; }
 #hWind svg{ transition:transform .25s linear; }
-body.touch #hWind{ font-size:11px; padding:2px 9px; }
-#hAp{ display:none; background:var(--caution); color:#15110a; font-weight:700; font-size:13px; letter-spacing:.04em; border-radius:6px; padding:3px 9px; }
+#hAp{ display:none; background:var(--caution); color:#15110a; font-weight:700; font-size:11px; letter-spacing:.04em; border-radius:6px; padding:2px 8px; }
 #hAp.on{ display:block; }
-body.touch .big{ font-size:24px; }
-body.touch #hud .card{ min-width:92px; padding:3px 9px 4px; }
-body.touch #hud{ gap:4px; }
-body.touch #hCfg{ font-size:11px; padding:2px 9px; }
+@media (min-width:900px){ :root{ --map:120px; } .big{ font-size:26px; } #hud .card{ min-width:84px; } }
 
-/* ---------- top bar ---------- */
+/* ---------- pause, top centre ---------- */
+#bPause{ position:absolute; top:var(--padT); left:50%; transform:translateX(-50%); width:var(--icon); height:var(--icon); padding:0; display:grid; place-items:center; }
+#bPause svg{ width:18px; height:18px; }
+
+/* ---------- icons, top right ---------- */
 #tools{ position:absolute; top:var(--padT); right:var(--padR); display:flex; gap:6px; }
-body.touch #bView,body.touch #bFull{ display:none; }
-body.touch #tools button{ min-height:var(--tap); min-width:var(--tap); padding:6px 12px; font-size:15px; }
-#drawer{ position:absolute; top:calc(var(--padT) + var(--tap) + 8px); right:var(--padR); display:none; gap:6px; flex-wrap:nowrap; max-width:calc(100% - var(--padR) - 162px); overflow:hidden; }
-#drawer.on{ display:flex; }
-#drawer button{ min-height:var(--tap); min-width:var(--tap); padding:6px 6px; font-size:13px; white-space:nowrap; }
-body.easy .adv{ display:none; }
+#tools button{ min-width:var(--icon); height:var(--icon); padding:0 8px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; font-size:12px; line-height:1; }
+#tools button svg{ width:20px; height:20px; flex:none; }
+#tools button i{ font-style:normal; font-size:9px; font-weight:700; letter-spacing:.04em; color:var(--soft); }
+#tools button.lit{ border-color:var(--caution); } #tools button.lit i{ color:var(--caution); }
+#bAuto{ font-size:13px !important; font-weight:700; padding:0 10px !important; }
+#bGear[hidden],#bFlaps[hidden]{ display:none !important; }
+#flapPop{ position:absolute; top:calc(var(--padT) + var(--icon) + 8px); right:var(--padR); display:none; gap:6px; z-index:3; }
+#flapPop.on{ display:flex; }
+#flapPop button{ min-width:var(--icon); min-height:var(--icon); padding:0 8px; font-size:14px; font-weight:700; }
+body.touch #bFull{ display:none; }
 
 /* ---------- messages ---------- */
-#warn{ position:absolute; left:50%; top:var(--padT); transform:translateX(-50%); font-size:24px; font-weight:800; letter-spacing:.06em; color:#fff; background:var(--warn); border-radius:6px; padding:2px 16px; display:none; white-space:nowrap; }
+#warn{ position:absolute; left:50%; top:24%; transform:translateX(-50%); font-size:24px; font-weight:800; letter-spacing:.06em; color:#fff; background:var(--warn); border-radius:6px; padding:2px 16px; display:none; white-space:nowrap; }
 #warn.on{ display:block; animation:blink .5s steps(2) infinite; }
 @keyframes blink{ 50%{ opacity:.35; } }
 @media (prefers-reduced-motion: reduce){ #warn.on{ animation:none; } }
-#atc{ position:absolute; left:50%; top:calc(var(--padT) + var(--tap) + 8px); transform:translateX(-50%); max-width:min(520px,44vw); font-size:15px; font-weight:500; opacity:0; transition:opacity .35s; }
-/* the drawer takes the same band across the top, so the radio call steps aside for it */
-#drawer.on ~ #atc{ opacity:0 !important; }
+#atc{ position:absolute; left:50%; top:calc(var(--padT) + var(--icon) + 8px); transform:translateX(-50%); width:max-content; max-width:clamp(150px, calc(100vw - 2 * (var(--padL) + var(--map) + 162px)), 440px); font-size:12px; font-weight:500; line-height:1.3; opacity:0; transition:opacity .35s; padding:5px 10px; }
+body.missOn #atc{ top:calc(var(--padT) + var(--icon) + 64px); }
 #atc.on{ opacity:1; }
 #atc b{ color:var(--radio); font-weight:600; margin-right:6px; }
-#toast{ position:absolute; left:50%; top:calc(var(--padT) + var(--tap) + 74px); transform:translateX(-50%); font-size:19px; font-weight:600; opacity:0; transition:opacity .3s; text-align:center; text-shadow:0 1px 3px rgba(0,0,0,.7); white-space:nowrap; }
+#atc .plain{ display:block; color:var(--sand); font-weight:700; font-size:14px; margin-top:3px; }
+#atc.hasPlain{ font-size:11px; color:var(--soft); }
+#toast{ position:absolute; left:50%; top:37%; transform:translateX(-50%); font-size:17px; font-weight:600; opacity:0; transition:opacity .3s; text-align:center; text-shadow:0 1px 3px rgba(0,0,0,.7); white-space:nowrap; }
 #toast.on{ opacity:1; }
-#bigcfg{ position:absolute; left:50%; top:57%; transform:translate(-50%,-50%); font-size:44px; font-weight:800; letter-spacing:.06em; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,.8); opacity:0; transition:opacity .45s; white-space:nowrap; }
+#bigcfg{ position:absolute; left:50%; top:57%; transform:translate(-50%,-50%); font-size:32px; font-weight:800; letter-spacing:.06em; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,.8); opacity:0; transition:opacity .45s; white-space:nowrap; }
 #bigcfg.on{ opacity:1; transition:opacity .08s; }
-body.touch #bigcfg{ font-size:32px; }
 
-/* ---------- minimap ---------- */
-#map{ position:absolute; right:var(--padR); top:calc(var(--padT) + var(--tap) + 8px); border-radius:50%; }
-/* on a phone the drawer opens into the band under the top bar, so the map sits below it */
-body.touch #map{ top:calc(var(--padT) + var(--tap) * 2 + 16px); }
+/* ---------- mini map, top left ---------- */
+#map{ position:absolute; left:var(--padL); top:var(--padT); border-radius:12px; cursor:pointer; box-shadow:0 0 0 1px rgba(246,193,119,.25); }
+#hDest{ position:absolute; left:var(--padL); top:calc(var(--padT) + 126px); display:flex; align-items:center; gap:8px; min-height:44px; max-width:calc(36vw - var(--padL));
+  padding:4px 10px 4px 6px; border-radius:10px; background:rgba(26,16,9,.78); border:1.5px solid var(--orange); color:var(--sand); font:700 13px var(--font); pointer-events:auto; cursor:pointer; }
+#hDest[hidden]{ display:none; }
+#dArrow{ width:26px; height:26px; flex:none; transition:transform .2s linear; }
+body.easy #dArrow{ width:38px; height:38px; }
+#dTxt{ display:flex; flex-direction:column; min-width:0; line-height:1.15; } #dTxt b,#dTxt span{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } #dTxt span{ font-size:12px; color:#f0d6ad; }
+body.hasDest #stickZone{ top:calc(var(--padT) + 178px); }
+#mapOv{ background:transparent; padding:0; z-index:12; touch-action:none; }
+#fmap{ position:absolute; inset:0; touch-action:none; }
+#mapOv .mbar{ position:absolute; display:flex; gap:8px; }
+#mapOv .mbar.tr{ top:var(--padT); right:var(--padR); } #mapOv .mbar.br{ bottom:var(--padB); right:var(--padR); } #mapOv .mbar.bc{ bottom:var(--padB); left:50%; transform:translateX(-50%); align-items:center; }
+#mapOv button{ min-width:44px; min-height:44px; background:rgba(26,16,9,.85); color:var(--sand); border:1.5px solid rgba(246,193,119,.4); font-size:18px; font-weight:800; }
+#mapOv #mapClear{ font-size:14px; padding:0 14px; } #mapOv #mapClear[hidden]{ display:none; }
+#mapInfo{ font:700 14px var(--font); color:var(--sand); background:rgba(26,16,9,.8); padding:8px 12px; border-radius:10px; white-space:nowrap; }
+#mapOv .mt{ position:absolute; top:var(--padT); left:var(--padL); font:800 20px var(--font); color:var(--sand); background:rgba(26,16,9,.8); padding:8px 14px; border-radius:10px; }
 
 /* ---------- sensor ball overlay ---------- */
 #mts{ position:absolute; inset:0; display:none; }
@@ -116,44 +143,39 @@ body.touch #map{ top:calc(var(--padT) + var(--tap) * 2 + 16px); }
 #mts .h,#mts .v{ position:absolute; background:#f3f2ee; opacity:.85; }
 #mts .h{ top:50%; height:2px; width:70px; margin-top:-1px; }
 #mts .v{ left:50%; width:2px; height:70px; margin-left:-1px; }
-#mtsTxt{ position:absolute; left:50%; top:calc(var(--padT) + var(--tap) + 112px); transform:translateX(-50%); font:600 14px var(--font); color:#f3f2ee; letter-spacing:.06em; white-space:pre; text-align:center; line-height:1.5; text-shadow:0 1px 2px #000; }
+#mtsTxt{ position:absolute; left:50%; top:calc(var(--padT) + var(--icon) + 60px); transform:translateX(-50%); font:600 14px var(--font); color:#f3f2ee; letter-spacing:.06em; white-space:pre; text-align:center; line-height:1.5; text-shadow:0 1px 2px #000; }
 
 /* ---------- touch controls ---------- */
 #touch{ display:none; position:absolute; inset:0; pointer-events:none; }
 body.touch #touch{ display:block; }
-/* left thumb zone: a floating stick appears wherever the thumb lands */
-#stickZone{ position:absolute; left:0; top:calc(var(--padT) + 132px); width:40%; bottom:0; pointer-events:auto; touch-action:none; }
-#stick{ position:absolute; width:150px; height:150px; margin:-75px 0 0 -75px; border-radius:50%;
-  background:rgba(20,24,30,.42); border:1.5px solid rgba(255,255,255,.22); display:none; pointer-events:none; }
+/* left thumb: a stick appears wherever the thumb lands, and springs back on release */
+#stickZone{ position:absolute; left:0; top:calc(var(--padT) + 124px); width:36%; bottom:0; pointer-events:auto; touch-action:none; }
+#stick{ position:absolute; width:140px; height:140px; margin:-70px 0 0 -70px; border-radius:50%;
+  background:rgba(20,24,30,.36); border:2px solid rgba(255,255,255,.55); box-shadow:0 0 0 1px rgba(0,0,0,.25); display:none; pointer-events:none; }
+#stick::after{ content:''; position:absolute; left:50%; top:50%; width:10px; height:10px; margin:-5px 0 0 -5px; border-radius:50%; background:rgba(255,255,255,.35); }
 #stick.on{ display:block; }
-#knob{ position:absolute; left:50%; top:50%; width:58px; height:58px; margin:-29px 0 0 -29px; border-radius:50%; background:rgba(242,169,0,.85); }
-/* right thumb: context buttons and the throttle */
-#rightCol{ position:absolute; right:var(--padR); bottom:var(--padB); display:flex; align-items:flex-end; gap:10px; pointer-events:auto; }
-#ctxBtns{ display:flex; flex-direction:column; gap:8px; }
-#ctxBtns button{ min-width:76px; min-height:var(--tap); padding:11px 8px; font-size:15px; font-weight:700; }
-#ctxBtns button[hidden]{ display:none; }
-#ctxBtns button.held{ background:var(--caution); color:#15110a; }
-#fixBtns{ display:flex; flex-direction:column; gap:8px; }
-#fixBtns button{ min-width:80px; min-height:var(--tap); padding:11px 6px; font-size:15px; font-weight:700; }
-#fixBtns button.held{ background:var(--caution); color:#15110a; }
-/* the throttle takes the space left under the minimap, so it never slides beneath it */
-#thr{ position:relative; width:66px; min-height:126px;
-  height:min(186px, calc(var(--vvh) - var(--padT) - var(--padB) - var(--tap)*2 - 120px));
-  border-radius:12px; background:var(--glass);
-  border:1px solid rgba(255,255,255,.18); touch-action:none; overflow:hidden; }
-#thrFill{ position:absolute; left:0; right:0; bottom:0; background:rgba(242,169,0,.8); }
-#thr .det{ position:absolute; left:0; right:0; text-align:center; font-size:12px; font-weight:800; letter-spacing:.08em;
+#knob{ position:absolute; left:50%; top:50%; width:56px; height:56px; margin:-28px 0 0 -28px; border-radius:50%; background:rgba(246,193,119,.95); border:2px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.4); z-index:1; }
+#knob.spring{ transition:transform .14s ease-out; }
+/* the idle hint shows where the stick lives until the first touch */
+#stickHint{ position:absolute; left:calc(var(--padL) + 18px); bottom:calc(var(--padB) + 18px); width:96px; height:96px; border-radius:50%; border:2px dashed rgba(255,255,255,.35); pointer-events:none; display:grid; place-items:center; font-size:11px; font-weight:700; letter-spacing:.08em; color:rgba(255,255,255,.6); text-align:center; }
+#stickHint.gone{ display:none; }
+/* right edge: brake over the throttle */
+#thrCol{ position:absolute; right:var(--padR); top:calc(var(--padT) + var(--icon) * 2 + 16px); bottom:var(--padB); width:var(--col); display:flex; flex-direction:column; gap:8px; pointer-events:auto; }
+#bBrake{ min-height:var(--icon); padding:0; font-size:13px; font-weight:800; letter-spacing:.04em; touch-action:none; }
+#bBrake.held{ background:var(--caution); color:#15110a; }
+#thr{ position:relative; flex:1; min-height:110px; border-radius:12px; background:var(--glass);
+  border:1px solid rgba(255,255,255,.22); touch-action:none; overflow:hidden; }
+#thrFill{ position:absolute; left:0; right:0; bottom:0; background:linear-gradient(0deg,rgba(168,89,42,.9),rgba(217,138,61,.85)); }
+#thrGrip{ position:absolute; left:4px; right:4px; height:6px; margin-top:-3px; border-radius:3px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.5); pointer-events:none; }
+#thr .det{ position:absolute; left:0; right:0; text-align:center; font-size:11px; font-weight:800; letter-spacing:.06em;
   color:var(--ink); text-shadow:0 1px 2px rgba(0,0,0,.8); padding:4px 0; }
 #thr .det::before{ content:''; position:absolute; left:6px; right:6px; top:50%; height:1px; background:rgba(255,255,255,.28); }
 #thr .det span{ position:relative; }
+/* lower right: weapon and mission buttons only, when there are any */
+#wpn{ position:absolute; right:calc(var(--padR) + var(--col) + 12px); bottom:var(--padB); display:flex; flex-direction:column-reverse; gap:8px; pointer-events:auto; }
+#wpn button{ min-width:84px; min-height:52px; font-size:16px; font-weight:800; }
+#wpn button[hidden]{ display:none; }
 
-/* ---------- coach ---------- */
-#coach{ position:absolute; left:50%; bottom:var(--padB); transform:translateX(-50%); max-width:min(520px,44vw);
-  display:none; align-items:center; gap:12px; font-size:17px; font-weight:600; border:2px solid var(--caution); }
-#coach.on{ display:flex; }
-#coach button{ padding:5px 10px; font-size:14px; flex:none; }
-body.touch #coach{ max-width:34vw; left:calc(40% + 8px); transform:none; font-size:13px; gap:8px; padding:6px 8px 6px 10px; bottom:calc(var(--padB) + 4px); }
-body.touch #coach button{ min-height:var(--tap); min-width:var(--tap); padding:6px 8px; }
 
 /* ---------- mouse yoke ---------- */
 #yoke{ position:fixed; width:110px; height:110px; margin:-55px 0 0 -55px; border-radius:50%; border:2px solid rgba(242,169,0,.7); pointer-events:none; display:none; }
@@ -161,10 +183,10 @@ body.touch #coach button{ min-height:var(--tap); min-width:var(--tap); padding:6
 #yokeK{ position:absolute; left:50%; top:50%; width:22px; height:22px; margin:-11px 0 0 -11px; border-radius:50%; background:rgba(242,169,0,.9); }
 
 /* ---------- overlays ---------- */
-.overlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; padding:20px; background:rgba(8,14,22,.55); overflow:auto; touch-action:pan-y; }
+.overlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; padding:max(12px,var(--padT)) var(--padR) var(--padB) var(--padL); background:rgba(8,14,22,.55); overflow:auto; touch-action:pan-y; }
 .overlay.on{ display:flex; }
 .sheet{ background:var(--glass); border:1px solid rgba(255,255,255,.12); border-radius:14px; padding:24px 26px; max-width:640px; width:100%; margin:auto; }
-.reg{ font-size:clamp(56px,13vw,112px); font-weight:800; line-height:.9; letter-spacing:.02em; margin:0; color:#fff; text-shadow:0 3px 0 #1d3557, 0 6px 0 var(--caution); }
+.reg{ font-size:clamp(56px,13vw,112px); font-weight:800; line-height:.9; letter-spacing:.02em; margin:0; color:var(--sand); text-shadow:0 3px 0 var(--brown), 0 6px 0 var(--night); }
 .sub{ font-size:19px; color:var(--soft); margin:10px 0 16px; line-height:1.3; }
 .keys{ display:grid; grid-template-columns:auto 1fr; gap:3px 16px; font-size:16px; margin:0 0 18px; }
 .keys dt{ font-weight:600; color:var(--caution); } .keys dd{ margin:0; }
@@ -178,10 +200,15 @@ body.touch #coach button{ min-height:var(--tap); min-width:var(--tap); padding:6
 .picks.bases{ grid-template-columns:repeat(2,1fr); margin-top:-6px; }
 .picks.tods{ grid-template-columns:repeat(3,1fr); }
 .gLetter{ font-size:84px; font-weight:900; line-height:1; margin:0; }
+#gradeOv .sheet{ display:grid; grid-template-columns:auto 1fr; gap:0 18px; align-items:start; max-width:720px; }
+#gradeOv .gLetter{ grid-row:1 / span 2; } #gradeOv #gLines,#gradeOv .row{ grid-column:1 / span 2; } #gradeOv #gLines{ margin-bottom:10px; font-size:15px; line-height:1.45; }
+#gradeOv .sub{ margin:8px 0 6px; }
+.primary.big{ font-size:20px; padding:10px 24px; background:var(--rust); color:#fff4e0; }
+#gradeOv button{ min-height:44px; }
 .gLetter.gA,.gLetter.gB{ color:#4cd97b; } .gLetter.gC{ color:var(--caution); } .gLetter.gD,.gLetter.gF{ color:var(--warn); }
 #gLines{ margin:0 0 16px; font-size:16px; line-height:1.55; }
 #gLines .ok::before{ content:'\2713  '; color:#4cd97b; font-weight:800; } #gLines .no::before{ content:'\2717  '; color:var(--warn); font-weight:800; }
-#sixpack{ position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom,0px) + 4px);
+#sixpack{ position:fixed; left:calc(50% + 20px); bottom:calc(env(safe-area-inset-bottom,0px) + 4px);
   transform:translateX(-50%); width:300px; height:200px; display:none; z-index:3;
   pointer-events:none; filter:drop-shadow(0 2px 6px rgba(0,0,0,.55)); }
 #sixpack.on{ display:block; }
@@ -194,6 +221,17 @@ body.touch #sixpack{ width:216px; height:144px; }
 #banner b{ font-size:15px; letter-spacing:.18em; color:var(--caution); }
 #banner span{ font-size:20px; font-weight:800; }
 body.touch #banner{ padding:5px 16px; } body.touch #banner b{ font-size:10px; } body.touch #banner span{ font-size:14px; }
+/* ---------- landing grade and record badges: never pause, never take input unless tapped ---------- */
+#badges{ position:fixed; right:var(--padR); top:calc(var(--padT) + var(--icon) + 8px); display:flex; flex-direction:column; align-items:flex-end; gap:6px; z-index:6; pointer-events:none; }
+.badge{ display:flex; align-items:center; gap:10px; max-width:min(240px,32vw); padding:6px 12px 6px 10px; border-radius:12px;
+  background:rgba(12,16,22,.84); border:1.5px solid rgba(255,255,255,.16); color:var(--ink); font:600 14px var(--font); line-height:1.15;
+  transform:translateX(24px); opacity:0; transition:transform .28s cubic-bezier(.2,.8,.2,1), opacity .28s; pointer-events:none; cursor:pointer; min-height:44px; }
+.badge.on{ transform:none; opacity:1; pointer-events:auto; }
+.badge.fade{ opacity:0; transition:opacity .6s; pointer-events:none; }
+.badge b{ font-size:26px; font-weight:900; line-height:1; min-width:22px; text-align:center; }
+.badge b.gA,.badge b.gB{ color:#4cd97b; } .badge b.gC{ color:var(--caution); } .badge b.gD,.badge b.gF{ color:var(--warn); }
+.badge.rec{ border-color:var(--caution); } .badge.rec b{ font-size:11px; letter-spacing:.14em; color:var(--caution); }
+@media (prefers-reduced-motion: reduce){ .badge{ transition:opacity .2s; transform:none; } }
 /* Records sits on top of the menu, so it needs its own opaque ground and a
    solid sheet, or the menu behind it reads straight through the text. */
 #recOv{ background:rgba(6,9,14,.94); }
@@ -211,24 +249,21 @@ body.touch .recSec{ margin:9px 0 2px; font-size:11px; }
 .gl i.pt{ display:inline-block; min-width:2.4em; text-align:right; margin-left:12px; font-style:normal; color:var(--soft); }
 .gl i.pt.good{ color:#4cd97b; } .gl i.pt.bad{ color:var(--warn); }
 .gl.got b{ color:#4cd97b; }
+.gl.sub2{ font-size:12px; border-bottom-color:rgba(255,255,255,.16); } .gl.sub2 b{ white-space:normal; text-align:right; font-weight:500; color:var(--soft); }
 button.danger{ color:var(--warn); } button.danger.arm{ background:var(--warn); color:#12161c; font-weight:800; }
 /* mission HUD and result card, sharing the grade card's letter styling */
 #mLines,#sLines{ margin:0 0 16px; font-size:16px; line-height:1.55; }
 .gl{ display:flex; justify-content:space-between; gap:18px; border-bottom:1px solid rgba(255,255,255,.09); padding:4px 0; }
 .gl span{ color:var(--soft); } .gl b{ font-variant-numeric:tabular-nums; white-space:nowrap; }
-#miss{ position:fixed; left:50%; top:calc(env(safe-area-inset-top,0px) + 8px); transform:translateX(-50%);
+#miss{ position:fixed; left:50%; top:calc(var(--padT) + var(--icon) + 8px); transform:translateX(-50%);
   display:none; flex-direction:column; gap:1px; text-align:center; z-index:5; pointer-events:none;
   border:2px solid #7fd4ff; max-width:min(560px,86vw); }
 #miss.on{ display:flex; }
 #miss.warn{ border-color:var(--caution); }
 #miss b{ font-size:17px; letter-spacing:.02em; }
 #miss span{ font-size:14px; color:var(--soft); }
-body.touch #miss{ font-size:13px; padding:5px 10px; max-width:44vw; }
+body.touch #miss{ font-size:13px; padding:5px 10px; max-width:30vw; }
 body.touch #miss b{ font-size:14px; } body.touch #miss span{ font-size:12px; }
-#school{ display:none; margin:0 0 14px; }
-#school.on{ display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:8px; }
-#school button{ text-align:left; padding:10px 12px; line-height:1.25; }
-#school button b{ display:block; font-size:17px; } #school button span{ font-size:13px; color:var(--soft); } #school button i{ float:right; font-style:normal; font-weight:900; color:var(--caution); }
 #lesson{ position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom,0px) + 22px); transform:translateX(-50%); display:none; flex-direction:column; gap:3px; max-width:min(560px,90vw); z-index:5; border:2px solid #7fd4ff; font-size:16px; }
 #lesson.on{ display:flex; }
 #lesson{ pointer-events:none; } #lesQuit{ pointer-events:auto; }
@@ -236,7 +271,7 @@ body.touch #miss b{ font-size:14px; } body.touch #miss span{ font-size:12px; }
 #lesson .lesTop b{ color:#7fd4ff; font-size:13px; letter-spacing:.08em; text-transform:uppercase; }
 #lesson .lesTop button{ padding:3px 10px; font-size:13px; }
 #lesI{ font-weight:700; } #lesM{ font-variant-numeric:tabular-nums; color:var(--soft); font-size:14px; }
-body.touch #lesson{ left:40%; max-width:36vw; font-size:13px; padding:6px 10px; bottom:calc(env(safe-area-inset-bottom,0px) + 14px); }
+body.touch #lesson{ max-width:30vw; font-size:13px; padding:6px 10px; bottom:calc(env(safe-area-inset-bottom,0px) + 10px); }
 body.touch #lesM{ font-size:12px; }
 .crashTitle{ font-size:42px; font-weight:800; margin:0; color:var(--warn); }
 .touchnote{ display:none; color:var(--soft); margin:0 0 16px; font-size:16px; }
@@ -258,62 +293,241 @@ body.touch .row.tonly{ display:flex; }
 label.sens{ display:flex; align-items:center; gap:10px; font-size:15px; color:var(--soft); }
 label.sens input[type=range]{ width:150px; accent-color:var(--caution); }
 label.sens b{ color:var(--ink); min-width:74px; }
-#tiltDiag{ display:none; font-size:13px; line-height:1.5; color:var(--soft); margin:0 0 12px; font-variant-numeric:tabular-nums; }
-body.touch #tiltDiag{ display:block; }
 @media (max-height:520px){ .reg{ font-size:44px; } .sheet{ padding:14px 16px; } .sub{ font-size:15px; margin:6px 0 10px; } .pick b{ font-size:18px; } .picks{ margin-bottom:10px; } }
+
+/* ================= menu: sand, dunes and near black, from the app icon ================= */
+#menu{ padding:0; background:var(--sand); color:var(--night); overflow:hidden; touch-action:none; display:none; }
+#menu.on{ display:block; }
+#menu.see3d{ background:transparent; }
+#menu .scr{ position:absolute; inset:0; display:none; flex-direction:column; gap:8px; padding:var(--padT) var(--padR) var(--padB) var(--padL); }
+#menu .scr.on{ display:flex; }
+#menu button{ background:var(--night); color:var(--sand); border:none; border-radius:12px; min-height:44px; font-weight:700; }
+#menu button:focus-visible{ outline:3px solid var(--rust); outline-offset:2px; }
+#menu .primary{ background:var(--rust); color:#fff4e0; font-size:18px; padding:10px 22px; }
+.mh{ display:flex; align-items:center; gap:10px; min-height:44px; flex:none; }
+.mh h2{ margin:0; font-size:24px; font-weight:800; letter-spacing:.01em; flex:1; }
+.mh .steps{ font-size:14px; font-weight:700; color:var(--brown); }
+#menu .back{ width:44px; height:44px; padding:0; display:grid; place-items:center; }
+#menu .back svg{ width:22px; height:22px; }
+/* home */
+#sHome{ align-items:center; justify-content:center; }
+#sHome .dunes{ position:absolute; left:0; right:0; bottom:0; width:100%; height:46%; pointer-events:none; }
+#sHome .sun{ position:absolute; right:14%; top:12%; width:13vh; height:13vh; border-radius:50%; background:var(--sun); pointer-events:none; }
+.homeC{ position:relative; display:flex; flex-direction:column; align-items:center; gap:clamp(10px,4vh,26px); margin-top:-6vh; }
+.title{ margin:0; font-size:clamp(44px,14vh,88px); text-align:center; font-weight:800; line-height:.9; letter-spacing:.01em; color:var(--night); }
+.homeRow{ display:flex; gap:clamp(10px,2vw,16px); align-items:stretch; }
+.homeCol{ display:flex; flex-direction:column; gap:clamp(6px,1.6vh,10px); }
+#menu .midB{ position:relative; min-width:clamp(170px,26vw,240px); min-height:44px; flex:1; font-size:clamp(15px,4.4vh,19px); font-weight:800; letter-spacing:.06em; border-radius:12px; background:var(--brown); color:var(--sand); }
+.startHere{ position:absolute; right:-8px; top:-9px; background:var(--rust); color:#fff4e0; font-size:11px; font-weight:800; letter-spacing:.04em; padding:3px 8px; border-radius:10px; box-shadow:0 2px 4px rgba(42,22,8,.35); display:none; }
+.startHere.on{ display:block; }
+#menu .bigB{ min-width:clamp(170px,27vw,250px); min-height:clamp(120px,38vh,168px); font-size:clamp(40px,12vh,58px); font-weight:800; letter-spacing:.06em;
+  border-radius:16px; box-shadow:0 6px 0 rgba(42,22,8,.28); }
+#menu .bigB:active{ transform:translateY(3px); box-shadow:0 3px 0 rgba(42,22,8,.28); }
+#hFly{ background:var(--rust); color:#fff4e0; letter-spacing:.1em; box-shadow:0 7px 0 var(--brown); }
+#menu .corner{ position:absolute; top:var(--padT); width:48px; height:48px; padding:0; display:grid; place-items:center; background:rgba(42,22,8,.12); color:var(--night); }
+#menu .corner svg{ width:24px; height:24px; }
+.corner.tl{ left:var(--padL); } .corner.tr{ right:var(--padR); }
+/* fly: one screen. The carousel window is drawn by the game renderer through a transparent hole. */
+#sFly{ gap:6px; }
+.carx{ position:relative; flex:1; min-height:0; display:flex; flex-direction:column; }
+.cwin{ position:relative; flex:1; min-height:60px; touch-action:pan-y; cursor:grab; }
+.cinfo{ position:absolute; left:50%; bottom:0; transform:translateX(-50%); width:min(560px,calc(100% - 120px)); display:flex; align-items:center; gap:10px;
+  background:rgba(42,22,8,.86); color:var(--sand); border-radius:14px; padding:5px 6px 5px 14px; }
+.cinfo .tx{ flex:1; min-width:0; }
+.cinfo .nm{ font-size:19px; font-weight:800; line-height:1.05; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cinfo .tail{ font-size:13px; font-weight:700; color:var(--orange); margin-left:8px; letter-spacing:.04em; }
+.cinfo .desc{ margin:1px 0 0; font-size:13px; line-height:1.2; color:#f3dcb8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.carx .story{ flex:none; background:transparent !important; border:1.5px solid rgba(246,193,119,.6) !important; color:var(--sand) !important; padding:0 12px; }
+.carx .arrow{ position:absolute; top:calc(50% - 44px); width:44px; height:56px; padding:0; display:grid; place-items:center; background:rgba(42,22,8,.6) !important; color:var(--sand) !important; border:none; border-radius:12px; }
+.carx .arrow svg{ width:24px; height:24px; }
+.carx .arrow.l{ left:0; } .carx .arrow.r{ right:0; } .carx .arrow.r svg{ transform:scaleX(-1); }
+.cdots{ position:absolute; left:0; right:0; top:2px; display:flex; justify-content:center; gap:7px; pointer-events:none; }
+.cdots span{ width:7px; height:7px; border-radius:50%; background:rgba(42,22,8,.28); pointer-events:auto; }
+.cdots span.sel{ background:var(--night); }
+.carx.compact .cinfo{ width:auto; max-width:calc(100% - 104px); padding:4px 12px; }
+.carx.compact .desc,.carx.compact .story,.carx.compact .cdots{ display:none; }
+.carx.compact .nm{ font-size:16px; }
+.carx.compact .cwin{ border-radius:12px; overflow:hidden; }
+/* chips under the carousel: two rows */
+.frows{ display:flex; flex-direction:column; gap:6px; flex:none; }
+.frow{ display:flex; gap:10px; align-items:stretch; }
+.grp{ display:flex; gap:6px; align-items:center; flex:1; min-width:0; }
+.grp.g4{ flex:1.9; } .grp.g2{ flex:1.1; } .grp.g3{ flex:1.8; }
+.glbl{ writing-mode:vertical-rl; transform:rotate(180deg); font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--brown); flex:none; }
+.frows .chip{ flex:1; min-width:0; min-height:44px; height:44px; border-radius:12px; padding:0 4px; line-height:1; white-space:nowrap; }
+.frows .chip b{ display:block; font-size:clamp(13px,2.2vw,17px); font-weight:800; overflow:hidden; text-overflow:ellipsis; }
+.frows .go{ flex:1; min-height:44px; border-radius:14px; font-size:26px; font-weight:900; letter-spacing:.08em; background:var(--rust) !important; color:#fff4e0 !important; box-shadow:0 5px 0 var(--brown); border:none; }
+.frows .go:active{ transform:translateY(3px); box-shadow:0 2px 0 var(--brown); }
+#menu .chip{ background:rgba(42,22,8,.1); color:var(--night); border:2px solid rgba(42,22,8,.18); border-radius:12px; line-height:1.1; }
+#menu .chip.sel{ background:var(--night); color:var(--sand); border-color:var(--night); }
+.chips{ display:flex; gap:8px; align-items:center; }
+#menu .frows .chip{ background:rgba(42,22,8,.1); color:var(--night); border:2px solid rgba(42,22,8,.18); }
+#menu .frows .chip.sel{ background:var(--night); color:var(--sand); border-color:var(--night); }
+.chip.slot{ border-style:dashed !important; background:transparent !important; opacity:.35; }
+#sumLine{ font-weight:700; color:var(--brown); font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:55%; }
+/* the pause sheet: actions on the left, change flight on the right */
+#pauseOv{ background:transparent; }
+.pzR{ background:none !important; border:none !important; padding:0 !important; gap:6px !important; }
+.pzR .pzT{ background:rgba(26,16,9,.9); border-radius:12px; padding:6px 12px; }
+.pzR .frows{ background:rgba(26,16,9,.9); border-radius:12px; padding:6px 8px; }
+.pz{ display:flex; gap:14px; width:100%; height:100%; max-width:980px; max-height:560px; }
+.pzL,.pzR{ background:rgba(26,16,9,.9); border:1px solid rgba(246,193,119,.18); border-radius:16px; padding:10px 12px; display:flex; flex-direction:column; gap:8px; }
+.pzL{ flex:0 0 clamp(140px,22vw,200px); }
+.pzL button{ min-height:44px; font-size:16px; }
+.pzR{ flex:1; min-width:0; }
+.pzT{ margin:0; font-size:17px; font-weight:800; color:var(--sand); letter-spacing:.02em; }
+#pauseOv .primary{ background:var(--rust); color:#fff4e0; border:none; }
+#pauseOv .glbl{ color:var(--orange); }
+#pauseOv .frows .chip{ background:rgba(246,193,119,.1); color:var(--sand); border:2px solid rgba(246,193,119,.22); }
+#pauseOv .frows .chip.sel{ background:var(--sand); color:var(--night); border-color:var(--sand); }
+#pauseOv .cwin{ background:transparent; }
+#pauseOv .frows .chip b{ font-size:clamp(12px,2vw,16px); }
+/* cards: missions, school, arcade. Sized to their content, two or three to a row. */
+.cards{ flex:1; min-height:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(min(196px,30vw),1fr)); grid-auto-rows:min-content; align-content:center; gap:8px; }
+#menu .mcard{ display:flex; align-items:center; gap:10px; text-align:left; padding:8px 10px; background:var(--night); color:var(--sand); border-radius:14px; min-height:64px; }
+.mcard .ico{ width:58px; height:44px; flex:none; background:rgba(246,193,119,.08); border-radius:10px; }
+.mcard .mt{ display:flex; flex-direction:column; gap:1px; min-width:0; }
+.mcard .ac{ font-size:10px; font-weight:800; letter-spacing:.1em; color:var(--orange); text-transform:uppercase; }
+.mcard b{ font-size:16px; font-weight:800; line-height:1.1; }
+.mcard .d{ font-size:12px; font-weight:500; color:#f0d6ad; line-height:1.2; }
+.mcard .sc{ display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:var(--sand); margin-top:2px; }
+.mcard .sc em{ font-style:normal; color:#f0d6ad; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.stars{ font-style:normal; color:var(--orange); letter-spacing:1px; font-size:13px; } .stars u{ text-decoration:none; color:rgba(246,193,119,.22); }
+#arcCards{ grid-template-columns:1fr 1fr; }
+#menu .mcard.feat{ grid-column:1 / -1; background:linear-gradient(90deg,var(--rust),var(--brown)); }
+#menu .mcard.feat .ac{ color:var(--sand); } #menu .mcard.feat .d{ color:#ffe9cc; }
+#photoOv{ background:transparent; padding:0; z-index:12; }
+#photoPad{ position:absolute; inset:0; touch-action:none; cursor:grab; }
+#photoOv button{ position:absolute; min-width:44px; min-height:44px; background:rgba(26,16,9,.8); color:var(--sand); border:1.5px solid rgba(246,193,119,.45); font-weight:800; }
+#phX{ top:var(--padT); right:var(--padR); font-size:18px; }
+#phSave{ bottom:var(--padB); left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:8px; padding:0 22px; min-height:52px !important; font-size:18px; letter-spacing:.08em; background:var(--rust) !important; color:#fff4e0 !important; }
+.phHint{ position:absolute; top:var(--padT); left:50%; transform:translateX(-50%); margin:0; font:700 13px var(--font); color:var(--sand); background:rgba(26,16,9,.6); padding:6px 12px; border-radius:10px; pointer-events:none; }
+#pauseOv .ph{ display:flex; align-items:center; justify-content:center; gap:8px; }
+body.photoOn #uiroot, body.photoOn #badges, body.photoOn #sixpack, body.photoOn #tutArrow, body.photoOn #miss, body.photoOn #lesson{ display:none !important; }
+.aStars{ margin:0; font-size:54px; line-height:1; color:var(--orange); letter-spacing:4px; } .aStars u{ text-decoration:none; color:rgba(246,193,119,.22); }
+#arcOv .sheet{ max-width:560px; } #arcOv #aLines{ margin:0 0 12px; font-size:15px; } #arcOv button{ min-height:44px; }
+.sc.soon{ color:var(--orange); letter-spacing:.08em; text-transform:uppercase; font-size:11px; }
+.schAc{ flex:none; } #menu .schAc .chip{ min-height:44px; padding:0 12px; } #menu .schAc .chip b{ font-size:14px; }
+/* the lessons: one learning path, finished ones ticked, the next one lit */
+.lessons{ flex:1; min-height:0; display:grid; grid-template-columns:1fr 1fr; grid-auto-rows:1fr; gap:8px; max-height:300px; align-self:stretch; margin:auto 0; }
+#menu .lrow{ display:flex; align-items:center; gap:10px; text-align:left; padding:6px 12px; background:rgba(42,22,8,.1); color:var(--night); border:2px solid rgba(42,22,8,.16); border-radius:14px; min-height:48px; }
+.lrow .ln{ flex:none; width:30px; height:30px; border-radius:50%; display:grid; place-items:center; font-weight:900; font-size:15px; background:rgba(42,22,8,.14); }
+.lrow .lt{ flex:1; min-width:0; display:flex; flex-direction:column; }
+.lrow .lt b{ font-size:16px; font-weight:800; line-height:1.1; } .lrow .lt span{ font-size:12px; font-weight:500; color:var(--brown); line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lrow .lg{ flex:none; font-weight:900; font-size:16px; color:var(--rust); }
+#menu .lrow.done .ln{ background:#3f8f4f; color:#fff; }
+#menu .lrow.next{ background:var(--night); color:var(--sand); border-color:var(--rust); box-shadow:0 0 0 3px rgba(168,89,42,.35); }
+#menu .lrow.next .lt span{ color:#f0d6ad; } #menu .lrow.next .ln{ background:var(--rust); color:#fff4e0; }
+.lrow .go1{ display:none; font-size:11px; font-weight:800; letter-spacing:.08em; color:var(--orange); } .lrow.next .go1{ display:inline; }
+/* tutorial arrow and the bigger prompt card */
+#tutArrow{ position:fixed; left:0; top:0; width:64px; height:40px; z-index:7; pointer-events:none; display:none; }
+#tutArrow.on{ display:block; }
+#tutArrow svg{ width:64px; height:40px; animation:nudge .9s ease-in-out infinite; filter:drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
+@keyframes nudge{ 50%{ transform:translateX(10px); } }
+@media (prefers-reduced-motion: reduce){ #tutArrow svg{ animation:none; } }
+#lesson.tut{ border-color:var(--sand); max-width:min(460px,38vw); }
+#lesson.tut #lesI{ font-size:15px; line-height:1.25; }
+#lesson.tut #lesQuit{ min-height:44px; min-width:64px; font-size:15px; font-weight:800; }
+body.menuOn #tutArrow, body.pauseOn #tutArrow{ display:none !important; }
+/* settings */
+.setGrid{ flex:1; display:grid; grid-template-columns:1fr 1fr; gap:6px 20px; align-content:center; min-height:0; }
+.setCol{ display:flex; flex-direction:column; gap:clamp(4px,1.6vh,10px); }
+.srow{ display:flex; align-items:center; gap:10px; min-height:48px; }
+.srow > span{ width:56px; flex:none; font-size:13px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--brown); }
+#menu .tog{ background:rgba(42,22,8,.1); color:var(--night); border:2px solid rgba(42,22,8,.18); padding:0 12px; font-size:15px; white-space:nowrap; }
+#menu .tog.on{ background:var(--night); color:var(--sand); border-color:var(--night); box-shadow:none; }
+#menu label.sens{ color:var(--brown); gap:8px; } #menu label.sens b{ color:var(--night); min-width:64px; }
+#menu label.sens input[type=range]{ width:clamp(90px,14vw,150px); height:44px; accent-color:var(--rust); }
+#menu #a2hs{ margin:0; flex:none; background:rgba(168,89,42,.14); border-color:rgba(168,89,42,.4); color:var(--night); font-size:13px; padding:6px 10px; }
+#menu #a2hs b{ color:var(--rust); }
+#menu #a2hs .shr::before{ border-color:var(--rust); } #menu #a2hs .shr::after{ background:var(--rust); box-shadow:-3px 3.2px 0 -0.2px var(--rust), 3px 3.2px 0 -0.2px var(--rust); }
+.helpBody{ flex:1; min-height:0; display:flex; align-items:center; }
+#menu .keys{ font-size:14px; gap:2px 14px; margin:0; } #menu .keys dt{ color:var(--rust); }
+#menu .touchnote{ color:var(--night); font-size:clamp(14px,4.2vh,17px); line-height:1.4; margin:0; max-width:760px; }
+body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArrow, body.pauseOn #uiroot, body.pauseOn #badges, body.pauseOn #sixpack, body.menuOn #uiroot, body.menuOn #badges, body.menuOn #sixpack, body.menuOn #miss, body.menuOn #lesson{ display:none !important; }
+#menu .pick.sel{ box-shadow:none; } .acard.pick.sel{ border:none; }
+#funnel{ background:var(--sand); color:var(--night); z-index:30; padding:var(--padT) var(--padR) var(--padB) var(--padL); }
+.fun{ display:flex; flex-direction:column; align-items:center; gap:clamp(10px,4vh,22px); width:100%; }
+.fun h1{ margin:0; font-size:clamp(28px,8.6vh,44px); font-weight:800; text-align:center; }
+.fun p{ margin:0; font-size:14px; color:var(--brown); font-weight:600; }
+.fun .a2hsTip{ display:none; font-size:13px; color:var(--night); } .fun .a2hsTip b{ color:var(--rust); }
+.funB{ display:flex; gap:clamp(10px,2.4vw,20px); width:min(760px,100%); }
+.funB button{ flex:1; min-height:clamp(120px,40vh,170px); display:flex; flex-direction:column; justify-content:center; gap:8px; text-align:left;
+  background:var(--night); color:var(--sand); border:none; border-radius:18px; padding:14px 20px; box-shadow:0 6px 0 rgba(42,22,8,.3); }
+.funB button b{ font-size:clamp(24px,7.4vh,34px); font-weight:800; line-height:1; }
+.funB button span{ font-size:clamp(13px,3.8vh,16px); font-weight:500; color:#f0d6ad; line-height:1.3; }
+#fRookie{ background:var(--rust); } #fRookie span{ color:#ffe9cc; }
+#storyOv .sheet{ background:var(--night); color:var(--sand); } #storyOv .reg{ font-size:30px; text-shadow:none; }
+#storyOv .sub{ color:#f0d6ad; font-size:16px; }
+#splash{ position:fixed; inset:0; z-index:60; background:#F6C177; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:clamp(8px,3vh,16px);
+  padding:var(--padT) var(--padR) var(--padB) var(--padL); transition:opacity .45s ease; }
+#splash.done{ opacity:0; pointer-events:none; }
+#splash.gone{ display:none; }
+.spIcon{ width:clamp(88px,30vh,150px); height:clamp(88px,30vh,150px); border-radius:22%; box-shadow:0 10px 30px rgba(42,22,8,.28); }
+.spTitle{ font:800 clamp(26px,8vh,40px) var(--font); color:#2A1608; letter-spacing:.01em; }
+.spBar{ width:min(240px,50vw); height:4px; border-radius:2px; background:rgba(42,22,8,.16); overflow:hidden; }
+.spBar i{ display:block; height:100%; width:0; background:#A8592A; border-radius:2px; animation:spLoad 5s cubic-bezier(.1,.7,.2,1) forwards; }
+#splash.done .spBar i{ width:100% !important; animation:none; transition:width .2s; }
+@keyframes spLoad{ to{ width:88%; } }
+@media (prefers-reduced-motion: reduce){ #splash{ transition:none; } }
+.credit{ display:inline-flex; align-items:center; gap:7px; min-height:44px; padding:0 6px; font:600 13px var(--font); color:#6B3517; text-decoration:none; -webkit-tap-highlight-color:transparent; }
+.credit .yt{ width:22px; height:auto; flex:none; }
+.credit:focus-visible{ outline:2px solid #A8592A; border-radius:8px; }
+.spCredit{ position:absolute; bottom:var(--padB); left:50%; transform:translateX(-50%); opacity:.85; }
+.setFoot{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex:none; flex-wrap:nowrap; }
+.setFoot #a2hs{ flex:1; min-width:0; }
+.setFoot .credit{ flex:none; order:2; }
 #rotate{ position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:24px; text-align:center; background:rgba(8,14,22,.92); z-index:20; font-size:22px; font-weight:700; }
 @media (orientation:portrait){ body.touch:not(.portraitok) #rotate{ display:flex; } }
 </style>
 </head>
-<body>
+<body class="menuOn">
+<!-- splash: plain HTML so it paints before any script runs, then fades into the home screen -->
+<div id="splash" role="status" aria-label="Loading">
+  <img src="icons/icon-512.png" alt="" class="spIcon">
+  <div class="spTitle">Pocket Flight Sim</div>
+  <div class="spBar"><i></i></div>
+  <a class="credit spCredit" href="https://www.youtube.com/@OhRabah" target="_blank" rel="noopener"><svg class="yt" viewBox="0 0 28 20" aria-hidden="true"><path d="M27.4 3.1A3.5 3.5 0 0 0 24.9.6C22.7 0 14 0 14 0S5.3 0 3.1.6A3.5 3.5 0 0 0 .6 3.1C0 5.3 0 10 0 10s0 4.7.6 6.9a3.5 3.5 0 0 0 2.5 2.5C5.3 20 14 20 14 20s8.7 0 10.9-.6a3.5 3.5 0 0 0 2.5-2.5C28 14.7 28 10 28 10s0-4.7-.6-6.9Z" fill="#FF0000"/><path d="M11.2 14.3 18.4 10l-7.2-4.3v8.6Z" fill="#FFFFFF"/></svg><span>Made by @OhRabah</span></a>
+</div>
 <canvas id="gl"></canvas>
 <!-- everything in here is laid out inside the visual viewport, so nothing hides under
      the notch, the home indicator, or a host app header -->
 <div id="uiroot">
+  <canvas id="map"></canvas>
   <div id="hud">
-    <div class="card"><div class="big"><span id="hIas">0</span><small>KT</small></div><div class="lbl">Airspeed</div></div>
-    <div class="card"><div class="big"><span id="hAlt">1,070</span><small>FT</small></div><div class="lbl">Altitude MSL</div></div>
-    <div id="hCfg" class="card"><span id="hFlap">FLAPS 0&deg;</span><span id="hGear"></span></div>
-    <div id="hWind" class="card"><svg viewBox="0 0 20 20" width="15" height="15"><path id="hWindA" d="M10 2 L15 11 L11.5 11 L11.5 18 L8.5 18 L8.5 11 L5 11 Z" fill="currentColor"/></svg><span id="hWindT">050&deg; 5 KT</span></div>
+    <div id="hGrid">
+      <div class="card"><div class="big" id="hIas">0</div><div class="lbl" id="lIas">KIAS</div></div>
+      <div class="card"><div class="big" id="hAlt">1,070</div><div class="lbl" id="lAlt">ALT</div></div>
+      <div class="card"><div class="big" id="hVs">0</div><div class="lbl" id="lVs">VS</div></div>
+      <div class="card"><div class="big" id="hHdg">026</div><div class="lbl" id="lHdg">HDG</div></div>
+    </div>
+    <div id="hLine" class="card"><span id="hFlap">FLAPS 0&deg;</span><span id="hGear"></span><span id="hWind"><svg viewBox="0 0 20 20" width="12" height="12"><path id="hWindA" d="M10 2 L15 11 L11.5 11 L11.5 18 L8.5 18 L8.5 11 L5 11 Z" fill="currentColor"/></svg><span id="hWindT">050&deg; 5 KT</span></span></div>
     <div id="hAp"></div>
   </div>
+  <button id="hDest" hidden aria-label="Destination, tap to clear"><svg id="dArrow" viewBox="0 0 24 24"><path d="M12 2 L20 20 L12 15.5 L4 20Z" fill="#D98A3D" stroke="#2A1608" stroke-width="1.2" stroke-linejoin="round"/></svg><span id="dTxt"></span></button>
+  <button id="bPause" title="Pause (P)" aria-label="Pause"><svg viewBox="0 0 20 20"><rect x="4" y="3" width="4" height="14" rx="1" fill="currentColor"/><rect x="12" y="3" width="4" height="14" rx="1" fill="currentColor"/></svg></button>
   <div id="tools">
     <button id="bAuto" title="Auto takeoff or land (O)">Auto T/O</button>
+    <button id="bGear" title="Gear (G)" aria-label="Landing gear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v7"/><circle cx="12" cy="15" r="6"/><circle cx="12" cy="15" r="2" fill="currentColor"/></svg><i id="bGearT">DOWN</i></button>
+    <button id="bFlaps" title="Flaps ([ ])" aria-label="Flaps"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M2 10 Q9 5 18 9 L18 11 Q9 10 2 11 Z"/><path d="M18 10 L22 15"/></svg><i id="bFlapsT">0&deg;</i></button>
+    <button id="bCam" title="Camera (C)" aria-label="Camera"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg><i>VIEW</i></button>
     <button id="bFull" class="donly" title="Full screen">Full screen</button>
-    <button id="bView" title="Camera (C)">View</button>
-    <button id="bPause" title="Pause (P)">Pause</button>
-    <button id="bMore" class="tonly">More</button>
-    <button id="bMenu" title="Menu (Esc)">Menu</button>
   </div>
-  <div id="drawer">
-    <button data-a="view">View</button>
-    <button data-a="tilt" id="tTilt">Tilt</button>
-    <button data-a="zoom" id="bZoom" hidden>Zoom</button>
-    <button data-a="gear" class="adv">Gear</button>
-    <button data-a="trimDn" class="adv">Trim &#9660;</button>
-    <button data-a="trimUp" class="adv">Trim &#9650;</button>
-  </div>
+  <div id="flapPop"></div>
   <div id="warn"></div>
   <div id="atc" class="card"></div>
   <div id="toast"></div>
   <div id="bigcfg"></div>
-  <canvas id="map"></canvas>
   <div id="mts"><div class="h" style="left:calc(50% - 90px)"></div><div class="h" style="left:calc(50% + 20px)"></div><div class="v" style="top:calc(50% - 90px)"></div><div class="v" style="top:calc(50% + 20px)"></div><div id="mtsTxt"></div></div>
   <div id="touch">
     <div id="stickZone"></div>
+    <div id="stickHint">STICK</div>
     <div id="stick"><div id="knob"></div></div>
-    <div id="rightCol">
-      <div id="ctxBtns">
-        <button id="ctxA"></button>
-        <button id="ctxB"></button>
-        <button data-a="brake" class="fixb">Brake</button>
-      </div>
-      <div id="fixBtns">
-        <button data-a="flapUp" class="fixb">Flaps UP</button>
-        <button data-a="flapDn" class="fixb">Flaps DN</button>
-      </div>
-      <div id="thr">
-        <div id="thrFill"></div>
+    <div id="wpn"><button id="wA" hidden></button><button id="wB" hidden></button><button id="wC" hidden></button></div>
+    <div id="thrCol">
+      <button id="bBrake" aria-label="Brake, hold">BRAKE</button>
+      <div id="thr" role="slider" aria-label="Throttle" aria-valuemin="0" aria-valuemax="100">
+        <div id="thrFill"></div><div id="thrGrip"></div>
         <div class="det" data-p="1" style="top:4px">FULL</div>
         <div class="det" data-p="c" style="top:50%;margin-top:-11px">CLIMB</div>
         <div class="det" data-p="0" style="bottom:4px">IDLE</div>
@@ -321,90 +535,153 @@ body.touch #tiltDiag{ display:block; }
     </div>
   </div>
   <div id="bigFlash" style="position:fixed;inset:0;background:#fff3d6;opacity:0;pointer-events:none;z-index:4"></div>
-<div id="coach" class="card"><span></span><button id="coachSkip">Skip</button></div>
 <div id="lesson" class="card"><div class="lesTop"><b id="lesT"></b><button id="lesQuit">End</button></div><div id="lesI"></div><div id="lesM"></div></div>
 </div>
 <div id="miss" class="card"><b id="missT"></b><span id="missS"></span></div>
-<div id="banner"></div>
+<div id="badges"><div class="badge" id="gBadge" role="button" aria-label="Landing grade, tap for details"><b id="gbL"></b><span id="gbT"></span></div><div class="badge rec" id="banner" role="button" aria-label="New record, tap for records"></div></div>
 <canvas id="sixpack" width="300" height="200"></canvas>
+<div id="tutArrow"><svg viewBox="0 0 64 40"><path d="M2 14 H40 V3 L62 20 L40 37 V26 H2 Z" fill="#F6C177" stroke="#2A1608" stroke-width="2.5" stroke-linejoin="round"/></svg></div>
 <div id="yoke"><div id="yokeK"></div></div>
 <div id="rotate"><div>Turn your phone sideways</div><div style="font-size:16px;font-weight:500;color:var(--soft)">Landscape gives you the stick, throttle, and a wider view.</div><button id="rotOk">Play in portrait anyway</button></div>
-<div class="overlay on" id="menu"><div class="sheet">
-  <p class="reg" id="regTitle">N8401L</p>
-  <p class="sub" id="acSub"></p>
-  <div class="picks">
-    <button class="pick" data-t="f16"><b>F-16</b><span>Viper</span></button>
-    <button class="pick" data-t="reaper"><b>MQ-9A</b><span>Reaper</span></button>
-    <button class="pick" data-t="mq9b"><b>MQ-9B</b><span>SkyGuardian</span></button>
-    <button class="pick" data-t="cessna"><b>C172</b><span>N8401L</span></button>
-    <button class="pick" data-t="c130"><b>C-130</b><span>Hercules</span></button>
-    <button class="pick" data-t="alpha"><b>Alpha</b><span>Pipistrel</span></button>
+<div class="overlay on" id="menu">
+ <div class="scr on" id="sHome">
+  <div class="sun" aria-hidden="true"></div>
+  <svg class="dunes" viewBox="0 0 1000 300" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0 110 C160 60 300 70 470 95 S800 60 1000 35 L1000 300 L0 300Z" fill="#D98A3D"/>
+    <path d="M0 175 C200 145 380 160 560 170 S850 140 1000 150 L1000 300 L0 300Z" fill="#A8592A"/>
+    <path d="M0 240 C220 215 430 230 640 225 S900 205 1000 215 L1000 300 L0 300Z" fill="#6B3517"/></svg>
+  <button class="corner tl" id="hRec" aria-label="Records"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4M12 14v4M8 20h8"/></svg></button>
+  <button class="corner tr" id="hSet" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></button>
+  <div class="homeC">
+   <h1 class="title">Pocket Flight Sim</h1>
+   <div class="homeRow">
+    <button class="bigB" id="hFly">FLY</button>
+    <div class="homeCol">
+     <button class="midB" id="hSch">FLIGHT SCHOOL<span class="startHere" id="startHere">Start here</span></button>
+     <button class="midB" id="hMis">MISSIONS</button>
+     <button class="midB" id="hArc">ARCADE</button>
+    </div>
+   </div>
   </div>
-  <div class="picks bases tods">
-    <button class="pick" data-tod="day"><b>Day</b><span>Midday sun</span></button>
-    <button class="pick" data-tod="sunset"><b>Sunset</b><span>Low light</span></button>
-    <button class="pick" data-tod="night"><b>Night</b><span>Runway lights</span></button>
+ </div>
+ <div class="scr" id="sFly">
+  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Fly</h2><span class="steps" id="sumLine"></span></header>
+  <div class="carx" id="carMain"></div>
+  <div class="frows">
+   <div class="frow"><div class="grp g2"><span class="glbl">Base</span>
+     <button class="pick chip" data-b="kgeu"><b>Glendale</b></button><button class="pick chip" data-b="luke"><b>Luke AFB</b></button></div>
+    <div class="grp g4"><span class="glbl">Time</span>
+     <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><span class="chip slot" aria-hidden="true"></span></div></div>
+   <div class="frow"><div class="grp g3"><span class="glbl">Start</span>
+     <button class="pick chip" data-pos="runway"><b>Runway</b></button><button class="pick chip" data-pos="ramp"><b>Ramp</b></button><button class="pick chip" data-pos="final"><b>3 mi final</b></button></div>
+    <button class="go" id="bGo">GO</button></div>
   </div>
-  <div class="picks bases">
-    <button class="pick" data-b="kgeu"><b>Glendale</b><span>KGEU runway 1</span></button>
-    <button class="pick" data-b="luke"><b>Luke AFB</b><span>KLUF runway 03L</span></button>
+ </div>
+ <div class="scr" id="sMis">
+  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Missions</h2><span class="steps"></span></header>
+  <div class="cards" id="misCards"></div>
+ </div>
+ <div class="scr" id="sSchool">
+  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Flight school</h2><div class="chips schAc"><button class="pick chip" data-sch="cessna"><b>Cessna 172</b></button><button class="pick chip" data-sch="alpha"><b>Pipistrel Alpha</b></button></div></header>
+  <div class="lessons" id="school"></div>
+ </div>
+ <div class="scr" id="sArc">
+  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Arcade</h2><span class="steps"></span></header>
+  <div class="cards" id="arcCards"></div>
+ </div>
+ <div class="scr" id="sSet">
+  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Settings</h2><span class="steps"></span></header>
+  <div class="setGrid">
+   <div class="setCol">
+    <div class="srow"><span>Skill</span><div class="chips"><button class="pick chip sk" data-skill="rookie"><b>Rookie</b></button><button class="pick chip sk" data-skill="pilot"><b>Pilot</b></button></div></div>
+    <div class="srow"><span>Radio</span><div class="chips"><button class="tog" id="oRadio">Radio: On</button>
+      <label class="sens"><input type="range" id="oRvol" min="0" max="10" step="1" value="7" aria-label="Radio volume"><b id="oRvolV">70%</b></label></div></div>
+    <div class="srow"><span>Sound</span><div class="chips"><button class="tog" id="oSound">Sound: On</button></div></div>
+   </div>
+   <div class="setCol">
+    <div class="srow"><span>Stick</span><div class="chips"><label class="sens"><input type="range" class="oSens" min="0" max="4" step="1" value="2" aria-label="Stick sensitivity"><b class="oSensV">Medium</b></label></div></div>
+    <div class="srow"><span>Pitch</span><div class="chips"><button class="tog oInv">Invert pitch: Off</button></div></div>
+    <div class="srow"><span>Help</span><div class="chips" id="helpRow"><button id="bHelp">Controls help</button><button id="bReplay">Replay first flight</button></div></div>
+   </div>
   </div>
-<div class="row opts">
-    <button class="tog" id="oEasy">Easy flight: On</button>
-    <button class="tog tonly" id="oTilt">Tilt steering: Off</button>
-    <button class="tog tonly" id="oInv">Tilt pitch: Normal</button>
-  </div>
-  <div class="row opts">
-    <button class="tog" id="oRadio">Radio: On</button>
-    <label class="sens">Radio volume
-      <input type="range" id="oRvol" min="0" max="10" step="1" value="7">
-      <b id="oRvolV">70%</b></label>
-  </div>
-  <div class="row opts tonly" id="sensRow">
-    <label class="sens">Tilt sensitivity
-      <input type="range" id="oSens" min="0" max="4" step="1" value="2">
-      <b id="oSensV">Medium</b></label>
-  </div>
-  <div id="tiltDiag"></div>
-  <div class="row" style="margin-bottom:14px">
-    <button class="primary" id="bRunway">Take off from runway 1</button>
-    <button id="bRamp">Start at the ramp</button>
-    <button id="bFinal">Start on 3 mile final</button>
-    <button id="bStrike">Reaper strike: live range</button>
-    <button id="bDrop">C-130 airdrop: desert DZ</button>
-    <button id="bShort">C-130 short field landing</button>
-    <button id="bSchool">Flight school</button>
-    <button id="bRecords">Records and achievements</button>
-    <button id="bResume" style="display:none">Resume</button>
-  </div>
-  <div id="school"></div>
-  <dl class="keys">
-    <dt>Arrows or W A S D</dt><dd>Fly. Easy flight: let go and it flies straight</dd>
-    <dt>Mouse or trackpad</dt><dd>Click and drag on the scene to fly like a yoke. Scroll to set throttle</dd>
+  <div class="setFoot"><a class="credit" href="https://www.youtube.com/@OhRabah" target="_blank" rel="noopener"><svg class="yt" viewBox="0 0 28 20" aria-hidden="true"><path d="M27.4 3.1A3.5 3.5 0 0 0 24.9.6C22.7 0 14 0 14 0S5.3 0 3.1.6A3.5 3.5 0 0 0 .6 3.1C0 5.3 0 10 0 10s0 4.7.6 6.9a3.5 3.5 0 0 0 2.5 2.5C5.3 20 14 20 14 20s8.7 0 10.9-.6a3.5 3.5 0 0 0 2.5-2.5C28 14.7 28 10 28 10s0-4.7-.6-6.9Z" fill="#FF0000"/><path d="M11.2 14.3 18.4 10l-7.2-4.3v8.6Z" fill="#FFFFFF"/></svg><span>Made by @OhRabah</span></a>
+  <p id="a2hs"><b>Play it full screen.</b> Tap <span class="shr"></span> <b>Share</b> in Safari, then <b>Add to Home Screen</b>.</p></div>
+ </div>
+ <div class="scr" id="sHelp">
+  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Controls help</h2><span class="steps"></span></header>
+  <div class="helpBody">
+   <p class="touchnote">Left thumb anywhere on the left half: a stick appears there. Push to roll and climb or dive, let go and it springs back. Right edge: the throttle, slide it or tap IDLE, CLIMB, FULL. BRAKE above it, hold on the ground. Top right: Auto takes off or lands for you, then gear, flaps and camera. Pause is top centre. Tap the grade badge after a landing to see the details.</p>
+   <dl class="keys">
+    <dt>Arrows or W A S D</dt><dd>Fly. Rookie: let go and it levels out</dd>
+    <dt>Mouse or trackpad</dt><dd>Click and drag on the scene like a yoke. Scroll for throttle</dd>
     <dt>Shift, Control</dt><dd>Throttle up, down (R and F also work)</dd>
-    <dt>1  2  3</dt><dd>Throttle Idle, Climb, Full</dd>
+    <dt>1  2  3</dt><dd>Throttle idle, climb, full</dd>
     <dt>O</dt><dd>Smart auto: takes off on the ground, lands in the air</dd>
     <dt>Space</dt><dd>Brakes (hold)</dd>
+    <dt>C  P  M  T</dt><dd>Camera, pause, all sound, radio</dd>
+    <dt>G  ] [  Y H</dt><dd>Gear, flaps, trim</dd>
     <dt>Controller</dt><dd>Left stick flies, triggers throttle, A auto, B brakes, Y camera, X gear, bumpers flaps</dd>
-    <dt>C  P  M  T</dt><dd>Camera, pause, all sound, radio voices</dd>
-    <dt>G  ] [  Y H</dt><dd>Realistic mode: gear, flaps, trim</dd>
-  </dl>
-  <p id="a2hs"><b>Play it full screen.</b> Tap <span class="shr"></span> <b>Share</b> at the bottom of Safari, then <b>Add to Home Screen</b>. It gets its own icon and loses the browser bar.</p>
-  <p class="touchnote">Put your left thumb anywhere on the left of the screen and a stick appears there. The bar on the right is the throttle: tap IDLE, CLIMB or FULL to jump. More holds the camera, tilt, brakes and the realistic mode switches. Auto up top takes off or lands for you.</p>
-  <p class="sub" style="font-size:16px;margin:0 0 16px"><span id="tips"></span> Best landing: <span id="best">none yet</span>. Best strike: <span id="bestStrike">none yet</span></p>
-
+   </dl>
+  </div>
+ </div>
+</div>
+<div class="overlay" id="funnel"><div class="fun">
+  <h1>How do you want to fly?</h1>
+  <div class="funB">
+   <button id="fRookie"><b>New to flying</b><span>Plain words and plenty of help. Starts with a 60 second first flight.</span></button>
+   <button id="fPilot"><b>I'm a pilot</b><span>Real terms, six pack gauges, full ATC, no assists.</span></button>
+  </div>
+  <p>You can change this any time in Settings.</p>
+  <p class="a2hsTip" id="a2hsF"><b>Tip:</b> tap Share in Safari, then <b>Add to Home Screen</b>, to play full screen.</p>
+ </div></div>
+<div class="overlay" id="storyOv"><div class="sheet"><p class="reg" id="storyH"></p><p class="sub" id="storyT"></p><div class="row"><button class="primary" id="storyX">Close</button></div></div></div>
+<div class="overlay" id="pauseOv"><div class="pz">
+  <div class="pzL">
+   <p class="pzT">Paused</p>
+   <button class="primary" id="pResume">Resume</button><button id="pPhoto" class="ph"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>Photo</button><button id="pRestart">Restart</button><button id="pSet">Settings</button><button id="pMenu">Main menu</button>
+  </div>
+  <div class="pzR">
+   <p class="pzT">Change flight</p>
+   <div class="carx compact" id="carPause"></div>
+   <div class="frows">
+   <div class="frow"><div class="grp g2"><span class="glbl">Base</span>
+     <button class="pick chip" data-b="kgeu"><b>Glendale</b></button><button class="pick chip" data-b="luke"><b>Luke AFB</b></button></div>
+    <div class="grp g4"><span class="glbl">Time</span>
+     <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><span class="chip slot" aria-hidden="true"></span></div></div>
+   <div class="frow"><div class="grp g3"><span class="glbl">Start</span>
+     <button class="pick chip" data-pos="runway"><b>Runway</b></button><button class="pick chip" data-pos="ramp"><b>Ramp</b></button><button class="pick chip" data-pos="final"><b>3 mi final</b></button></div>
+    <button class="go apply" id="pApply">Apply</button></div>
+  </div>
+  </div>
+ </div></div>
+<div class="overlay" id="mapOv"><canvas id="fmap"></canvas>
+  <div class="mt">Map</div>
+  <div class="mbar tr"><button id="mapX" aria-label="Close map">&#x2715;</button></div>
+  <div class="mbar br"><button id="mapOut" aria-label="Zoom out">&minus;</button><button id="mapIn" aria-label="Zoom in">+</button></div>
+  <div class="mbar bc"><span id="mapInfo"></span><button id="mapClear">Clear destination</button></div>
+</div>
+<div class="overlay" id="photoOv"><div id="photoPad"></div>
+  <p class="phHint">Drag to orbit, pinch to zoom</p>
+  <button id="phX" aria-label="Close photo mode">&#x2715;</button>
+  <button id="phSave"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>SAVE</button>
+</div>
+<div class="overlay" id="arcOv"><div class="sheet">
+  <p class="aStars" id="aStars"></p>
+  <p class="sub" id="aTitle"></p>
+  <div id="aLines"></div>
+  <div class="row"><button class="primary big" id="aRetry">Try again</button><button id="aHub">Arcade</button><button id="aFree">Keep flying</button></div>
 </div></div>
 <div class="overlay" id="gradeOv"><div class="sheet">
   <p class="gLetter" id="gLetter">A</p>
   <p class="sub" id="gTitle"></p>
   <div id="gLines"></div>
-  <div class="row"><button class="primary" id="gRetry">Try again</button><button id="gSchool">All lessons</button><button id="gFree">Free flight</button></div>
+  <div class="row"><button class="primary big" id="gNext">Next lesson</button><button id="gRetry">Try again</button><button id="gSchool">Flight school</button><button id="gFree">Free flight</button></div>
 </div></div>
 <div class="overlay" id="landOv"><div class="sheet">
   <p class="gLetter" id="lLetter">A</p>
   <p class="sub" id="lTitle"></p>
   <div id="lLines"></div>
-  <div class="row"><button class="primary" id="lAgain">Fly again</button><button id="lRec">Records</button><button id="lMenu">Menu</button></div>
+  <div class="row"><button class="primary" id="lKeep">Keep flying</button><button id="lAgain">Fly again</button><button id="lRec">Records</button><button id="lMenu">Menu</button></div>
 </div></div>
 <div class="overlay" id="recOv"><div class="sheet">
   <p class="reg">Records</p>
@@ -424,6 +701,7 @@ body.touch #tiltDiag{ display:block; }
     <button class="primary" id="cRunway">Retry from runway 1</button>
     <button id="cRamp">Retry from the ramp</button>
     <button id="cFinal">Retry on final</button>
+    <button id="cMenu">Main menu</button>
   </div>
 </div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -1087,6 +1365,8 @@ const isTouch=coarse||(navigator.maxTouchPoints>0&&!(window.matchMedia&&window.m
 if(isTouch) document.body.classList.add('touch');
 const fontsReady=(document.fonts&&document.fonts.load)?Promise.race([document.fonts.load('800 60px "Saira Condensed"'),new Promise(r=>setTimeout(r,1500))]):Promise.resolve();
 fontsReady.then(init,init);
+// if the game fails to start, do not leave the splash up forever
+setTimeout(()=>{const sp=document.getElementById('splash');if(sp&&!sp.classList.contains('done')){sp.classList.add('done');setTimeout(()=>sp.classList.add('gone'),480);}},8000);
 
 // ---------- HD airframes (from the Hangar viewer, built to published dimensions) ----------
 // Wrapped in its own scope so its helpers never collide with the game's. The game renders
@@ -3738,7 +4018,23 @@ function updatePeople(dt,t){
   iTorso.instanceMatrix.needsUpdate=iHead.instanceMatrix.needsUpdate=iLeg.instanceMatrix.needsUpdate=iArm.instanceMatrix.needsUpdate=true;
 }
 
+// ---------- every runway in the game, and both of its ends ----------
+// hdg is the direction you land in, radians clockwise from north. x,z is the landing threshold.
+const RUNWAYS=(function(){
+  const out=[];
+  function add(apt,code,num,len,wid,cx,cz,h,lo,hi,thrLo,thrHi){
+    const dx=Math.sin(h),dz=-Math.cos(h),r={apt:apt,code:code,num:num,len:len,wid:wid,x:cx,z:cz,h:h,lo:lo,hi:hi,ends:[]};
+    r.ends.push({rwy:r,num:lo,x:cx-dx*(len/2-thrLo),z:cz-dz*(len/2-thrLo),h:h});
+    r.ends.push({rwy:r,num:hi,x:cx+dx*(len/2-thrHi),z:cz+dz*(len/2-thrHi),h:h+Math.PI});
+    out.push(r);}
+  add('Glendale','KGEU','1-19',RWY_LEN,30,wX(RWY_LEN/2,0),wZ(RWY_LEN/2,0),RH,'1','19',THR01,RWY_LEN-THR19);
+  for(const r of LUKE_RWY)add('Luke AFB','KLUF',r.lo+'-'+r.hi,r.len,46,lkX(0,r.v),lkZ(0,r.v),LUKE.h,r.lo,r.hi,0,0);
+  for(const r of SH_RWY)add('Sky Harbor','KPHX',r.lo+'-'+r.hi,r.len,46,shX(0,r.v),shZ(0,r.v),SKY_HARBOR.h,r.lo,r.hi,0,0);
+  add('Assault strip','LZ','9-27',LZ.len,LZ.wid,LZ.x,LZ.z,LZ.h,'9','27',0,0);
+  return out;})();
+const RWY_ENDS=[].concat(...RUNWAYS.map(r=>r.ends));
 // ---------- state & input ----------
+const $=id=>document.getElementById(id);
 let st=createState('runway'),running=false,paused=false,camMode=0,muted=false,FREECAM=null;
 let sensorMode=false,strikeBtn=null,camBump=0,camLean=0,strikeBest=null;
 try{strikeBest=JSON.parse(localStorage.getItem('kgeuStrikeBest')||'null');}catch(e){}
@@ -3751,8 +4047,7 @@ let SPAWN_BASE=HOME(acType);try{const b=localStorage.getItem('kgeuBase');if(b&&B
 const bestKey=()=>acType==='reaper'?'kgeuMQ9Best':'kgeuBest_'+acType;
 function loadBest(){try{const b=localStorage.getItem(bestKey());return b===null?null:+b;}catch(e){return null;}}
 let best=loadBest();
-const bestEl=document.getElementById('best');function showBest(){bestEl.textContent=best===null?'none yet':best+' fpm';
-  const bs=document.getElementById('bestStrike');if(bs)bs.textContent=strikeBestText();}
+function showBest(){}
 const CAMS=['Chase','Nose camera','Sensor ball','Tower','Crowd'];
 function cycleCam(){camMode=(camMode+1)%5;if(camMode===2&&AC.id!=='reaper')camMode=3;
   // the ball is only useful with something else flying, so hand the aircraft to the orbit
@@ -3789,7 +4084,11 @@ function apToggle(mode){
   else{if(st.onGround){toast('Auto Land works once you are airborne');return;}apEngage(st,'land');toast('Autoland engaged. Heading for runway 1');}
 }
 const touchIn={elev:0,ail:0,active:false,brake:false};
-let easy=true;try{easy=localStorage.getItem('kgeuEasy')!=='0';}catch(e){}
+// Skill level, chosen on first launch and changeable in Settings. Rookie is easy
+// flight plus plain English and the extra assists; Pilot is the real thing.
+let SKILL=null;try{const v=localStorage.getItem('kgeuOnboard');if(v==='rookie'||v==='pilot')SKILL=v;}catch(e){}
+let easy=SKILL!=='pilot';
+const rookie=()=>SKILL!=='pilot';
 function autoSmart(){if(!running||paused||st.crashed)return;
   if(LES.on){toast('No autopilot in flight school. Tap End to quit the lesson');return;}
   // Reaper, airborne, nothing engaged: the first tap parks it in an orbit, the next lands it
@@ -3798,102 +4097,17 @@ function autoSmart(){if(!running||paused||st.crashed)return;
   if(st.ap&&st.ap.mode!=='hold'){apOff('Autopilot off, your airplane');return;}
   if(st.ap){st.ap=null;st.apW=null;}
   apToggle(st.onGround?'to':'land');}
-function setThr(v){apOff('Autopilot off, your airplane');st.throttle=v;}
-// ---- tilt steering (phone) ----
-// Gravity is projected into SCREEN space, so both landscape directions work, and the
-// reading is taken relative to the pose at switch on. Working relatively also makes the
-// devicemotion fallback immune to the vendor sign disagreement on
-// accelerationIncludingGravity: flipping the sign flips baseline and sample alike.
-const TILT_SENS=[0.55,0.75,1,1.35,1.8];                       // slider positions, 3 = medium
-const tilt={on:false,x:0,y:0,base:null,inv:false,sens:2,raw:[0,0],src:'none',
-  perm:'not asked',n:0,rate:0,rateN:0,rateT:0,onAt:0,blocked:false,haveOri:false};
-try{tilt.inv=localStorage.getItem('kgeuTiltInv')==='1';}catch(e){}
-try{const v=localStorage.getItem('kgeuTiltSens');if(v!==null&&v!==''){const s=+v;if(s>=0&&s<=4)tilt.sens=s;}}catch(e){}
-const inFrame=(function(){try{return window.top!==window.self;}catch(e){return true;}})();
-const screenAngle=()=>{
-  const a=(screen.orientation&&typeof screen.orientation.angle==='number')?screen.orientation.angle:(window.orientation||0);
-  return a*Math.PI/180;
-};
-// device axes -> screen axes, then gravity direction to [roll, pitch]
-function gravToAngles(gx,gy,gz){
-  const L=Math.hypot(gx,gy,gz);if(!(L>0.2))return null;
-  gx/=L;gy/=L;gz/=L;
-  const a=screenAngle(),c=Math.cos(a),s=Math.sin(a);
-  const sx=gx*c+gy*s, sy=-gx*s+gy*c;
-  // roll: where gravity sits within the screen plane, like a steering wheel
-  // pitch: how far gravity lies out of the screen plane, tipping the top edge toward you
-  return [Math.atan2(sx,sy),Math.atan2(gz,Math.hypot(sx,sy))];
-}
-function oriToAngles(e){
-  if(e.beta===null||e.gamma===null||e.beta===undefined||e.gamma===undefined)return null;
-  const b=e.beta*Math.PI/180,g=e.gamma*Math.PI/180;
-  return gravToAngles(-Math.cos(b)*Math.sin(g),Math.sin(b),Math.cos(b)*Math.cos(g));
-}
-const dzone=(d,z)=>Math.abs(d)<z?0:d-Math.sign(d)*z;
-function tiltSample(A,src){
-  if(!A)return;
-  if(src==='orientation')tilt.haveOri=true;
-  else if(tilt.haveOri)return;                                // orientation wins when present
-  tilt.src=src;tilt.raw=A;tilt.n++;tilt.rateN++;tilt.blocked=false;
-  if(!tilt.on)return;
-  if(!tilt.base)tilt.base=A.slice();
-  const S=TILT_SENS[tilt.sens];
-  let dr=A[0]-tilt.base[0];dr=Math.atan2(Math.sin(dr),Math.cos(dr));
-  const dp=A[1]-tilt.base[1];
-  const nx=clamp(dzone(dr,0.035)/(0.45/S),-1,1);
-  const ny=clamp(-dzone(dp,0.035)/(0.30/S),-1,1)*(tilt.inv?-1:1);
-  tilt.x+=(nx-tilt.x)*0.25;tilt.y+=(ny-tilt.y)*0.25;           // low pass
-}
-window.addEventListener('deviceorientation',e=>tiltSample(oriToAngles(e),'orientation'));
-window.addEventListener('devicemotion',e=>{
-  const g=e.accelerationIncludingGravity;if(!g||g.x===null||g.x===undefined)return;
-  tiltSample(gravToAngles(g.x,g.y,g.z),'motion');
-});
-function tiltUI(){
-  document.querySelectorAll('[data-a="tilt"]').forEach(t=>t.classList.toggle('on',tilt.on));
-  const o=document.getElementById('oTilt');
-  if(o){o.textContent='Tilt steering: '+(tilt.on?'On':'Off');o.classList.toggle('on',tilt.on);}
-  const iv=document.getElementById('oInv');if(iv)iv.textContent='Tilt pitch: '+(tilt.inv?'Inverted':'Normal');
-  const sv=document.getElementById('oSens');if(sv)sv.value=String(tilt.sens);
-  const sl=document.getElementById('oSensV');if(sl)sl.textContent=['Very low','Low','Medium','High','Very high'][tilt.sens];
-}
-function tiltDiag(){
-  const d=document.getElementById('tiltDiag');if(!d)return;
-  d.textContent='Tilt: '+(tilt.on?'on':'off')+'  permission '+tilt.perm+'  source '+tilt.src+
-    '  '+tilt.rate+'/s  roll '+(tilt.raw[0]*57.3).toFixed(0)+'° pitch '+(tilt.raw[1]*57.3).toFixed(0)+'°'+
-    (inFrame?'  [in a frame]':'');
-}
-function tiltBlockedMsg(){
-  tilt.blocked=true;
-  toast(inFrame?'Tilt is blocked in this viewer. Open the link in Safari.':'No motion data from this device.');
-}
-// Permission must be requested synchronously inside a click handler: iOS does not treat
-// pointerdown or touchstart as a user gesture for DeviceOrientation/DeviceMotion.
-function setTilt(on){
-  if(!on){tilt.on=false;tilt.x=tilt.y=0;tilt.base=null;tiltUI();toast('Tilt off');return;}
-  const DOE=window.DeviceOrientationEvent,DME=window.DeviceMotionEvent;
-  if(!DOE&&!DME){tilt.perm='unsupported';tiltUI();toast('Tilt is not supported on this device');return;}
-  const go=()=>{
-    tilt.on=true;tilt.base=null;tilt.x=tilt.y=0;tilt.n=0;tilt.onAt=performance.now();tiltUI();
-    toast('Tilt on. Hold the phone how you like, that is centre');
-    setTimeout(()=>{if(tilt.on&&tilt.n===0)tiltBlockedMsg();},1500);
-  };
-  const needs=(typeof DOE==='function'&&typeof DOE.requestPermission==='function')||
-              (typeof DME==='function'&&typeof DME.requestPermission==='function');
-  if(!needs){tilt.perm='not required';go();return;}
-  // both requests fire now, in the gesture, not chained one after the other
-  let p1,p2;
-  try{p1=(DOE&&DOE.requestPermission)?DOE.requestPermission():Promise.resolve('granted');}catch(e){p1=Promise.reject(e);}
-  try{p2=(DME&&DME.requestPermission)?DME.requestPermission():Promise.resolve('granted');}catch(e){p2=Promise.reject(e);}
-  tilt.perm='asking';tiltUI();
-  Promise.all([p1.catch(e=>'error'),p2.catch(e=>'error')]).then(r=>{
-    const ori=r[0],mot=r[1];
-    tilt.perm=(ori==='granted'||mot==='granted')?'granted':(ori==='denied'||mot==='denied')?'denied':String(ori);
-    if(ori==='granted'||mot==='granted'){go();return;}
-    tiltUI();
-    if(tilt.perm==='denied')toast('Motion access denied. Settings, Safari, Motion and Orientation Access');
-    else toast(inFrame?'Tilt is blocked in this viewer. Open the link in Safari.':'Tilt could not start on this device');
-  });
+function setThr(v){apOff('Autopilot off, your airplane');st.throttle=v;if(typeof ROOK!=='undefined')ROOK.to=false;}
+// ---- touch stick settings: sensitivity and invert pitch ----
+const STICK_SENS=[0.6,0.8,1,1.25,1.55];                       // slider positions, 3 = medium
+const TOUCH={sens:2,inv:false};
+try{const v=localStorage.getItem('kgeuStickSens');if(v!==null&&v!==''&&+v>=0&&+v<=4)TOUCH.sens=+v;TOUCH.inv=localStorage.getItem('kgeuInvPitch')==='1';}catch(e){}
+function setStickSens(v){TOUCH.sens=clamp(Math.round(v),0,4);try{localStorage.setItem('kgeuStickSens',String(TOUCH.sens));}catch(e){}stickUI();}
+function setInvPitch(v){TOUCH.inv=!!v;try{localStorage.setItem('kgeuInvPitch',TOUCH.inv?'1':'0');}catch(e){}stickUI();}
+function stickUI(){
+  document.querySelectorAll('.oSens').forEach(e=>e.value=String(TOUCH.sens));
+  document.querySelectorAll('.oSensV').forEach(e=>e.textContent=['Very low','Low','Medium','High','Very high'][TOUCH.sens]);
+  document.querySelectorAll('.oInv').forEach(e=>{e.textContent='Invert pitch: '+(TOUCH.inv?'On':'Off');e.classList.toggle('on',TOUCH.inv);});
 }
 // ---- mouse or trackpad yoke (Mac): press and drag on the scene ----
 const yoke={on:false,x0:0,y0:0,x:0,y:0,id:null},yokeEl=document.getElementById('yoke'),yokeK=document.getElementById('yokeK');
@@ -3936,7 +4150,7 @@ function pollPad(dt){
   padActive=false;padX=padY=0;if(!g)return;
   const dz=v=>Math.abs(v)<0.12?0:(v-Math.sign(v)*0.12)/0.88,B=i=>g.buttons[i]?(g.buttons[i].value||(g.buttons[i].pressed?1:0)):0,edge=i=>B(i)>0.5&&!(padPrev[i]>0.5);
   padX=dz(g.axes[0]||0);padY=dz(g.axes[1]||0);padActive=!!(padX||padY);
-  if(edge(9)){if(!running)start('runway');else if(!st.crashed)togglePause();}
+  if(edge(9)){if(!running)freeStart();else if(!st.crashed)togglePause();}
   if(sensorMode){
     const rx=dz(g.axes[2]||0),ry=dz(g.axes[3]||0);
     if(rx||ry)slewSensor(rx,ry,dt);
@@ -3974,10 +4188,10 @@ window.addEventListener('keydown',e=>{
   if(k==='c') cycleCam();
   if(k==='g') toggleGear();
   if(k==='p'&&running) togglePause();
-  if(k==='m'){muted=!muted;if(muted&&window.speechSynthesis)speechSynthesis.cancel();toast(muted?'Sound off':'Sound on');}
+  if(k==='m'){setMuted(!muted);toast(muted?'Sound off':'Sound on');}
   if(k==='t'){setRadioOn(!RADIO.on);toast(RADIO.on?'Radio on':'Radio off');}
-  if(k==='enter') start('runway');
-  if(k==='escape') openMenu();
+  if(k==='enter'&&menu.classList.contains('on')&&curScr.startsWith('sFly')) freeStart();
+  if(k==='escape'){if(menu.classList.contains('on'))navBack();else openMenu();}
 });
 window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
 window.addEventListener('blur',()=>{for(const k in keys)keys[k]=false;});
@@ -3987,11 +4201,10 @@ function updateControls(dt){
   const kR=(keys['e']?1:0)-(keys['q']?1:0);
   const tUp=keys['r']||keys['shift'],tDn=keys['f']||keys['control'];
   let ext=null,soft=false;
-  // expo on the stick and on tilt: fine control near centre, full authority at the edge
+  // expo on the stick: fine control near centre, full authority at the edge
   const expo=(x)=>{const a=Math.abs(x);return Math.sign(x)*(0.6*a*a*a+0.4*a);};
-  if(touchIn.active){ext=[touchIn.ail,touchIn.elev];soft=true;}
+  if(touchIn.active){const k=STICK_SENS[TOUCH.sens];ext=[clamp(touchIn.ail*k,-1,1),clamp(touchIn.elev*k,-1,1)*(TOUCH.inv?-1:1)];soft=true;}
   else if(padActive)ext=[padX,padY];else if(yoke.on)ext=[yoke.x,yoke.y];
-  else if(tilt.on&&tilt.base&&!kE&&!kA){ext=[tilt.x,tilt.y];soft=true;}
   if(sensorMode){
     // the ball is on the stick now; the orbit autopilot flies the aircraft
     if(ext)slewSensor(ext[0],ext[1],dt);
@@ -4041,11 +4254,11 @@ function scLoad(){
   try{const j=JSON.parse(localStorage.getItem(SC_KEY)||'null');
     if(j&&typeof j==='object'){
       Object.assign(SCORE.log,j.log||{});
-      SCORE.best=j.best||{};SCORE.ach=j.ach||{};}
+      SCORE.best=j.best||{};SCORE.ach=j.ach||{};SCORE.recent=Array.isArray(j.recent)?j.recent:[];}
   }catch(e){}
 }
 function scSave(){try{localStorage.setItem(SC_KEY,JSON.stringify(SCORE));}catch(e){}}
-function scReset(){SCORE.log={time:0,landings:0,streak:0,bestStreak:0};SCORE.best={};SCORE.ach={};scSave();scUI();}
+function scReset(){SCORE.log={time:0,landings:0,streak:0,bestStreak:0};SCORE.best={};SCORE.ach={};SCORE.recent=[];scSave();scUI();}
 scLoad();
 
 const ACH={
@@ -4068,17 +4281,17 @@ function achGrant(id){
 function runwayFix(x,z){
   const u=toU(x,z),v=toV(x,z);
   if(u>-60&&u<RWY_LEN+60&&Math.abs(v)<60)
-    return {name:'Glendale runway 1',along:u-(THR01+300),off:Math.abs(v),hdg:26};
+    return {name:'Glendale runway 1',along:u-(THR01+300),off:Math.abs(v),lat:v,ax:[DX,DZ],hdg:26};
   const K=lukeUV(x,z);
   for(const r of LUKE_RWY){
     if(Math.abs(K[0])<r.len/2+60&&Math.abs(K[1]-r.v)<60){
       const thr=-r.len/2;
-      return {name:'Luke runway '+r.lo,along:K[0]-(thr+300),off:Math.abs(K[1]-r.v),hdg:42.6};
+      return {name:'Luke runway '+r.lo,along:K[0]-(thr+300),off:Math.abs(K[1]-r.v),lat:K[1]-r.v,ax:[Math.sin(LUKE.h),-Math.cos(LUKE.h)],hdg:42.6};
     }
   }
   const Z=lzUV(x,z);
   if(Math.abs(Z[0])<LZ.len/2+60&&Math.abs(Z[1])<40)
-    return {name:'the assault strip',along:Z[0]-(-LZ.len/2+91),off:Math.abs(Z[1]),hdg:90};
+    return {name:'the assault strip',along:Z[0]-(-LZ.len/2+91),off:Math.abs(Z[1]),lat:Z[1],ax:[LZs,-LZc],hdg:90};
   return null;
 }
 // crosswind component across the runway in knots
@@ -4109,8 +4322,15 @@ function gradeLanding(e){
   const sSpd =band(dv,[[0,100],[3,100],[8,76],[15,46],[25,12],[40,0]]);
   const pts=Math.round(sSink*0.35+sOff*0.2+sAim*0.25+sSpd*0.2);
   const xw=xwind(fix.hdg,e.wdir,e.wkt);
+  // which way we were rolling along the runway: the aim point and the left/right side follow it
+  const fwd=(e.vx===undefined?1:Math.sign(e.vx*fix.ax[0]+e.vz*fix.ax[1])||1);
+  const along=fix.along*fwd,side=fix.lat*fwd;
+  const sinkW=e.fpm<120?'Butter':e.fpm<300?'Smooth':e.fpm<500?'Firm':'Hard';
+  const notes=[[sOff,(side>0?'right':'left')+' of centerline'],[sAim,along<0?'short of the aim point':'long'],[sSpd,kt>tgt?'fast':'slow']]
+    .filter(n=>n[0]<80).sort((a,b)=>a[0]-b[0]);
+  const line=sinkW+', '+(notes.length?notes[0][1]:(sOff>=95?'on centerline':'on the numbers'));
   return {pts:pts,letter:letterFor(pts),fpm:e.fpm,off:fix.off,along:fix.along,kt:kt,tgt:tgt,
-          xw:xw,where:fix.name,
+          xw:xw,where:fix.name,line:line,
           parts:[['Sink rate',e.fpm+' fpm',Math.round(sSink)],
                  ['Off centreline',fix.off.toFixed(1)+' m',Math.round(sOff)],
                  ['From the aim point',Math.round(Math.abs(fix.along))+' m '+(fix.along<0?'short':'long'),Math.round(sAim)],
@@ -4137,12 +4357,22 @@ function scRecord(key,rec){
 }
 
 // ---- NEW RECORD banner ----
-const bannerEl=document.getElementById('banner');let bannerT=0;
+// Both badges slide in, stay about four seconds and fade. They never pause the game
+// and take no input except a deliberate tap, which opens the details and only then pauses.
+// Wall clock, not the frame clock, so four seconds is four seconds at any frame rate.
+const bannerEl=document.getElementById('banner'),gBadge=document.getElementById('gBadge');
+function badgeOn(el){clearTimeout(el._t1);clearTimeout(el._t2);el.classList.remove('fade');el.classList.add('on');
+  el._t1=setTimeout(()=>el.classList.add('fade'),4000);el._t2=setTimeout(()=>el.classList.remove('on','fade'),4600);}
+function badgeOff(el){clearTimeout(el._t1);clearTimeout(el._t2);el.classList.remove('on','fade');}
 function bannerShow(kind,text){
-  bannerEl.innerHTML='<b>'+kind+'</b><span>'+text+'</span>';
-  bannerEl.classList.add('on');bannerT=4.2;
+  bannerEl.innerHTML='<b>'+kind+'</b><span>'+text+'</span>';badgeOn(bannerEl);
 }
-function bannerUpdate(dt){if(bannerT>0){bannerT-=dt;if(bannerT<=0)bannerEl.classList.remove('on');}}
+function gradeBadge(g){
+  const L=document.getElementById('gbL');L.textContent=g.letter;L.className='g'+g.letter;
+  document.getElementById('gbT').textContent=g.line;badgeOn(gBadge);
+}
+function bannerUpdate(){}
+function badgeHide(){badgeOff(bannerEl);badgeOff(gBadge);}
 
 // ---- the pilot log ----
 function logLanding(g){
@@ -4210,7 +4440,10 @@ function onLanding(e){
   if(dash)rows.push('<div class="gl"><span>Luke to Glendale</span><b>'+fmtT(dash.secs)+
     ',  '+dash.g.toFixed(1)+' G peak</b></div>');
   document.getElementById('lLines').innerHTML=rows.join('');
-  landOv.classList.add('on');paused=true;
+  // the full breakdown also goes to Records; the flight carries on through the rollout
+  SCORE.recent=(SCORE.recent||[]);SCORE.recent.unshift({ac:AC.name,letter:g.letter,pts:g.pts,where:g.where,line:g.line,
+    parts:g.parts.map(p=>[p[0],p[1],p[2]]),when:Date.now()});SCORE.recent.length=Math.min(SCORE.recent.length,10);scSave();
+  gradeBadge(g);
   if(better)bannerShow('NEW RECORD',REC[AC.id]?REC[AC.id].fmt(SCORE.best[AC.id]||g):'');
 }
 // the C-130 missions feed the same record store
@@ -4233,7 +4466,8 @@ const REC_ROWS=[
   ['mq9b','MQ-9B SkyGuardian','mq9b','Best landing',r=>r.letter+'   '+r.pts+' pts,  '+r.fpm+' fpm'],
   ['reaper','MQ-9A Reaper','reaper','Loiter and strike',r=>r.pts+' pts,  '+r.hits+'/4 hits,  '+r.avg+' m,  '+r.tot+' s on target'],
   ['c130d','C-130H Hercules','c130:drop','Airdrop',r=>r.letter+'   '+r.dist+' m from centre'],
-  ['c130s','','c130:short','Short field',r=>r.letter+'   stopped in '+r.stopFt+' ft, touched at '+r.tdFt+' ft']
+  ['c130s','','c130:short','Short field',r=>r.letter+'   stopped in '+r.stopFt+' ft, touched at '+r.tdFt+' ft'],
+  ['arcl','Arcade','arc:landing','Landing challenge',r=>r.pts+' pts,  '+fmtT(r.secs)+',  '+r.ac]
 ];
 function scUI(){
   const el=document.getElementById('recBody');if(!el)return;
@@ -4248,6 +4482,9 @@ function scUI(){
     const r=SCORE.best[key];
     html+='<div class="gl"><span>'+label+'</span><b>'+(r?fmt(r):'<i class="none">none yet</i>')+'</b></div>';
   }
+  if(SCORE.recent&&SCORE.recent.length){html+='<div class="recSec">Recent landings</div>';
+    for(const r of SCORE.recent){html+='<div class="gl"><span>'+r.ac+', '+r.where+'</span><b>'+r.letter+'  '+r.pts+' pts</b></div>'+
+      '<div class="gl sub2"><span>'+r.line+'</span><b>'+r.parts.map(p=>p[0]+' '+p[1]).join(' · ')+'</b></div>';}}
   html+='<div class="recSec">Achievements</div>';
   for(const id in ACH){
     const got=SCORE.ach[id];
@@ -4400,40 +4637,38 @@ function missScore(r){
 
 // ---------- touch controls ----------
 (function(){
-  const stick=document.getElementById('stick'),knob=document.getElementById('knob'),
-        zone=document.getElementById('stickZone'),thr=document.getElementById('thr'),
-        drawer=document.getElementById('drawer'),ctxA=document.getElementById('ctxA'),ctxB=document.getElementById('ctxB');
-  // ---- floating joystick: it appears wherever the thumb lands ----
-  let sid=null,sx=0,sy=0,R=70;
-  const pad=document.getElementById('touch');
+  const stick=$('stick'),knob=$('knob'),zone=$('stickZone'),thr=$('thr'),grip=$('thrGrip'),hint=$('stickHint'),pad=$('touch');
+  // ---- floating stick: it appears wherever the left thumb lands, springs back on release ----
+  let sid=null,sx=0,sy=0,R=64;
   function place(e){
     const r=pad.getBoundingClientRect(),z=zone.getBoundingClientRect();
-    R=Math.min(74,Math.max(52,z.height*0.26));
+    R=Math.min(70,Math.max(48,z.height*0.26));
     sx=clamp(e.clientX-r.left,z.left-r.left+R,z.right-r.left-R);
     sy=clamp(e.clientY-r.top,z.top-r.top+R,z.bottom-r.top-R);
     stick.style.left=sx+'px';stick.style.top=sy+'px';
     stick.style.width=stick.style.height=(R*2)+'px';
     stick.style.margin=(-R)+'px 0 0 '+(-R)+'px';
-    stick.classList.add('on');
+    knob.classList.remove('spring');stick.classList.add('on');hint.classList.add('gone');
   }
   function mv(e){
     const r=pad.getBoundingClientRect();
     let dx=(e.clientX-r.left-sx)/R,dy=(e.clientY-r.top-sy)/R;
     const l=Math.hypot(dx,dy);if(l>1){dx/=l;dy/=l;}
     touchIn.ail=dx;touchIn.elev=dy;
-    knob.style.transform=`translate(${dx*R*0.6}px,${dy*R*0.6}px)`;
+    knob.style.transform=`translate(${dx*R*0.72}px,${dy*R*0.72}px)`;
   }
   zone.addEventListener('pointerdown',e=>{
-    if(tilt.on)return;                       // tilt replaces the stick
+    if(sid!==null)return;
     sid=e.pointerId;try{zone.setPointerCapture(sid);}catch(_){}
     touchIn.active=true;place(e);mv(e);
   });
   zone.addEventListener('pointermove',e=>{if(e.pointerId===sid)mv(e);});
   const up=e=>{if(e.pointerId!==sid)return;sid=null;touchIn.active=false;touchIn.ail=0;touchIn.elev=0;
-    knob.style.transform='';stick.classList.remove('on');};
+    knob.classList.add('spring');knob.style.transform='';setTimeout(()=>{if(sid===null)stick.classList.remove('on');},160);};
   zone.addEventListener('pointerup',up);zone.addEventListener('pointercancel',up);
+  window.stickReset=()=>{sid=null;touchIn.active=false;touchIn.ail=touchIn.elev=0;knob.style.transform='';stick.classList.remove('on');};
 
-  // ---- throttle with built in detents ----
+  // ---- throttle: a vertical slider on the right edge, with detents you can tap ----
   let tid=null,tMoved=false,tStart=0;
   function tset(e){const r=thr.getBoundingClientRect();st.throttle=clamp(1-(e.clientY-r.top)/r.height,0,1);}
   thr.addEventListener('pointerdown',e=>{
@@ -4454,68 +4689,52 @@ function missScore(r){
     else{apOff('Autopilot off, your airplane');tset(e);}
   };
   thr.addEventListener('pointerup',tup);thr.addEventListener('pointercancel',()=>tid=null);
+  window.thrUI=()=>{const v=st.throttle;$('thrFill').style.height=(v*100)+'%';grip.style.top=((1-v)*100)+'%';thr.setAttribute('aria-valuenow',Math.round(v*100));};
 
-  // ---- the More drawer: one row, closes after a tap ----
-  const hold={up:false,dn:false};
-  function doAction(a,b,down){
-    if(a==='flapUp'){setFlaps(st.flapIdx-1);return;}
-    if(a==='flapDn'){setFlaps(st.flapIdx+1);return;}
-    if(a==='zoom'){SENSOR.zoom=SENSOR.zoom?0:1;toast(SENSOR.zoom?'Narrow field':'Wide field');return;}
-    if(a==='view'){cycleCam();return;}
-    if(a==='gear'){toggleGear();return;}
-    if(a==='brake'){touchIn.brake=down;b&&b.classList.toggle('held',down);return;}
-    if(a==='trimUp')hold.up=down;
-    if(a==='trimDn')hold.dn=down;
-  }
-  document.getElementById('bMore').addEventListener('click',()=>drawer.classList.toggle('on'));
-  drawer.querySelectorAll('button').forEach(b=>{
-    const a=b.dataset.a;
-    if(a==='tilt')return;                                   // wired to click below
-    if(a==='brake'||a==='trimUp'||a==='trimDn'){            // held buttons stay put
-      b.addEventListener('pointerdown',e=>{e.preventDefault();doAction(a,b,true);});
-      const rel=()=>doAction(a,b,false);
-      b.addEventListener('pointerup',rel);b.addEventListener('pointerleave',rel);b.addEventListener('pointercancel',rel);
-    } else {
-      b.addEventListener('click',()=>{doAction(a,b,true);drawer.classList.remove('on');});
-    }
-  });
-  // click, not pointerdown: iOS only grants motion permission from a real click gesture
-  document.querySelectorAll('[data-a="tilt"]').forEach(b=>b.addEventListener('click',()=>{
-    setTilt(!tilt.on);drawer.classList.remove('on');
-    if(tilt.on){sid=null;touchIn.active=false;touchIn.ail=touchIn.elev=0;stick.classList.remove('on');}
-  }));
-  setInterval(()=>{if(hold.up)st.trim=clamp(st.trim+0.035,-1,1);if(hold.dn)st.trim=clamp(st.trim-0.035,-1,1);},100);
+  // ---- brake: hold ----
+  const bb=$('bBrake');
+  bb.addEventListener('pointerdown',e=>{e.preventDefault();touchIn.brake=true;bb.classList.add('held');try{bb.setPointerCapture(e.pointerId);}catch(_){}});
+  const brel=()=>{touchIn.brake=false;bb.classList.remove('held');};
+  bb.addEventListener('pointerup',brel);bb.addEventListener('pointercancel',brel);
 
-  // ---- context buttons: at most two, by state ----
-  function bindCtx(btn){
-    btn.addEventListener('pointerdown',e=>{e.preventDefault();const a=btn.dataset.a;
-      if(a==='brake'){touchIn.brake=true;btn.classList.add('held');}
-      else if(a==='fire'||a==='track'){strikeBtnPress(a);}
-      else if(a==='drop'){missDrop();}
-      else doAction(a,btn,true);});
-    const rel=()=>{if(btn.dataset.a==='brake'){touchIn.brake=false;btn.classList.remove('held');}};
-    btn.addEventListener('pointerup',rel);btn.addEventListener('pointerleave',rel);btn.addEventListener('pointercancel',rel);
-  }
-  bindCtx(ctxA);bindCtx(ctxB);
-  document.querySelectorAll('.fixb').forEach(b=>{const a=b.dataset.a;
-    if(a==='brake'){b.addEventListener('pointerdown',e=>{e.preventDefault();touchIn.brake=true;b.classList.add('held');});
-      const rel=()=>{touchIn.brake=false;b.classList.remove('held');};b.addEventListener('pointerup',rel);b.addEventListener('pointerleave',rel);b.addEventListener('pointercancel',rel);}
-    else b.addEventListener('pointerdown',e=>{e.preventDefault();if(!running||st.crashed)return;doAction(a,b,true);});});
+  // ---- weapon and mission buttons, lower right, only when there is something to press ----
+  const W=[$('wA'),$('wB'),$('wC')];
+  W.forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();const a=b.dataset.a;
+    if(a==='fire'||a==='track')strikeBtnPress(a);
+    else if(a==='drop')missDrop();
+    else if(a==='zoom'){SENSOR.zoom=SENSOR.zoom?0:1;toast(SENSOR.zoom?'Narrow field':'Wide field');}}));
   let ctxKey='';
   window.updateCtx=function(){
-    let a,b=null;
-    const bz=document.getElementById('bZoom');if(bz)bz.hidden=!sensorMode;
-    if(sensorMode){a=['fire','Fire'];b=['track','Track'];}
-    else if(MISS.on&&MISS.kind==='drop'&&!MISS.dropped){a=['drop','DROP'];b=['view','View'];}
-    else{a=['view','View'];}
-    const key=(a?a[0]:'')+'|'+(b?b[0]:'');
+    let L=[];
+    if(sensorMode)L=[['fire','FIRE'],['track','TRACK'],['zoom','ZOOM']];
+    else if(MISS.on&&MISS.kind==='drop'&&!MISS.dropped&&running)L=[['drop','DROP']];
+    const key=L.map(x=>x[0]).join('|');
     if(key===ctxKey)return;ctxKey=key;
-    ctxA.dataset.a=a[0];ctxA.textContent=a[1];ctxA.hidden=false;
-    if(b){ctxB.dataset.a=b[0];ctxB.textContent=b[1];ctxB.hidden=false;}else ctxB.hidden=true;
+    W.forEach((b,i)=>{const x=L[i];b.hidden=!x;if(x){b.dataset.a=x[0];b.textContent=x[1];}});
   };
   updateCtx();
 })();
-
+// ---------- icons, top right: gear, flaps, camera ----------
+(function(){
+  const pop=$('flapPop');let popT=0;
+  $('bGear').addEventListener('click',()=>toggleGear());
+  $('bCam').addEventListener('click',()=>cycleCam());
+  $('bFlaps').addEventListener('click',()=>{
+    if(pop.classList.contains('on')){pop.classList.remove('on');return;}
+    pop.innerHTML='';
+    FLAPS.forEach((f,i)=>{const b=document.createElement('button');b.textContent=f.deg+'°';b.classList.toggle('on',i===st.flapIdx);
+      b.addEventListener('click',()=>{if(running&&!st.crashed)setFlaps(i);pop.classList.remove('on');});pop.appendChild(b);});
+    pop.classList.add('on');clearTimeout(popT);popT=setTimeout(()=>pop.classList.remove('on'),4000);
+  });
+  let key='';
+  window.iconsUI=()=>{
+    const k=AC.id+'|'+st.flapIdx+'|'+(AC.retract?(st.gearPos>0.99?'D':st.gearPos<0.01?'U':'T'):'-');
+    if(k===key)return;key=k;
+    $('bGear').hidden=!AC.retract;
+    const gp=st.gearPos>0.99?'DOWN':st.gearPos<0.01?'UP':'MOVING';$('bGearT').textContent=gp;$('bGear').classList.toggle('lit',gp!=='DOWN');
+    $('bFlapsT').textContent=FLAPS[st.flapIdx].deg+'°';$('bFlaps').classList.toggle('lit',st.flapIdx>0);
+  };
+})();
 // ---------- audio ----------
 let actx=null,eng,eng2,eng2G,engF,engG,noiseG,noiseF,hornG,cheerG,whine,whineG;
 function toggleGear(){if(!running||st.crashed)return;if(!AC.retract){toast('Fixed gear on the '+(AC.id==='alpha'?'Alpha':'172'));return;}if(st.onGround){toast('Gear stays down on the ground');return;}st.gearDown=!st.gearDown;toast(st.gearDown?'Gear down':'Gear up');}
@@ -4652,9 +4871,31 @@ function radioSpeak(clips,textLen){
   g.linearRampToValueAtTime(0,end+0.07);
   return end-actx.currentTime+0.30;
 }
+const CLOCK_W=['ahead','ahead, a little right','ahead and to the right','to your right','behind you on the right','behind you on the right','behind you','behind you on the left','behind you on the left','to your left','ahead and to the left','ahead, a little left','ahead'];
+function plainOf(l){
+  const t=l.text,mine=AC.cs&&(t.indexOf(AC.cs)>=0||(AC.csS&&t.indexOf(AC.csS)>=0)),who=/Ground/.test(l.who)?'Ground':/Range/.test(l.who)?'Range':/Approach/.test(l.who)?'Approach':'Tower';
+  if(l.who==='Instructor')return '';
+  if(l.who===AC.cs||l.kind==='pilot')return 'You: got it.';
+  if(/^Crash/.test(t))return 'Tower says: crash! Fire trucks are on the way.';
+  if(/Good hit/.test(t))return 'Range says: direct hit!';
+  if(/^Miss/.test(t))return 'Range says: you missed. Try again.';
+  if(!mine&&who!=='Range')return 'Other pilots talking. Nothing for you.';
+  let m;
+  if(/cleared for takeoff/.test(t))return who+' says: you can take off now.';
+  if(m=t.match(/runway (\S+?),? (check wheels down, )?cleared to land/))return who+' says: you can land on runway '+m[1]+'.';
+  if(/taxi to the active/.test(t))return 'Ground says: drive to the runway along the yellow line.';
+  if(/closed traffic/.test(t))return 'Tower says: fly a loop to the right and come back to land.';
+  if(m=t.match(/traffic (\d+) o'clock/))return 'Tower says: another plane is nearby, '+CLOCK_W[+m[1]%12]+'.';
+  if(/nice landing/.test(t))return 'Tower says: nice landing! Leave the runway at the next turn.';
+  if(/security/.test(t))return 'Tower says: you landed at an air force base. Stop, security is coming!';
+  return who==='Range'?'Range control is talking to you.':'';
+}
 function playLine(l){
   atcEl.innerHTML='';const b=document.createElement('b');b.textContent=l.who;atcEl.appendChild(b);
-  atcEl.appendChild(document.createTextNode(l.text));atcEl.classList.add('on');
+  atcEl.appendChild(document.createTextNode(l.text));
+  const pl=rookie()?plainOf(l):'';atcEl.classList.toggle('hasPlain',!!pl);
+  if(pl){const e=document.createElement('span');e.className='plain';e.textContent=pl;atcEl.appendChild(e);}
+  atcEl.classList.add('on');
   radioBusy=radioSpeak(l.clips,l.text.length);atcT=Math.max(5,radioBusy+1.2);
 }
 function say(who,text,clips){radioQ.length=0;playLine({who:who,text:text,clips:clips});}
@@ -4773,33 +5014,192 @@ function atcTouchdown(e){
         [csTs(),'t_nice_landing']);A.land=0;A.pattern=0;}
 }
 
+// ---------- guide path: glowing hoops down a 3 degree glideslope to one runway end ----------
+const GUIDE=(function(){
+  const N=10,hoops=[],mat=new THREE.MeshBasicMaterial({color:0xF6C177,transparent:true,opacity:0.75,depthWrite:false,blending:THREE.AdditiveBlending,fog:false});
+  const geo=new THREE.TorusGeometry(1,0.07,6,40);
+  for(let i=0;i<N;i++){const m=new THREE.Mesh(geo,mat);m.visible=false;m.renderOrder=2;scene.add(m);hoops.push(m);}
+  return {hoops:hoops,mat:mat,end:null,on:false};})();
+const _gv=new V3();
+function guideShow(end,t){
+  const H=GUIDE.hoops;if(!end){if(GUIDE.on){H.forEach(h=>h.visible=false);GUIDE.on=false;}GUIDE.end=null;return;}
+  GUIDE.end=end;GUIDE.on=true;
+  const dx=Math.sin(end.h),dz=-Math.cos(end.h),gh=groundHeight(end.x,end.z);
+  const along=(st.pos.x-end.x)*-dx+(st.pos.z-end.z)*-dz;              // metres out on the approach side
+  const R=Math.max(14,AC.span*0.9),step=Math.max(300,Math.min(700,along/(H.length+1)));
+  GUIDE.mat.opacity=0.55+0.25*Math.sin(t*3);
+  H.forEach((h,i)=>{const d=150+step*i;
+    if(d>along-120){h.visible=false;return;}                        // only the hoops still ahead
+    h.visible=true;h.position.set(end.x-dx*d,gh+GEAR+15+d*Math.tan(3*Math.PI/180),end.z-dz*d);
+    h.rotation.set(0,-end.h,0);h.scale.setScalar(R);});
+}
+// Rookie: the runway you are lining up for, if any
+function approachEnd(){
+  if(st.onGround||st.agl>900)return null;
+  const hdg=Math.atan2(st.vel.x,-st.vel.z);let best=null,bd=1e9;
+  for(const e of RWY_ENDS){
+    if(e.rwy.code==='LZ'&&!(MISS.on&&MISS.kind==='short'))continue;
+    const dx=Math.sin(e.h),dz=-Math.cos(e.h),rx=st.pos.x-e.x,rz=st.pos.z-e.z;
+    const along=-(rx*dx+rz*dz),lat=Math.abs(rx*dz-rz*dx);
+    if(along<400||along>9000||lat>along*0.6+400)continue;
+    if(Math.abs(Math.atan2(Math.sin(hdg-e.h),Math.cos(hdg-e.h)))>1.2)continue;
+    if(along<bd){bd=along;best=e;}}
+  return best;
+}
+// Rookie assists on top of easy flight: full power on the takeoff roll once the stick
+// comes back, eased to climb power at 500 ft, and the glowing path on approach.
+const ROOK={to:false};
+function rookieAssist(dt,t){
+  if(!running||paused||st.crashed){return;}
+  if(rookie()&&!st.ap&&!LES.on){
+    if(st.onGround&&!ROOK.to&&st.throttle<0.5&&st.elev>0.3&&st.vel.length()<25){ROOK.to=true;st.throttle=1;toast('Full power. Keep the stick back gently');}
+    if(ROOK.to&&!st.onGround&&st.agl>150){ROOK.to=false;st.throttle=Math.max(AC.thrC,0.75);toast('Climb power set');}
+  } else ROOK.to=false;
+  const dest=navDest();
+  guideShow(dest&&destNear(dest)?dest:((rookie()||LES.on==='first')&&!st.ap?approachEnd():null),t);
+}
+// ================= Arcade: landing challenge against the clock, and a daily challenge =================
+// You start in the air a few miles out and the clock runs until the wheels touch the
+// target runway. Score is par over your time, weighted by the landing grade.
+const ARC={on:false,kind:'',t0:0,end:null,par:0,done:false,dist:0};
+const ARC_TARGETS=()=>RWY_ENDS.filter(e=>e.rwy.code==='KGEU'||e.rwy.code==='KLUF');
+function todayKey(){const d=new Date();return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();}
+function dayRng(k){let s=(k*2654435761)>>>0;return ()=>{s=(s+0x6D2B79F5)>>>0;let t=s;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
+// the same challenge for everyone on a given day
+function dailySpec(){const r=dayRng(todayKey()),T=ARC_TARGETS();
+  return {type:CAR[Math.floor(r()*CAR.length)],end:T[Math.floor(r()*T.length)],dist:6500+r()*4000,off:(r()*2-1)*1.3,alt:1800+r()*1600};}
+function placeAir(x,z,aglFt,h,kt){
+  const y=Math.max(0,groundHeight(x,z))+aglFt/M2FT+GEAR,V=kt/MS2KT/Math.sqrt(1.097*Math.exp(-y/9200)/1.225);
+  st.pos.set(x,y,z);st.vel.set(Math.sin(h)*V,0,-Math.cos(h)*V);st.quat.setFromEuler(new THREE.Euler(0.02,-h,0,'YXZ'));st.w.set(0,0,0);
+  st.onGround=false;st.airTime=30;st.flapIdx=0;st.throttle=st.power=AC.thrC;st.gearDown=!AC.retract;st.gearPos=AC.retract?0:1;
+  st.ezCfg='clean';st.ez=0;st.ias=kt/MS2KT;snapCamera=true;
+}
+function arcStart(kind){
+  const sp=kind==='daily'?dailySpec():{type:savedType,end:RWY_ENDS.find(e=>e.rwy.code==='KGEU'&&e.num==='1'),dist:9000,off:0.9,alt:2500};
+  pickType(sp.type,1);start('runway',sp.end.rwy.code==='KLUF'?'luke':'kgeu');
+  const e=sp.end,back=Math.atan2(-Math.sin(e.h),Math.cos(e.h))+sp.off;         // bearing from the threshold out along the approach, swung aside
+  const x=e.x+Math.sin(back)*sp.dist,z=e.z-Math.cos(back)*sp.dist,h=Math.atan2(e.x-x,-(e.z-z));
+  placeAir(x,z,sp.alt,h,AC.vapp*MS2KT*1.35);st.mode='arcade';A.land=1;A.tko=1;
+  Object.assign(ARC,{on:true,kind:kind,t0:st.time,end:e,done:false,dist:sp.dist,par:Math.round((sp.dist+2500)/(AC.vapp*1.3)+25)});
+  DEST=e;document.body.classList.add('hasDest');destUI(true);
+  toast((kind==='daily'?'Daily challenge: ':'Landing challenge: ')+e.rwy.apt+' runway '+e.num+'. Go!');
+}
+function arcTick(){
+  if(!ARC.on||ARC.done)return;
+  const t=st.time-ARC.t0;missHud((ARC.kind==='daily'?'Daily: ':'')+fmtT(t)+'  (par '+fmtT(ARC.par)+')',ARC.end.rwy.apt+' runway '+ARC.end.num,t>ARC.par);
+}
+function arcTouchdown(ev){
+  if(!ARC.on||ARC.done)return;
+  const g=gradeLanding(ev),secs=st.time-ARC.t0;ARC.done=true;
+  const fix=runwayFix(ev.x,ev.z),right=fix&&ARC.end&&(fix.name.indexOf(ARC.end.rwy.code==='KGEU'?'Glendale':'Luke')>=0);
+  setTimeout(()=>{if(running&&ARC.on)arcResult(g,secs,right);},2600);
+}
+const GF={A:1,B:0.9,C:0.8,D:0.7,F:0};
+function arcResult(g,secs,right){
+  const letter=g?g.letter:'F',pts=right?Math.round(1000*Math.min(1.5,ARC.par/secs)*GF[letter]):0;
+  const stars=!right||letter==='F'?0:secs<=ARC.par&&'AB'.includes(letter)?3:secs<=ARC.par*1.3?2:1;
+  const key=ARC.kind==='daily'?'arc:daily:'+todayKey():'arc:landing';
+  const rec={pts:pts,secs:Math.round(secs),letter:letter,stars:stars,ac:AC.name};
+  const better=pts>0&&scRecord(key,rec);
+  $('aStars').innerHTML='★'.repeat(stars)+'<u>'+'★'.repeat(3-stars)+'</u>';
+  $('aTitle').textContent=!right?'Wrong runway. Target was '+ARC.end.rwy.apt+' '+ARC.end.num:letter==='F'?'Too rough to count':(better?'New best! ':'')+pts+' points';
+  $('aLines').innerHTML=[['Time',fmtT(secs)+'  (par '+fmtT(ARC.par)+')'],['Landing',g?letter+'  '+g.line:'off the runway'],['Aircraft',AC.name],
+    ['Best',SCORE.best[key]?SCORE.best[key].pts+' pts, '+fmtT(SCORE.best[key].secs):'none yet']].map(l=>'<div class="gl"><span>'+l[0]+'</span><b>'+l[1]+'</b></div>').join('');
+  missHud(null);paused=true;$('arcOv').classList.add('on');
+}
+function arcStop(){if(ARC.on&&DEST===ARC.end){DEST=null;document.body.classList.remove('hasDest');destUI(true);}ARC.on=false;ARC.done=false;}
+$('aRetry').onclick=()=>{$('arcOv').classList.remove('on');arcStart(ARC.kind);};
+$('aHub').onclick=()=>{$('arcOv').classList.remove('on');arcStop();openMenu();nav('sArc');};
+$('aFree').onclick=()=>{$('arcOv').classList.remove('on');arcStop();paused=false;};
+function arcScore(id){
+  if(id==='landing'){const r=SCORE.best['arc:landing'];return r?[r.stars,r.pts+' pts, '+fmtT(r.secs)]:[0,''];}
+  if(id==='daily'){const r=SCORE.best['arc:daily:'+todayKey()];return r?[r.stars,r.pts+' pts today']:[0,''];}
+  return [0,''];
+}
+// ================= photo mode =================
+// Freeze the frame, hide the HUD, orbit and zoom around the aircraft by finger, and
+// save a clean image with a small watermark through the iOS share sheet.
+const PHOTO={on:false,yaw:0,pitch:0.18,dist:0,ptrs:new Map(),pinch:null};
+const wmIcon=new Image();wmIcon.src='icons/icon-192.png';
+function photoOpen(){
+  if(!running||st.crashed)return;
+  pauseOv.classList.remove('on');paused=true;PHOTO.on=true;
+  _eu.setFromQuaternion(st.quat,'YXZ');PHOTO.yaw=_eu.y+Math.PI+0.6;PHOTO.pitch=0.16;PHOTO.dist=Math.max(14,AC.span*1.6);
+  document.body.classList.add('photoOn');$('photoOv').classList.add('on');
+}
+function photoClose(){PHOTO.on=false;document.body.classList.remove('photoOn');$('photoOv').classList.remove('on');pauseOv.classList.add('on');CARP.sync();snapCamera=true;}
+function photoCam(){
+  const d=PHOTO.dist,cp=Math.cos(PHOTO.pitch);
+  camera.position.set(st.pos.x+Math.sin(PHOTO.yaw)*cp*d,st.pos.y+Math.sin(PHOTO.pitch)*d,st.pos.z+Math.cos(PHOTO.yaw)*cp*d);
+  const g=groundHeight(camera.position.x,camera.position.z)+1.2;if(camera.position.y<g)camera.position.y=g;
+  camera.up.set(0,1,0);camera.lookAt(st.pos);camera.fov=50;
+}
+const pc=$('photoPad');
+pc.addEventListener('pointerdown',e=>{PHOTO.ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});try{pc.setPointerCapture(e.pointerId);}catch(_){}
+  if(PHOTO.ptrs.size===2){const [a,b]=[...PHOTO.ptrs.values()];PHOTO.pinch=Math.hypot(a.x-b.x,a.y-b.y);}});
+pc.addEventListener('pointermove',e=>{const p=PHOTO.ptrs.get(e.pointerId);if(!p)return;
+  if(PHOTO.ptrs.size===1){PHOTO.yaw-=(e.clientX-p.x)*0.008;PHOTO.pitch=clamp(PHOTO.pitch+(e.clientY-p.y)*0.006,-0.25,1.45);p.x=e.clientX;p.y=e.clientY;return;}
+  p.x=e.clientX;p.y=e.clientY;const [a,b]=[...PHOTO.ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y);
+  if(PHOTO.pinch&&d>10){PHOTO.dist=clamp(PHOTO.dist*PHOTO.pinch/d,AC.len*0.7,AC.span*6);PHOTO.pinch=d;}});
+const pUp=e=>{PHOTO.ptrs.delete(e.pointerId);if(PHOTO.ptrs.size<2)PHOTO.pinch=null;};
+pc.addEventListener('pointerup',pUp);pc.addEventListener('pointercancel',pUp);
+pc.addEventListener('wheel',e=>{e.preventDefault();PHOTO.dist=clamp(PHOTO.dist*Math.exp(e.deltaY*0.0012),AC.len*0.7,AC.span*6);},{passive:false});
+// Everything from the render to the share call happens synchronously inside the tap,
+// so Safari still treats it as a user gesture and opens the share sheet.
+function photoImage(){
+  photoCam();camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.render(scene,camera);
+  const W=glc.width,H=glc.height,c=document.createElement('canvas');c.width=W;c.height=H;
+  const x=c.getContext('2d');x.drawImage(glc,0,0);
+  const fs=Math.round(H*0.034),pad=Math.round(H*0.025),txt='Pocket Flight Sim';
+  x.font='800 '+fs+'px '+F;const tw=x.measureText(txt).width,ic=Math.round(fs*1.35);
+  x.globalAlpha=0.85;x.shadowColor='rgba(0,0,0,.55)';x.shadowBlur=fs*0.3;
+  if(wmIcon.complete&&wmIcon.naturalWidth){x.save();x.beginPath();const ix=W-pad-tw-ic-fs*0.4,iy=H-pad-ic;
+    if(x.roundRect)x.roundRect(ix,iy,ic,ic,ic*0.22);else x.rect(ix,iy,ic,ic);x.clip();x.drawImage(wmIcon,ix,iy,ic,ic);x.restore();}
+  x.fillStyle='#F6C177';x.textAlign='right';x.textBaseline='bottom';x.fillText(txt,W-pad,H-pad-(ic-fs)*0.35);
+  return c;
+}
+function photoSave(){
+  const c=photoImage(),url=c.toDataURL('image/png'),bin=atob(url.split(',')[1]),u8=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+  const name='pocket-flight-sim-'+Date.now()+'.png',file=new File([u8],name,{type:'image/png'});
+  window.__lastPhoto=file;
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    navigator.share({files:[file],title:'Pocket Flight Sim'}).then(()=>toast('Shared'),e=>{if(e&&e.name!=='AbortError')toast('Could not share: '+e.name);});return;}
+  const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();toast('Photo saved');
+}
+$('pPhoto').onclick=photoOpen;$('phX').onclick=photoClose;$('phSave').onclick=photoSave;
 // ---------- menus ----------
-const menu=document.getElementById('menu'),crashEl=document.getElementById('crash'),resumeBtn=document.getElementById('bResume');
-function start(mode){
+const menu=document.getElementById('menu'),crashEl=document.getElementById('crash');
+function start(mode,base){
   initAudio();
   setType(acType);useModel(acType);sizeShadow();radioQ.length=0;
-  st=createState(mode,SPAWN_BASE);st.type=acType;st.easy=easy;st.noPF=isTouch||easy;document.body.classList.toggle('easy',easy);A={};running=true;paused=false;events.length=0;cfgReset();camBump=0;
-  menu.classList.remove('on');crashEl.classList.remove('on');resumeBtn.style.display='';document.getElementById('bPause').textContent='Pause';snapCamera=true;
+  st=createState(mode,base||SPAWN_BASE);st.type=acType;ROOK.to=false;guideShow(null);st.easy=easy;st.noPF=isTouch||easy;document.body.classList.toggle('easy',easy);A={};running=true;paused=false;events.length=0;cfgReset();camBump=0;
+  menuClose();crashEl.classList.remove('on');pauseOv.classList.remove('on');$('storyOv').classList.remove('on');snapCamera=true;
   if((mode==='ramp'&&camMode>2)||(camMode===2&&AC.id!=='reaper'))camMode=0;
-  STRIKE.active=false;lesEnd();gradeOv.classList.remove('on');
+  STRIKE.active=false;lesEnd();gradeOv.classList.remove('on');arcStop();$('arcOv').classList.remove('on');
   missReset();missOv.classList.remove('on');landOv.classList.remove('on');
-  document.getElementById('recOv').classList.remove('on');DASH.on=false;
+  document.getElementById('recOv').classList.remove('on');DASH.on=false;badgeHide();
   if(mode==='range')strikeStart();
   if(mode==='drop'||mode==='short')missStart(mode==='drop'?'drop':'short');
 }
-function openMenu(){if(running&&!st.crashed){paused=true;document.getElementById('bPause').textContent='Resume';}menu.classList.add('on');tiltDiag();}
-function togglePause(){paused=!paused;document.getElementById('bPause').textContent=paused?'Resume':'Pause';}
-document.getElementById('bRunway').onclick=()=>start('runway');document.getElementById('bRamp').onclick=()=>start('ramp');document.getElementById('bFinal').onclick=()=>start('final');
-document.getElementById('bStrike').onclick=()=>{pickType('reaper');start('range');};
-document.getElementById('bDrop').onclick=()=>{pickType('c130');start('drop');};
-document.getElementById('bShort').onclick=()=>{pickType('c130');start('short');};
+const pauseOv=$('pauseOv');
+function openMenu(scr){if(running&&!st.crashed)paused=true;pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
+// the pause button, P and a backgrounded app all land here; the sheet shows while paused
+function togglePause(){paused=!paused;pauseOv.classList.toggle('on',paused);if(paused){CARP.sync();if(window.stickReset)stickReset();}}
+$('pResume').onclick=()=>{paused=false;pauseOv.classList.remove('on');initAudio();};
+$('pRestart').onclick=()=>{pauseOv.classList.remove('on');start(st.mode==='final'||st.mode==='ramp'?st.mode:(MISS.on?MISS.kind:STRIKE.active?'range':'runway'));};
+$('pMenu').onclick=()=>openMenu();
+function freeStart(mode){pickType(savedType);pickPos(mode||SPAWN_POS);start(SPAWN_POS);}
 document.getElementById('mRetry').onclick=()=>{missOv.classList.remove('on');start(MISS.kind==='drop'?'drop':'short');};
 document.getElementById('mOther').onclick=()=>{missOv.classList.remove('on');start(MISS.kind==='drop'?'short':'drop');};
 document.getElementById('mFree').onclick=()=>{missOv.classList.remove('on');missReset();start('runway');};
+function landDetails(){if(!running||st.crashed||menu.classList.contains('on'))return;badgeHide();paused=true;landOv.classList.add('on');}
+gBadge.addEventListener('click',landDetails);
+bannerEl.addEventListener('click',()=>{if(!running||menu.classList.contains('on'))return;badgeHide();if(!st.crashed){paused=true;}recOpen();});
+document.getElementById('lKeep').onclick=()=>{landOv.classList.remove('on');paused=false;};
 document.getElementById('lAgain').onclick=()=>{landOv.classList.remove('on');start(st.mode==='final'?'final':'runway');};
 document.getElementById('lMenu').onclick=()=>{landOv.classList.remove('on');openMenu();};
 document.getElementById('lRec').onclick=()=>{landOv.classList.remove('on');recOpen();};
-document.getElementById('bRecords').onclick=()=>recOpen();
 document.getElementById('recClose').onclick=()=>{document.getElementById('recOv').classList.remove('on');};
 // Reset is deliberately two taps: it throws away every record on the device.
 document.getElementById('recReset').onclick=e=>{
@@ -4807,23 +5207,31 @@ document.getElementById('recReset').onclick=e=>{
   scReset();resetArmed=0;e.target.textContent='Reset all records';e.target.classList.remove('arm');
   toast('All records and achievements erased');};
 document.getElementById('cRunway').onclick=()=>start('runway');document.getElementById('cRamp').onclick=()=>start('ramp');document.getElementById('cFinal').onclick=()=>start('final');
-resumeBtn.onclick=()=>{if(st.type!==acType){start('runway');return;}menu.classList.remove('on');paused=false;document.getElementById('bPause').textContent='Pause';initAudio();};
-document.getElementById('bView').onclick=cycleCam;
+$('cMenu').onclick=()=>{crashEl.classList.remove('on');openMenu();};
 document.getElementById('bAuto').onclick=autoSmart;
 document.getElementById('bFull').onclick=()=>{const d=document.documentElement;if(document.fullscreenElement){document.exitFullscreen&&document.exitFullscreen();return;}
   const r=d.requestFullscreen||d.webkitRequestFullscreen;if(!r){toast('Full screen not available here');return;}try{const p=r.call(d);if(p&&p.catch)p.catch(()=>toast('Full screen is blocked in this view. Use Ctrl Cmd F'));}catch(e){toast('Full screen is blocked in this view');}};
-function easyUI(){const b=document.getElementById('oEasy');b.textContent='Easy flight: '+(easy?'On':'Off');b.classList.toggle('on',easy);document.body.classList.toggle('easy',easy);}
-document.getElementById('oEasy').onclick=()=>{easy=!easy;try{localStorage.setItem('kgeuEasy',easy?'1':'0');}catch(e){}easyUI();if(running){st.easy=easy;st.noPF=isTouch||easy;}};
-document.getElementById('oTilt').onclick=()=>setTilt(!tilt.on);
-document.getElementById('oInv').onclick=()=>{tilt.inv=!tilt.inv;try{localStorage.setItem('kgeuTiltInv',tilt.inv?'1':'0');}catch(e){}tiltUI();};
-document.getElementById('oSens').addEventListener('input',e=>{tilt.sens=+e.target.value;try{localStorage.setItem('kgeuTiltSens',String(tilt.sens));}catch(e2){}tiltUI();});
+function easyUI(){document.querySelectorAll('[data-skill]').forEach(b=>b.classList.toggle('sel',b.dataset.skill===(SKILL||'rookie')));
+  document.body.classList.toggle('easy',easy);document.body.classList.toggle('pilot',!easy);hudLabels();}
+function setSkill(v){SKILL=v==='pilot'?'pilot':'rookie';easy=SKILL==='rookie';try{localStorage.setItem('kgeuOnboard',SKILL);}catch(e){}
+  easyUI();if(running){st.easy=easy;st.noPF=isTouch||easy;}}
+// readout labels: plain English for rookies, the real abbreviations for pilots
+function hudLabels(){const R=rookie(),L=R?['Speed','Height','Climbing','Direction']:['KIAS','ALT','VS','HDG'];
+  ['lIas','lAlt','lVs','lHdg'].forEach((id,i)=>{const e=$(id);if(e)e.textContent=L[i];});}
+document.querySelectorAll('[data-skill]').forEach(b=>b.onclick=()=>setSkill(b.dataset.skill));
+document.querySelectorAll('.oInv').forEach(b=>b.onclick=()=>setInvPitch(!TOUCH.inv));
+document.querySelectorAll('.oSens').forEach(r=>r.addEventListener('input',e=>setStickSens(+e.target.value)));
 document.getElementById('oRadio').onclick=()=>{initAudio();setRadioOn(!RADIO.on);};
 document.getElementById('oRvol').addEventListener('input',e=>{initAudio();setRadioVol(+e.target.value/10);});
-easyUI();tiltUI();radioUI();
+function soundUI(){const b=$('oSound');b.textContent='Sound: '+(muted?'Off':'On');b.classList.toggle('on',!muted);}
+try{muted=localStorage.getItem('kgeuMuted')==='1';}catch(e){}
+function setMuted(v){muted=!!v;if(muted&&window.speechSynthesis)speechSynthesis.cancel();try{localStorage.setItem('kgeuMuted',muted?'1':'0');}catch(e){}soundUI();}
+$('oSound').onclick=()=>{initAudio();setMuted(!muted);};
+easyUI();stickUI();radioUI();soundUI();
 // Add to Home Screen tip. iOS has no install prompt a page can trigger, so the
 // best we can do is say exactly where the button is, and only when it applies.
 (function(){
-  const el=document.getElementById('a2hs'); if(!el)return;
+  const el=document.getElementById('a2hs'),el2=document.getElementById('a2hsF'); if(!el)return;
   const ua=navigator.userAgent;
   const iOS=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
   const inApp=/CriOS|FxiOS|EdgiOS|OPiOS|FBAN|FBAV|Instagram|Line\//.test(ua);
@@ -4833,18 +5241,15 @@ easyUI();tiltUI();radioUI();
   if(!iOS||installed)return;
   if(inApp){
     el.innerHTML='<b>Open this in Safari first.</b> Tap the menu in this app and choose Open in Safari, then Share and Add to Home Screen.';
+    if(el2)el2.innerHTML='<b>Tip:</b> open this in Safari to play full screen.';
   }
-  el.style.display='block';
+  el.style.display='block';if(el2)el2.style.display='block';
 })();
-// ---- first flight coach ----
-const coachEl=document.getElementById('coach'),coachTxt=coachEl.querySelector('span');let coachStep=0,coachT=0;try{coachStep=+(localStorage.getItem('kgeuCoach')||0);}catch(e){}
-function coachSet(n){coachStep=n;try{localStorage.setItem('kgeuCoach',String(n));}catch(e){}coachEl.classList.remove('on');}
-function coachShow(m){if(coachTxt.textContent!==m)coachTxt.textContent=m;coachEl.classList.add('on');}
-document.getElementById('coachSkip').onclick=()=>coachSet(3);
 // ================= Flight school: graded checkride maneuvers for the C172 and the Alpha =================
 const SCH={cessna:{turn:95,slow:55,glide:68,thrTurn:0.79,thrSlow:0.53,cruise:100,thrCruise:0.89},
            alpha:{turn:85,slow:47,glide:69,thrTurn:0.45,thrSlow:0.36,cruise:95,thrCruise:0.59}};
 const LESSONS=[
+  {id:'first',name:'First flight',desc:'60 seconds: take off, one turn, land'},
   {id:'steep',name:'Steep turns',desc:'45 degree bank, full 360, hold altitude'},
   {id:'slow',name:'Slow flight',desc:'Just above the stall for 45 seconds'},
   {id:'stall',name:'Power off stall',desc:'Stall it, recover with the least altitude lost'},
@@ -4872,18 +5277,33 @@ function airStart(u,v,altFt,hdg,kt,flap,thr){
   st.pos.set(wX(u,v),y,wZ(u,v));st.vel.set(Math.sin(h)*V,0,-Math.cos(h)*V);st.quat.setFromEuler(new THREE.Euler(0.03,-h,0,'YXZ'));st.w.set(0,0,0);
   st.onGround=false;st.airTime=30;st.flapIdx=flap;st.throttle=st.power=thr;st.gearDown=true;st.gearPos=1;st.ezCfg='clean';st.ez=0;st.ias=kt/MS2KT;st.mode='school';snapCamera=true;
 }
+let schoolAc='cessna';try{if(localStorage.getItem('kgeuSchoolAc')==='alpha')schoolAc='alpha';}catch(e){}
+function lessonGrade(id){return schoolBest[(id==='first'?'cessna':schoolAc)+':'+id];}
+function lessonDone(id){const g=lessonGrade(id);return !!g&&g!=='F';}
+function nextLesson(after){const i0=after?LESSONS.findIndex(l=>l.id===after)+1:0;
+  for(let i=i0;i<LESSONS.length;i++)if(!lessonDone(LESSONS[i].id))return LESSONS[i];
+  return after&&i0<LESSONS.length?LESSONS[i0]:(LESSONS.find(l=>!lessonDone(l.id))||null);}
 function schoolList(){
   const el=document.getElementById('school');el.innerHTML='';
-  LESSONS.forEach(l=>{const b=document.createElement('button');const g=schoolBest[(acType==='alpha'?'alpha':'cessna')+':'+l.id];
-    b.innerHTML='<i>'+(g||'')+'</i><b></b><span></span>';b.querySelector('b').textContent=l.name;b.querySelector('span').textContent=l.desc;
+  document.querySelectorAll('[data-sch]').forEach(b=>b.classList.toggle('sel',b.dataset.sch===schoolAc));
+  const nx=nextLesson();
+  LESSONS.forEach((l,i)=>{const b=document.createElement('button');const g=lessonGrade(l.id),done=lessonDone(l.id);
+    b.className='lrow'+(done?' done':'')+(nx&&nx.id===l.id?' next':'');b.dataset.l=l.id;
+    b.innerHTML='<span class="ln">'+(done?'\u2713':i+1)+'</span><div class="lt"><b></b><span></span></div><span class="lg">'+(g&&g!=='F'?g:'')+'<i class="go1">START</i></span>';
+    b.querySelector('b').textContent=l.name;b.querySelector('.lt span').textContent=l.desc;
+    b.setAttribute('aria-label',l.name+(done?', finished':'')+(nx&&nx.id===l.id?', next lesson':''));
     b.onclick=()=>startLesson(l.id);el.appendChild(b);});
 }
+function startHereUI(){let sk=false;try{sk=!!localStorage.getItem('kgeuTut');}catch(e){}$('startHere').classList.toggle('on',rookie()&&!lessonDone('first')&&!sk);}
+document.querySelectorAll('[data-sch]').forEach(b=>b.onclick=()=>{schoolAc=b.dataset.sch;try{localStorage.setItem('kgeuSchoolAc',schoolAc);}catch(e){}schoolList();});
 function startLesson(id){
-  if(acType!=='cessna'&&acType!=='alpha'){pickType('cessna');toast('Flight school uses the C172 or the Alpha');}
+  if(id==='first')pickType('cessna',1);else if(acType!==schoolAc)pickType(schoolAc,1);
   const S=SCH[acType];gradeOv.classList.remove('on');
-  start(id==='pattern'?'runway':'final');A.land=1;
-  LES.on=id;LES.t=0;LES.ph=0;LES.d={};LES.name=LESSONS.find(l=>l.id===id).name;lesT.textContent='Flight school: '+LES.name;lesEl.classList.add('on');
-  st.ezManFlap=id!=='pattern'&&id!=='engine'?1:0;
+  start(id==='pattern'||id==='first'?'runway':'final','kgeu');A.land=1;
+  lesEl.classList.toggle('tut',id==='first');$('lesQuit').textContent=id==='first'?'Skip':'End';
+  LES.on=id;LES.t=0;LES.ph=0;LES.d={};LES.name=LESSONS.find(l=>l.id===id).name;lesT.textContent=id==='first'?'Lesson 1: First flight':'Flight school: '+LES.name;lesEl.classList.add('on');
+  st.ezManFlap=id!=='pattern'&&id!=='engine'&&id!=='first'?1:0;
+  if(id==='first'){st.easy=true;st.noPF=true;coach2('Your first flight. Follow the arrows. It takes about a minute.');return;}
   if(id==='steep'){airStart(7000,2500,3500,360,S.turn,0,S.thrTurn);st.bankMax=0.95;
     coach2('Steep turns. Roll into a 45 degree bank, left or right, and hold 3,500 feet all the way around.');}
   else if(id==='slow'){airStart(7000,2500,3500,360,S.slow+8,FLAPS.length-1,S.thrSlow);st.noProt=1;
@@ -4894,7 +5314,7 @@ function startLesson(id){
     coach2('Cruising at 2,500 above the ground. Stand by.');}
   else coach2('Pattern work. Take off, climb to 700 above the ground, then fly the circuit at 2,100 feet and bring it back to runway 1.','Pattern work. Take off, climb to seven hundred above the ground, then fly the circuit at two thousand one hundred feet, and bring it back to runway one.');
 }
-function lesEnd(){LES.on=null;lesEl.classList.remove('on');if(st){st.noProt=0;st.bankMax=0;}}
+function lesEnd(){LES.on=null;lesEl.classList.remove('on','tut');tutArrow.classList.remove('on');if(st){st.noProt=0;st.bankMax=0;st.easy=easy;}}
 const GR=[[90,'A'],[80,'B'],[70,'C'],[60,'D'],[-1e9,'F']];
 function grade(score,title,lines,failWhy){
   score=Math.round(clamp(score,0,100));const L2=failWhy?'F':GR.find(g=>score>=g[0])[1];
@@ -4904,14 +5324,19 @@ function grade(score,title,lines,failWhy){
   document.getElementById('gTitle').textContent=LES.name+(failWhy?': '+failWhy:'. Score '+score+' of 100.');
   const box=document.getElementById('gLines');box.innerHTML='';
   lines.forEach(l=>{const d=document.createElement('div');d.className=l[0]?'ok':'no';d.textContent=l[1];box.appendChild(d);});
-  const id=LES.on;LES.last=id;lesEnd();paused=true;gradeOv.classList.add('on');
+  const id=LES.on;LES.last=id;lesEnd();paused=true;
+  if(id==='first'&&L2!=='F'){try{localStorage.setItem('kgeuTut','1');}catch(e){}}
+  const nx=nextLesson(id),gn=$('gNext');gn.hidden=!nx||(L2==='F'&&nx.id!==id);if(nx)gn.textContent='Next lesson: '+nx.name;gn.dataset.l=nx?nx.id:'';
+  gradeOv.classList.add('on');
   coach2(L2==='A'?'Excellent. That is checkride standard.':L2==='F'?'Unsatisfactory. Let us try that again.':'Not bad. Grade '+L2+'.');
 }
 document.getElementById('gRetry').onclick=()=>startLesson(LES.last);
-document.getElementById('gSchool').onclick=()=>{gradeOv.classList.remove('on');openMenu();document.getElementById('school').classList.add('on');schoolList();};
-document.getElementById('gFree').onclick=()=>{gradeOv.classList.remove('on');paused=false;document.getElementById('bPause').textContent='Pause';};
-document.getElementById('lesQuit').onclick=()=>{lesEnd();toast('Lesson ended. Free flight');};
-document.getElementById('bSchool').onclick=()=>{const el=document.getElementById('school');el.classList.toggle('on');schoolList();};
+$('gNext').onclick=()=>startLesson($('gNext').dataset.l);
+$('bReplay').onclick=()=>startLesson('first');
+document.getElementById('gSchool').onclick=()=>{gradeOv.classList.remove('on');openMenu();nav('sSchool');};
+document.getElementById('gFree').onclick=()=>{gradeOv.classList.remove('on');paused=false;};
+document.getElementById('lesQuit').onclick=()=>{const f=LES.on==='first';lesEnd();
+  if(f){try{localStorage.setItem('kgeuTut','skip');}catch(e){}startHereUI();}toast(f?'First flight skipped. Free flight':'Lesson ended. Free flight');};
 function lessonEvent(ev){
   const d=LES.d;
   if(ev.type==='touchdown'){d.td=ev;d.tdU=toU(ev.x,ev.z);d.tdV=Math.abs(toV(ev.x,ev.z));}
@@ -4920,6 +5345,7 @@ function lessonEvent(ev){
 function lessonTick(dt){
   if(!LES.on||st.crashed)return;
   const S=SCH[acType],d=LES.d,id=LES.on,a=lesAtt(),alt=altMSL(),kt=kts();LES.t+=dt;
+  if(id==='first'){firstTick(dt,d,a);return;}
   if(id==='steep'){
     if(LES.ph===0){if(d.h0===undefined)d.h0=a.hdg;
       lesShow('Roll into 45 degrees of bank, either way. Hold 3,500 ft.','Bank '+Math.abs(a.bank).toFixed(0)+'\u00b0   '+dev(alt-3500)+'   '+kt.toFixed(0)+' kt');
@@ -4989,32 +5415,229 @@ function lessonTick(dt){
     if(LES.t>600)grade(0,'',[[0,'Ran out of time']],'too long');
   }
 }
-function warnFlash(){const w=document.getElementById('warn');if(w){w.textContent=LES.on==='engine'?'ENGINE FAILURE':'STALL';w.classList.add('on');setTimeout(()=>w.classList.remove('on'),2500);}}
-function coachUpdate(dt){
-  if(LES.on||coachStep>=3||!running||paused||st.crashed){coachEl.classList.remove('on');return;}
-  const s=st,ap=s.ap;
-  if(coachStep===0){if(ap&&ap.mode==='to'){coachSet(1);return;}if(!s.onGround){coachSet(1);return;}
-    coachShow(isTouch?'Tap Auto T/O up top and keep your hands off. It flies the takeoff for you.':'Press O or click Auto T/O. Hands off, it flies the takeoff for you.');}
-  else if(coachStep===1){if(s.onGround&&!ap)return;
-    if(ap&&ap.mode!=='hold'){coachEl.classList.remove('on');return;}
-    coachShow(isTouch?'Your turn. Move the stick or tilt the phone to fly. Let go and it flies straight.':'Your turn. Use the arrow keys, or click and drag on the scene. Let go and it flies straight.');
-    if(!ap&&(Math.abs(s.ail)>0.2||Math.abs(s.elev)>0.2)){coachSet(2);coachT=15;}}
-  else if(coachStep===2){if(s.onGround||(ap&&ap.mode==='land')){coachSet(3);return;}coachT-=dt;
-    if(coachT<=0)coachShow(isTouch?'Tap Auto Land to bring it home, or land it yourself.':'Press O or click Auto Land to bring it home, or land it yourself.');}
+// ---- lesson 1, first flight: about a minute, arrows point at what to touch ----
+const tutArrow=$('tutArrow');
+function tutPoint(sel){
+  if(!sel){tutArrow.classList.remove('on');return;}
+  const e=document.querySelector(sel);if(!e){tutArrow.classList.remove('on');return;}
+  const r=e.getBoundingClientRect();let x,y,rot;
+  if(sel==='#stickZone'){x=r.left+r.width*0.5-32;y=r.top+r.height*0.55-90;rot=90;}  // above the thumb, pointing down
+  else{x=r.left-72;y=r.top+Math.min(r.height*0.3,70)-20;rot=0;}                     // left of it, pointing right
+  tutArrow.style.transform='translate('+Math.round(x)+'px,'+Math.round(y)+'px) rotate('+rot+'deg)';tutArrow.classList.add('on');
 }
+function tutShow(msg,sel,step){lesShow(msg,'Step '+step+' of 6');tutPoint(sel);}
+function firstTick(dt,d,a){
+  if(LES.ph===0){tutShow(isTouch?'Slide the throttle on the right edge all the way up to FULL.':'Press 3 for full power.','#thr',1);
+    if(st.throttle>0.9){LES.ph=1;}}
+  else if(LES.ph===1){tutShow(isTouch?'Now pull the stick gently down, toward you, to lift off.':'Hold the down arrow gently to lift off.','#stickZone',2);
+    if(!st.onGround&&st.agl>8){LES.ph=2;d.t=0;}}
+  else if(LES.ph===2){d.t+=dt;tutShow('You are flying! Let go of the stick. It flies level by itself.',null,3);
+    if(d.t>3.5&&st.agl>40){LES.ph=3;d.h0=a.hdg;}}
+  else if(LES.ph===3){tutShow(isTouch?'One gentle turn: push the stick to the right and hold it.':'One gentle turn: hold the right arrow.','#stickZone',4);
+    if(angD(a.hdg,d.h0)>25){LES.ph=4;d.t=0;}}
+  else if(LES.ph===4){tutShow('Let go. The wings level out by themselves.',null,4);
+    if(Math.abs(a.bank)<6)d.t+=dt;
+    if(d.t>1.2){LES.ph=5;
+      // straight onto a short final for runway 1, so the whole lesson is about a minute
+      airStart(THR01-800,0,FIELD_FT+190,RH*180/Math.PI,AC.vapp*MS2KT,AC.landFlap,0.35);
+      st.ezCfg='approach';st.ezV=AC.vapp;st.mode='school';toast('Now we land');}}
+  else if(LES.ph===5){tutShow('Time to land. Fly through the glowing hoops. Small moves only.',null,5);
+    if(st.agl<12)LES.ph=6;}
+  else if(LES.ph===6){tutShow('Hands off. It flares and lands for you.',null,5);if(d.td){LES.ph=7;d.t=0;}}
+  else if(LES.ph===7){d.t+=dt;tutShow(isTouch?'You landed! Hold BRAKE to stop.':'You landed! Hold Space to brake.','#bBrake',6);
+    if(st.vel.length()<3||d.t>14){const f=d.td.fpm;
+      grade(d.td.paved?100-(f<=300?0:Math.min(40,(f-300)/8)):40,'',[[1,'Took off'],[1,'Made a turn and levelled out'],[f<=300,'Touchdown '+f+' fpm'+(f<=300?', smooth':', a little firm')],[d.td.paved,'Landed on the runway']]);}}
+  if(LES.t>200)grade(0,'',[[0,'Ran out of time']],'took too long');
+}
+function warnFlash(){const w=document.getElementById('warn');if(w){w.textContent=LES.on==='engine'?'ENGINE FAILURE':'STALL';w.classList.add('on');setTimeout(()=>w.classList.remove('on'),2500);}}
 function pickBase(id){SPAWN_BASE=BASES[id]?id:'kgeu';try{localStorage.setItem('kgeuBase',SPAWN_BASE);}catch(e){}
-  document.querySelectorAll('.pick[data-b]').forEach(b=>b.classList.toggle('sel',b.dataset.b===SPAWN_BASE));}
+  document.querySelectorAll('.pick[data-b]').forEach(b=>b.classList.toggle('sel',b.dataset.b===SPAWN_BASE));sumUI();}
 document.querySelectorAll('.pick[data-b]').forEach(b=>b.addEventListener('click',()=>pickBase(b.dataset.b)));
-document.querySelectorAll('.pick[data-tod]').forEach(b=>b.addEventListener('click',()=>setTOD(b.dataset.tod)));
-function pickType(id){acType=TYPES[id]?id:'reaper';try{localStorage.setItem('kgeuType',acType);}catch(e){}
-  pickBase(HOME(acType));
-  document.querySelectorAll('.pick').forEach(b=>b.classList.toggle('sel',b.dataset.t===acType));
-  const T=TYPES[acType];document.getElementById('regTitle').textContent=T.title;document.getElementById('acSub').textContent=T.sub;document.getElementById('tips').textContent=T.tips;
-  best=loadBest();showBest();resumeBtn.style.display=(running&&!st.crashed&&st.type===acType)?'':'none';}
-document.querySelectorAll('.pick').forEach(b=>b.onclick=()=>pickType(b.dataset.t));
-pickType(acType);setType(acType);useModel(acType);sizeShadow();st=createState('runway',SPAWN_BASE);st.type=acType;
-document.getElementById('bPause').onclick=()=>{if(running&&!st.crashed)togglePause();};
-document.getElementById('bMenu').onclick=openMenu;
+document.querySelectorAll('.pick[data-tod]').forEach(b=>b.addEventListener('click',()=>{setTOD(b.dataset.tod);sumUI();}));
+let SPAWN_POS='runway';try{const v=localStorage.getItem('kgeuPos');if(v==='ramp'||v==='final')SPAWN_POS=v;}catch(e){}
+function pickPos(id){SPAWN_POS=id==='ramp'||id==='final'?id:'runway';try{localStorage.setItem('kgeuPos',SPAWN_POS);}catch(e){}
+  document.querySelectorAll('.pick[data-pos]').forEach(b=>b.classList.toggle('sel',b.dataset.pos===SPAWN_POS));sumUI();}
+document.querySelectorAll('.pick[data-pos]').forEach(b=>b.addEventListener('click',()=>pickPos(b.dataset.pos)));
+// Every menu choice is independent: aircraft, base, time of day and start position
+// each keep their own saved value. A mission may borrow an aircraft for one flight
+// (temp), which never touches the saved pick.
+let savedType=acType;
+function pickType(id,temp){acType=TYPES[id]?id:'reaper';best=loadBest();
+  if(temp)return;
+  savedType=acType;try{localStorage.setItem('kgeuType',acType);}catch(e){}
+  document.querySelectorAll('.pick[data-t]').forEach(b=>b.classList.toggle('sel',b.dataset.t===acType));
+  sumUI();}
+// ================= menu screens =================
+// One screen at a time with a back button. Everything fits an iPhone in landscape
+// without scrolling. The aircraft carousel shows the real models, drawn by the game
+// renderer behind a transparent screen, so there is no second WebGL context.
+const NAV=[];let curScr='sHome',fromPause=false;
+function showScr(id){
+  curScr=id;document.body.classList.toggle('menuOn',menu.classList.contains('on'));document.querySelectorAll('#menu .scr').forEach(e=>e.classList.toggle('on',e.id===id));
+  menu.classList.toggle('see3d',id==='sFly');SHOW.on=id==='sFly'&&menu.classList.contains('on');
+  if(id==='sFly'){CARM.sync();sumUI();}
+  if(id==='sSchool')schoolList();if(id==='sHome')startHereUI();if(id==='sArc')arcList();if(id==='sMis')misList();
+}
+function nav(id,reset){if(reset){NAV.length=0;fromPause=false;}else if(curScr!==id)NAV.push(curScr);showScr(id);}
+function navBack(){
+  if(fromPause&&!NAV.length){fromPause=false;menuClose();pauseOv.classList.add('on');CARP.sync();return;}
+  showScr(NAV.pop()||'sHome');
+}
+function menuClose(){menu.classList.remove('on','see3d');SHOW.on=false;document.body.classList.remove('menuOn');}
+document.querySelectorAll('#menu .back').forEach(b=>b.onclick=navBack);
+$('hFly').onclick=()=>nav('sFly');$('hSch').onclick=()=>nav('sSchool');$('hMis').onclick=()=>nav('sMis');$('hArc').onclick=()=>nav('sArc');
+$('hRec').onclick=()=>recOpen();$('hSet').onclick=()=>nav('sSet');$('bHelp').onclick=()=>nav('sHelp');
+$('bGo').onclick=()=>freeStart();
+$('pSet').onclick=()=>{pauseOv.classList.remove('on');menu.classList.add('on');nav('sSet',true);fromPause=true;};
+$('storyX').onclick=()=>$('storyOv').classList.remove('on');
+
+// ---- the aircraft, friendliest first ----
+const CAR=['cessna','alpha','f16','reaper','mq9b','c130'];
+const AC_INFO={
+  cessna:['Cessna 172','Cessna 172','The friendly four seat trainer. The best first airplane.'],
+  alpha:['Pipistrel Alpha','Pipistrel Alpha','A tiny two seat trainer that glides for miles.'],
+  f16:['F-16C Viper','F-16','A fighter jet. Very fast, very agile, afterburner included.'],
+  reaper:['MQ-9A Reaper','MQ-9A Reaper','A long winged drone that circles for hours and strikes from above.'],
+  mq9b:['MQ-9B SkyGuardian','MQ-9B SkyGuardian','The bigger, longer winged Reaper built to fly over cities.'],
+  c130:['C-130H Hercules','C-130 Hercules','A four engine cargo hauler that lands on dirt strips.']};
+// ---- the carousel: loops forever both ways. The same component, compact, sits in
+// the pause sheet. Settling on an aircraft picks it, so both stay in sync. ----
+const wrapI=i=>((i%CAR.length)+CAR.length)%CAR.length;
+function Carousel(root){
+  const B='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>';
+  root.innerHTML='<div class="cwin"><div class="cdots"></div><button class="arrow l" aria-label="Previous aircraft">'+B+'</button><button class="arrow r" aria-label="Next aircraft">'+B+'</button>'+
+    '<div class="cinfo"><div class="tx"><div class="nm"></div><p class="desc"></p></div><button class="story">Story</button></div></div>';
+  const c={root:root,win:root.querySelector('.cwin'),pos:0,target:0,idx:0,drag:null,shown:-1};
+  const dots=root.querySelector('.cdots');
+  CAR.forEach((t,i)=>{const d=document.createElement('span');d.className='pick';d.dataset.t=t;d.onclick=e=>{e.stopPropagation();c.set(c.idx+((i-wrapI(c.idx)+CAR.length+2)%CAR.length)-2);};dots.appendChild(d);});
+  c.set=i=>{c.idx=i;c.target=i;pickType(CAR[wrapI(i)]);};
+  c.sync=()=>{const i=CAR.indexOf(savedType);c.idx=c.pos=c.target=i<0?0:i;c.info(true);};
+  c.info=force=>{const k=wrapI(Math.round(c.pos));if(k===c.shown&&!force)return;c.shown=k;const t=CAR[k],I=AC_INFO[t];
+    root.querySelector('.nm').innerHTML=I[0]+'<span class="tail">'+TYPES[t].title+'</span>';root.querySelector('.desc').textContent=I[2];
+    dots.querySelectorAll('span').forEach((d,j)=>d.classList.toggle('sel',j===k));};
+  root.querySelector('.arrow.l').onclick=e=>{e.stopPropagation();c.set(c.idx-1);};
+  root.querySelector('.arrow.r').onclick=e=>{e.stopPropagation();c.set(c.idx+1);};
+  root.querySelector('.story').onclick=e=>{e.stopPropagation();const t=CAR[wrapI(c.idx)],I=AC_INFO[t];
+    $('storyH').textContent=I[0]+'  '+TYPES[t].title;$('storyT').textContent=TYPES[t].sub;$('storyOv').classList.add('on');};
+  c.win.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;c.drag={id:e.pointerId,x:e.clientX,p0:c.pos,t:performance.now(),moved:false};});
+  c.win.addEventListener('pointermove',e=>{const d=c.drag;if(!d||e.pointerId!==d.id)return;const dx=e.clientX-d.x;if(Math.abs(dx)>6)d.moved=true;
+    c.pos=d.p0-dx/c.win.clientWidth;});
+  const up=e=>{const d=c.drag;if(!d||e.pointerId!==d.id)return;c.drag=null;if(!d.moved)return;
+    const dx=e.clientX-d.x,v=dx/Math.max(1,performance.now()-d.t);
+    let i=Math.round(c.pos);if(Math.abs(dx)>c.win.clientWidth*0.12||Math.abs(v)>0.5)i=Math.round(d.p0)-Math.sign(dx);
+    c.set(i);};
+  c.win.addEventListener('pointerup',up);c.win.addEventListener('pointercancel',up);
+  return c;
+}
+const CARM=Carousel($('carMain')),CARP=Carousel($('carPause'));
+
+// ---- the showroom: sand, warm light, the model turning slowly, drawn only into the
+// carousel window with a scissor, so the paused flight stays visible around it ----
+const SHOW={on:false,items:{},t:0,scene:new THREE.Scene(),cam:new THREE.PerspectiveCamera(30,1,1,5000)};
+SHOW.scene.background=new THREE.Color(0xF6C177);
+SHOW.scene.fog=new THREE.Fog(0xF6C177,1e6,2e6);SHOW.scene.environment=scene.environment;
+SHOW.scene.add(new THREE.HemisphereLight(0xfff4e2,0x8a5a3a,0.85));
+{const d=new THREE.DirectionalLight(0xffffff,0.95);d.position.set(-0.5,1,0.7);SHOW.scene.add(d);}
+function showItem(t){
+  if(SHOW.items[t])return SHOW.items[t];
+  const m=getModel(t),c=m.g.clone(true);c.visible=true;c.position.set(0,0,0);c.quaternion.identity();
+  const box=new THREE.Box3().setFromObject(c),sz=box.getSize(new V3()),ctr=box.getCenter(new V3());
+  c.position.sub(ctr);const piv=new THREE.Group();piv.add(c);
+  const sh=new THREE.Mesh(flatQuad,new THREE.MeshBasicMaterial({map:shadowTex,transparent:true,depthWrite:false,opacity:0.5}));
+  sh.position.y=-sz.y/2-0.05;sh.scale.set(sz.x*1.1,1,sz.z*1.1);piv.add(sh);
+  piv.userData.dim=Math.max(sz.x,sz.z);SHOW.scene.add(piv);return SHOW.items[t]=piv;
+}
+function showRender(dt,c){
+  const r=c.win.getBoundingClientRect();if(r.width<10||r.height<10)return;
+  SHOW.t+=dt;
+  if(!c.drag)c.pos+=(c.target-c.pos)*(1-Math.exp(-10*dt));
+  c.info();
+  const cam=SHOW.cam,dist=100,el=0.3,H=innerHeight,k=2*dist*Math.tan(cam.fov*Math.PI/360)/r.height,D=r.width*k;
+  const S=Math.min(r.width*0.52,r.height*1.55)*k,used={};
+  for(let i=Math.floor(c.pos)-1;i<=Math.ceil(c.pos)+1;i++){const t=CAR[wrapI(i)];if(used[t])continue;used[t]=1;const p=showItem(t);
+    p.visible=true;p.position.set(i*D,0,0);p.scale.setScalar(S/p.userData.dim);p.rotation.y=0.9+SHOW.t*0.35;}
+  for(const t in SHOW.items)if(!used[t])SHOW.items[t].visible=false;
+  // lift the model clear of the name strip under it
+  const info=c.root.querySelector('.cinfo').getBoundingClientRect(),lift=info.height?(info.height*0.5)*k:0;
+  const x=c.pos*D;cam.aspect=r.width/r.height;cam.position.set(x,dist*Math.sin(el)-lift,dist*Math.cos(el));cam.lookAt(x,-lift,0);cam.updateProjectionMatrix();
+  renderer.setScissorTest(true);renderer.setScissor(r.left,H-r.bottom,r.width,r.height);renderer.setViewport(r.left,H-r.bottom,r.width,r.height);
+  renderer.render(SHOW.scene,cam);
+  renderer.setScissorTest(false);renderer.setViewport(0,0,innerWidth,H);
+}
+
+// ---- where, when and go ----
+const POS_TXT={runway:'on the runway',ramp:'at the ramp',final:'on 3 mile final'};
+// the pause sheet's change flight panel: same picks, Apply restarts at once
+$('pApply').onclick=()=>{pauseOv.classList.remove('on');freeStart();};
+function sumUI(){const el=$('sumLine');if(!el)return;const I=AC_INFO[savedType]||AC_INFO.cessna;
+  el.textContent=I[1]+' at '+(SPAWN_BASE==='luke'?'Luke AFB':'Glendale')+', '+TOD.name.toLowerCase()+', '+POS_TXT[SPAWN_POS];}
+
+// ---- missions: everything that is not an arcade game ----
+// ---- card icons: simple silhouettes in the palette, inline SVG ----
+const SIL={
+  c130:'<g fill="#F6C177"><rect x="-2.6" y="-15" width="5.2" height="30" rx="2.6"/><rect x="-20" y="-7" width="40" height="4.6" rx="2"/><rect x="-8" y="11" width="16" height="3.4" rx="1.5"/>'+
+       '<rect x="-15.5" y="-10" width="2.6" height="6" rx="1"/><rect x="-9.5" y="-10" width="2.6" height="6" rx="1"/><rect x="6.9" y="-10" width="2.6" height="6" rx="1"/><rect x="12.9" y="-10" width="2.6" height="6" rx="1"/></g>',
+  f16:'<path fill="#F6C177" d="M0-16 L2.6-4 L14 6 L14 8.5 L2.6 6 L3.4 11 L7.5 14 L7.5 16 L0 14.5 L-7.5 16 L-7.5 14 L-3.4 11 L-2.6 6 L-14 8.5 L-14 6 L-2.6-4Z"/>',
+  cessna:'<g fill="#F6C177"><rect x="-18" y="-6" width="36" height="4.5" rx="1.6"/><rect x="-2.2" y="-13" width="4.4" height="25" rx="2.2"/><rect x="-7" y="10" width="14" height="3.2" rx="1.4"/><rect x="-4" y="-14.5" width="8" height="1.6" rx=".8" fill="#D98A3D"/></g>',
+  mq9:'<g fill="#F6C177"><rect x="-22" y="-3" width="44" height="2.8" rx="1.3"/><rect x="-2" y="-12" width="4" height="24" rx="2"/><path d="M0 10 L-7 16 L-6 17 L0 13 L6 17 L7 16Z"/></g>'};
+const ICO_PARTS={
+  chute:'<g><path d="M-9 0 A9 8 0 0 1 9 0 Z" fill="#D98A3D"/><path d="M-9 0 L-1.5 11 M9 0 L1.5 11 M0 0 L0 11" stroke="#F6C177" stroke-width=".9"/><rect x="-3" y="11" width="6" height="5" rx="1" fill="#A8592A" stroke="#F6C177" stroke-width=".8"/></g>',
+  watch:'<g><circle r="8" fill="none" stroke="#D98A3D" stroke-width="2.2"/><rect x="-1.6" y="-12" width="3.2" height="3" rx="1" fill="#D98A3D"/><path d="M0 0 L0-5.2 M0 0 L3.6 2" stroke="#F6C177" stroke-width="1.8" stroke-linecap="round"/></g>',
+  list:'<g><rect x="-7" y="-9" width="14" height="18" rx="2" fill="none" stroke="#D98A3D" stroke-width="2"/><path d="M-3.5-4 H4 M-3.5 0 H4 M-3.5 4 H1.5" stroke="#F6C177" stroke-width="1.5" stroke-linecap="round"/><path d="M1.5 5 L4 7.5 L9-1" stroke="#F6C177" stroke-width="2" fill="none" stroke-linecap="round"/></g>',
+  cross:'<g stroke="#D98A3D" stroke-width="2" fill="none"><circle r="9"/><path d="M0-13 V-5 M0 5 V13 M-13 0 H-5 M5 0 H13"/></g><circle r="1.6" fill="#F6C177"/>',
+  runway:'<g><path d="M-6 16 L6 16 L3.4-16 L-3.4-16Z" fill="#A8592A"/><path d="M0 12 V8 M0 3 V-1 M0-6 V-9 M0-13 V-15" stroke="#F6C177" stroke-width="1.3"/></g>',
+  strip:'<g><rect x="-20" y="-3" width="40" height="6" rx="1" fill="#A8592A"/><path d="M-16 0 H-11 M-6 0 H-1 M4 0 H9 M14 0 H18" stroke="#F6C177" stroke-width="1.1"/></g>'};
+const svgI=parts=>'<svg class="ico" viewBox="0 0 64 48" aria-hidden="true">'+parts.map(p=>'<g transform="'+p[1]+'">'+p[0]+'</g>').join('')+'</svg>';
+const ICONS={
+  drop:svgI([[SIL.c130,'translate(22 18) rotate(-90) scale(.78)'],[ICO_PARTS.chute,'translate(46 26) scale(.95)']]),
+  short:svgI([[ICO_PARTS.strip,'translate(32 40) scale(1.2 1)'],[SIL.c130,'translate(30 18) rotate(-90) scale(.82)']]),
+  dash:svgI([[SIL.f16,'translate(22 24) rotate(50) scale(1.05)'],[ICO_PARTS.watch,'translate(48 27) scale(1.05)']]),
+  school:svgI([[SIL.cessna,'translate(22 24) rotate(-30) scale(1.05)'],[ICO_PARTS.list,'translate(48 24) scale(1.05)']]),
+  range:svgI([[SIL.mq9,'translate(22 22) rotate(-20) scale(.9)'],[ICO_PARTS.cross,'translate(46 28) scale(.95)']]),
+  landing:svgI([[ICO_PARTS.runway,'translate(20 26) scale(1.1 1.35)'],[ICO_PARTS.watch,'translate(46 24) scale(1.1)']]),
+  daily:svgI([['<g><rect x="-12" y="-10" width="24" height="22" rx="3" fill="none" stroke="#D98A3D" stroke-width="2.2"/><path d="M-12-4 H12" stroke="#D98A3D" stroke-width="2.2"/><rect x="-7" y="-14" width="2.6" height="6" rx="1" fill="#F6C177"/><rect x="4.4" y="-14" width="2.6" height="6" rx="1" fill="#F6C177"/></g>','translate(20 25)'],[SIL.f16,'translate(46 26) rotate(30) scale(.75)']]),
+  dogfight:svgI([[SIL.f16,'translate(20 28) rotate(40) scale(.9)'],[SIL.f16,'translate(44 20) rotate(-140) scale(.9)']])};
+// ---- stars and best score, from the records store ----
+const stars=n=>'<i class="stars" aria-label="'+n+' of 3 stars">'+'★'.repeat(n)+'<u>'+'★'.repeat(3-n)+'</u></i>';
+const L2S={A:3,B:2,C:1,D:1,F:0};
+function scoreOf(id){
+  const B=SCORE.best;let r;
+  if(id==='short'){r=B['c130:short'];return r?[L2S[r.letter]||0,r.stopFt.toLocaleString('en-US')+' ft stop']:[0,''];}
+  if(id==='drop'){r=B['c130:drop'];return r?[L2S[r.letter]||0,r.dist+' m off centre']:[0,''];}
+  if(id==='dash'){r=B.f16;return r?[r.secs<180?3:r.secs<240?2:1,fmtT(r.secs)+' best']:[0,''];}
+  if(id==='range'){r=B.reaper||strikeBest;if(!r)return [0,''];const p=r.pts!==undefined?r.pts:null;
+    return [p===null?1:p>=80?3:p>=55?2:1,(p!==null?p+' pts':r.hits+'/4 hits')];}
+  if(id==='school'){const g=LESSONS.map(l=>schoolBest[schoolAc+':'+l.id]).filter(Boolean),pass=g.filter(x=>x!=='F').length,a=g.filter(x=>x==='A').length;
+    return g.length?[a>=5?3:a>=3?2:pass?1:0,pass+' of 5 passed']:[0,''];}
+  if(id==='landing'||id==='daily')return arcScore(id);
+  return [0,''];
+}
+function cardHTML(o){const sc=o.score||scoreOf(o.id);
+  return (ICONS[o.icon||o.id]||'')+'<div class="mt"><span class="ac">'+o.ac+'</span><b>'+o.name+'</b><span class="d">'+o.desc+'</span>'+
+    (o.soon?'<span class="sc soon">Coming soon</span>':'<span class="sc">'+stars(sc[0])+'<em>'+(sc[1]||'Not flown yet')+'</em></span>')+'</div>';}
+
+function fillCards(el,list){el.innerHTML='';list.forEach(o=>{const b=document.createElement('button');b.className='mcard'+(o.cls?' '+o.cls:'');b.dataset.m=o.id;b.innerHTML=cardHTML(o);b.onclick=o.go;if(o.soon)b.setAttribute('aria-disabled','true');el.appendChild(b);});}
+function misList(){
+  const B=SCORE.best;
+  fillCards($('misCards'),[
+    {id:'short',ac:'C-130H Hercules',name:'Short field landing',desc:'Stop a Hercules on a 3,000 ft dirt strip.',go:()=>{pickType('c130',1);start('short');}},
+    {id:'dash',ac:'F-16C Viper',name:'Luke to Glendale dash',desc:'Wheels up at Luke, down at Glendale. Beat 3 minutes.',go:()=>{pickType('f16',1);start('runway','luke');}}]);
+}
+function arcList(){
+  const D=dailySpec(),DI=AC_INFO[D.type];
+  fillCards($('arcCards'),[
+    {id:'dogfight',ac:'Featured',name:'Red Flag Dogfight',desc:'F-16 against F-16 over the range.',soon:1,cls:'feat',go:()=>toast('Red Flag Dogfight is coming soon')},
+    {id:'landing',ac:AC_INFO[savedType][1],name:'Landing challenge',desc:'Start 5 miles out. Beat the clock to runway 1.',go:()=>arcStart('landing')},
+    {id:'daily',ac:'Daily challenge',name:DI[1]+' to '+(D.end.rwy.code==='KGEU'?'Glendale ':'Luke ')+D.end.num,desc:'New every day. Same one for everyone.',go:()=>arcStart('daily')},
+    {id:'drop',ac:'C-130H Hercules',name:'Airdrop challenge',desc:'Put the bundle on the drop zone.',go:()=>{pickType('c130',1);start('drop');}},
+    {id:'range',ac:'MQ-9A Reaper',name:'Strike range',desc:'Find the targets, lock on, four missiles.',go:()=>{pickType('reaper',1);start('range');}}]);
+}
+// ---- first launch: one screen, two big buttons ----
+function funnelPick(v){setSkill(v);$('funnel').classList.remove('on');startHereUI();if(v==='rookie')startLesson('first');}
+$('fRookie').onclick=()=>funnelPick('rookie');$('fPilot').onclick=()=>funnelPick('pilot');
+if(!SKILL)$('funnel').classList.add('on');
+startHereUI();pickType(acType);pickBase(SPAWN_BASE);pickPos(SPAWN_POS);setType(acType);useModel(acType);sizeShadow();st=createState('runway',SPAWN_BASE);st.type=acType;
+document.getElementById('bPause').onclick=()=>{if(running&&!st.crashed&&!paused)togglePause();};
 const toastEl=document.getElementById('toast');let toastT=0;
 function toast(msg){toastEl.textContent=msg;toastEl.classList.add('on');toastT=3;}
 
@@ -5119,8 +5742,8 @@ function drawSixPack(){
   // --- turn coordinator ---
   {const [cx,cy]=cell(0,1);spFace(x,cx,cy,R);
    const rate=st.w.y*180/Math.PI;                          // deg per second of yaw
-   const tilt=clamp(-rate/3,-2,2)*0.32;                    // a standard rate turn is 3 deg/s
-   x.save();x.translate(cx,cy-2);x.rotate(tilt);
+   const lean=clamp(-rate/3,-2,2)*0.32;                    // a standard rate turn is 3 deg/s
+   x.save();x.translate(cx,cy-2);x.rotate(lean);
    x.strokeStyle='#e8eaec';x.lineWidth=2.5;
    x.beginPath();x.moveTo(-22,0);x.lineTo(22,0);x.moveTo(0,-3);x.lineTo(0,4);
    x.moveTo(-7,9);x.lineTo(7,9);x.stroke();x.restore();
@@ -5162,20 +5785,135 @@ function drawSixPack(){
    spLabel(x,cx,cy+30,'FPM x100');}
 }
 
-// ---------- minimap ----------
-const mc=document.getElementById('map'),mx=mc.getContext('2d');let ms=140;
-function sizeMap(){dpr=Math.min(window.devicePixelRatio||1,2);ms=isTouch?96:140;mc.width=ms*dpr;mc.height=ms*dpr;mc.style.width=ms+'px';mc.style.height=ms+'px';}
+// ---------- maps: a heading up mini map, and a full north up map with destinations ----------
+const mc=document.getElementById('map'),mx=mc.getContext('2d');let ms=92;
+const LANDMARKS=[
+  {name:'White Tank Mountains',x:-23200,z:-6900,rx:6500,rz:12500,rot:0.12,kind:'mtn'},
+  {name:'Camelback',x:31400,z:350,rx:1900,rz:900,rot:0.25,kind:'mtn'},
+  {name:'State Farm Stadium',x:3480,z:-979,rx:170,rz:130,rot:0,kind:'stadium'}];
+const AIRPORTS=[['Glendale','KGEU',wX(RWY_LEN/2,0),wZ(RWY_LEN/2,0)],['Luke AFB','KLUF',LUKE.x,LUKE.z],['Sky Harbor','KPHX',SKY_HARBOR.x,SKY_HARBOR.z],['Assault strip','LZ',LZ.x,LZ.z]];
+let DEST=null;
+function navDest(){return DEST;}
+function destNear(d){return running&&!st.onGround&&Math.hypot(st.pos.x-d.x,st.pos.z-d.z)<12000;}
+function setDest(e){DEST=e;document.body.classList.toggle('hasDest',!!e);destUI(true);
+  if(e)toast('Destination: '+e.rwy.apt+' runway '+e.num);}
+function sizeMap(){dpr=Math.min(window.devicePixelRatio||1,2);ms=innerWidth>=900?120:92;mc.width=ms*dpr;mc.height=ms*dpr;mc.style.width=ms+'px';mc.style.height=ms+'px';}
+function rwyPoly(ctx,r,P,minW){
+  const dx=Math.sin(r.h),dz=-Math.cos(r.h),a=P(r.x-dx*r.len/2,r.z-dz*r.len/2),b=P(r.x+dx*r.len/2,r.z+dz*r.len/2);
+  ctx.lineCap='butt';ctx.lineWidth=minW;ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();
+}
 function drawMap(hdgT){
-  const W=mc.width,R=W/2,range=7000,k=R/range,ox=st.pos.x,oz=st.pos.z,P=(x,z)=>[R+(x-ox)*k,R+(z-oz)*k];
-  mx.clearRect(0,0,W,W);mx.save();mx.beginPath();mx.arc(R,R,R-1,0,TAU);mx.clip();mx.fillStyle='rgba(20,24,30,.78)';mx.fillRect(0,0,W,W);
-  mx.strokeStyle='rgba(127,212,255,.5)';mx.lineWidth=3*dpr;mx.beginPath();for(let z=oz-range;z<=oz+range;z+=300){const q=P(riverX(z),z);z===oz-range?mx.moveTo(q[0],q[1]):mx.lineTo(q[0],q[1]);}mx.stroke();
-  mx.strokeStyle='rgba(200,200,200,.45)';mx.lineWidth=2.5*dpr;let a=P(FWY_X,I10_Z),b=P(FWY_X,-17000);mx.beginPath();mx.moveTo(a[0],a[1]);mx.lineTo(b[0],b[1]);a=P(-17000,I10_Z);b=P(26000,I10_Z);mx.moveTo(a[0],a[1]);mx.lineTo(b[0],b[1]);mx.stroke();
-  mx.fillStyle='rgba(230,230,230,.7)';a=P(3480,-979);mx.beginPath();mx.arc(a[0],a[1],3*dpr,0,TAU);mx.fill();
-  mx.strokeStyle='#fff';mx.lineWidth=3.5*dpr;a=P(0,0);b=P(wX(RWY_LEN,0),wZ(RWY_LEN,0));mx.beginPath();mx.moveTo(a[0],a[1]);mx.lineTo(b[0],b[1]);mx.stroke();
-  const s=Math.sin(LUKE.h),c=Math.cos(LUKE.h);mx.strokeStyle='#c9c6bd';mx.lineWidth=2.5*dpr;mx.beginPath();for(const v of [-160,160]){a=P(LUKE.x-s*1600+c*v,LUKE.z+c*1600+s*v);b=P(LUKE.x+s*1600+c*v,LUKE.z-c*1600+s*v);mx.moveTo(a[0],a[1]);mx.lineTo(b[0],b[1]);}mx.stroke();
-  mx.fillStyle='#7fd4ff';TRAFFIC.forEach(o=>{a=P(o.m.g.position.x,o.m.g.position.z);mx.beginPath();mx.arc(a[0],a[1],2.5*dpr,0,TAU);mx.fill();});
-  mx.translate(R,R);mx.rotate(hdgT*Math.PI/180);mx.fillStyle='#f2a900';mx.beginPath();mx.moveTo(0,-7*dpr);mx.lineTo(5*dpr,6*dpr);mx.lineTo(0,3*dpr);mx.lineTo(-5*dpr,6*dpr);mx.closePath();mx.fill();mx.restore();
-  mx.fillStyle='#eef2f6';mx.font=`600 ${11*dpr}px ${F}`;mx.textAlign='center';mx.fillText('N',R,11*dpr);
+  const W=mc.width,C=W/2,range=5500,k=C/range,ox=st.pos.x,oz=st.pos.z,h=hdgT*Math.PI/180,c=Math.cos(-h),s=Math.sin(-h);
+  // heading up: rotate the world about the aircraft
+  const P=(x,z)=>{const X=(x-ox)*k,Z=(z-oz)*k;return [C+X*c-Z*s,C+X*s+Z*c];};
+  mx.clearRect(0,0,W,W);mx.save();
+  const R=12*dpr;mx.beginPath();mx.roundRect?mx.roundRect(0,0,W,W,R):mx.rect(0,0,W,W);mx.clip();
+  mx.fillStyle='rgba(26,16,9,.52)';mx.fillRect(0,0,W,W);
+  mx.strokeStyle='rgba(127,212,255,.45)';mx.lineWidth=2*dpr;mx.beginPath();
+  for(let z=oz-range*1.5;z<=oz+range*1.5;z+=300){const q=P(riverX(z),z);z===oz-range*1.5?mx.moveTo(q[0],q[1]):mx.lineTo(q[0],q[1]);}mx.stroke();
+  // range ring, 2 nm
+  mx.strokeStyle='rgba(246,193,119,.35)';mx.lineWidth=1*dpr;mx.setLineDash([3*dpr,3*dpr]);mx.beginPath();mx.arc(C,C,3704*k,0,TAU);mx.stroke();mx.setLineDash([]);
+  // runways as clear strips, numbers at each end, kept upright
+  mx.strokeStyle='#f3efe6';
+  for(const r of RUNWAYS){if(Math.hypot(r.x-ox,r.z-oz)>range*1.6)continue;rwyPoly(mx,r,P,Math.max(3*dpr,r.wid*k*1.6));}
+  mx.fillStyle='#fff';mx.font=`800 ${9*dpr}px ${F}`;mx.textAlign='center';mx.textBaseline='middle';
+  for(const e of RWY_ENDS){if(Math.hypot(e.x-ox,e.z-oz)>range*1.3)continue;
+    const q=P(e.x-Math.sin(e.h)*380,e.z+Math.cos(e.h)*380);mx.fillText(e.num,q[0],q[1]);}
+  // destination
+  if(DEST){const q=P(DEST.x,DEST.z),dq=Math.hypot(q[0]-C,q[1]-C);mx.strokeStyle='#D98A3D';mx.lineWidth=2*dpr;mx.setLineDash([4*dpr,3*dpr]);
+    mx.beginPath();mx.moveTo(C,C);mx.lineTo(q[0],q[1]);mx.stroke();mx.setLineDash([]);
+    if(dq<C){mx.fillStyle='#D98A3D';mx.beginPath();mx.arc(q[0],q[1],4*dpr,0,TAU);mx.fill();}}
+  mx.fillStyle='#7fd4ff';TRAFFIC.forEach(o=>{const a=P(o.m.g.position.x,o.m.g.position.z);mx.beginPath();mx.arc(a[0],a[1],2.2*dpr,0,TAU);mx.fill();});
+  // the aircraft, always pointing up
+  mx.translate(C,C);mx.fillStyle='#F6C177';mx.strokeStyle='#2A1608';mx.lineWidth=1.2*dpr;mx.beginPath();
+  mx.moveTo(0,-7*dpr);mx.lineTo(5*dpr,6*dpr);mx.lineTo(0,3*dpr);mx.lineTo(-5*dpr,6*dpr);mx.closePath();mx.fill();mx.stroke();mx.restore();
+  // north tick on the rim
+  const nx=C+Math.sin(-h)*(C-8*dpr),ny=C-Math.cos(-h)*(C-8*dpr);mx.fillStyle='#eef2f6';mx.font=`700 ${9*dpr}px ${F}`;mx.textAlign='center';mx.textBaseline='middle';mx.fillText('N',nx,ny);
+  mx.fillStyle='rgba(246,193,119,.8)';mx.font=`700 ${8*dpr}px ${F}`;mx.textAlign='left';mx.fillText('2 NM',4*dpr,W-7*dpr);
+}
+// ---- the full map: north up, pinch to zoom, drag to pan, tap a runway end to fly there ----
+const FM={on:false,cx:0,cz:0,scale:0.02,ptrs:new Map(),moved:false,wasPaused:false,pinch:null},fmc=$('fmap'),fx=fmc.getContext('2d');
+function fmOpen(){
+  if(!running||st.crashed||menu.classList.contains('on'))return;
+  FM.on=true;FM.wasPaused=paused;paused=true;if(window.stickReset)stickReset();
+  // open on every airport at once, with the aircraft somewhere on screen
+  let x0=Math.min(st.pos.x,...AIRPORTS.map(a=>a[2])),x1=Math.max(st.pos.x,...AIRPORTS.map(a=>a[2])),z0=Math.min(st.pos.z,...AIRPORTS.map(a=>a[3])),z1=Math.max(st.pos.z,...AIRPORTS.map(a=>a[3]));
+  FM.cx=(x0+x1)/2;FM.cz=(z0+z1)/2;FM.scale=Math.min((innerWidth-150)/(x1-x0+4000),(innerHeight-170)/(z1-z0+4000));
+  $('mapOv').classList.add('on');document.body.classList.add('mapOn');fmSize();fmDraw();
+}
+function fmClose(){FM.on=false;$('mapOv').classList.remove('on');document.body.classList.remove('mapOn');paused=FM.wasPaused;}
+function fmSize(){const d=Math.min(window.devicePixelRatio||1,2);fmc.width=innerWidth*d;fmc.height=innerHeight*d;fmc.style.width=innerWidth+'px';fmc.style.height=innerHeight+'px';FM.d=d;}
+const fmP=(x,z)=>[innerWidth/2+(x-FM.cx)*FM.scale,innerHeight/2+(z-FM.cz)*FM.scale];
+const fmW=(X,Y)=>[FM.cx+(X-innerWidth/2)/FM.scale,FM.cz+(Y-innerHeight/2)/FM.scale];
+function fmDraw(){
+  if(!FM.on)return;const d=FM.d,W=innerWidth,H=innerHeight,sc=FM.scale;
+  fx.setTransform(d,0,0,d,0,0);fx.clearRect(0,0,W,H);
+  fx.fillStyle='rgba(42,22,8,.62)';fx.fillRect(0,0,W,H);
+  // landmarks
+  for(const L of LANDMARKS){const q=fmP(L.x,L.z);fx.save();fx.translate(q[0],q[1]);fx.rotate(L.rot);
+    fx.fillStyle=L.kind==='mtn'?'rgba(168,89,42,.55)':'rgba(246,193,119,.55)';fx.beginPath();fx.ellipse(0,0,Math.max(4,L.rx*sc),Math.max(3,L.rz*sc),0,0,TAU);fx.fill();fx.restore();
+    fx.fillStyle='#F6C177';fx.font='700 12px '+F;fx.textAlign='center';fx.textBaseline='middle';
+    fx.fillText(L.name,q[0],q[1]+(L.kind==='mtn'?0:Math.max(3,L.rz*sc)+10));}
+  // river and the two freeways
+  fx.strokeStyle='rgba(127,212,255,.5)';fx.lineWidth=2;fx.beginPath();
+  const zs=fmW(0,0)[1]-2000,ze=fmW(0,H)[1]+2000;for(let z=zs;z<=ze;z+=250){const q=fmP(riverX(z),z);z===zs?fx.moveTo(q[0],q[1]):fx.lineTo(q[0],q[1]);}fx.stroke();
+  fx.strokeStyle='rgba(230,230,230,.3)';fx.lineWidth=2;fx.beginPath();let a=fmP(FWY_X,I10_Z),b=fmP(FWY_X,-17000);fx.moveTo(a[0],a[1]);fx.lineTo(b[0],b[1]);
+  a=fmP(-30000,I10_Z);b=fmP(40000,I10_Z);fx.moveTo(a[0],a[1]);fx.lineTo(b[0],b[1]);fx.stroke();
+  const dz=fmP(DROPZ.x,DROPZ.z);fx.strokeStyle='rgba(246,193,119,.6)';fx.beginPath();fx.arc(dz[0],dz[1],Math.max(3,DROPZ.r*sc),0,TAU);fx.stroke();
+  // runways to scale, at least 3 px wide so they stay visible zoomed out
+  fx.strokeStyle='#f3efe6';for(const r of RUNWAYS)rwyPoly(fx,r,fmP,Math.max(3,r.wid*sc));
+  // airport names
+  fx.font='800 13px '+F;fx.textAlign='center';fx.textBaseline='bottom';
+  for(const A of AIRPORTS){const q=fmP(A[2],A[3]);fx.fillStyle='#fff';fx.fillText(A[0]+'  '+A[1],q[0],q[1]-Math.max(26,2000*sc));}
+  // runway ends: tappable dots with the number
+  fx.font='800 12px '+F;fx.textAlign='center';
+  for(const e of RWY_ENDS){const q=fmP(e.x,e.z),on=DEST===e,back=Math.max(420,18/sc),side=/L$/.test(e.num)?-1:/R$/.test(e.num)?1:0,sd=side*Math.max(0,9/sc);
+    // parallel runways: L labels sit to the left of the landing direction, R to the right
+    const o=fmP(e.x-Math.sin(e.h)*back+Math.cos(e.h)*sd,e.z+Math.cos(e.h)*back+Math.sin(e.h)*sd);
+    fx.fillStyle=on?'#D98A3D':'rgba(246,193,119,.9)';fx.beginPath();fx.arc(q[0],q[1],on?7:5,0,TAU);fx.fill();
+    fx.fillStyle=on?'#D98A3D':'#fff';fx.fillText(e.num,o[0],o[1]);}
+  // the aircraft
+  const p=fmP(st.pos.x,st.pos.z),hd=Math.atan2(st.vel.x,-st.vel.z)||0;
+  fx.save();fx.translate(p[0],p[1]);fx.rotate(-new THREE.Euler().setFromQuaternion(st.quat,'YXZ').y);fx.fillStyle='#F6C177';fx.strokeStyle='#2A1608';fx.lineWidth=1.5;
+  fx.beginPath();fx.moveTo(0,-10);fx.lineTo(7,8);fx.lineTo(0,4);fx.lineTo(-7,8);fx.closePath();fx.fill();fx.stroke();fx.restore();
+  if(DEST){const q=fmP(DEST.x,DEST.z);fx.strokeStyle='#D98A3D';fx.lineWidth=2;fx.setLineDash([6,4]);fx.beginPath();fx.moveTo(p[0],p[1]);fx.lineTo(q[0],q[1]);fx.stroke();fx.setLineDash([]);}
+  // scale bar
+  const nm=1852,px=nm*sc,n=px<40?(px<8?10:5):1;fx.strokeStyle='#F6C177';fx.lineWidth=2;fx.beginPath();fx.moveTo(16,H-16);fx.lineTo(16+px*n,H-16);fx.stroke();
+  fx.fillStyle='#F6C177';fx.textAlign='left';fx.font='700 11px '+F;fx.fillText(n+' nm',16,H-26);
+  $('mapInfo').textContent=DEST?'Destination: '+DEST.rwy.apt+' runway '+DEST.num:'Tap a runway end to fly there';
+  $('mapClear').hidden=!DEST;
+}
+function fmHit(X,Y){let best=null,bd=26;for(const e of RWY_ENDS){const q=fmP(e.x,e.z),d=Math.hypot(q[0]-X,q[1]-Y);if(d<bd){bd=d;best=e;}}return best;}
+function fmZoom(f,X,Y){X=X===undefined?innerWidth/2:X;Y=Y===undefined?innerHeight/2:Y;const w=fmW(X,Y);
+  FM.scale=clamp(FM.scale*f,Math.min(innerWidth,innerHeight)/90000,0.35);const w2=fmW(X,Y);FM.cx+=w[0]-w2[0];FM.cz+=w[1]-w2[1];fmDraw();}
+fmc.addEventListener('pointerdown',e=>{FM.ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});FM.moved=false;try{fmc.setPointerCapture(e.pointerId);}catch(_){}
+  if(FM.ptrs.size===2){const [a,b]=[...FM.ptrs.values()];FM.pinch={d:Math.hypot(a.x-b.x,a.y-b.y),mx:(a.x+b.x)/2,my:(a.y+b.y)/2};}});
+fmc.addEventListener('pointermove',e=>{const p=FM.ptrs.get(e.pointerId);if(!p)return;
+  if(FM.ptrs.size===1){const dx=e.clientX-p.x,dy=e.clientY-p.y;if(Math.abs(dx)+Math.abs(dy)>4)FM.moved=true;
+    FM.cx-=dx/FM.scale;FM.cz-=dy/FM.scale;p.x=e.clientX;p.y=e.clientY;fmDraw();return;}
+  p.x=e.clientX;p.y=e.clientY;FM.moved=true;const [a,b]=[...FM.ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y);
+  if(FM.pinch&&d>10){fmZoom(d/FM.pinch.d,(a.x+b.x)/2,(a.y+b.y)/2);FM.pinch.d=d;}});
+const fmUp=e=>{const had=FM.ptrs.has(e.pointerId);FM.ptrs.delete(e.pointerId);if(FM.ptrs.size<2)FM.pinch=null;
+  if(had&&!FM.moved&&FM.ptrs.size===0){const hit=fmHit(e.clientX,e.clientY);if(hit){setDest(hit);fmDraw();}}};
+fmc.addEventListener('pointerup',fmUp);fmc.addEventListener('pointercancel',e=>{FM.ptrs.delete(e.pointerId);FM.pinch=null;});
+fmc.addEventListener('wheel',e=>{e.preventDefault();fmZoom(Math.exp(-e.deltaY*0.0015),e.clientX,e.clientY);},{passive:false});
+mc.addEventListener('click',fmOpen);
+$('mapX').onclick=fmClose;$('mapClear').onclick=()=>{setDest(null);fmDraw();};
+$('mapIn').onclick=()=>fmZoom(1.6);$('mapOut').onclick=()=>fmZoom(1/1.6);
+$('hDest').addEventListener('click',()=>{setDest(null);toast('Destination cleared');});
+// ---- destination readout: distance, bearing, time. Rookies get a big arrow. ----
+let destKey='';
+function destUI(force){
+  const el=$('hDest');if(!DEST){el.hidden=true;return;}
+  el.hidden=false;
+  const dx=DEST.x-st.pos.x,dz=DEST.z-st.pos.z,dist=Math.hypot(dx,dz),brg=(Math.atan2(dx,-dz)*180/Math.PI+360)%360;
+  const gs=Math.max(Math.hypot(st.vel.x,st.vel.z),1),ete=dist/gs,hd=((-new THREE.Euler().setFromQuaternion(st.quat,'YXZ').y*180/Math.PI)%360+360)%360;
+  const R=rookie(),rel=brg-hd;
+  $('dArrow').style.transform='rotate('+Math.round(rel)+'deg)';
+  const name=DEST.rwy.code+' '+DEST.num;
+  const txt=R?[DEST.rwy.apt+' runway '+DEST.num,(dist/1609.34).toFixed(1)+' mi',gs>5?Math.max(1,Math.round(ete/60))+' min':'']
+             :[name,(dist/1852).toFixed(1)+' nm',String(Math.round((brg-MAGVAR+360)%360)%360||360).padStart(3,'0')+'°',gs>5?fmtT(ete):'--:--'];
+  const k=txt.join('|');if(k!==destKey||force){destKey=k;$('dTxt').innerHTML='<b></b><span></span>';$('dTxt').firstChild.textContent=txt[0];$('dTxt').lastChild.textContent=txt.slice(1).filter(Boolean).join('   ');}
 }
 
 // ================= Reaper strike: live range =================
@@ -5618,29 +6356,31 @@ function sensorText(){
 }
 
 // ---------- main loop ----------
-function resize(){const w=window.innerWidth,h=window.innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();sizeMap();}
+function resize(){const w=window.innerWidth,h=window.innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();sizeMap();if(FM.on){fmSize();fmDraw();}}
 window.addEventListener('resize',resize);resize();
-const $=id=>document.getElementById(id);
-const mtsEl=$('mts'),mtsTxt=$('mtsTxt'),_mtsE=new THREE.Euler(),hIas=$('hIas'),hAlt=$('hAlt'),hWindT=$('hWindT'),hWindA=$('hWindA'),hAp=$('hAp'),bAuto=$('bAuto'),warnEl=$('warn'),thrFill=$('thrFill');
+const mtsEl=$('mts'),mtsTxt=$('mtsTxt'),_mtsE=new THREE.Euler(),hIas=$('hIas'),hAlt=$('hAlt'),hWindT=$('hWindT'),hWindA=$('hWindA'),hAp=$('hAp'),bAuto=$('bAuto'),warnEl=$('warn'),hVs=$('hVs'),hHdg=$('hHdg');
 const APN={to:'AUTO T/O',hold:'ALT HOLD',land:'AUTOLAND',orbit:'ORBIT'},APP={climb:'CLIMB',nav:'NAV',loc:'FINAL',orb:'DESCEND'};
 const _cf=new V3(),_cu=new V3(),_co=new V3(),_ct=new V3(),_cr=new V3(),_eu=new THREE.Euler(0,0,0,'YXZ'),_el=new THREE.Euler(0,0,0,'YXZ');
 const TOWER=new V3(wX(1290,-470),24.5,wZ(1290,-470)),CROWD=new V3(wX(1590,-196),2.8,wZ(1590,-196));
-let gearWarn=false,snapCamera=true,last=performance.now(),acc=0,hudT=0,mapT=0;const DT=1/120;
+let frameN=0,gearWarn=false,snapCamera=true,last=performance.now(),acc=0,hudT=0,mapT=0;const DT=1/120;
+const BOOT_T=performance.now();
+function splashDone(){const sp=$('splash');if(!sp||sp.classList.contains('done'))return;
+  setTimeout(()=>{sp.classList.add('done');setTimeout(()=>sp.classList.add('gone'),480);},Math.max(0,700-(performance.now()-BOOT_T)));}
 function frame(t){
   requestAnimationFrame(frame);
   const dt=Math.min(0.1,(t-last)/1000);last=t;const ts=t/1000;
   sensorMode=camMode===2&&AC.id==='reaper'&&!st.onGround&&!!st.ap&&running&&!paused&&!st.crashed;
   pollPad(dt);
   if(running&&!paused&&!st.crashed){
-    updateControls(dt);lessonTick(dt);acc+=dt;
+    updateControls(dt);lessonTick(dt);rookieAssist(dt,ts);acc+=dt;
     while(acc>=DT){autopilot(st,DT,events);step(st,DT,events);acc-=DT;if(st.crashed)break;}
     if(st.crashed&&LES.on){const k=(acType==='alpha'?'alpha':'cessna')+':'+LES.on;if(!schoolBest[k]){schoolBest[k]='F';try{localStorage.setItem('kgeuSchool',JSON.stringify(schoolBest));}catch(e){}}lesEnd();}
     if(st.crashed){$('crashWhy').textContent=st.crashReason;crashEl.classList.add('on');say('Glendale Tower 121.0','Crash, crash, crash. Emergency vehicles are rolling.',['t_crash']);}
     else atcUpdate();
   }
   while(events.length){const ev=events.shift();if(LES.on)lessonEvent(ev);
-    if(ev.type==='touchdown'){const f=ev.fpm,g=f<120?'Butter':f<300?'Smooth':f<500?'Firm':'Hard';toast(`Touchdown ${f} fpm. ${g}.`);
-      missTouchdown(ev);onLanding(ev);
+    if(ev.type==='touchdown'){ev.vx=st.vel.x;ev.vz=st.vel.z;const f=ev.fpm,g=f<120?'Butter':f<300?'Smooth':f<500?'Firm':'Hard';toast(`Touchdown ${f} fpm. ${g}.`);
+      missTouchdown(ev);onLanding(ev);arcTouchdown(ev);
       camBump=clamp(f/620,0.12,1);
       if(ev.paved&&(best===null||f<best)){best=f;try{localStorage.setItem(bestKey(),String(f));}catch(e){}showBest();}
       atcTouchdown(ev);clusters.forEach(c=>{if(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)<1800){c.cheer=4.5;}});}
@@ -5649,11 +6389,8 @@ function frame(t){
     if(ev.type==='liftoff') clusters.forEach(c=>{if(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)<1500){c.cheer=4;}});
   }
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.classList.remove('on');}
-  tilt.rateT+=dt;if(tilt.rateT>=1){tilt.rate=tilt.rateN;tilt.rateN=0;tilt.rateT=0;
-    if(tilt.on&&tilt.rate===0&&!tilt.blocked&&performance.now()-tilt.onAt>1500)tiltBlockedMsg();
-    if(menu.classList.contains('on'))tiltDiag();}
-  missUpdate(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);
-  {const show=camMode===1&&(AC.id==='cessna'||AC.id==='alpha')&&running&&!st.crashed;
+  missUpdate(dt);if(running&&!paused)arcTick();logTime(dt);dashUpdate(dt);bannerUpdate(dt);
+  {const show=!rookie()&&camMode===1&&(AC.id==='cessna'||AC.id==='alpha')&&running&&!st.crashed;
    if(spCan){spCan.classList.toggle('on',show);if(show)drawSixPack();}}
   radioUpdate(dt);cfgUpdate(dt);
   const s=st,q=s.quat;
@@ -5686,8 +6423,9 @@ function frame(t){
   const wd=s.windDir*Math.PI/180,wkt=s.windKt*(1+s.gust);
   socks.forEach((p,i)=>{p.rotation.order='YXZ';p.rotation.y=Math.atan2(-(Math.cos(wd)),(-Math.sin(wd)))*1;p.rotation.z=-(1-clamp(wkt/15,0,1))*1.1+0.05*Math.sin(ts*3+i);});
   // cameras
-  mtsEl.classList.toggle('on',camMode===2);glc.style.filter=camMode===2?'grayscale(1) contrast(1.12) brightness(0.86)':'';
-  if(FREECAM){// test hook: camera at an offset in the aircraft frame, looking at an offset in the same frame
+  mtsEl.classList.toggle('on',camMode===2);glc.style.filter=camMode===2&&!PHOTO.on?'grayscale(1) contrast(1.12) brightness(0.86)':'';
+  if(PHOTO.on)photoCam();
+  else if(FREECAM){// test hook: camera at an offset in the aircraft frame, looking at an offset in the same frame
     _co.set(FREECAM.p[0],FREECAM.p[1],FREECAM.p[2]).applyQuaternion(q).add(s.pos);camera.position.copy(_co);
     _ct.set(FREECAM.t[0],FREECAM.t[1],FREECAM.t[2]).applyQuaternion(q).add(s.pos);camera.up.set(0,1,0);camera.lookAt(_ct);camera.fov=FREECAM.fov||30;}
   else if(camMode===0){_co.set(0,AC.chase[0],AC.chase[1]).applyQuaternion(q).add(s.pos);const cg=groundHeight(_co.x,_co.z)+1.5;if(_co.y<cg)_co.y=cg;
@@ -5719,26 +6457,34 @@ function frame(t){
     {const wd=Math.round(s.windDir/10)*10||360,wk=Math.round(s.windKt*(1+s.gust));hWindT.textContent=String(wd).padStart(3,'0')+'\u00b0 '+Math.max(1,wk)+' KT';
      // the arrow shows which way the wind is blowing, relative to your nose
      const rel=(s.windDir+180)-(-new THREE.Euler().setFromQuaternion(s.quat,'YXZ').y*180/Math.PI);hWindA.parentNode.style.transform='rotate('+rel.toFixed(0)+'deg)';}
-    hIas.textContent=Math.round(s.ias*MS2KT);hAlt.textContent=(Math.round((s.pos.y*M2FT+FIELD_FT-GEAR*M2FT)/10)*10).toLocaleString('en-US');
+    if(rookie()){hIas.innerHTML=Math.round(s.ias*MS2KT*1.15078)+'<small>mph</small>';
+      hAlt.innerHTML=(Math.max(0,Math.round(s.agl*M2FT/10)*10)).toLocaleString('en-US')+'<small>ft</small>';}
+    else{hIas.textContent=Math.round(s.ias*MS2KT);hAlt.textContent=(Math.round((s.pos.y*M2FT+FIELD_FT-GEAR*M2FT)/10)*10).toLocaleString('en-US');}
     const apm=s.ap;hAp.classList.toggle('on',!!apm);if(apm)hAp.textContent=((APN[apm.mode]||'AUTO')+'  '+(apm.flare?'FLARE':s.onGround&&apm.mode==='land'?'ROLLOUT':(APP[apm.phase]||''))).trim();
     const orb=apm&&(apm.mode==='hold'||apm.mode==='orbit');
     const lbl=apm?(orb?'Auto Land':'Auto ON'):(s.onGround?'Auto T/O':(AC.id==='reaper'?'Orbit':'Auto Land'));
     if(bAuto.textContent!==lbl)bAuto.textContent=lbl;bAuto.classList.toggle('on',!!apm&&!orb);
-    coachUpdate(0.08);updateCtx();
-    thrFill.style.height=(s.throttle*100)+'%';}
+    {const vs=Math.round(s.vel.y*196.85/10)*10;
+     if(rookie()){hVs.textContent=Math.abs(vs)<50?'Level':(vs>0?'\u25B2 ':'\u25BC ')+Math.abs(vs).toLocaleString('en-US');
+       hHdg.textContent=['N','NE','E','SE','S','SW','W','NW'][Math.round(hdgT/45)%8];}
+     else{hVs.textContent=(vs>0?'+':'')+vs.toLocaleString('en-US');hHdg.textContent=String(Math.round(hdgM)%360||360).padStart(3,'0');}}
+    updateCtx();iconsUI();thrUI();destUI();}
   const kias=s.ias*MS2KT;let w='';
   gearWarn=running&&!s.crashed&&AC.retract&&!s.onGround&&s.gearPos<0.99&&agl<120&&s.vel.y<-0.8;
   if(running&&!paused&&!s.crashed){if(s.aoaWarn)w='STALL';else if(gearWarn)w='GEAR UP';else if(kias>AC.vne)w='OVERSPEED';else if(s.flapIdx>0&&kias>AC.vfe)w='FLAP SPEED';}
   warnEl.textContent=w;warnEl.classList.toggle('on',!!w);
-  updateAudio();renderer.render(scene,camera);
+  updateAudio();frameN++;if(frameN===4)splashDone();
+  if(SHOW.on){renderer.setClearColor(0xF6C177,1);renderer.clear();showRender(dt,CARM);}
+  else{if(!menu.classList.contains('on')||frameN<40)renderer.render(scene,camera);
+    const po=pauseOv.classList.contains('on');document.body.classList.toggle('pauseOn',po);if(po)showRender(dt,CARP);}
 }
 // test hook: headless UI checks need to reach a few internals
-window.__kgeu={tilt:tilt,setTilt:setTilt,state:()=>st,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},HD:()=>HD,
+window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},HD:()=>HD,
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
   setTOD:setTOD,isNight:isNight,TOD:()=>TOD,drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
   RADIO:RADIO,radioQ:()=>radioQ,radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,initAudio:initAudio,
-  pick:pickType,pickBase:pickBase,togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),arcStart:arcStart,ARC:ARC,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&{apt:DEST.rwy.apt,num:DEST.num},fmOpen:fmOpen,fmClose:fmClose,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   MISS:MISS,DROPZ:DROPZ,LZ:LZ,lzUV:lzUV,lzX:lzX,lzZ:lzZ,missDrop:missDrop,missTouchdown:missTouchdown,
   // step the mission clock without waiting on rAF: the pallet takes 50 s to come down
   missTick:(n,dt)=>{for(let i=0;i<n;i++)missUpdate(dt);},

@@ -1,4 +1,4 @@
-# Spawn picker: the F-16 starts at Luke, everything else at Glendale, and either
+# Spawn picker: any aircraft can start at Luke or Glendale, the choice is independent, and either
 # aircraft can be sent to either field.
 import asyncio, os, sys, json, threading, functools, http.server, socketserver
 from playwright.async_api import async_playwright
@@ -40,13 +40,13 @@ async def main():
                   distLuke:Math.hypot(s.pos.x-K.LUKE.x,s.pos.z-K.LUKE.z),
                   distKgeu:Math.hypot(s.pos.x,s.pos.z),crashed:s.crashed};}""")
 
-    r=await spawn('f16')
-    chk('F-16 defaults to Luke', r['base']=='luke' and r['distLuke']<2000, json.dumps({k:round(v,0) if isinstance(v,float) else v for k,v in r.items()}))
+    r=await spawn('f16','luke')
+    chk('F-16 can be sent to Luke', r['base']=='luke' and r['distLuke']<2000, json.dumps({k:round(v,0) if isinstance(v,float) else v for k,v in r.items()}))
     chk('F-16 sits on Luke runway 03L', abs(r['lukeV']+152.5)<30 and r['lukeU']<-1400, f"u {r['lukeU']:.0f} v {r['lukeV']:.0f}")
     await pg.screenshot(path=f'{SHOTS}/base_f16_luke.png')
 
-    r=await spawn('cessna')
-    chk('C172 defaults to Glendale', r['base']=='kgeu' and r['distKgeu']<400, f"base {r['base']} dist {r['distKgeu']:.0f} m")
+    r=await spawn('cessna','kgeu')
+    chk('C172 can be sent to Glendale', r['base']=='kgeu' and r['distKgeu']<400, f"base {r['base']} dist {r['distKgeu']:.0f} m")
 
     r=await spawn('c130','luke')
     chk('C-130 can be sent to Luke', r['base']=='luke' and r['distLuke']<2000, f"base {r['base']} dist {r['distLuke']:.0f} m")
@@ -55,13 +55,13 @@ async def main():
     r=await spawn('f16','kgeu')
     chk('F-16 can be sent to Glendale', r['base']=='kgeu' and r['distKgeu']<400, f"base {r['base']} dist {r['distKgeu']:.0f} m")
 
-    # picking an aircraft resets to its home field
+    # picking an aircraft never moves the base: every menu choice is independent
     await pg.evaluate("()=>window.__kgeu.pick('f16')")
     bb=await pg.evaluate("()=>window.__kgeu.base()")
-    chk('picking the F-16 again resets it to Luke', bb=='luke', bb)
+    chk('picking the F-16 keeps the chosen base', bb=='kgeu', bb)
 
     # ramp and final work at Luke too
-    await pg.evaluate("()=>{window.__kgeu.pick('f16');window.__kgeu.start('ramp');}")
+    await pg.evaluate("()=>{window.__kgeu.pick('f16');window.__kgeu.pickBase('luke');window.__kgeu.start('ramp');}")
     await pg.wait_for_timeout(1400)
     r=await pg.evaluate("""()=>{const K=window.__kgeu,s=K.state();return {base:s.base,paved:K.isPaved(s.pos.x,s.pos.z),crashed:s.crashed};}""")
     chk('Luke ramp start is on pavement', r['base']=='luke' and r['paved'] and not r['crashed'], json.dumps(r))

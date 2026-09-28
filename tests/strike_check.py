@@ -24,6 +24,7 @@ async def main():
     await pg.route('**/three.min.js', lambda r: r.fulfill(body=THREE, content_type='application/javascript'))
     await pg.route('**/fonts.googleapis.com/**', lambda r: r.abort())
     await pg.goto(URL); await pg.wait_for_timeout(2200)
+    await pg.wait_for_function("()=>{const s=document.getElementById('splash');return !s||s.classList.contains('gone')}", timeout=30000)
 
     # ---------- siting ----------
     site = await pg.evaluate("""()=>{
@@ -65,7 +66,7 @@ async def main():
     chk('over 3 km from Luke AFB', site['luke'] > 3000, f"{site['luke']:.0f} m")
 
     # ---------- start the mode ----------
-    await pg.tap('#bStrike'); await pg.wait_for_timeout(1500)
+    await pg.evaluate("()=>window.__kgeu.mission('range')"); await pg.wait_for_timeout(1500)
     info = await pg.evaluate("""()=>{const K=window.__kgeu,s=K.state();
       return {active:K.STRIKE.active,n:K.STRIKE.targets.length,
         kinds:K.STRIKE.targets.map(t=>t.kind).sort().join(','),
@@ -171,13 +172,12 @@ async def main():
     chk('firing with empty rails is refused',
         (await pg.evaluate("()=>{window.__kgeu.fire();return window.__kgeu.STRIKE.shots;}"))==4)
 
-    # the zoom toggle is available on a phone, in the More drawer, only in sensor mode
-    await pg.tap('#bMore'); await pg.wait_for_timeout(300)
-    zvis = await pg.is_visible('#bZoom')
+    # the zoom toggle sits with FIRE and TRACK in the lower right, only in sensor mode
+    zvis = await pg.evaluate("()=>{const b=document.getElementById('wC');return !b.hidden&&b.dataset.a==='zoom'}")
     chk('zoom toggle is offered in sensor mode', zvis)
     if zvis:
         z0 = await pg.evaluate("()=>window.__kgeu.SENSOR.zoom")
-        await pg.tap('#bZoom'); await pg.wait_for_timeout(250)
+        await pg.evaluate("()=>document.getElementById('wC').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}))"); await pg.wait_for_timeout(250)
         z1 = await pg.evaluate("()=>window.__kgeu.SENSOR.zoom")
         chk('zoom toggles wide and narrow', z0 != z1, f'{z0} -> {z1}')
         fov = await pg.evaluate("()=>window.__kgeu.SENSOR.zoom")

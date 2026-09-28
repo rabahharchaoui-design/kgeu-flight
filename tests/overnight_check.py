@@ -65,7 +65,7 @@ async def main():
         await pg.goto(URL)
         await pg.wait_for_timeout(2500)
         chk('page loads with no console errors', not errs, ' | '.join(errs[:3]))
-        chk('menu is up', await pg.is_visible('#menu'))
+        chk('menu is up', await pg.is_visible('#hFly'))
 
         # Warm up once before measuring anything. Terrain build, shader compile and
         # texture upload all land on the first few seconds of the first flight, and
@@ -81,7 +81,7 @@ async def main():
             ok = await pg.evaluate(f"()=>!!(window.TYPES_TEST&&window.TYPES_TEST['{t}'])")
             if not ok:
                 # fall back: the picker button is the public contract
-                ok = await pg.is_visible(f'.pick[data-t="{t}"]')
+                ok = await pg.query_selector(f'#carMain .pick[data-t="{t}"]') is not None
             chk(f'{t}: type exists', ok)
             if not ok:
                 continue
