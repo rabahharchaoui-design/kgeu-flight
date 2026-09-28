@@ -145,6 +145,17 @@ body.hasDest #stickZone{ top:calc(var(--padT) + 178px); }
 #sensorHud .bk.c{ left:calc(50% - 30vh); bottom:calc(50% - 22vh); border-width:0 0 1px 1px; }
 #sensorHud .bk.d{ right:calc(50% - 30vh); bottom:calc(50% - 22vh); border-width:0 1px 1px 0; }
 #sensorHud .tx{ position:absolute; }
+/* strike target markers: diamonds on targets in view, edge arrows for the rest, a brief x on a kill */
+#sensorHud .tgtMark,#sensorHud .tgtArrow{ position:absolute; left:0; top:0; display:none; font-size:10px; line-height:1.2; text-align:center; }
+#sensorHud .tgtMark.on,#sensorHud .tgtArrow.on{ display:block; }
+#sensorHud .tgtMark .dm{ position:relative; display:block; width:11px; height:11px; margin:3px auto 5px; border:1.5px solid rgba(238,242,236,.9); transform:rotate(45deg); box-shadow:0 0 2px rgba(0,0,0,.8); }
+#sensorHud .tgtMark.lk{ color:#ffd66b; }
+#sensorHud .tgtMark.lk .dm{ width:15px; height:15px; margin:1px auto 3px; border:2px solid #ffd66b; background:rgba(255,214,107,.45); }
+#sensorHud .tgtMark.dead .dm{ border:0; box-shadow:none; }
+#sensorHud .tgtMark.dead .dm::before,#sensorHud .tgtMark.dead .dm::after{ content:''; position:absolute; left:4.5px; top:-2px; width:2px; height:15px; background:rgba(238,242,236,.9); box-shadow:0 0 2px #000; }
+#sensorHud .tgtMark.dead .dm::after{ transform:rotate(90deg); }
+#sensorHud .tgtArrow .ar{ display:block; width:0; height:0; margin:0 auto 3px; border-left:13px solid rgba(238,242,236,.9); border-top:7px solid transparent; border-bottom:7px solid transparent; filter:drop-shadow(0 0 1px #000); }
+#bNext i{ letter-spacing:0; }
 #shTL{ left:calc(var(--padL) + var(--map) + 10px); top:var(--padT); }
 #shTR{ right:calc(var(--padR) + var(--col) + 10px); top:var(--padT); text-align:right; }
 body:not(.touch) #shTR{ top:calc(var(--padT) + var(--icon) + 8px); }
@@ -559,6 +570,7 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
       <button id="bMode" hidden title="Sensor mode (M)" aria-label="Sensor mode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg><i id="bModeT">DAY TV</i></button>
       <button id="bZoom" hidden title="Sensor zoom (Z)" aria-label="Sensor zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="10" r="6"/><path d="M14.5 14.5L20 20M10 7.5v5M7.5 10h5"/></svg><i id="bZoomT">ZOOM x1</i></button>
       <button id="bLock" hidden title="Lock the point under the crosshair (L)" aria-label="Sensor lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg><i>LOCK</i></button>
+      <button id="bNext" hidden title="Next target (N)" aria-label="Next target"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M9 5l5 5-5 5-5-5z"/><path d="M15 16h6M18 13l3 3-3 3"/></svg><i>NEXT TARGET</i></button>
       <button id="bFire" hidden title="Fire (Space)" aria-label="Fire"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2l3 5v9l-3 2-3-2V7z"/><path d="M9 16l-3 4M15 16l3 4"/></svg><i>FIRE</i></button>
       <button id="bDrop" hidden title="Drop the load" aria-label="Drop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 9a8 6 0 0 1 16 0z"/><path d="M5 9l6 8M19 9l-6 8"/><rect x="9.5" y="16" width="5" height="5"/></svg><i>DROP</i></button>
       <button id="bGear" hidden title="Gear (G)" aria-label="Landing gear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v7"/><circle cx="12" cy="15" r="6"/><circle cx="12" cy="15" r="2" fill="currentColor"/></svg><i id="bGearT">GEAR DN</i></button>
@@ -578,7 +590,7 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
   <div id="bigcfg"></div>
   <div id="sensorHud"><div class="ch chL"></div><div class="ch chR"></div><div class="ch chT"></div><div class="ch chB"></div>
     <div class="bk a"></div><div class="bk b"></div><div class="bk c"></div><div class="bk d"></div>
-    <div class="tx" id="shTL"></div><div class="tx" id="shTR"></div><div class="tx" id="shBL"></div><div class="tx" id="shBR"></div><div class="tx" id="shMid"></div></div>
+    <div class="tx" id="shTL"></div><div class="tx" id="shTR"></div><div class="tx" id="shBL"></div><div class="tx" id="shBR"></div><div class="tx" id="shMid"></div><div id="tgtMarks"></div></div>
   <div id="touch">
     <div id="stickZone"></div>
     <div id="stickHint">STICK</div>
@@ -4526,10 +4538,11 @@ document.getElementById('rotOk').onclick=()=>document.body.classList.add('portra
 window.addEventListener('keydown',e=>{
   const k=e.key.toLowerCase();
   if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
-  if(e.repeat&&[']','[','c','p','m','t','g','o','l','z','1','2','3'].includes(k)) return;
+  if(e.repeat&&[']','[','c','p','m','t','g','o','l','z','n','1','2','3'].includes(k)) return;
   keys[k]=true;
   if(k===']') setFlaps(st.flapIdx+1);
   if(k===' '&&sensorMode){fireMissile();return;}
+  if(sensorMode&&k==='n'&&STRIKE.active){nextTarget();return;}
   if(sensorMode&&(k==='z'||k==='m'||k==='l')){if(k==='z')sensorZoomStep(0);else if(k==='m')sensorModeStep();else sensorLock();return;}
   if(k==='o') autoSmart();
   if(k==='l') apToggle('land');
@@ -5200,11 +5213,12 @@ function sensorView(){if(!running||st.crashed||!hasBall())return;
   tapBtn($('bZoom'),()=>sensorZoomStep(0));
   tapBtn($('bLock'),()=>sensorLock());
   tapBtn($('bFire'),()=>strikeBtnPress('fire'),true);
+  tapBtn($('bNext'),()=>nextTarget());
   tapBtn($('bFlapUp'),()=>{if(running&&!st.crashed)setFlaps(st.flapIdx-1);});
   tapBtn($('bFlapDn'),()=>{if(running&&!st.crashed)setFlaps(st.flapIdx+1);});
   const dock=$('dock'),A=$('ctlA'),B=$('ctlB');
   // top to bottom; BRAKE is always last, nearest the thumb
-  const ORDER=['bAuto','bCam','bLookBack','bSensor','bMode','bZoom','bLock','bFire','bDrop','bGear','flapGrp','bBrake'].map(id=>$(id));
+  const ORDER=['bAuto','bCam','bLookBack','bSensor','bMode','bZoom','bLock','bNext','bFire','bDrop','bGear','flapGrp','bBrake'].map(id=>$(id));
   const HT={flapGrp:112},GAP=6;
   let lkey='',dockH=0;
   const reH=()=>{dockH=0;};window.addEventListener('resize',reH);if(window.visualViewport)visualViewport.addEventListener('resize',reH);
@@ -5214,7 +5228,7 @@ function sensorView(){if(!running||st.crashed||!hasBall())return;
     const sv=sensorMode,lo=dcOn()&&!MISS.result;
     if(lo!==document.body.classList.contains('lookOn')){document.body.classList.toggle('lookOn',lo);if(!lo&&DCAM.drag){DCAM.drag=null;$('lookPad').classList.remove('held');}}
     $('bLookBack').classList.toggle('lit',DCAM.mode==='ramp');
-    const show={bAuto:1,bCam:1,bLookBack:lo,bSensor:hasBall(),bMode:sv,bZoom:sv,bLock:sv,bFire:sv&&STRIKE.active,bDrop:dropOn,
+    const show={bAuto:1,bCam:1,bLookBack:lo,bSensor:hasBall(),bMode:sv,bZoom:sv,bLock:sv,bNext:sv&&STRIKE.active,bFire:sv&&STRIKE.active,bDrop:dropOn,
       bGear:P&&!!AC.retract&&!sv,flapGrp:P&&AC.id!=='f16'&&!sv,bBrake:isTouch&&!sv};
     const H=dockH||(dockH=dock.clientHeight);
     const key=Object.keys(show).map(k=>show[k]?1:0).join('')+'|'+H;
@@ -6422,7 +6436,7 @@ function destUI(force){
 // ================= Reaper strike: live range =================
 // Game tuned throughout. Nothing here models real weapon performance.
 // zoom: index into SENSOR_FOV. mode: 'tv' day colour, 'irw' white hot, 'irb' black hot
-const SENSOR={az:0,el:-0.6,zoom:0,mode:'tv',track:null,tgt:null,spot:new V3(),valid:false,slant:0,gimbal:false};
+const SENSOR={az:0,el:-0.6,zoom:0,mode:'tv',track:null,tgt:null,slewTo:null,spot:new V3(),valid:false,slant:0,gimbal:false};
 const SENSOR_FOV=[14,7,3.5,1.75];
 
 // ---- IR sensor look ----
@@ -6581,9 +6595,57 @@ function sensorHudUpdate(){
     const inr=SENSOR.valid&&SENSOR.slant>=RNG_MIN&&SENSOR.slant<=RNG_MAX;
     const rng=SENSOR.valid?(SENSOR.slant/1000).toFixed(1)+' km':'---';
     const tof=STRIKE.missiles.length?'  TOF '+Math.max(0,Math.ceil(STRIKE.missiles[0].tof)):'';
-    mid=(lock||'NO LOCK')+'\nSLANT '+rng+'  '+(inr?'IN RANGE':'NO RANGE')+'\nMSL '+(4-STRIKE.shots)+tof;}
+    mid=(lock||'NO LOCK')+'\nSLANT '+rng+'  '+(inr?'IN RANGE':'NO RANGE')+'\nMSL '+(4-STRIKE.shots)+tof;
+    if(r&&STRIKE.shots<4)mid+=SENSOR.tgt?(inr?'\nTap FIRE':''):'\nTap NEXT TARGET, then FIRE';}
   if(SENSOR.gimbal)mid+=(mid?'\n':'')+'GIMBAL';
   shSet('Mid',mid);
+}
+// ---- target markers: a diamond with name and distance on every live target in view, an
+// arrow on the edge for the ones outside it, an x for 3 s where one died. 8 of each, pooled.
+const TM={mk:[],ar:[],shown:false,W:0,H:0,R:0,mt:0};const _tmv=new V3();
+(function(){const box=$('tgtMarks');
+  for(let i=0;i<8;i++){
+    const m=document.createElement('div');m.className='tgtMark';m.innerHTML='<b class="dm"></b><span></span>';box.appendChild(m);
+    TM.mk.push({el:m,tx:m.lastChild,base:'tgtMark',c:'',tr:'',txt:''});
+    const a=document.createElement('div');a.className='tgtArrow';a.innerHTML='<b class="ar"></b><span></span>';box.appendChild(a);
+    TM.ar.push({el:a,ar:a.firstChild,tx:a.lastChild,base:'tgtArrow',c:'',tr:'',rot:'',txt:''});}
+  window.addEventListener('resize',()=>{TM.W=0;});})();
+function tmPut(o,cls,x,y,txt){
+  const c=o.base+(cls===null?'':' on'+(cls?' '+cls:''));if(o.c!==c){o.c=c;o.el.className=c;}
+  if(cls===null)return;
+  const tr='translate('+Math.round(x)+'px,'+Math.round(y)+'px) translate(-50%,-10px)';if(o.tr!==tr){o.tr=tr;o.el.style.transform=tr;}
+  if(o.txt!==txt){o.txt=txt;o.tx.textContent=txt;}
+}
+function tgtMarkHide(){TM.shown=false;for(let i=0;i<8;i++){tmPut(TM.mk[i],null);tmPut(TM.ar[i],null);}}
+function tgtMarkUpdate(dt){
+  if(!STRIKE.active||!STRIKE.built){if(TM.shown)tgtMarkHide();return;}
+  TM.shown=true;
+  TM.mt-=dt;if(!TM.W||TM.mt<=0){TM.mt=1;TM.W=hudSens.clientWidth;TM.H=hudSens.clientHeight;
+    const dk=$('dock').getBoundingClientRect(),hr=hudSens.getBoundingClientRect();TM.R=Math.min(TM.W-44,(dk.width?dk.left-hr.left:TM.W)-18);}
+  const W=TM.W,H=TM.H,L=48,T=40,R=TM.R,B=H-54,cx=W/2,cy=H/2,r=rookie();
+  camera.updateMatrixWorld();sensorOrigin(_so);
+  const tY=Math.tan(camera.fov*Math.PI/360),tX=tY*camera.aspect;
+  let mi=0,ai=0;
+  for(const t of STRIKE.targets){
+    if(t.dead&&t.deadT>3)continue;
+    _tmv.set(t.x,t.y+2.5,t.z).applyMatrix4(camera.matrixWorldInverse);
+    const cz=-_tmv.z,nx=_tmv.x/tX,ny=_tmv.y/tY;
+    if(cz>1&&Math.abs(nx)<=cz&&Math.abs(ny)<=cz){
+      if(mi>=8)continue;
+      const sx=(nx/cz+1)/2*W,sy=(1-ny/cz)/2*H;
+      if(t.dead){tmPut(TM.mk[mi++],'dead',sx,sy,'');continue;}
+      const nm=r?t.name:t.name.toUpperCase(),lk=SENSOR.tgt===t,ds=fmtDist(_so.distanceTo(_tmv.set(t.x,t.y,t.z)));
+      tmPut(TM.mk[mi++],lk?'lk':'',sx,sy,(lk?'LOCK ':'')+nm+'\n'+ds);
+    } else if(!t.dead&&ai<8){
+      let dx=nx,dy=-ny;if(Math.abs(dx)+Math.abs(dy)<1e-6)dy=1;
+      dx*=W/2;dy*=H/2;
+      const kx=dx>0?(R-cx)/dx:dx<0?(L-cx)/dx:1e9,ky=dy>0?(B-cy)/dy:dy<0?(T-cy)/dy:1e9,k=Math.min(kx,ky);
+      const o=TM.ar[ai++],rot='rotate('+Math.round(Math.atan2(dy,dx)*180/Math.PI)+'deg)';
+      if(o.rot!==rot){o.rot=rot;o.ar.style.transform=rot;}
+      tmPut(o,'',cx+dx*k,cy+dy*k,fmtDist(_so.distanceTo(_tmv.set(t.x,t.y,t.z))));
+    }
+  }
+  while(mi<8)tmPut(TM.mk[mi++],null);while(ai<8)tmPut(TM.ar[ai++],null);
 }
 const GIM_AZ=2.6,GIM_EL_LO=-1.48,GIM_EL_HI=-0.06;     // ball limits, radians
 const RNG_MIN=700,RNG_MAX=8200;                        // in range window, metres
@@ -6616,35 +6678,48 @@ function smokeUpdate(dt){
   smokeGeo.attributes.position.needsUpdate=true;smokeGeo.attributes.color.needsUpdate=true;
   smokePts.visible=any;
 }
-// ---- pooled fire and smoke that sits on a destroyed target ----
+// ---- wind at the surface, m/s, for anything the air carries ----
+function windVec(out){const wd=st.windDir*Math.PI/180,ws=Math.max(0,st.windKt*0.5144*(1+st.gust));
+  return out.set(-Math.sin(wd)*ws,0,Math.cos(wd)*ws);}
+const _fw=new V3();
+// ---- pooled fire and smoke that sits on a burning wreck ----
 const fireTex=tex(64,64,(x,w,h)=>{const g=x.createRadialGradient(32,36,1,32,32,31);
   g.addColorStop(0,'rgba(255,240,180,1)');g.addColorStop(0.35,'rgba(255,150,40,.85)');
   g.addColorStop(1,'rgba(180,60,10,0)');x.fillStyle=g;x.fillRect(0,0,64,64);});
-const FIRE_MAX=24,fires=[];
+const FIRE_MAX=28,fires=[];
 for(let i=0;i<FIRE_MAX;i++){
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:i%4?puffTex:fireTex,
     color:i%4?0x555552:0xffffff,transparent:true,opacity:0,depthWrite:false,fog:true}));
-  sp.visible=false;scene.add(sp);fires.push({sp:sp,on:false,x:0,z:0,y0:0,t:i*0.37,fire:i%4===0});
+  if(i%4)sp.layers.set(1);
+  sp.visible=false;scene.add(sp);fires.push({sp:sp,on:false,x:0,z:0,y0:0,t:i*0.37,fire:i%4===0,left:0});
 }
-function lightFire(x,z,y0){let n=0;
-  for(const f of fires){if(f.on||n>=4)continue;f.on=true;f.x=x;f.z=z;f.y0=y0;f.sp.visible=true;n++;}}
-function fireUpdate(dt,t){
-  for(const f of fires){if(!f.on)continue;f.t+=dt;
-    if(f.fire){const k=0.8+0.25*Math.sin(f.t*9);f.sp.position.set(f.x,f.y0+1.6*k,f.z);
-      f.sp.scale.setScalar(5.5*k);f.sp.material.opacity=0.85;}
-    else{const a=(f.t*0.16)%1;f.sp.position.set(f.x+Math.sin(f.t*0.5)*a*9,f.y0+3+a*34,f.z+Math.cos(f.t*0.4)*a*7);
-      f.sp.scale.setScalar(7+a*26);f.sp.material.opacity=0.5*(1-a);}}
+// one flame and three smoke puffs; sec: how long it burns (default until the range resets)
+function lightFire(x,z,y0,sec){let n=0;
+  for(const f of fires){if(f.on||n>=4)continue;f.on=true;f.x=x;f.z=z;f.y0=y0;f.left=sec||1e9;f.sp.visible=true;n++;}}
+// how lit unlit smoke should look: full by day, dim at dusk, dark at night; flat grey in IR
+function fxLit(){return camMode===2&&SENSOR.mode!=='tv'?-1:TOD.night?0.16:TOD.id==='sunset'?0.6:1;}
+function fireUpdate(dt){
+  windVec(_fw);const lit=fxLit();
+  for(const f of fires){if(!f.on)continue;f.t+=dt;f.left-=dt;
+    if(f.left<=0){f.on=false;f.sp.visible=false;continue;}
+    const fade=clamp(f.left/5,0,1);
+    if(f.fire){const k=0.8+0.25*Math.sin(f.t*9);f.sp.position.set(f.x,f.y0+2.4*k,f.z);
+      f.sp.scale.setScalar(8*k);f.sp.material.opacity=0.85*fade;}
+    else{const a=(f.t*0.16)%1,s=a*6.25;   // s: seconds since this puff left the wreck
+      f.sp.position.set(f.x+Math.sin(f.t*0.5)*a*9+_fw.x*s,f.y0+3+a*40,f.z+Math.cos(f.t*0.4)*a*7+_fw.z*s);
+      f.sp.scale.setScalar(8+a*30);f.sp.material.opacity=0.5*(1-a)*fade;f.sp.material.color.setScalar(lit<0?0.42:0.333*lit);}}
 }
 // ---- pooled impact debris ----
 const DEB_MAX=30,debris=[];
 {const dg=new THREE.BoxGeometry(1,1,1),dm=lam(0x3a352e);
  for(let i=0;i<DEB_MAX;i++){const m=new THREE.Mesh(dg,dm);m.visible=false;scene.add(m);
    debris.push({m:m,v:new V3(),life:0});}}
-function throwDebris(x,y,z){let n=0;
-  for(const d of debris){if(d.life>0||n>=14)continue;n++;
-    d.life=2.2+Math.random()*1.2;d.m.visible=true;d.m.position.set(x,y+1,z);
-    const s=0.6+Math.random()*1.6;d.m.scale.set(s,s*0.7,s*0.8);
-    d.v.set((Math.random()-0.5)*60,18+Math.random()*38,(Math.random()-0.5)*60);}}
+// cnt pieces (14 by default), s: blast scale, bigger blasts throw bigger pieces further
+function throwDebris(x,y,z,cnt,s){s=s||1;cnt=cnt||14;const k=Math.sqrt(s);let n=0;
+  for(const d of debris){if(d.life>0||n>=cnt)continue;n++;
+    d.life=(2.2+Math.random()*1.2)*k;d.m.visible=true;d.m.position.set(x,y+1,z);
+    const sz=(0.6+Math.random()*1.6)*k;d.m.scale.set(sz,sz*0.7,sz*0.8);
+    d.v.set((Math.random()-0.5)*60*k,(18+Math.random()*38)*k,(Math.random()-0.5)*60*k);}}
 function debrisUpdate(dt){
   for(const d of debris){if(d.life<=0)continue;d.life-=dt;
     d.v.y-=9.81*dt;d.m.position.addScaledVector(d.v,dt);
@@ -6652,41 +6727,190 @@ function debrisUpdate(dt){
     const gh=groundHeight(d.m.position.x,d.m.position.z);
     if(d.m.position.y<gh+0.3){d.m.position.y=gh+0.3;d.v.set(0,0,0);}
     if(d.life<=0)d.m.visible=false;}}
-// ---- flash and fireball ----
-const blast=new THREE.Sprite(new THREE.SpriteMaterial({map:fireTex,transparent:true,opacity:0,
-  depthWrite:false,blending:THREE.AdditiveBlending,fog:false}));
-blast.visible=false;scene.add(blast);let blastT=0;
-// big blast: pooled per event, 2 concurrent. Core flash, rolling fireball, smoke column, shock ring, scorch.
-const BIG=[];
-{const ringG=new THREE.RingGeometry(0.8,1,40);ringG.rotateX(-Math.PI/2);const scG=new THREE.CircleGeometry(1,24);scG.rotateX(-Math.PI/2);
- for(let k=0;k<2;k++){const o={t:99,x:0,y:0,z:0,fb:[],sm:[]};
-  for(let i=0;i<7;i++){const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:fireTex,color:0xffd7a0,transparent:true,opacity:0,depthWrite:false,fog:false}));sp.visible=false;scene.add(sp);
-    o.fb.push({sp:sp,dx:(Math.random()-0.5)*2,dz:(Math.random()-0.5)*2,up:0.4+Math.random()*0.9,sz:0.7+Math.random()*0.6});}
-  for(let i=0;i<9;i++){const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:puffTex,color:0x2a2724,transparent:true,opacity:0,depthWrite:false,fog:true}));sp.visible=false;scene.add(sp);
-    o.sm.push({sp:sp,dx:(Math.random()-0.5)*2,dz:(Math.random()-0.5)*2,up:0.5+Math.random(),sz:0.8+Math.random()*0.7,d:i*0.12});}
-  o.ring=new THREE.Mesh(ringG,new THREE.MeshBasicMaterial({color:0xf3e2c0,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));o.ring.visible=false;scene.add(o.ring);
-  o.scorch=new THREE.Mesh(scG,new THREE.MeshBasicMaterial({color:0x1c1914,transparent:true,opacity:0,depthWrite:false}));o.scorch.visible=false;scene.add(o.scorch);
-  BIG.push(o);}}
-let bigI=0;
-function bang(x,y,z){blast.position.set(x,y+4,z);blast.visible=true;blastT=1;
-  const o=BIG[bigI++%BIG.length];o.t=0;o.x=x;o.y=y;o.z=z;
-  o.fb.forEach(f=>f.sp.visible=true);o.sm.forEach(f=>f.sp.visible=true);o.ring.visible=true;
-  o.scorch.visible=true;o.scorch.position.set(x,groundHeight(x,z)+0.15,z);o.scorch.scale.setScalar(26+Math.random()*8);o.scorch.material.opacity=0.75;
-  const fl=document.getElementById('bigFlash');if(fl&&camera.position.distanceTo(_st2.set(x,y,z))<6000){fl.style.transition='none';fl.style.opacity='0.55';requestAnimationFrame(()=>{fl.style.transition='opacity .5s';fl.style.opacity='0';});}
+// ================= FX: explosions =================
+// explode(x,y,z,opt) with opt {scale: 1 truck, 2 bunker, 3 aircraft crash, 5 C-130;
+//   secondary: 0-3 smaller bursts 0.4-1.5 s later; debris: pieces thrown; smokeSec: how long
+//   the column lingers (60); fireSec: how long the wreck burns (0 none); glow: light the
+//   ground at night (true)}.
+// Three explosions at once, each 10 fireball sprites, 1 flash, 14 smoke sprites, a shock
+// ring, a dust ring, a scorch and a night ground glow; secondaries come from a pool of 4
+// three-sprite bursts. Everything is built here; explode() only moves and resets it.
+const FX_N=3,FX_FB=10,FX_SM=14,FX_CORE=4,FX_MINI=4;
+// hot core: white centre, yellow, orange rim
+const fxCoreTex=tex(64,64,(x,w,h)=>{const g=x.createRadialGradient(32,32,1,32,32,31);
+  g.addColorStop(0,'rgba(255,255,245,1)');g.addColorStop(0.3,'rgba(255,236,160,.95)');
+  g.addColorStop(0.62,'rgba(255,150,40,.5)');g.addColorStop(1,'rgba(200,60,10,0)');x.fillStyle=g;x.fillRect(0,0,64,64);});
+// fireball body: lumpy, a few overlapping blobs so it rolls rather than reads as a disc
+const fxBallTex=tex(64,64,(x,w,h)=>{
+  for(let i=0;i<9;i++){const a=i/9*6.283+(i%3)*0.4,r=i?9+(i%4)*2.5:0,cx=32+Math.cos(a)*r,cy=32+Math.sin(a)*r,R=i?13+(i%3)*3:20;
+    const g=x.createRadialGradient(cx,cy,1,cx,cy,R);g.addColorStop(0,'rgba(255,255,255,.85)');g.addColorStop(0.55,'rgba(255,255,255,.55)');g.addColorStop(1,'rgba(255,255,255,0)');
+    x.fillStyle=g;x.fillRect(0,0,64,64);}});
+// smoke: soft billows with some grain inside, alpha only (colour comes from the material)
+const fxSmokeTex=tex(128,128,(x,w,h)=>{
+  let sd=7;const rnd=()=>{sd=(sd*16807)%2147483647;return sd/2147483647;};
+  for(let i=0;i<22;i++){const a=rnd()*6.283,r=rnd()*30,cx=64+Math.cos(a)*r,cy=64+Math.sin(a)*r*0.85,R=18+rnd()*20;
+    const g=x.createRadialGradient(cx,cy,1,cx,cy,R);const v=200+rnd()*55|0;
+    g.addColorStop(0,`rgba(${v},${v},${v},.32)`);g.addColorStop(0.6,`rgba(${v},${v},${v},.16)`);g.addColorStop(1,`rgba(${v},${v},${v},0)`);
+    x.fillStyle=g;x.fillRect(0,0,128,128);}
+  // fade the square's corners so no edge ever shows
+  const id=x.getImageData(0,0,128,128),d=id.data;
+  for(let y=0;y<128;y++)for(let X=0;X<128;X++){const r=Math.hypot(X-64,y-64)/64,k=(y*128+X)*4;
+    d[k+3]=d[k+3]*clamp((1-r)*2.2,0,1)*(0.85+rnd()*0.3);}
+  x.putImageData(id,0,0);});
+// warm ground light under a fire at night, an additive decal like the landing light pool
+const fxGlowTex=tex(64,64,(x,w,h)=>{const g=x.createRadialGradient(32,32,1,32,32,32);
+  g.addColorStop(0,'rgba(255,180,90,1)');g.addColorStop(0.3,'rgba(255,130,50,.7)');g.addColorStop(0.65,'rgba(255,100,30,.25)');g.addColorStop(1,'rgba(255,90,20,0)');
+  x.fillStyle=g;x.fillRect(0,0,64,64);});
+const FX=[],FX_M=[];
+{const ringG=new THREE.RingGeometry(0.86,1,48);ringG.rotateX(-Math.PI/2);
+ const dustG=new THREE.RingGeometry(0.45,1,40);dustG.rotateX(-Math.PI/2);
+ const scG=new THREE.CircleGeometry(1,24);scG.rotateX(-Math.PI/2);
+ const glG=new THREE.PlaneGeometry(1,1);glG.rotateX(-Math.PI/2);
+ // every sprite sits on layer 1, so the IR view draws it in its second pass as itself: soft,
+ // the fire white hot (or black), the smoke lukewarm grey, instead of hard override discs
+ const spr=(map,add,fog,heat)=>{const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:map,transparent:true,opacity:0,depthWrite:false,
+   fog:fog,blending:add?THREE.AdditiveBlending:THREE.NormalBlending}));sp.visible=false;sp.userData.heat=heat;sp.userData.add=add;sp.layers.set(1);scene.add(sp);return sp;};
+ const decal=(g,c,add,ro)=>{const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:c,map:add?fxGlowTex:null,transparent:true,opacity:0,depthWrite:false,
+   side:THREE.DoubleSide,fog:!add,blending:add?THREE.AdditiveBlending:THREE.NormalBlending}));m.visible=false;m.renderOrder=ro;scene.add(m);return m;};
+ for(let k=0;k<FX_N;k++){const o={on:false,t:0,end:0,x:0,y:0,z:0,gy:0,s:1,T:2.5,H:250,smokeSec:60,fireSec:0,glow:true,frames:0,fb:[],sm:[],sec:[],secN:0};
+  for(let i=0;i<FX_FB;i++){const core=i<FX_CORE;
+    o.fb.push({sp:spr(core?fxCoreTex:fxBallTex,core,false,1),core:core,dx:0,dy:0,dz:0,sz:1,rot:0});}
+  o.flash=spr(fxCoreTex,true,false,1);
+  for(let i=0;i<FX_SM;i++){const sp=spr(fxSmokeTex,false,true,0.3);
+    o.sm.push({sp:sp,live:false,age:0,life:0,gen:0,x:0,y:0,z:0,ox:0,oz:0,out:0,outMax:0,vb:0,burst:0,sz:1,spin:0,due:0,shade:0});}
+  for(let i=0;i<3;i++)o.sec.push({t:0,dx:0,dz:0,done:true});
+  o.ring=decal(ringG,0xfff0d0,false,1);o.dust=decal(dustG,0xc2ad88,false,1);
+  o.scorch=decal(scG,0x1c1914,false,0);o.glowM=decal(glG,0xffffff,true,2);
+  FX.push(o);}
+ for(let k=0;k<FX_MINI;k++){const m={on:false,t:0,x:0,y:0,z:0,s:1,fb:[]};
+  for(let i=0;i<3;i++)m.fb.push({sp:spr(i?fxBallTex:fxCoreTex,!i,false,1),dx:0,dy:0,dz:0,sz:1});
+  FX_M.push(m);}}
+let fxLast=null;
+// fireball colour as it cools: white-yellow, orange, dark red
+const FX_RAMP=[[1,0.98,0.86],[1,0.78,0.36],[1,0.42,0.1],[0.3,0.12,0.07]];
+// fire colour: the cooling ramp in colour, white (or black) hot in IR
+function fxHot(sp,u){const m=sp.material,ir=camMode===2&&SENSOR.mode!=='tv';
+  if(!ir){m.blending=sp.userData.add?THREE.AdditiveBlending:THREE.NormalBlending;fxRamp(u,m.color);return;}
+  const inv=SENSOR.mode==='irb';m.blending=inv?THREE.NormalBlending:THREE.AdditiveBlending;m.color.setScalar(inv?0:1);}
+function fxRamp(u,c){u=clamp(u,0,1)*3;const i=Math.min(2,u|0),f=u-i,a=FX_RAMP[i],b=FX_RAMP[i+1];
+  c.setRGB(a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f,a[2]+(b[2]-a[2])*f);}
+function fxFlashDom(x,y,z,s){
+  const fl=document.getElementById('bigFlash'),d=camera.position.distanceTo(_st2.set(x,y,z));
+  if(!fl||d>6000*Math.sqrt(s))return;
+  fl.style.transition='none';fl.style.opacity=String(Math.min(0.7,0.3+0.13*s)*clamp(1.3-d/(6000*Math.sqrt(s)),0,1));
+  requestAnimationFrame(()=>{fl.style.transition='opacity .5s';fl.style.opacity='0';});}
+function fxShake(x,y,z,s){const d=camera.position.distanceTo(_st2.set(x,y,z));
+  camBump=Math.max(camBump,clamp(s*1500/Math.max(d,500),0,1.5));}
+function explode(x,y,z,opt){opt=opt||{};
+  const s=opt.scale||1,gy=groundHeight(x,z);
+  // a free slot, else the oldest
+  let o=null;for(const e of FX)if(!e.on){o=e;break;}
+  if(!o){o=FX[0];for(const e of FX)if(e.t>o.t)o=e;}
+  o.on=true;o.t=0;o.frames=0;o.x=x;o.y=Math.max(y,gy);o.z=z;o.gy=gy;o.s=s;
+  o.T=2.5*Math.sqrt(s);o.H=250*Math.sqrt(s);
+  o.smokeSec=opt.smokeSec!==undefined?opt.smokeSec:60;o.fireSec=opt.fireSec||0;o.glow=opt.glow!==false;
+  o.end=Math.max(o.smokeSec,o.fireSec,o.T)+2;fxLast=o;
+  const R=15*Math.pow(s,0.75),S=52*Math.pow(s,0.75);
+  for(const f of o.fb){
+    const a=Math.random()*6.283,c=Math.random()*2-1,r=Math.sqrt(1-c*c);
+    f.dx=Math.cos(a)*r*R;f.dz=Math.sin(a)*r*R;f.dy=(Math.abs(c)*0.8+0.2)*R;
+    f.sz=(f.core?0.55:0.8+Math.random()*0.5)*S;f.rot=Math.random()*6.283;f.sp.material.rotation=f.rot;f.sp.visible=true;}
+  o.flash.visible=true;o.flash.position.set(x,o.y+3*Math.sqrt(s),z);
+  for(let i=0;i<FX_SM;i++){const m=o.sm[i];m.live=false;m.gen=0;m.due=i*3/FX_SM;m.sp.visible=false;}
+  o.ring.visible=o.dust.visible=true;o.ring.position.set(x,gy+0.6,z);o.dust.position.set(x,gy+0.45,z);
+  o.ring.scale.setScalar(0.01);o.dust.scale.setScalar(0.01);
+  o.scorch.visible=true;o.scorch.position.set(x,gy+0.15,z);o.scorch.scale.setScalar((13+Math.random()*4)*Math.pow(s,0.8));o.scorch.material.opacity=0.8;
+  o.glowM.position.set(x,gy+0.35,z);o.glowM.visible=false;
+  const n=Math.min(3,opt.secondary||0);o.secN=n;
+  for(let i=0;i<3;i++){const e=o.sec[i];e.done=i>=n;e.t=0.4+Math.random()*1.1;
+    const a=Math.random()*6.283,d=(6+Math.random()*10)*Math.sqrt(s);e.dx=Math.cos(a)*d;e.dz=Math.sin(a)*d;}
+  if(opt.debris)throwDebris(x,gy,z,opt.debris,s);
+  if(o.fireSec>0)lightFire(x,z,gy,o.fireSec);
+  boom(x,z,s);fxShake(x,o.y,z,s);fxFlashDom(x,o.y,z,s);
+  irDirty=true;
+  return o;
 }
-function bigUpdate(dt){
-  for(const o of BIG){if(o.t>=30)continue;o.t+=dt;const t=o.t;
-    const fbA=clamp(1-t/2.2,0,1);
-    for(const f of o.fb){const e=1-Math.exp(-t*3);f.sp.position.set(o.x+f.dx*14*e,o.y+6+f.up*38*e+t*5,o.z+f.dz*14*e);
-      f.sp.scale.setScalar((26+100*e)*f.sz);f.sp.material.opacity=Math.min(1,fbA*1.6);if(fbA<=0)f.sp.visible=false;}
-    for(const m of o.sm){const u=Math.max(0,t-m.d),e=1-Math.exp(-u*0.9),a=clamp(u/0.6,0,1)*clamp(1-(u-6)/18,0,1);
-      m.sp.position.set(o.x+m.dx*24*e+u*2.2,o.y+14+m.up*170*e,o.z+m.dz*24*e+u*1.2);m.sp.scale.setScalar((32+115*e)*m.sz);m.sp.material.opacity=0.88*a;if(u>24)m.sp.visible=false;}
-    const rA=clamp(1-t/1.3,0,1);o.ring.position.set(o.x,groundHeight(o.x,o.z)+0.6,o.z);o.ring.scale.setScalar(10+t*300);o.ring.material.opacity=rA*0.85;if(rA<=0)o.ring.visible=false;
-    if(t>20)o.scorch.material.opacity=0.75*clamp(1-(t-20)/10,0,1);if(t>=30)o.scorch.visible=false;}
+// a smaller burst: a cooking-off secondary, or anything that wants a pop without a column
+function fxMini(x,y,z,s){
+  let m=null;for(const e of FX_M)if(!e.on){m=e;break;}
+  if(!m){m=FX_M[0];for(const e of FX_M)if(e.t>m.t)m=e;}
+  m.on=true;m.t=0;m.x=x;m.y=y;m.z=z;m.s=s;
+  const S=30*Math.pow(s,0.8);
+  for(const f of m.fb){const a=Math.random()*6.283;f.dx=Math.cos(a)*S*0.3;f.dz=Math.sin(a)*S*0.3;f.dy=S*(0.2+Math.random()*0.3);
+    f.sz=(0.7+Math.random()*0.5)*S;f.sp.visible=true;}
+  throwDebris(x,y,z,4,s);boom(x,z,s);fxShake(x,y,z,s);
 }
-function blastUpdate(dt){bigUpdate(dt);if(blastT<=0)return;blastT-=dt*1.4;
-  const a=Math.max(blastT,0);blast.scale.setScalar(40+(1-a)*260);
-  blast.material.opacity=a*a;if(blastT<=0)blast.visible=false;}
+function fxUpdate(dt){
+  windVec(_fw);const lit=fxLit(),rl=lit<0?1:Math.max(lit,0.3);
+  const night=TOD.night?1:TOD.lights*0.45;
+  for(const o of FX){if(!o.on)continue;
+    o.t+=dt;o.frames++;const t=o.t,s=o.s,T=o.T,u=t/T,rs=Math.sqrt(s);
+    if(t>=o.end){o.on=false;o.fb.forEach(f=>f.sp.visible=false);o.sm.forEach(m=>m.sp.visible=false);
+      o.flash.visible=o.ring.visible=o.dust.visible=o.scorch.visible=o.glowM.visible=false;continue;}
+    // flash: the first three frames only
+    if(o.flash.visible){const k=o.frames<=3?1:0;fxHot(o.flash,0);o.flash.scale.setScalar(70*s*(1+0.3*o.frames));o.flash.material.opacity=k;if(!k)o.flash.visible=false;}
+    // fireball: 2/3 of its size by 0.3 s, rising, cooling through orange to dark red
+    const e=1-Math.exp(-t*3.66),rise=t*(9+4*e)*rs;
+    for(const f of o.fb){if(!f.sp.visible)continue;
+      if(u>=1){f.sp.visible=false;continue;}
+      const m=f.sp.material,uu=f.core?u*1.35:u;
+      f.sp.position.set(o.x+f.dx*e+_fw.x*t,o.y+4*rs+f.dy*e+rise*(f.core?0.8:1),o.z+f.dz*e+_fw.z*t);
+      f.sp.scale.setScalar(f.sz*(0.15+0.85*e)*(1+0.25*u));
+      fxHot(f.sp,f.core?uu*1.2:0.2+0.8*uu);
+      m.opacity=f.core?clamp(1-uu,0,1):clamp((1-u)*1.8,0,1)*0.95;m.rotation=f.rot+t*0.25;}
+    // smoke column: 14 puffs let go over 3 s, then recycled at the base until the fire dies down
+    const H=o.H,thin=clamp(1-t/o.smokeSec,0,1),feed=t<o.smokeSec*0.6;
+    for(const m of o.sm){
+      if(!m.live){
+        if(t<m.due||(m.gen>0&&!feed)){m.sp.visible=false;continue;}
+        m.live=true;m.age=0;m.gen++;
+        const a=Math.random()*6.283,r=Math.random()*4*rs;
+        m.x=o.x+Math.cos(a)*r;m.z=o.z+Math.sin(a)*r;m.y=o.y+2*rs;m.ox=Math.cos(a);m.oz=Math.sin(a);m.out=0;m.outMax=H*(0.18+0.2*Math.random());
+        m.vb=6+Math.random()*4;
+        // the first puffs ride the fireball up fast, so the cap forms early
+        m.burst=m.gen===1?H*(0.45+0.45*Math.random())*0.6:0;
+        m.life=m.gen===1?o.smokeSec*(0.55+0.35*Math.random()):(H/m.vb)*(0.8+Math.random()*0.5);
+        m.sz=(0.8+Math.random()*0.4)*rs;m.spin=(Math.random()-0.5)*0.3;m.shade=Math.random()*0.08;
+        m.sp.material.rotation=Math.random()*6.283;m.sp.visible=true;}
+      m.age+=dt;
+      if(m.age>=m.life){m.live=false;m.due=0;m.sp.visible=false;continue;}
+      const h=m.y-o.y,f=clamp(h/H,0,1);
+      // slows toward the top of the column; past 0.6 of it the puffs spread into a cap
+      let vy=(m.vb+m.burst*Math.exp(-m.age*0.6))*clamp((1-f)/0.25,0,1);
+      const cf=cap01(f);if(cf>0)m.out=Math.min(m.outMax,m.out+cf*(5+8*cf)*rs*dt);
+      const wk=0.6+0.6*f;
+      m.x+=_fw.x*wk*dt;m.z+=_fw.z*wk*dt;m.y+=vy*dt;
+      const grow=Math.min(1,m.age/7);
+      m.sp.position.set(m.x+m.ox*m.out,m.y,m.z+m.oz*m.out);
+      m.sp.scale.setScalar(m.sz*(20+40*grow+56*f));
+      m.sp.material.rotation+=m.spin*dt;
+      // low down the column still glows from the fire under it
+      const g=(0.14+m.shade+0.22*f+0.1*grow)*Math.max(lit,0),hot=clamp(1-t/(T*1.4),0,1)*clamp(1-f*3,0,1);
+      if(lit<0)m.sp.material.color.setScalar(0.42);
+      else m.sp.material.color.setRGB(g+hot*0.55,g+hot*0.22,g*0.97+hot*0.05);
+      m.sp.material.opacity=0.7*clamp(m.age/0.6,0,1)*clamp((m.life-m.age)/(m.life*0.3),0,1)*(0.35+0.65*thin);}
+    // shock ring out to 120 m * scale in 0.8 s; a slower dust ring behind it
+    o.ring.material.color.setRGB(rl,0.94*rl,0.82*rl);o.dust.material.color.setRGB(0.76*rl,0.68*rl,0.53*rl);
+    {const k=clamp(t/0.8,0,1);o.ring.scale.setScalar(Math.max(0.01,120*s*(1-(1-k)*(1-k))));o.ring.material.opacity=0.75*(1-k);if(k>=1)o.ring.visible=false;
+     const d=clamp(t/3.5,0,1);o.dust.scale.setScalar(Math.max(0.01,48*s*(1-(1-d)*(1-d)*(1-d))));o.dust.material.opacity=0.5*Math.pow(1-d,1.5);if(d>=1)o.dust.visible=false;}
+    if(t>o.end*0.75)o.scorch.material.opacity=0.8*clamp((o.end-t)/(o.end*0.25),0,1);
+    // night: the fireball lights the ground, then the wreck flickers
+    let gl=0;
+    if(o.glow&&night>0){gl=Math.pow(clamp(1-u,0,1),1.2);
+      if(t<o.fireSec)gl=Math.max(gl,0.3*(0.8+0.14*Math.sin(t*11)+0.08*Math.sin(t*23.7))*clamp((o.fireSec-t)/5,0,1));
+      gl*=night;}
+    o.glowM.visible=gl>0.003;
+    if(o.glowM.visible){o.glowM.scale.setScalar(90*s*(u<1?0.6+0.4*e:0.55));o.glowM.material.opacity=Math.min(1,gl*1.7);}
+    // cooking off
+    for(const c of o.sec)if(!c.done&&t>=c.t){c.done=true;fxMini(o.x+c.dx,o.y,o.z+c.dz,s*0.4);}
+  }
+  for(const m of FX_M){if(!m.on)continue;m.t+=dt;const T=1.3*Math.sqrt(m.s),u=m.t/T,e=1-Math.exp(-m.t*4);
+    if(u>=1){m.on=false;m.fb.forEach(f=>f.sp.visible=false);continue;}
+    m.fb.forEach((f,i)=>{const mt=f.sp.material;f.sp.position.set(m.x+f.dx*e,m.y+3+f.dy*e+m.t*5,m.z+f.dz*e);
+      f.sp.scale.setScalar(f.sz*(0.2+0.8*e));fxHot(f.sp,i?0.2+0.8*u:u*1.3);mt.opacity=i?clamp((1-u)*2,0,1)*0.95:clamp(1-u*1.3,0,1);});}
+}
+function cap01(f){return clamp((f-0.6)/0.4,0,1);}
+function fxClear(){for(const o of FX){o.t=o.end;}fxUpdate(0);for(const m of FX_M){m.t=99;}fxUpdate(0);}
 
 // ---- the range itself ----
 function buildRange(){
@@ -6736,20 +6960,22 @@ function buildRange(){
   }
   function addTarget(kind,mesh,x,z,yaw,hitR){
     const Yg=groundHeight(x,z);
-    mesh.position.set(x,Yg,z);mesh.rotation.y=yaw;mesh.userData.heat=0.8;g.add(mesh);
+    // 1.6x so they read from altitude; engines running, the bunker a little cooler
+    mesh.position.set(x,Yg,z);mesh.rotation.y=yaw;mesh.scale.setScalar(1.6);mesh.userData.heat=kind==='bunker'?0.7:0.9;g.add(mesh);
     mesh.traverse(o=>{if(o.isMesh)o.userData.m0=o.material;});   // so a replay can undo the scorch
     const t={kind:kind,mesh:mesh,x:x,z:z,y:Yg,r:hitR,dead:false,moving:false,
       name:kind==='hull'?'Armour':kind==='bunker'?'Bunker':'Truck'};
     STRIKE.targets.push(t);return t;
   }
   const R=RANGE;
-  addTarget('truck',mkTruck(),R.x-210,R.z-140,0.7,9);
-  addTarget('truck',mkTruck(),R.x+60,R.z-260,2.1,9);
-  addTarget('truck',mkTruck(),R.x+250,R.z+90,-1.2,9);
-  addTarget('hull',mkHull(),R.x-120,R.z+210,1.9,10);
-  addTarget('hull',mkHull(),R.x+180,R.z-60,-0.4,10);
-  addTarget('bunker',mkBunker(),R.x-20,R.z+30,0.35,12);
-  const mv=addTarget('truck',mkTruck(),R.x+R.road,R.z,0,9);
+  // parked in the open, no two closer than 160 m; the mover keeps to the loop road far outside them
+  addTarget('truck',mkTruck(),R.x-210,R.z-140,0.7,14);
+  addTarget('truck',mkTruck(),R.x+60,R.z-260,2.1,14);
+  addTarget('truck',mkTruck(),R.x+250,R.z+90,-1.2,14);
+  addTarget('hull',mkHull(),R.x-120,R.z+210,1.9,16);
+  addTarget('hull',mkHull(),R.x+180,R.z-60,-0.4,16);
+  addTarget('bunker',mkBunker(),R.x-20,R.z+30,0.35,20);
+  const mv=addTarget('truck',mkTruck(),R.x+R.road,R.z,0,14);
   mv.moving=true;mv.ang=0;mv.spd=11;
 }
 function rangeMoving(dt){
@@ -6761,12 +6987,16 @@ function rangeMoving(dt){
     t.mesh.position.set(t.x,t.y,t.z);t.mesh.rotation.y=-t.ang+Math.PI/2;
   }
 }
+// strike targets: dead ones cool from 0.95 to 0.5 heat over a minute
+function targetsTick(dt){
+  for(const t of STRIKE.targets){if(!t.dead)continue;t.deadT=(t.deadT||0)+dt;
+    t.mesh.userData.heat=0.95-0.45*clamp(t.deadT/60,0,1);}
+}
 function killTarget(t){
   t.dead=true;t.moving=false;t.mesh.userData.heat=0.95;irDirty=true;
   const dark=lam(0x241f1a);
   t.mesh.traverse(o=>{if(o.isMesh)o.material=dark;});
-  t.mesh.rotation.z+=(Math.random()-0.5)*0.35;
-  lightFire(t.x,t.z,t.y);
+  t.mesh.rotation.z+=(Math.random()-0.5)*0.35;t.deadT=0;
 }
 
 // ---- sensor ball ----
@@ -6803,6 +7033,37 @@ function sensorTrackHere(){
   if(t){SENSOR.tgt=t;SENSOR.track=null;toast('Tracking '+t.name);}
   else{SENSOR.tgt=null;SENSOR.track=SENSOR.spot.clone();toast('Tracking ground point');}
 }
+// ball angles that put target t under the crosshair; false past the gimbal limits
+const SENSOR_AIM={az:0,el:0};
+function sensorAim(t){
+  sensorOrigin(_so);const dx=t.x-_so.x,dy=(t.y+1.5)-_so.y,dz=t.z-_so.z,hz=Math.hypot(dx,dz);
+  _eu.setFromQuaternion(st.quat,'YXZ');
+  let az=Math.atan2(dx,-dz)-(-_eu.y);az=Math.atan2(Math.sin(az),Math.cos(az));const el=Math.atan2(dy,hz);
+  SENSOR_AIM.az=az;SENSOR_AIM.el=el;
+  return Math.abs(az)<=GIM_AZ&&el>=GIM_EL_LO&&el<=GIM_EL_HI;
+}
+// NEXT TARGET: live targets nearest first, one on from the one under the crosshair.
+// Pilot: the ball slews there. Rookie: it snaps there and locks.
+function nextTarget(){
+  if(!STRIKE.active||camMode!==2)return;
+  sensorOrigin(_so);const ox=_so.x,oz=_so.z;
+  const live=STRIKE.targets.filter(t=>!t.dead).sort((a,b)=>Math.hypot(a.x-ox,a.z-oz)-Math.hypot(b.x-ox,b.z-oz));
+  if(!live.length){toast('No targets left');return;}
+  const cur=SENSOR.tgt||SENSOR.slewTo||(SENSOR.valid?targetUnder(SENSOR.spot,60):null);
+  const i0=cur?live.indexOf(cur):-1;let t=null;
+  for(let j=1;j<=live.length;j++){const c=live[(i0+j)%live.length];if(sensorAim(c)){t=c;break;}}
+  if(!t){toast(rookie()?'Targets are behind us, wait for the turn':'GIMBAL LIMIT');return;}
+  const d=Math.hypot(t.x-ox,t.z-oz);
+  if(rookie()){
+    SENSOR.slewTo=null;SENSOR.track=null;SENSOR.az=SENSOR_AIM.az;SENSOR.el=SENSOR_AIM.el;sensorUpdate(0);
+    SENSOR.tgt=t;toast('Tracking '+t.name+'. Tap FIRE');
+  } else {
+    if(SENSOR.tgt||SENSOR.track){SENSOR.tgt=null;SENSOR.track=null;}
+    SENSOR.slewTo=t;toast(t.name.toUpperCase()+'  '+fmtDist(d),1.5);
+  }
+  updateCtx();
+}
+const fmtDist=d=>d<1000?(Math.round(d/10)*10)+' m':(d/1000).toFixed(1)+' km';
 function sensorBreak(why){
   if(!SENSOR.track&&!SENSOR.tgt)return;
   SENSOR.track=null;SENSOR.tgt=null;if(why)toast(why);
@@ -6821,7 +7082,13 @@ function sensorUpdate(dt){
     if(Math.abs(az)>GIM_AZ||el<GIM_EL_LO||el>GIM_EL_HI){
       SENSOR.gimbal=true;sensorBreak('Track lost, gimbal limit');
     } else {SENSOR.gimbal=false;SENSOR.az=az;SENSOR.el=el;}
-  } else SENSOR.gimbal=false;
+  } else {SENSOR.gimbal=false;
+    // NEXT TARGET: swing the ball over, quick then settling
+    const g=SENSOR.slewTo;
+    if(g&&(g.dead||!sensorAim(g))){SENSOR.slewTo=null;}
+    else if(g){const k=dt>0?1-Math.exp(-dt*7):0;
+      let da=SENSOR_AIM.az-SENSOR.az;da=Math.atan2(Math.sin(da),Math.cos(da));const de=SENSOR_AIM.el-SENSOR.el;
+      SENSOR.az+=da*k;SENSOR.el+=de*k;if(Math.abs(da)<0.0015&&Math.abs(de)<0.0015)SENSOR.slewTo=null;}}
   SENSOR.az=clamp(SENSOR.az,-GIM_AZ,GIM_AZ);
   SENSOR.el=clamp(SENSOR.el,GIM_EL_LO,GIM_EL_HI);
   sensorDir(SENSOR.az,SENSOR.el,_sd);
@@ -6832,7 +7099,7 @@ function sensorUpdate(dt){
 function slewSensor(x,y,dt){
   if(!x&&!y)return;
   const k=Math.max(0.09,0.75*SENSOR_FOV[SENSOR.zoom]/14);   // narrow field slews slower, as it should
-  if(Math.abs(x)>0.02||Math.abs(y)>0.02)sensorBreak(null);
+  if(Math.abs(x)>0.02||Math.abs(y)>0.02){sensorBreak(null);SENSOR.slewTo=null;}
   SENSOR.az=clamp(SENSOR.az+x*k*dt,-GIM_AZ,GIM_AZ);
   SENSOR.el=clamp(SENSOR.el-y*k*dt,GIM_EL_LO,GIM_EL_HI);
 }
@@ -6919,14 +7186,17 @@ function missileUpdate(dt){
 }
 function impact(m,gh){
   m.mesh.g.visible=false;m.mesh.glow.material.opacity=0;
-  const x=m.pos.x,z=m.pos.z,y=Math.max(m.pos.y,gh);
-  bang(x,y,z);throwDebris(x,gh,z);boom(x,z);
-  camBump=Math.max(camBump,clamp(1.3-camera.position.distanceTo(_st2.set(x,y,z))/4000,0,1.3));
+  let x=m.pos.x,z=m.pos.z;const y=Math.max(m.pos.y,gh);
   // nearest live target inside its own hit radius is destroyed
   let hit=null,miss=1e9;
   for(const t of STRIKE.targets){if(t.dead)continue;
     const d=Math.hypot(t.x-x,t.z-z);if(d<miss){miss=d;hit=t;}}
   const killed=hit&&miss<=hit.r;
+  // a kill goes up where the target is, and the wreck burns there
+  const K=killed?hit.kind:'',sc=K==='bunker'?2:K==='hull'?1.3:1;
+  if(killed){x=hit.x;z=hit.z;}
+  explode(x,killed?hit.y:y,z,{scale:sc,secondary:K==='bunker'?2:K==='hull'?1:0,
+    debris:K==='bunker'?16:K==='hull'?12:10,smokeSec:killed?60:14,fireSec:killed?600:0});
   if(killed){killTarget(hit);STRIKE.hits++;}
   STRIKE.missSum+=Math.min(miss,999);
   const md=miss<999?Math.round(miss)+' m':'long';
@@ -6936,18 +7206,27 @@ function impact(m,gh){
     :L('Gila Range Control','tower','Miss, '+md+'. Reset and try again.','Miss, '+md+'. Reset and try again.'));
   strikeScore();
 }
-function boom(x,z){
-  if(!actx||muted)return;
-  try{const t=actx.currentTime,d=clamp(1-Math.hypot(x-st.pos.x,z-st.pos.z)/3500,0,1);
+// s: blast scale. Bigger is louder, lower and carries further; 2 and up crackle after
+let boomBuf=null,crackBuf=null;
+function boom(x,z,s){
+  if(!actx||muted)return;s=s||1;
+  try{const t=actx.currentTime,D=Math.hypot(x-st.pos.x,z-st.pos.z),d=clamp(1-D/(3500*Math.sqrt(s)),0,1);
     if(d<=0.02)return;
-    const n=actx.sampleRate*2.2|0,b=actx.createBuffer(1,n,actx.sampleRate),c=b.getChannelData(0);
-    for(let i=0;i<n;i++)c[i]=(Math.random()*2-1)*Math.pow(1-i/n,2.6);
-    const s=actx.createBufferSource(),f=actx.createBiquadFilter(),g=actx.createGain();
-    s.buffer=b;f.type='lowpass';f.frequency.setValueAtTime(1400,t);f.frequency.exponentialRampToValueAtTime(60,t+1.6);
-    g.gain.value=0.8*d;
-    const dl=Math.min(1.4,Math.hypot(x-st.pos.x,z-st.pos.z)/340),o=actx.createOscillator(),og=actx.createGain();o.type='sine';o.frequency.setValueAtTime(70,t+dl);o.frequency.exponentialRampToValueAtTime(28,t+dl+1.2);
-    og.gain.setValueAtTime(0.0001,t+dl);og.gain.exponentialRampToValueAtTime(0.6*d,t+dl+0.03);og.gain.exponentialRampToValueAtTime(0.0001,t+dl+1.4);o.connect(og).connect(actx.destination);o.start(t+dl);o.stop(t+dl+1.5);s.connect(f).connect(g).connect(actx.destination);
-    s.start(t+Math.min(1.4,Math.hypot(x-st.pos.x,z-st.pos.z)/340));
+    if(!boomBuf){const sr=actx.sampleRate,n=sr*2.2|0;boomBuf=actx.createBuffer(1,n,sr);const c=boomBuf.getChannelData(0);
+      for(let i=0;i<n;i++)c[i]=(Math.random()*2-1)*Math.pow(1-i/n,2.6);
+      const n2=sr*1.4|0;crackBuf=actx.createBuffer(1,n2,sr);const c2=crackBuf.getChannelData(0);
+      for(let i=0;i<n2;i++)c2[i]=Math.random()<0.004?(Math.random()*2-1)*Math.pow(1-i/n2,1.5):c2[Math.max(0,i-1)]*0.55;}
+    const dl=Math.min(1.4,D/340),lo=Math.pow(s,-0.35),vol=Math.min(1.5,0.6+0.4*s);
+    const src=actx.createBufferSource(),f=actx.createBiquadFilter(),g=actx.createGain();
+    src.buffer=boomBuf;src.playbackRate.value=Math.max(0.6,lo);
+    f.type='lowpass';f.frequency.setValueAtTime(1400*lo,t+dl);f.frequency.exponentialRampToValueAtTime(60*lo,t+dl+1.6);
+    g.gain.value=0.8*d*vol;
+    const o=actx.createOscillator(),og=actx.createGain();o.type='sine';o.frequency.setValueAtTime(70*lo,t+dl);o.frequency.exponentialRampToValueAtTime(28*lo,t+dl+1.2);
+    og.gain.setValueAtTime(0.0001,t+dl);og.gain.exponentialRampToValueAtTime(0.6*d*vol,t+dl+0.03);og.gain.exponentialRampToValueAtTime(0.0001,t+dl+1.4+0.3*s);o.connect(og).connect(actx.destination);o.start(t+dl);o.stop(t+dl+1.5+0.3*s);
+    src.connect(f).connect(g).connect(actx.destination);src.start(t+dl);
+    if(s>=2){const c=actx.createBufferSource(),hp=actx.createBiquadFilter(),cg=actx.createGain();
+      c.buffer=crackBuf;hp.type='highpass';hp.frequency.value=900;cg.gain.value=0.45*d;
+      c.connect(hp).connect(cg).connect(actx.destination);c.start(t+dl+0.5);}
   }catch(e){}
 }
 // ---- score ----
@@ -6977,13 +7256,14 @@ function strikeStart(){
   STRIKE.active=true;STRIKE.cleared=false;STRIKE.shots=0;STRIKE.hits=0;STRIKE.missSum=0;
   STRIKE.missiles.length=0;STRIKE.t0=0;STRIKE.tot=0;
   for(const t of STRIKE.targets){
-    if(t.dead){t.dead=false;t.mesh.rotation.z=0;
+    if(t.dead){t.dead=false;t.mesh.rotation.z=0;t.deadT=0;t.mesh.userData.heat=t.kind==='bunker'?0.7:0.9;irDirty=true;
       t.mesh.traverse(o=>{if(o.isMesh&&o.userData.m0)o.material=o.userData.m0;});}
     if(t.kind==='truck'&&t.ang!==undefined)t.moving=true;}
-  SENSOR.az=0;SENSOR.el=-0.6;SENSOR.zoom=0;SENSOR.track=null;SENSOR.tgt=null;
+  SENSOR.az=0;SENSOR.el=-0.6;SENSOR.zoom=0;SENSOR.track=null;SENSOR.tgt=null;SENSOR.slewTo=null;
   for(const m of MSL){m.g.visible=false;m.glow.material.opacity=0;}
   if(plane.pylons)plane.pylons.forEach(p=>p.visible=true);
   for(const f of fires){f.on=false;f.sp.visible=false;}
+  fxClear();
   apEngage(st,'orbit',{cx:RANGE.x,cz:RANGE.z,r:2400,y:st.pos.y-GEAR,v:AC.vcruise,dir:1});st.ap.sensor=true;
   camMode=2;snapCamera=true;
   radioQ.push(L('Gila Range Control','tower',
@@ -7101,14 +7381,13 @@ function tick(t,skipRender){
   if(running&&!paused){updateTraffic(dt);updateCars(dt);}
   updatePeople(dt,ts);
   if(running&&!paused&&!st.crashed){
-    if(STRIKE.built)rangeMoving(dt);
+    if(STRIKE.built){rangeMoving(dt);targetsTick(dt);}
     if(STRIKE.active||(camMode===2&&hasBall()))sensorUpdate(dt);
     if(STRIKE.active){missileUpdate(dt);
       // time on target: the ball locked onto an actual target, not a ground point
       if(SENSOR.tgt&&!SENSOR.tgt.dead)STRIKE.tot=(STRIKE.tot||0)+dt;}
   }
-  if(STRIKE.built)fireUpdate(dt,ts);
-  smokeUpdate(dt);debrisUpdate(dt);blastUpdate(dt);
+  {const fdt=paused?0:dt;fireUpdate(fdt);smokeUpdate(fdt);debrisUpdate(fdt);fxUpdate(fdt);}
   plane.g.position.copy(dp);plane.g.quaternion.copy(q);
   const on=running&&!s.crashed&&!FREECAM;   // the free camera is a model check, blades still
   if(plane.props){const o=on?0.3:0;for(let i=0;i<plane.props.length;i++){plane.props[i].rotation.z+=(on?107:0)*dt;plane.props[i].visible=!on;plane.discs[i].material.opacity=o;}}
@@ -7145,6 +7424,7 @@ function tick(t,skipRender){
   if(camBump>0){camBump=Math.max(0,camBump-dt*2.4);const k=camBump*camBump*1.3;
     camera.position.x+=(Math.random()-0.5)*k;camera.position.y+=(Math.random()-0.5)*k*1.5;camera.position.z+=(Math.random()-0.5)*k;}
   camera.updateProjectionMatrix();sky.position.copy(camera.position);
+  if(sensOn)tgtMarkUpdate(dt);else if(TM.shown)tgtMarkHide();
   // PAPI
   PAPI.forEach(pp=>{const eye=camera.position,du=(toU(eye.x,eye.z)-pp.u)*pp.dir;const ang=du<0?Math.atan2(eye.y-0.9,-du)*180/Math.PI:10;
     pp.sp.material.color.setHex(ang>pp.ang?0xffffff:0xff2a2a);const cd=camera.position.distanceTo(pp.sp.position);
@@ -7210,7 +7490,19 @@ window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,tou
   sensor:()=>({mode:SENSOR.mode,zoomIdx:SENSOR.zoom,fov:SENSOR_FOV[SENSOR.zoom],lock:!!(SENSOR.tgt||SENSOR.track),
     az:+(SENSOR.az*180/Math.PI).toFixed(2),el:+(SENSOR.el*180/Math.PI).toFixed(2),ap:!!st.ap}),
   setSensorMode:setSensorMode,sensorZoom:()=>sensorZoomStep(0),sensorLock:()=>sensorLock(),
-  fire:()=>fireMissile(),trackHere:()=>sensorTrackHere(),
+  fire:()=>fireMissile(),trackHere:()=>sensorTrackHere(),nextTarget:()=>nextTarget(),explode:explode,
+  // explosions: slots running, sprites showing (FX, secondaries and wreck fires), and for the
+  // newest one the smoke top above its origin and the mean smoke offset against the wind
+  fx:()=>{let act=0,spr=0;const vis=sp=>{if(sp.visible)spr++;};
+    for(const o of FX){if(o.on)act++;o.fb.forEach(f=>vis(f.sp));vis(o.flash);o.sm.forEach(m=>vis(m.sp));}
+    FX_M.forEach(m=>m.fb.forEach(f=>vis(f.sp)));fires.forEach(f=>vis(f.sp));
+    const o=fxLast,out={active:act,sprites:spr,smokeTop:0,smokeN:0,mean:[0,0],wind:windVec(new V3()).toArray(),t:o?o.t:0,scale:o?o.s:0};
+    if(o&&o.on){let n=0,mx=0,mz=0,top=0;for(const m of o.sm){if(!m.sp.visible)continue;n++;mx+=m.sp.position.x-o.x;mz+=m.sp.position.z-o.z;top=Math.max(top,m.y-o.y);}
+      out.smokeN=n;out.smokeTop=top;out.mean=n?[mx/n,mz/n]:[0,0];}
+    return out;},
+  fxSlots:()=>FX.filter(o=>o.on).map(o=>{let n=0,mx=0,mz=0;for(const m of o.sm){if(!m.sp.visible)continue;n++;mx+=m.sp.position.x-o.x;mz+=m.sp.position.z-o.z;}
+    return {t:o.t,scale:o.s,smokeN:n,mean:n?[mx/n,mz/n]:[0,0],wind:windVec(new V3()).toArray()};}),
+  fxCaps:{FX_N:FX_N,FX_FB:FX_FB,FX_SM:FX_SM,FX_MINI:FX_MINI,FIRE_MAX:FIRE_MAX},
   pylonsVisible:()=>(plane.pylons||[]).map(p=>p.visible),
   // point the ball at a target the way a slew would, so the real lock path is exercised
   pointAt:(i)=>{const t=STRIKE.targets[i];if(!t)return false;
