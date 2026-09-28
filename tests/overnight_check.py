@@ -17,7 +17,8 @@ THREE = open('node_modules/three/build/three.min.js').read()
 SRV, URL = serve(os.path.abspath('.'))
 SHOTS = os.path.abspath('overnight-screenshots')
 LABEL = sys.argv[1] if len(sys.argv) > 1 else 'run'
-TYPES = sys.argv[2:] or ['cessna', 'f16', 'reaper', 'c130']
+TYPES = sys.argv[2:] or ['cessna', 'f16', 'reaper', 'mq9b', 'c130']
+FALLBACK = {'mq9b': 'reaper'}   # a new type is judged against its nearest relative until it has a baseline
 IPHONE = {'width': 844, 'height': 390}      # iPhone 14 / 15, landscape
 BASE_F = os.path.join('tests', 'overnight_fps.json')
 FPS_KEEP = 0.80          # a feature may cost at most 20% of the baseline frame rate
@@ -94,10 +95,11 @@ async def main():
             chk(f'{t}: not crashed on spawn', not s['crashed'])
             f = await fps(pg)
             results[t] = f
-            if t in BASE:
-                floor = BASE[t] * FPS_KEEP
-                chk(f'{t}: {f:.1f} fps (baseline {BASE[t]:.1f}, floor {floor:.1f})',
-                    f >= floor, f'{100*f/BASE[t]:.0f}% of baseline')
+            bk = t if t in BASE else FALLBACK.get(t)
+            if bk in BASE:
+                floor = BASE[bk] * FPS_KEEP
+                chk(f'{t}: {f:.1f} fps (baseline {BASE[bk]:.1f}{"" if bk == t else " from " + bk}, floor {floor:.1f})',
+                    f >= floor, f'{100*f/BASE[bk]:.0f}% of baseline')
             else:
                 print(f'  --   {t}: {f:.1f} fps, no baseline yet')
             chk(f'{t}: no new console errors', len(errs) == n0, ' | '.join(errs[n0:n0+2]))

@@ -170,7 +170,7 @@ body.touch #coach button{ min-height:var(--tap); min-width:var(--tap); padding:6
 .keys dt{ font-weight:600; color:var(--caution); } .keys dd{ margin:0; }
 .row{ display:flex; gap:10px; flex-wrap:wrap; }
 .primary{ background:var(--caution); color:#15110a; border-color:transparent; font-size:18px; padding:10px 18px; }
-.picks{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:0 0 14px; }
+.picks{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:0 0 14px; }
 .pick{ padding:10px 6px; line-height:1.15; text-align:center; }
 .pick b{ display:block; font-size:22px; font-weight:800; }
 .pick span{ font-size:13px; color:var(--soft); }
@@ -334,7 +334,8 @@ body.touch #tiltDiag{ display:block; }
   <p class="sub" id="acSub"></p>
   <div class="picks">
     <button class="pick" data-t="f16"><b>F-16</b><span>Viper</span></button>
-    <button class="pick" data-t="reaper"><b>MQ-9</b><span>Reaper</span></button>
+    <button class="pick" data-t="reaper"><b>MQ-9A</b><span>Reaper</span></button>
+    <button class="pick" data-t="mq9b"><b>MQ-9B</b><span>SkyGuardian</span></button>
     <button class="pick" data-t="cessna"><b>C172</b><span>N8401L</span></button>
     <button class="pick" data-t="c130"><b>C-130</b><span>Hercules</span></button>
     <button class="pick" data-t="alpha"><b>Alpha</b><span>Pipistrel</span></button>
@@ -549,6 +550,13 @@ const TYPES={
     cs:'Reaper 8401L',csS:'Reaper 01L',say:'Reaper eight four zero one lima',sayS:'Reaper zero one lima',
     sub:'MQ-9A Reaper at Glendale, KGEU. 66 ft wing, 900 shp turboprop pusher. Runway 1 is 7,150 ft, field elevation 1,071. Wind changes every flight.',
     tips:'Manual: flaps 10, full power, rotate at 95 kt, gear up once climbing. Land at 100 kt, flaps 30, under 300 fpm.'},
+  mq9b:{id:'mq9b',name:'MQ-9B SkyGuardian',title:'N190TC',mass:4600,S:27.5,Tstatic:9500,Pmax:670000,eta:0.78,CL0:0.35,CLa:5.8,aStall:0.2,CD0:0.026,k:0.016,span:24,len:11.7,
+    spool:1.3,pf:1,retract:1,wave:0,tipRoll:0.14,tipMsg:'Wingtip strike. That 79 ft wing has 8 degrees of clearance, level it before touchdown.',gndPitch:0.1,trimBase:0.03,trimK:0.1,
+    flaps:[{deg:0,cl:0,cd:0},{deg:10,cl:0.15,cd:0.008},{deg:20,cl:0.3,cd:0.024},{deg:30,cl:0.45,cd:0.055}],toFlap:1,landFlap:3,finalFlap:2,finalThr:0.10,finalPitch:0.04,finalTrim:0.6,vr:95*KT,vy:110*KT,vcruise:125*KT,vapp:100*KT,patAlt:305,climbVS:4,descMax:4,
+    maxBank:0.44,ipD:5600,fafD:3300,slowD:2400,decel:0.42,ezG:0.2,ezGR:0.12,ezBank:0.7,thrC:0.8,flareH:6,flareK:0.3,tdSink:0.45,tdPitch:0,rotP:0.09,rotRate:0.06,apRate:[0.3,0.3,0.5],vne:230,vfe:140,snd:'turbo',cam1:[0,0.14,-5.3],cam1Name:'Nose camera',chase:[5.5,30],
+    cs:'SkyGuardian 190TC',csS:'SkyGuardian 0TC',say:'Sky Guardian one niner zero tango charlie',sayS:'Sky Guardian zero tango charlie',
+    sub:'MQ-9B SkyGuardian, N190TC, at Glendale KGEU. 79 ft wing with winglets, 40 hours of endurance, and it glides like a sailplane. Runway 1 is 7,150 ft, field elevation 1,071. Wind changes every flight.',
+    tips:'Manual: flaps 10, full power, rotate at 95 kt, gear up once climbing. Land at 100 kt, flaps 30. It floats, so pull the power early and let it settle.'},
   cessna:{id:'cessna',name:'Cessna 172',title:'N8401L',mass:1050,S:16.2,Tstatic:2800,Pmax:134000,eta:0.75,CL0:0.3,CLa:5.0,aStall:0.24,CD0:0.03,k:0.05,span:11,len:8.3,
     spool:0.35,pf:1,retract:0,wave:0,tipRoll:0.35,tipMsg:'Wingtip strike. Level the wings before touchdown.',gndPitch:0.15,trimBase:0.03,trimK:0.1,
     flaps:FL4,toFlap:1,landFlap:3,finalFlap:2,finalThr:0.4,finalPitch:0.0,finalTrim:0.5,vr:55*KT,vy:74*KT,vcruise:100*KT,vapp:65*KT,patAlt:305,climbVS:3,descMax:3.5,
@@ -2506,8 +2514,262 @@ function buildC130HD(opt){
   const meta={name:'C-130H Hercules',sub:'Lockheed',spec:{len:L,span:SPAN,height:HEIGHT},ground:GND};
   return {g:g,gear:gear,props:props,discs:discs,ab:null,meta:meta};
 }
+// =========================================================================
+//  MQ-9B SkyGuardian
+//  38 ft long, 79 ft span with upturned winglets, 12.5 ft high on the gear.
+//  Same family as the MQ-9A: bigger SATCOM dome on a longer nose, the sensor
+//  ball under the chin, a longer wing, and the Y tail with the ventral fin.
+//  Built as the N190TC demonstrator: light grey, dark radome, dark tips.
+// =========================================================================
+function buildMQ9BHD(opt){
+  opt=opt||{};
+  const L=11.70, SPAN=24.00, HEIGHT=3.81;
+  const CG=5.20;
+  const Z=s=>s-CG;
+  const GND=-1.5;
+  const P=MAT.P;
+  const g=new THREE.Group(); g.name='MQ-9B';
+  const gear=new THREE.Group(); gear.name='gear'; g.add(gear);
+  const weapons=new THREE.Group(); weapons.name='weapons'; g.add(weapons);
+
+  const C_BASE=new THREE.Color('#c3c8cb'), C_TOP=new THREE.Color('#b4babe'),
+        C_LOW =new THREE.Color('#cdd1d4'), C_DARK=new THREE.Color('#2e3338');
+  function skin(x,y,z,nx,ny,nz,out){
+    const t=smooth(AERO.clamp(ny/1.1+0.5,0,1));
+    out.copy(C_LOW).lerp(C_TOP,t);
+    out.lerp(C_BASE,0.35);
+  }
+  function skinned(geo,fn){
+    const n=geo.attributes.normal;let i=0;
+    AERO.paint(geo,(x,y,z,out)=>{(fn||skin)(x,y,z,n.getX(i),n.getY(i),n.getZ(i),out);i++;});
+    return geo;
+  }
+
+  // ---- fuselage: the B nose is longer and the dome taller ---------------
+  const FUS=[
+    [0.00,0.080,0.24,0.02,2.2],[0.20,0.240,0.44,-0.10,2.1],[0.50,0.360,0.62,-0.24,2.1],
+    [0.95,0.435,0.74,-0.32,2.2],[1.50,0.462,0.80,-0.36,2.3],[2.15,0.455,0.78,-0.38,2.5],
+    [2.85,0.430,0.72,-0.39,2.7],[3.70,0.405,0.64,-0.39,2.8],[4.60,0.385,0.60,-0.38,2.8],
+    [5.55,0.362,0.59,-0.36,2.8],[6.50,0.330,0.60,-0.32,2.7],[7.45,0.290,0.60,-0.28,2.6],
+    [8.40,0.250,0.58,-0.24,2.5],[9.25,0.216,0.55,-0.19,2.4],[10.0,0.190,0.49,-0.15,2.3],
+    [10.6,0.170,0.41,-0.11,2.2],[11.05,0.155,0.33,-0.06,2.2]
+  ];
+  const fusSec=FUS.map(f=>{const yc=(f[2]+f[3])/2;
+    return AERO.ring(Z(f[0]),f[1],f[2]-yc,yc-f[3],yc,f[4],24);});
+  mesh(skinned(AERO.loft(fusSec,{uScale:P,vScale:P}),(x,y,z,nx,ny,nz,out)=>{
+    if(z+CG<0.62)out.copy(C_DARK);else skin(x,y,z,nx,ny,nz,out);}),MAT.mq9Skin,g);
+
+  // ---- EO/IR sensor turret under the chin, a little further forward -----
+  {
+    const neck=new THREE.CylinderGeometry(0.18,0.21,0.14,16);
+    const nm=mesh(neck,MAT.turret,g); nm.position.set(0,-0.36,Z(1.55));
+    const ball=new THREE.SphereGeometry(0.255,20,16);
+    const bm=mesh(ball,MAT.turret,g); bm.position.set(0,-0.58,Z(1.55));
+    const win=new THREE.SphereGeometry(0.258,16,12,0,Math.PI*0.62,Math.PI*0.30,Math.PI*0.44);
+    const wm=mesh(win,MAT.glassDark,g);
+    wm.position.set(0,-0.58,Z(1.55)); wm.rotation.y=-1.25;
+  }
+  // ---- engine inlet on the spine, exhaust stubs, blade antennas --------
+  {
+    const inl=AERO.loft([
+      AERO.ring(Z(6.45),0.110,0.045,0.02,0.60,2.3,14),
+      AERO.ring(Z(6.75),0.140,0.110,0.02,0.62,2.3,14),
+      AERO.ring(Z(7.55),0.145,0.100,0.02,0.615,2.3,14),
+      AERO.ring(Z(8.10),0.118,0.032,0.02,0.59,2.3,14)],{uScale:P,vScale:P,capStart:false,capEnd:false});
+    mesh(skinned(inl),MAT.mq9Skin,g);
+    const mouth=new THREE.CylinderGeometry(0.10,0.09,0.08,14);
+    mouth.rotateX(Math.PI/2);
+    const mm=mesh(mouth,MAT.ductDark,g); mm.position.set(0,0.65,Z(6.45));
+    for(const sgn of [1,-1]){
+      const ex=new THREE.CylinderGeometry(0.052,0.060,0.20,10);
+      ex.rotateX(Math.PI/2);
+      const em=mesh(ex,MAT.hotDark,g); em.position.set(sgn*0.16,0.31,Z(8.60));
+    }
+    // the pair of blade antennas ahead of the wing that mark a SkyGuardian
+    for(const s of [3.05,3.45]){
+      const b=mesh(new THREE.BoxGeometry(0.03,0.30,0.22),MAT.mq9Skin,g);
+      AERO.paint(b.geometry,(x,y,z,o)=>o.copy(C_BASE)); b.position.set(0,0.78,Z(s));
+    }
+  }
+
+  // ---- wing: 24 m over the winglets, high aspect ratio ------------------
+  // Root chord 1.52 m, tip 0.60 m. The last 0.9 m of span curves up into the
+  // winglet, so the flat wing runs to 11.1 m a side.
+  const FLAT=11.10, W_LE=Z(3.80), ROOT_C=1.52, TIP_C=0.60;
+  const DIH=2.4*Math.PI/180, W_Y=0.52;
+  function wLE(ax){ return W_LE+ax*0.050; }
+  function wC(ax){ const t=Math.min(ax,FLAT)/FLAT; return AERO.lerp(ROOT_C,TIP_C,Math.pow(t,1.15)); }
+  function wY(ax){ return W_Y+ax*Math.tan(DIH); }
+  const wXs=[];for(let i=0;i<=12;i++)wXs.push(FLAT*Math.pow(i/12,0.94));
+  // leading edge boots and the outer 10% of span are dark
+  const wingPaint=(x,y,z,nx,ny,nz,out)=>{
+    const ax=Math.abs(x), c=wC(ax), u=(z-wLE(ax))/c;
+    if(u<0.09&&ny>-0.35)out.copy(C_DARK);else skin(x,y,z,nx,ny,nz,out);
+  };
+  const wSec=[];
+  for(let i=wXs.length-1;i>=0;i--){const a=wXs[i];
+    wSec.push(AERO.foil(-a,wLE(a),wC(a),0.135,wY(a),18));}
+  for(let i=1;i<wXs.length;i++){const a=wXs[i];
+    wSec.push(AERO.foil(a,wLE(a),wC(a),0.135,wY(a),18));}
+  mesh(skinned(AERO.loft(wSec,{uScale:P,vScale:P}),wingPaint),MAT.mq9Skin,g);
+  // winglets: the tip section swept round a quarter circle, up and slightly out
+  for(const sgn of [1,-1]){
+    const sec=[],R=1.05,n=6;
+    const le0=wLE(FLAT), c0=TIP_C, y0=wY(FLAT);
+    for(let i=0;i<=n;i++){
+      const a=i/n*1.50, c=AERO.lerp(c0,0.30,i/n), le=le0+(c0-c)*0.85;
+      const f=AERO.foil(0,le,c,0.11,0,12);
+      const X0=FLAT+R*Math.sin(a), Y0=y0+R*(1-Math.cos(a));
+      sec.push(f.map(p=>[sgn*(X0-p[1]*Math.sin(a)),Y0+p[1]*Math.cos(a),p[2]]));
+    }
+    const geo=AERO.loft(sec,{uScale:P,vScale:P});
+    mesh(skinned(geo,(x,y,z,nx,ny,nz,out)=>out.copy(C_DARK)),MAT.mq9Skin,g);
+  }
+  // aileron and flap breaks
+  function hingeQ(x0,z0,x1,z1,y0,y1,wide){
+    const dx=x1-x0,dz=z1-z0,len=Math.hypot(dx,dz);
+    const q=new THREE.PlaneGeometry(len,wide||0.04);
+    q.rotateX(-Math.PI/2);
+    const m=new THREE.Mesh(q,MAT.hinge);
+    m.position.set((x0+x1)/2,(y0+y1)/2,(z0+z1)/2);
+    m.rotation.y=-Math.atan2(dz,dx);
+    m.rotation.z=Math.atan2(y1-y0,len);
+    m.castShadow=false; g.add(m); return m;
+  }
+  for(const sgn of [1,-1])for(const up of [1,-1]){
+    const yo=up*0.048;
+    hingeQ(sgn*0.60,wLE(0.60)+wC(0.60)*0.72,sgn*4.90,wLE(4.90)+wC(4.90)*0.72,wY(0.60)+yo,wY(4.90)+yo);
+    hingeQ(sgn*5.30,wLE(5.30)+wC(5.30)*0.70,sgn*10.8,wLE(10.8)+wC(10.8)*0.70,wY(5.30)+yo,wY(10.8)+yo);
+  }
+
+  // ---- Y tail, a little larger than the A's ----------------------------
+  const TL_LE=Z(9.40), TL_ROOT_C=1.18, TL_TIP_C=0.62, TL_LEN=2.55, TL_CANT=38*Math.PI/180;
+  function vSurface(rootC,tipC,len,thick,leRake){
+    const sec=[],n=6;
+    for(let i=0;i<=n;i++){
+      const t=i/n, c=AERO.lerp(rootC,tipC,t), le=t*leRake, x=t*len;
+      const f=AERO.foil(0,le,c,thick,0,12);
+      sec.push(f.map(p=>[x,p[1],p[2]]));
+    }
+    return AERO.loft(sec,{uScale:P,vScale:P});
+  }
+  const tailPaint=(x,y,z,nx,ny,nz,out)=>{ if(x>TL_LEN*0.72)out.copy(C_DARK);else skin(x,y,z,nx,ny,nz,out); };
+  for(const sgn of [1,-1]){
+    const geo=vSurface(TL_ROOT_C,TL_TIP_C,TL_LEN,0.10,0.52);
+    const m=mesh(skinned(geo,tailPaint),MAT.mq9Skin,g);
+    m.position.set(sgn*0.12,0.42,TL_LE);
+    m.rotation.z=sgn>0?(Math.PI/2-TL_CANT):(Math.PI/2+TL_CANT);
+  }
+  {
+    const geo=vSurface(0.78,0.46,0.74,0.11,0.30);
+    const m=mesh(skinned(geo),MAT.mq9Skin,g);
+    m.position.set(0,-0.21,TL_LE+0.24);
+    m.rotation.z=-Math.PI/2;
+  }
+
+  // ---- pusher propeller ------------------------------------------------
+  const prop=new THREE.Group(); prop.name='prop';
+  {
+    const spin=new THREE.Group();
+    const sp=new THREE.ConeGeometry(0.14,0.36,16);
+    sp.rotateX(-Math.PI/2);
+    const spm=mesh(sp,MAT.mq9Skin,spin); AERO.paint(sp,(x,y,z,o)=>o.copy(C_BASE));
+    spm.position.z=0.18;
+    const blades=[];
+    for(let i=0;i<3;i++){
+      const sh=new THREE.Shape();
+      sh.moveTo(0.12,-0.115); sh.lineTo(1.28,-0.072);
+      sh.lineTo(1.32,0.058); sh.lineTo(0.12,0.128);
+      const bg=new THREE.ExtrudeGeometry(sh,{depth:0.028,bevelEnabled:true,bevelSize:0.009,
+        bevelThickness:0.008,bevelSegments:1,curveSegments:1,steps:1});
+      bg.translate(0,0,-0.014); bg.rotateY(0.30); bg.rotateZ(i/3*Math.PI*2); blades.push(bg);
+    }
+    mesh(AERO.merge(blades),MAT.prop,spin);
+    prop.add(spin); prop.userData.spin=spin;
+    prop.position.set(0,0.14,Z(11.30));
+    g.add(prop);
+  }
+
+  // ---- landing gear ----------------------------------------------------
+  function strut(a,b,r,mat,parent){
+    const d=new V3().subVectors(b,a),len=d.length();
+    const cg2=new THREE.CylinderGeometry(r,r*1.06,len,9);
+    cg2.translate(0,len/2,0);
+    const m=mesh(cg2,mat,parent);
+    m.position.copy(a);
+    m.quaternion.setFromUnitVectors(new V3(0,1,0),d.clone().normalize());
+    return m;
+  }
+  function wheelAt(x,y,z,R,W,parent){
+    const t=new THREE.CylinderGeometry(R,R,W,16); t.rotateZ(Math.PI/2);
+    const m=mesh(t,MAT.tyre,parent); m.position.set(x,y,z);
+    const h=new THREE.CylinderGeometry(R*0.5,R*0.5,W*1.06,10); h.rotateZ(Math.PI/2);
+    const hm=mesh(h,MAT.hub,parent); hm.position.set(x,y,z);
+  }
+  {
+    const NR=0.22, MR=0.28;
+    strut(new V3(0,-0.36,Z(2.20)),new V3(0,-1.28,Z(2.12)),0.050,MAT.gearLeg,gear);
+    wheelAt(0,-1.28,Z(2.12),NR,0.10,gear);
+    for(const sgn of [1,-1]){
+      strut(new V3(sgn*0.32,-0.34,Z(4.85)),new V3(sgn*0.95,-1.22,Z(4.92)),0.055,MAT.gearLeg,gear);
+      strut(new V3(sgn*0.28,-0.32,Z(5.35)),new V3(sgn*0.88,-1.08,Z(4.98)),0.030,MAT.gearLeg,gear);
+      wheelAt(sgn*0.95,-1.22,Z(4.92),MR,0.125,gear);
+    }
+  }
+
+  // ---- clean wing, the way the demonstrator flies: pylon stubs only ------
+  for(const sgn of [1,-1])for(const px of [2.7,4.2]){
+    const c=wC(px), le=wLE(px), y=wY(px);
+    const sh=new THREE.Shape();
+    sh.moveTo(le+c*0.14,0); sh.lineTo(le+c*0.90,0);
+    sh.lineTo(le+c*0.78,-0.16); sh.lineTo(le+c*0.28,-0.16);
+    const pg=new THREE.ExtrudeGeometry(sh,{depth:0.07,bevelEnabled:true,bevelSize:0.014,
+      bevelThickness:0.014,bevelSegments:1,curveSegments:1,steps:1});
+    pg.translate(0,0,-0.035); pg.rotateY(-Math.PI/2);
+    const m=mesh(pg,MAT.mq9Skin,weapons);
+    AERO.paint(m.geometry,(x,y2,z,o)=>o.copy(C_BASE));
+    m.position.set(sgn*px,y-0.04,0);
+  }
+
+  // ---- markings: the civil registration, large, on the aft fuselage -----
+  // Draped over the skin, since the boom tapers under it. u runs tail to nose
+  // on the right and nose to tail on the left so the unmirrored half reads.
+  function secAt(s){
+    let i=1;while(i<FUS.length-1&&FUS[i][0]<s)i++;
+    const a=FUS[i-1],b=FUS[i],f=AERO.clamp((s-a[0])/(b[0]-a[0]),0,1);
+    return [0,1,2,3,4].map(k=>AERO.lerp(a[k],b[k],f));
+  }
+  function skinX(s,y){
+    const f=secAt(s), yc=(f[2]+f[3])/2, h=y>=yc?(f[2]-yc):(yc-f[3]);
+    const v=AERO.clamp(Math.abs(y-yc)/h,0,1);
+    return f[1]*Math.pow(1-Math.pow(v,f[4]),1/f[4])+0.012;
+  }
+  function draped(sgn,s0,s1,y0,y1,map){
+    const K=10,J=4,pos=[],uv=[],idx=[];
+    for(let i=0;i<=K;i++){const s=AERO.lerp(s0,s1,i/K);
+      for(let j=0;j<=J;j++){const y=AERO.lerp(y0,y1,j/J);
+        pos.push(sgn*skinX(s,y),y,Z(s));const u=sgn>0?1-i/K:i/K;uv.push(u*0.5,j/J);}}
+    for(let i=0;i<K;i++)for(let j=0;j<J;j++){const a=i*(J+1)+j,b=a+J+1;
+      if(sgn<0)idx.push(a,b,a+1,a+1,b,b+1);else idx.push(a,a+1,b,a+1,b+1,b);}
+    const gg=new THREE.BufferGeometry();
+    gg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+    gg.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+    gg.setIndex(idx); gg.computeVertexNormals();
+    const m=new THREE.Mesh(gg,MAT.decal(map)); m.castShadow=false; g.add(m); return m;
+  }
+  {
+    const reg=TEX.stencil(opt.reg||'N190TC',120,'rgba(24,28,32,0.96)',768,160);
+    for(const sgn of [1,-1])draped(sgn,7.25,8.85,0.04,0.36,reg);
+    const ex=TEX.stencil('EXPERIMENTAL',40,'rgba(60,66,72,0.9)',640,96);
+    for(const sgn of [1,-1])draped(sgn,2.05,2.70,0.26,0.35,ex);
+  }
+
+  const meta={name:'MQ-9B SkyGuardian',sub:'General Atomics',
+    spec:{len:L,span:SPAN,height:HEIGHT},ground:GND};
+  return {g:g,gear:gear,prop:prop,ab:null,weapons:weapons,pylons:null,meta:meta};
+}
 // ======================== DROP-IN END ========================
-return {buildF16HD:buildF16HD,buildMQ9HD:buildMQ9HD,buildC130HD:buildC130HD,MAT:MAT,TEX:TEX,AERO:AERO};
+return {buildF16HD:buildF16HD,buildMQ9HD:buildMQ9HD,buildC130HD:buildC130HD,buildMQ9BHD:buildMQ9BHD,MAT:MAT,TEX:TEX,AERO:AERO};
 }
 function init(){
 const glc=document.getElementById('gl');
@@ -3348,6 +3610,7 @@ function getModel(id){
   else if(id==='cessna'){const c=buildPlane({reg:'N8401L',stripe:0x1d3557,accent:0xd4a017,full:true}),w=new THREE.Group();scene.remove(c.g);c.g.position.y=-0.15;w.add(c.g);scene.add(w);m={g:w,prop:c.prop,disc:c.disc};}
   else if(id==='alpha')m=buildAlpha();
   else if(id==='c130')m=hdModel('c130')||buildC130();
+  else if(id==='mq9b')m=hdModel('mq9b')||buildReaper('N190TC');
   else m=hdModel('reaper')||buildReaper();
   m.g.visible=false;return MODELS[id]=m;
 }
@@ -3919,7 +4182,7 @@ function onLanding(e){
   if(isNight())achGrant('night');
   const dash=AC.id==='f16'?dashLand(e):null;
   let better=false;
-  if(AC.id==='cessna'||AC.id==='alpha')better=scRecord(AC.id,g);
+  if(AC.id==='cessna'||AC.id==='alpha'||AC.id==='mq9b')better=scRecord(AC.id,g);
   if(dash&&dash.better)better=true;
   document.getElementById('lLetter').textContent=g.letter;
   document.getElementById('lLetter').className='gLetter g'+g.letter;
@@ -3950,6 +4213,7 @@ const REC_ROWS=[
   ['cessna','Cessna 172','cessna','Best landing',r=>r.letter+'   '+r.pts+' pts,  '+r.fpm+' fpm,  '+r.off.toFixed(1)+' m off'],
   ['alpha','Pipistrel Alpha','alpha','Best landing',r=>r.letter+'   '+r.pts+' pts,  '+r.fpm+' fpm'],
   ['f16','F-16C Viper','f16','Luke to Glendale',r=>fmtT(r.secs)+',  '+r.g.toFixed(1)+' G peak'],
+  ['mq9b','MQ-9B SkyGuardian','mq9b','Best landing',r=>r.letter+'   '+r.pts+' pts,  '+r.fpm+' fpm'],
   ['reaper','MQ-9A Reaper','reaper','Loiter and strike',r=>r.pts+' pts,  '+r.hits+'/4 hits,  '+r.avg+' m,  '+r.tot+' s on target'],
   ['c130d','C-130H Hercules','c130:drop','Airdrop',r=>r.letter+'   '+r.dist+' m from centre'],
   ['c130s','','c130:short','Short field',r=>r.letter+'   stopped in '+r.stopFt+' ft, touched at '+r.tdFt+' ft']
@@ -4380,8 +4644,8 @@ function say(who,text,clips){radioQ.length=0;playLine({who:who,text:text,clips:c
 const L=(who,kind,text,clips)=>({who,kind,text,clips});
 
 // ---- clip helpers ----
-const CSC ={cessna:'cs_skyhawk',  alpha:'cs_pipistrel',  reaper:'cs_reaper',  f16:'cs_viper',c130:'cs_herky'};
-const CSCS={cessna:'cs_skyhawk_s',alpha:'cs_pipistrel_s',reaper:'cs_reaper_s',f16:'cs_viper',c130:'cs_herky'};
+const CSC ={cessna:'cs_skyhawk',  alpha:'cs_pipistrel',  reaper:'cs_reaper',  f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian'};
+const CSCS={cessna:'cs_skyhawk_s',alpha:'cs_pipistrel_s',reaper:'cs_reaper_s',f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian_s'};
 const csT =()=>'t_'+(CSC[AC.id] ||'cs_skyhawk');
 const csTs=()=>'t_'+(CSCS[AC.id]||'cs_skyhawk_s');
 const csP =()=>'p_'+(CSC[AC.id] ||'cs_skyhawk');

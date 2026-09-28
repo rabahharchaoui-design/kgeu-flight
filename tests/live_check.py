@@ -83,7 +83,7 @@ async def main():
     # the checks above leave a flight running, so bring the menu back up first
     await pg.evaluate("()=>window.__kgeu.openMenu()")
     await pg.wait_for_timeout(600)
-    for t in ['cessna','alpha','f16','reaper','c130']:
+    for t in ['cessna','alpha','f16','reaper','mq9b','c130']:
         ok = await pg.is_visible(f'.pick[data-t="{t}"]')
         chk(f'{t} is offered in the menu', ok)
     chk('spawn picker is there', await pg.is_visible('.pick[data-b="luke"]'))

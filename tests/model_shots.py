@@ -32,13 +32,14 @@ REFS = {
     'cessna': ['refs/ref_c172.jpg'], 'alpha': ['refs/ref_alpha.jpg'],
 }
 
-# camera offsets in the aircraft frame, scaled by the type's length
-def angles(L):
-    d = L * 1.15
+# camera offsets in the aircraft frame, scaled by the type's length or span
+def angles(L, span):
+    d = max(L, span * 0.55) * 1.15          # side and three quarter
+    w = max(L, span * 0.80) * 1.15          # front and top must fit the span
     return {
         'side':    {'p': [d, L * 0.10, 0.05 * L], 't': [0, 0.05 * L, 0.05 * L], 'fov': 34},
-        'front':   {'p': [0, L * 0.12, -d * 1.05], 't': [0, 0.02 * L, 0], 'fov': 34},
-        'top':     {'p': [0.001, d * 1.25, 0.05 * L], 't': [0, 0, 0.05 * L], 'fov': 34},
+        'front':   {'p': [0, L * 0.12, -w * 1.05], 't': [0, 0.02 * L, 0], 'fov': 34},
+        'top':     {'p': [0.001, w * 1.25, 0.05 * L], 't': [0, 0, 0.05 * L], 'fov': 34},
         'quarter': {'p': [d * 0.75, L * 0.36, -d * 0.75], 't': [0, 0.06 * L, 0.05 * L], 'fov': 34},
     }
 
@@ -64,10 +65,10 @@ async def main():
             await pg.wait_for_timeout(2500)
             info = await pg.evaluate("""()=>{const p=window.__kgeu.plane();let n=0,d=0;
               p.g.traverse(m=>{if(m.isMesh&&m.visible){d++;const g=m.geometry;n+=g.index?g.index.count/3:g.attributes.position.count/3;}});
-              const L=window.__kgeu.TYPES[window.__kgeu.state().type].len;return {tris:Math.round(n),draws:d,L:L};}""")
+              const T=window.__kgeu.TYPES[window.__kgeu.state().type];return {tris:Math.round(n),draws:d,L:T.len,span:T.span};}""")
             tris[t] = info
             print(f'{t}: {info["tris"]} triangles, {info["draws"]} meshes')
-            for name, cam in angles(info['L']).items():
+            for name, cam in angles(info['L'], info['span']).items():
                 await pg.evaluate("(c)=>window.__kgeu.freeCam(c)", cam)
                 await pg.wait_for_timeout(700)
                 await pg.screenshot(path=f'{OUT}/{t}_{name}.png')
