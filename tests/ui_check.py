@@ -120,6 +120,15 @@ async def main():
         if skill == 'pilot': await pg.screenshot(path=f'tests/shot_strike_{w}x{h}.png')
         await go(f"{K}.mission('drop')", 2000)
         await audit(pg, f'{skill}, C-130 airdrop', w, h)
+        # the crash card (3.9): RETRY and MENU at the bottom, the flight controls gone
+        await go(f"{K}.pick('f16');{K}.pickBase('kgeu');{K}.start('final')", 800)
+        await go(f"{K}.crashNow('Hard impact at 1240 fpm. Keep the sink rate under 750 fpm.');for(let i=0;i<110;i++){K}.stepFrame(1/30,false,true);{K}.stepFrame(1/60);{K}.stepFrame(0,true)", 300)
+        await pg.wait_for_function("()=>getComputedStyle(document.getElementById('crash')).opacity==='1'", timeout=10000)
+        cc = await pg.evaluate("()=>['cRetry','cMenu'].map(id=>{const e=document.getElementById(id),r=e.getBoundingClientRect();return r.width>=44&&r.height>=44&&e.offsetParent!==null})")
+        if not all(cc):
+            failures.append(f'{w}x{h} {skill}: crash card RETRY/MENU missing or small'); print(f'  FAIL {w}x{h} {skill}: crash card buttons {cc}')
+        await audit(pg, f'{skill}, crash card', w, h)
+        if skill == 'rookie': await pg.screenshot(path=f'tests/shot_{w}x{h}_crash.png')
 
       await go(f"{K}.pick('cessna');{K}.pickBase('kgeu');{K}.start('final')", 1800)
       await go(f"{K}.setDest({K}.RWY_ENDS[3])", 600)

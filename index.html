@@ -325,7 +325,21 @@ body.touch #miss b{ font-size:14px; } body.touch #miss span{ font-size:12px; }
 #lesI{ font-weight:700; } #lesM{ font-variant-numeric:tabular-nums; color:var(--soft); font-size:14px; }
 body.touch #lesson{ max-width:30vw; font-size:13px; padding:6px 10px; bottom:calc(env(safe-area-inset-bottom,0px) + 10px); }
 body.touch #lesM{ font-size:12px; }
-.crashTitle{ font-size:42px; font-weight:800; margin:0; color:var(--warn); }
+/* crash: a one line reason at the top, then a compact card at the bottom (3.9) */
+#crashTop{ position:absolute; left:50%; top:calc(var(--padT) + 4px); transform:translateX(-50%); width:max-content; max-width:min(440px, calc(100% - 2 * (var(--padL) + var(--map) + 14px)));
+  font-size:15px; font-weight:600; line-height:1.25; text-align:center; color:#ffe2d2; text-shadow:0 1px 3px rgba(0,0,0,.8); padding:4px 12px; border-radius:8px;
+  background:rgba(26,16,9,.45); opacity:0; transition:opacity .25s; pointer-events:none; }
+#crashTop.on{ opacity:1; }
+#crash{ position:absolute; left:50%; bottom:calc(var(--padB) + 6px); transform:translate(-50%, calc(100% + 40px)); width:max-content;
+  max-width:min(520px, calc(100% - var(--padL) - var(--padR) - 16px)); display:flex; align-items:center; gap:12px; padding:8px 10px 8px 14px;
+  border-radius:12px; background:rgba(26,16,9,.55); border:1px solid rgba(255,255,255,.12); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+  opacity:0; transition:transform .35s cubic-bezier(.2,.8,.2,1), opacity .3s; pointer-events:none; }
+#crash.on{ transform:translate(-50%,0); opacity:1; pointer-events:auto; }
+#crash .ccTxt{ min-width:0; flex:1 1 auto; font-size:13px; line-height:1.25; }
+#crash .ccTxt b{ display:block; color:var(--warn); font-size:16px; font-weight:800; letter-spacing:.04em; }
+#crash .ccBtns{ display:flex; gap:8px; flex:none; }
+#crash button{ min-height:44px; min-width:84px; font-size:17px; font-weight:800; padding:8px 14px; }
+body.crashOn #hud, body.crashOn #dock, body.crashOn #touch, body.crashOn #lookPad, body.crashOn #bPause, body.crashOn #hDest, body.crashOn #warn, body.crashOn #bigcfg, body.crashOn #tutArrow{ display:none !important; }
 .touchnote{ display:none; color:var(--soft); margin:0 0 16px; font-size:16px; }
 #a2hs{ display:none; margin:0 0 14px; padding:10px 13px; font-size:15px; line-height:1.4;
   color:var(--ink); background:rgba(242,169,0,.13); border:1px solid rgba(242,169,0,.45); border-radius:10px; }
@@ -588,6 +602,10 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
   <div id="warn"></div>
   <div id="atc" class="card"></div>
   <div id="toast"></div>
+  <!-- crash: the reason as one line at the top, then after 3 s a small card at the bottom
+       that leaves the fireball in view -->
+  <div id="crashTop" aria-live="assertive"></div>
+  <div id="crash" role="dialog" aria-label="Crashed"><div class="ccTxt"><b>CRASHED</b><span id="crashWhy"></span></div><div class="ccBtns"><button class="primary" id="cRetry">RETRY</button><button id="cMenu">MENU</button></div></div>
   <div id="bigcfg"></div>
   <div id="sensorHud"><div class="ch chL"></div><div class="ch chR"></div><div class="ch chT"></div><div class="ch chB"></div>
     <div class="bk a"></div><div class="bk b"></div><div class="bk c"></div><div class="bk d"></div>
@@ -764,16 +782,6 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
   <p class="sub" id="mTitle"></p>
   <div id="mLines"></div>
   <div class="row"><button class="primary" id="mRetry">Try again</button><button id="mOther">Other mission</button><button id="mFree">Free flight</button></div>
-</div></div>
-<div class="overlay" id="crash"><div class="sheet">
-  <p class="crashTitle">Crashed</p>
-  <p class="sub" id="crashWhy"></p>
-  <div class="row">
-    <button class="primary" id="cRunway">Retry from runway 1</button>
-    <button id="cRamp">Retry from the ramp</button>
-    <button id="cFinal">Retry on final</button>
-    <button id="cMenu">Main menu</button>
-  </div>
 </div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -3804,7 +3812,7 @@ const _aclF=new V3();
 // per frame for the flown aircraft: switch logic, uniforms and the ground pool
 function aclUpdate(L,dp,q,agl,s){
   const air=!s.onGround,gear=AC.retract?s.gearPos:1;
-  const on=!air||agl<305;
+  const on=!s.crashed&&(!air||agl<305);
   ACL_STATE.on=on;
   const u=ACL_MAT.uniforms;u.uLand.value=on?1:0;u.uGear.value=gear>0.98?1:0;u.uAir.value=air?1:0;
   let op=0;
@@ -4802,6 +4810,7 @@ function showBest(){}
 const CAMS=['Chase','Nose camera','Sensor ball'];
 // chase, nose, and the ball on the aircraft that carry one
 function cycleCam(){
+  if(running&&st.crashed)return;   // the wreck view holds until RETRY or MENU
   // VIEW out of the ramp view or the pallet ride goes straight back to the chase camera
   if(camMode===0&&DCAM.mode!=='chase'){dcSet('chase',0);toast('Camera: '+CAMS[0]);return;}
   camMode=(camMode+1)%(hasBall()?3:2);
@@ -4937,7 +4946,7 @@ function pollPad(dt){
     if(edge(0))autoSmart();if(edge(2))toggleGear();if(edge(3))cycleCam();
     if(edge(4))setFlaps(st.flapIdx-1);if(edge(5))setFlaps(st.flapIdx+1);
     if(edge(12))setThr(1);if(edge(13))setThr(0);
-  } else if(crashEl.classList.contains('on')&&edge(0))start('runway');
+  } else if(crashEl.classList.contains('on')&&edge(0))crashRetry();
   touchIn.padBrake=B(1)>0.5;padPrev=g.buttons.map(b=>b.value||(b.pressed?1:0));
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&running&&!paused&&!st.crashed){togglePause();try{speechSynthesis.cancel();}catch(e){}}});
@@ -6119,12 +6128,12 @@ function photoSave(){
 }
 $('pPhoto').onclick=photoOpen;$('phX').onclick=photoClose;$('phSave').onclick=photoSave;
 // ---------- menus ----------
-const menu=document.getElementById('menu'),crashEl=document.getElementById('crash');
+const menu=document.getElementById('menu'),crashEl=document.getElementById('crash'),crashTopEl=document.getElementById('crashTop');
 function start(mode,base){
   initAudio();
   setType(acType);useModel(acType);sizeShadow();radioQ.length=0;radioHush();radioBusy=0;chatT=9;atcT=0;atcEl.classList.remove('on');
   st=createState(mode,base||SPAWN_BASE);st.type=acType;ROOK.to=false;guideShow(null);st.easy=easy;st.noPF=isTouch||easy;document.body.classList.toggle('easy',easy);A={};running=true;paused=false;events.length=0;cfgReset();camBump=0;
-  menuClose();crashEl.classList.remove('on');pauseOv.classList.remove('on');$('storyOv').classList.remove('on');snapCamera=true;
+  menuClose();crashClear();pauseOv.classList.remove('on');$('storyOv').classList.remove('on');snapCamera=true;
   if(camMode>1)camMode=0;   // the ball view is entered in flight, where its autopilot can take over
   STRIKE.active=false;lesEnd();gradeOv.classList.remove('on');arcStop();$('arcOv').classList.remove('on');
   missReset();missOv.classList.remove('on');landOv.classList.remove('on');
@@ -6158,8 +6167,10 @@ document.getElementById('recReset').onclick=e=>{
   if(!resetArmed){resetArmed=1;e.target.textContent='Tap again to erase everything';e.target.classList.add('arm');return;}
   scReset();resetArmed=0;e.target.textContent='Reset all records';e.target.classList.remove('arm');
   toast('All records and achievements erased');};
-document.getElementById('cRunway').onclick=()=>start('runway');document.getElementById('cRamp').onclick=()=>start('ramp');document.getElementById('cFinal').onclick=()=>start('final');
-$('cMenu').onclick=()=>{crashEl.classList.remove('on');openMenu();};
+// the crash card: RETRY flies the same start again (runway, ramp, final or mission, same base)
+function crashRetry(){start(CRASH.mode||'runway',CRASH.base);}
+tapBtn($('cRetry'),crashRetry);
+tapBtn($('cMenu'),()=>{crashEl.classList.remove('on');crashTopEl.classList.remove('on');openMenu();});
 document.getElementById('bFull').onclick=()=>{const d=document.documentElement;if(document.fullscreenElement){document.exitFullscreen&&document.exitFullscreen();return;}
   const r=d.requestFullscreen||d.webkitRequestFullscreen;if(!r){toast('Full screen not available here');return;}try{const p=r.call(d);if(p&&p.catch)p.catch(()=>toast('Full screen is blocked in this view. Use Ctrl Cmd F'));}catch(e){toast('Full screen is blocked in this view');}};
 function easyUI(){document.querySelectorAll('[data-skill]').forEach(b=>b.classList.toggle('sel',b.dataset.skill===(SKILL||'rookie')));
@@ -7135,6 +7146,8 @@ for(let i=0;i<FIRE_MAX;i++){
 function lightFire(x,z,y0,sec){let n=0;
   for(const f of fires){if(f.on||n>=3)continue;f.on=true;f.x=x;f.z=z;f.y0=y0;f.left=sec||1e9;f.sp.visible=true;n++;}}
 // how lit unlit smoke should look: full by day, dim at dusk, dark at night; flat grey in IR
+// 0 on the camera, 1 from 20 m out: fire and smoke never render on top of the lens
+function fxNear(sp){return clamp((sp.position.distanceTo(camera.position)-8)/12,0,1);}
 function fxLit(){return camMode===2&&SENSOR.mode!=='tv'?-1:TOD.night?0.16:TOD.id==='sunset'||TOD.id==='haboob'?0.6:1;}
 function fireUpdate(dt){
   windVec(_fw);const lit=fxLit();
@@ -7142,10 +7155,10 @@ function fireUpdate(dt){
     if(f.left<=0){f.on=false;f.sp.visible=false;continue;}
     const fade=clamp(f.left/5,0,1);
     if(f.fire){const k=0.8+0.25*Math.sin(f.t*9);f.sp.position.set(f.x,f.y0+2.4*k,f.z);
-      f.sp.scale.setScalar(8*k);f.sp.material.opacity=0.85*fade;}
+      f.sp.scale.setScalar(8*k);f.sp.material.opacity=0.85*fade*fxNear(f.sp);}
     else{const a=(f.t*0.16)%1,s=a*6.25;   // s: seconds since this puff left the wreck
       f.sp.position.set(f.x+Math.sin(f.t*0.5)*a*9+_fw.x*s,f.y0+3+a*40,f.z+Math.cos(f.t*0.4)*a*7+_fw.z*s);
-      f.sp.scale.setScalar(8+a*30);f.sp.material.opacity=0.5*(1-a)*fade;f.sp.material.color.setScalar(lit<0?0.42:0.333*lit);}}
+      f.sp.scale.setScalar(8+a*30);f.sp.material.opacity=0.5*(1-a)*fade*fxNear(f.sp);f.sp.material.color.setScalar(lit<0?0.42:0.333*lit);}}
 }
 // ---- pooled impact debris ----
 const DEB_MAX=30,debris=[];
@@ -7169,7 +7182,9 @@ function debrisUpdate(dt){
 // explode(x,y,z,opt) with opt {scale: 1 truck, 2 bunker, 3 aircraft crash, 5 C-130;
 //   secondary: 0-3 smaller bursts 0.4-1.5 s later; debris: pieces thrown; smokeSec: how long
 //   the column lingers (60); fireSec: how long the wreck burns (0 none); glow: light the
-//   ground at night (true)}.
+//   ground at night (true); boomDelay: when the bang arrives, s (default from the aircraft);
+//   baseFade: the bottom fraction of the column that fades in (0.04; a crash lifts it off the wreck)}.
+// Every fire and smoke sprite fades out inside 20 m of the camera (fxNear), so none ever sits on the lens.
 // Three explosions at once, each 8 fireball sprites (3 hard additive cores, 5 textured
 // bodies), 1 flash, 18 column sprites, a shock ring, a dust ring, a scorch and a night
 // ground glow; secondaries come from a pool of 4 three-sprite bursts. 117 sprites at most
@@ -7254,7 +7269,7 @@ function explode(x,y,z,opt){opt=opt||{};
   if(!o){o=FX[0];for(const e of FX)if(e.t>o.t)o=e;}
   o.on=true;o.t=0;o.frames=0;o.x=x;o.y=Math.max(y,gy);o.z=z;o.gy=gy;o.s=s;
   o.T=2.5*Math.sqrt(s);o.H=250*Math.sqrt(s);
-  o.smokeSec=opt.smokeSec!==undefined?opt.smokeSec:60;o.fireSec=opt.fireSec||0;o.glow=opt.glow!==false;
+  o.smokeSec=opt.smokeSec!==undefined?opt.smokeSec:60;o.bf=opt.baseFade||0.04;o.fireSec=opt.fireSec||0;o.glow=opt.glow!==false;
   o.end=Math.max(o.smokeSec,o.fireSec,o.T)+2;fxLast=o;
   // size goes with scale, so a bunker is plainly twice a truck
   const R=13*s,S=44*s;
@@ -7274,7 +7289,7 @@ function explode(x,y,z,opt){opt=opt||{};
     const a=Math.random()*6.283,d=(6+Math.random()*10)*Math.sqrt(s);e.dx=Math.cos(a)*d;e.dz=Math.sin(a)*d;}
   if(opt.debris)throwDebris(x,gy,z,opt.debris,s);
   if(o.fireSec>0)lightFire(x,z,gy,o.fireSec);
-  boom(x,z,s);fxShake(x,o.y,z,s);fxFlashDom(x,o.y,z,s);
+  boom(x,z,s,opt.boomDelay);fxShake(x,o.y,z,s);fxFlashDom(x,o.y,z,s);
   irDirty=true;
   return o;
 }
@@ -7307,8 +7322,8 @@ function fxUpdate(dt){
       const m=f.sp.material;
       f.sp.position.set(o.x+f.dx*e+_fw.x*t*u,o.y+3*rs+f.dy*e+rise*(f.core?0.5:1),o.z+f.dz*e+_fw.z*t*u);
       f.sp.scale.setScalar(f.sz*(0.15+0.85*e)*(1+0.35*u));
-      if(f.core){const c=clamp((t-0.35)/0.8,0,1);fxHot(f.sp,c*0.35);m.opacity=1-c;if(c>=1)f.sp.visible=false;}
-      else{fxHot(f.sp,u);m.opacity=0.97*clamp((1-u)*2.5,0,1);}
+      if(f.core){const c=clamp((t-0.35)/0.8,0,1);fxHot(f.sp,c*0.35);m.opacity=(1-c)*fxNear(f.sp);if(c>=1)f.sp.visible=false;}
+      else{fxHot(f.sp,u);m.opacity=0.97*clamp((1-u)*2.5,0,1)*fxNear(f.sp);}
       m.rotation=f.rot+t*0.3;}
     // smoke column: 18 sprites spread along it by phase. The top climbs to H in about 12 s;
     // each sprite rises through the stem, rolls out into the cap past 0.7 and comes back in
@@ -7329,7 +7344,7 @@ function fxUpdate(dt){
       const g=(0.09+m.shade+0.22*p)*Math.max(lit,0),hot=clamp(1-t/(T*1.6),0,1)*clamp(1-p*4,0,1);
       if(lit<0)m.sp.material.color.setScalar(0.42);
       else m.sp.material.color.setRGB(g+hot*0.6,g+hot*0.25,g*0.97+hot*0.06);
-      m.sp.material.opacity=(0.82-0.2*cf)*fin*clamp(p/0.04,0,1)*clamp((1-p)/0.08,0,1)*(0.3+0.7*thin);}
+      m.sp.material.opacity=(0.82-0.2*cf)*fin*clamp(p/o.bf,0,1)*clamp((1-p)/0.08,0,1)*(0.3+0.7*thin)*fxNear(m.sp);}
     // shock ring out to 120 m * scale in 0.8 s; a slower dust ring behind it
     o.ring.material.color.setRGB(rl,0.94*rl,0.82*rl);o.dust.material.color.setRGB(0.76*rl,0.68*rl,0.53*rl);
     {const k=clamp(t/0.8,0,1);o.ring.scale.setScalar(Math.max(0.01,120*s*(1-(1-k)*(1-k))));o.ring.material.opacity=0.75*(1-k);if(k>=1)o.ring.visible=false;
@@ -7348,9 +7363,192 @@ function fxUpdate(dt){
   for(const m of FX_M){if(!m.on)continue;m.t+=dt;const T=1.3*Math.sqrt(m.s),u=m.t/T,e=1-Math.exp(-m.t*4);
     if(u>=1){m.on=false;m.fb.forEach(f=>f.sp.visible=false);continue;}
     m.fb.forEach((f,i)=>{const mt=f.sp.material;f.sp.position.set(m.x+f.dx*e,m.y+3+f.dy*e+m.t*5,m.z+f.dz*e);
-      f.sp.scale.setScalar(f.sz*(0.2+0.8*e));fxHot(f.sp,i?0.2+0.8*u:u*1.3);mt.opacity=i?clamp((1-u)*2,0,1)*0.95:clamp(1-u*1.3,0,1);});}
+      f.sp.scale.setScalar(f.sz*(0.2+0.8*e));fxHot(f.sp,i?0.2+0.8*u:u*1.3);mt.opacity=(i?clamp((1-u)*2,0,1)*0.95:clamp(1-u*1.3,0,1))*fxNear(f.sp);});}
 }
 function fxClear(){for(const o of FX){o.t=o.end;}fxUpdate(0);for(const m of FX_M){m.t=99;}fxUpdate(0);}
+
+// ================= crash FX (3.9): every crash explodes, sized by the airframe =================
+// CRASH_FX[type]: scale (explode() scale), sec (secondaries), deb (pooled debris boxes),
+// fire (wreck burn, s), smoke (column, s), r (fuselage radius, m), col (hull colour),
+// parts (which wreck pieces: light, drone, trail, c130), look (m down the impact path the
+// wreck camera looks), stages (C-130 fuel tanks: [s after impact, span fraction, scale]; the
+// last one is a smaller pooled burst because the three explode() slots are in use by then)
+const CRASH_FX={
+  cessna:{scale:0.8,sec:0,deb:4,fire:45,smoke:60,r:0.6,col:0xe8e4da,parts:'light'},
+  alpha: {scale:0.8,sec:0,deb:4,fire:45,smoke:60,r:0.5,col:0xdfe4e8,parts:'light'},
+  reaper:{scale:0.9,sec:1,deb:8,fire:30,smoke:60,r:0.6,col:0x9ea3a6,parts:'drone'},
+  mq9b:  {scale:0.9,sec:1,deb:8,fire:30,smoke:60,r:0.6,col:0xa9aeb1,parts:'drone'},
+  f16:   {scale:1.6,sec:2,deb:12,fire:50,smoke:70,r:0.75,col:0x8c939a,parts:'trail',look:25},
+  c130:  {scale:2.6,sec:3,deb:20,fire:90,smoke:90,r:2.0,col:0x8d949b,parts:'c130',look:6,
+          stages:[[0.75,-0.3,1.4],[1.55,0.33,1.5],[2.4,-0.46,1.6]]}
+};
+// wreck pieces: 12 pooled groups (a body, a cylinder or a box, plus up to 6 box parts: wing,
+// fin, nacelles, tail plates) and a flame sprite each. Nothing is built per crash; the same
+// two geometries are scaled, and a piece is hidden when its life ends.
+const WRK_N=12,WRK_X=6,WRK=[],WRK_BOX=new THREE.BoxGeometry(1,1,1),WRK_CYL=new THREE.CylinderGeometry(1,1,1,10);WRK_CYL.rotateX(Math.PI/2);
+for(let i=0;i<WRK_N;i++){const mat=lam(0x555555),g=new THREE.Group(),b=new THREE.Mesh(WRK_BOX,mat),xs=[];
+  g.add(b);for(let j=0;j<WRK_X;j++){const x=new THREE.Mesh(WRK_BOX,mat);x.visible=false;g.add(x);xs.push(x);}
+  g.visible=false;g.userData.heat=0.85;scene.add(g);
+  const fl=new THREE.Sprite(new THREE.SpriteMaterial({map:fxBallTex,transparent:true,opacity:0,depthWrite:false,fog:false,blending:THREE.AdditiveBlending}));
+  fl.visible=false;fl.layers.set(1);fl.userData.heat=1;fl.userData.add=true;scene.add(fl);
+  WRK.push({g:g,b:b,xs:xs,mat:mat,fl:fl,v:new V3(),av:new V3(),life:0,burn:0,fric:5,hh:1,fs:1,kind:'',ground:false,ph:i*1.7});}
+const CRASH={on:false,cam:false,card:false,t:0,type:'',prof:null,s:1,p:new V3(),q:new Q4(),dir:new V3(),right:new V3(),spd:0,gy:0,
+  main:null,hull:null,fireballs:0,stage:0,boomAt:0,cardAt:3,shake:0,dist:30,az:0,camDir:new V3(),camP:new V3(),look:new V3(),up:new V3(),fov:62,mode:'runway',base:'kgeu'};
+const _wv=new V3(),_wo=new V3(),_wa=new V3(),_wt=new V3(),_wc=new V3(),_wq=new Q4(),_we=new THREE.Euler(0,0,0,'YXZ'),_wcol=new THREE.Color(),_wY=new V3(0,1,0);
+// one piece. off: offset in the aircraft frame; shape 'cyl' (sx=sy=radius, sz=length) or 'box';
+// xs: box parts [sx,sy,sz, x,y,z, roll] on it (wing, fin, nacelles); fwd/side/up: velocity along the impact path,
+// across it and up; o: {life, burn, fs (flame size), fric (sliding decel, m/s2), spin (rad/s), char}
+function wreckPiece(kind,off,shape,sx,sy,sz,xs,fwd,side,up,o){
+  let p=null;for(const e of WRK)if(e.life<=0){p=e;break;}if(!p)return null;
+  p.kind=kind;p.life=o.life||45;p.burn=o.burn||0;p.fs=o.fs||1;p.fric=o.fric||5;p.ground=false;
+  p.b.geometry=shape==='cyl'?WRK_CYL:WRK_BOX;p.b.scale.set(sx,sy,sz);p.hh=shape==='cyl'?sy:sy/2;
+  for(let j=0;j<WRK_X;j++){const m=p.xs[j],e=xs&&xs[j];m.visible=!!e;
+    if(e){m.scale.set(e[0],e[1],e[2]);m.position.set(e[3],e[4],e[5]);m.rotation.set(0,0,e[6]||0);}}
+  _wo.set(off[0],off[1],off[2]).applyQuaternion(CRASH.q);p.g.position.copy(CRASH.p).add(_wo);
+  p.g.quaternion.copy(CRASH.q);p.g.visible=true;
+  p.v.copy(CRASH.dir).multiplyScalar(fwd).addScaledVector(CRASH.right,side);p.v.y=up;
+  const sp=o.spin||0;p.av.set((Math.random()-0.5)*2*sp,(Math.random()-0.5)*2*sp,(Math.random()-0.5)*2*sp);
+  p.mat.color.setHex(CRASH.prof.col).lerp(_wcol.setHex(0x1e1a16),o.char!==undefined?o.char:0.5);
+  return p;
+}
+function crashParts(P){
+  const L=AC.len,S=AC.span,r=P.r,v=CRASH.spd,R=()=>Math.random(),pm=()=>R()<0.5?-1:1,burn=Math.min(P.fire,55);
+  if(P.parts==='light'){
+    CRASH.hull=wreckPiece('hull',[0,0,0],'cyl',r,r,L*0.62,[[S*0.85,0.12,1.4,0,r*0.55,-L*0.05]],Math.min(v*0.12,8),0,1,{life:58,burn:burn,fs:1.5,fric:6,spin:0.6});
+    wreckPiece('tail',[0,0.3,L*0.38],'box',0.45,1.3,L*0.3,[[2.8,0.08,0.9,0,0.2,0.3]],Math.min(v*0.1,5)+2,pm()*(1+R()*2),4,{life:58,fric:5,spin:3,char:0.3});
+  }else if(P.parts==='drone'){
+    // the fuselage stays in one piece with its V tail; both wings come off and tumble clear, inside ~40 m
+    const fl=L*0.85;
+    CRASH.hull=wreckPiece('hull',[0,0,0],'cyl',r,r,fl,[[0.1,2.4,1.3,-0.95,0.75,fl*0.42,0.75],[0.1,2.4,1.3,0.95,0.75,fl*0.42,-0.75],[0.1,1.2,1,0,-0.9,fl*0.42]],
+      Math.min(v*0.1,6),0,1,{life:58,burn:burn,fs:1.1,fric:6,spin:0.4,char:0.2});
+    for(const sd of [-1,1])wreckPiece('wing',[sd*S*0.25,0.3,0],'box',S*0.45,0.14,1.2,null,Math.min(v*0.06,4)*(0.5+R()*0.5),sd*(4+R()*2),7+R()*3,
+      {life:58,burn:6+R()*8,fs:0.8,fric:9,spin:4+R()*3,char:0.2});
+  }else if(P.parts==='trail'){
+    // the F-16 comes apart along its path: a 9 m fuselage chunk with its wing roots and fin, and
+    // burning pieces flung forward, sliding and tumbling to a stop
+    CRASH.hull=wreckPiece('hull',[0,0,0],'cyl',r,r,9,[[6,0.15,3.4,0,-0.1,1.2],[0.25,2.4,2.6,0,1.9,3.4,0.1]],Math.min(v*0.1,10),0,1,{life:58,burn:burn,fs:1.9,fric:6,spin:0.6,char:0.25});
+    // each piece's speed is picked so the flight (from whatever height) plus the slide ends
+    // 12 to 120 m down the path: v*tf + v^2/(2 fric) = D
+    const n=6+Math.floor(R()*5),hy=Math.max(0,CRASH.p.y-CRASH.gy);
+    for(let i=0;i<n;i++){const D=12+108*(i+R())/n,vy=2+R()*3,tf=(vy+Math.sqrt(vy*vy+2*9.81*hy))/9.81,fr=6;
+      const sp=fr*(-tf+Math.sqrt(tf*tf+2*D/fr)),ln=1+R()*1.5;
+      wreckPiece('trail',[(R()-0.5)*2,0.3,-R()*L*0.3],'box',ln*(0.4+R()*0.4),0.3+R()*0.4,ln,null,
+        sp,(R()-0.5)*4,vy,{life:45,burn:10+R()*25,fs:0.9+R()*0.5,fric:fr,spin:6+R()*4,char:0.4});}
+  }else if(P.parts==='c130'){
+    // a broken Hercules, airframe grey: an 8 m nose, the centre with the full wing and four
+    // nacelles, a 10 m tail with its fin and tailplane; then a wide field of chunks
+    const nac=[];for(const x of [-12.4,-6.4,6.4,12.4])nac.push([1.3,1.4,5,x,r*0.55,-1.4]);
+    wreckPiece('nose',[0,0,-L*0.36],'cyl',r,r,8,null,Math.min(v*0.15,14)+4,pm()*R()*1.5,2,{life:58,burn:40,fs:2.2,fric:4,spin:0.6,char:0.12});
+    CRASH.hull=wreckPiece('centre',[0,0,0],'cyl',r*1.05,r*1.05,12,[[S,0.5,4.2,0,r*0.8,0]].concat(nac),Math.min(v*0.08,6),0,0.5,{life:58,burn:burn,fs:3.2,fric:5,spin:0.2,char:0.12});
+    wreckPiece('tail',[0,0.4,L*0.38],'cyl',r*0.85,r*0.85,10,[[16,0.3,3.1,0,r*0.3,3.6],[0.42,6.6,4.6,0,r+3,2.8]],Math.min(v*0.05,3)-2,pm()*2,3,{life:58,burn:30,fs:2,fric:5,spin:0.8,char:0.12});
+    for(let i=0;i<5;i++)wreckPiece('chunk',[(R()-0.5)*S*0.8,0.5,(R()-0.5)*L*0.5],'box',0.8+R()*1.7,0.4+R()*0.8,0.8+R()*2,null,
+      6+R()*16,(R()-0.5)*24,5+R()*8,{life:45,burn:R()<0.5?8+R()*12:0,fs:1.2,fric:7,spin:5,char:0.5});
+  }
+}
+function wreckUpdate(dt){
+  if(dt<=0)return;const lit=fxLit(),t=performance.now()/1000;
+  for(const p of WRK){if(p.life<=0)continue;p.life-=dt;
+    if(p.life<=0){p.g.visible=false;p.fl.visible=false;continue;}
+    const P=p.g.position;let hs=0;
+    if(!p.ground){p.v.y-=9.81*dt;P.addScaledVector(p.v,dt);const gh=groundHeight(P.x,P.z)+p.hh;
+      if(P.y<=gh){P.y=gh;p.ground=true;p.v.y=0;p.av.multiplyScalar(0.6);}}
+    else{hs=Math.hypot(p.v.x,p.v.z);
+      if(hs>0){const k=Math.max(0,hs-p.fric*dt)/hs;p.v.x*=k;p.v.z*=k;}
+      P.x+=p.v.x*dt;P.z+=p.v.z*dt;P.y=groundHeight(P.x,P.z)+p.hh;
+      // the spin dies with the slide
+      p.av.multiplyScalar(Math.exp(-(hs>3?0.7:4)*dt));}
+    const w=p.av.length();
+    if(w>1e-3){_wq.setFromAxisAngle(_wa.copy(p.av).divideScalar(w),w*dt);p.g.quaternion.premultiply(_wq);}
+    // once it has slowed, it rolls down flat (upright or upside down, whichever is nearer)
+    if(p.ground&&hs<4){_we.setFromQuaternion(p.g.quaternion,'YXZ');const k=Math.exp(-3*dt);
+      _we.x*=k;const zt=Math.round(_we.z/Math.PI)*Math.PI;_we.z=zt+(_we.z-zt)*k;p.g.quaternion.setFromEuler(_we);}
+    // its own fire
+    const fl=p.fl;
+    if(p.burn>0){p.burn-=dt;fl.visible=true;const f=0.85+0.1*Math.sin(t*9+p.ph)+0.06*Math.sin(t*23+p.ph*2);
+      fl.position.set(P.x,P.y+p.hh+p.fs*1.1*f,P.z);fl.scale.set(p.fs*3.2*f,p.fs*4.2*f,1);fxHot(fl,0.28+0.06*Math.sin(t*5+p.ph));
+      fl.material.opacity=Math.min(1,p.burn/4)*(lit<0?0.8:0.95)*fxNear(fl);}
+    else if(fl.visible)fl.visible=false;}
+}
+// the tick's crash path: records, the tower call, the fireball, the pieces, the wreck camera
+function onCrash(){
+  if(LES.on){const k=(acType==='alpha'?'alpha':'cessna')+':'+LES.on;if(!schoolBest[k]){schoolBest[k]='F';try{localStorage.setItem('kgeuSchool',JSON.stringify(schoolBest));}catch(e){}}lesEnd();}
+  crashBegin();
+  say('Glendale Tower 121.0','Crash, crash, crash. Emergency vehicles are rolling.',['t_crash']);
+}
+function crashBegin(){
+  const P=CRASH_FX[AC.id]||CRASH_FX.cessna,C=CRASH;
+  wreckClear();
+  C.on=true;C.t=0;C.type=AC.id;C.prof=P;C.s=P.scale;C.stage=0;C.card=false;C.mode=st.mode||'runway';C.base=st.base;
+  // the wreck goes up where it meets the ground: below the aircraft if it came apart in the air
+  C.gy=groundHeight(st.pos.x,st.pos.z);C.p.set(st.pos.x,C.gy+GEAR,st.pos.z);C.q.copy(st.quat);
+  // the impact path over the ground: the velocity, else the nose
+  C.spd=Math.hypot(st.vel.x,st.vel.z);C.dir.set(st.vel.x,0,st.vel.z);
+  if(C.spd<1){C.dir.set(0,0,-1).applyQuaternion(st.quat);C.dir.y=0;if(C.dir.lengthSq()<1e-4)C.dir.set(0,0,-1);}
+  C.dir.normalize();C.right.set(-C.dir.z,0,C.dir.x);
+  // the bang reaches the camera at the speed of sound: at once in the cockpit, a beat later from outside
+  C.boomAt=camMode===1?0:camera.position.distanceTo(C.p)/340;
+  C.main=explode(C.p.x,C.p.y,C.p.z,{scale:P.scale,secondary:P.sec,debris:P.deb,smokeSec:P.smoke,fireSec:P.fire,boomDelay:C.boomAt,baseFade:0.14});
+  C.fireballs=1;C.shake=0.6;camBump=0;
+  crashParts(P);
+  // the airframe goes; its props, lights and burner go with it (the tick passes on=false)
+  plane.g.visible=false;shadow.visible=false;
+  // the wreck camera starts exactly where the camera is now, so nothing snaps
+  if(camMode!==0){camMode=0;}DCAM.mode='chase';DCAM.bt=1;
+  C.camP.copy(camera.position);camera.getWorldDirection(_wv);C.look.copy(camera.position).addScaledVector(_wv,40);
+  C.up.copy(camera.up);C.fov=camera.fov;C.dist=Math.max(35,3.5*AC.len);
+  C.camDir.set(camera.position.x-C.p.x,0,camera.position.z-C.p.z);
+  if(C.camDir.lengthSq()<4)C.camDir.copy(C.dir).negate();
+  C.camDir.normalize();C.az=Math.atan2(C.camDir.z,C.camDir.x);C.cam=true;
+  $('crashWhy').textContent=st.crashReason;crashTopEl.textContent=st.crashReason;crashTopEl.classList.add('on');
+  crashEl.classList.remove('on');document.body.classList.add('crashOn');
+}
+function crashTick(dt){
+  const C=CRASH;if(!C.on)return;C.t+=dt;const t=C.t,P=C.prof;
+  // C-130: the fuel tanks go up one after another, out along the wing of the centre piece
+  if(P.stages)while(C.stage<P.stages.length&&t>=P.stages[C.stage][0]){const g=P.stages[C.stage++];
+    const cp=WRK.find(p=>p.life>0&&p.kind==='centre'),o=cp?cp.g.position:C.p;
+    const x=o.x+C.right.x*g[1]*AC.span,z=o.z+C.right.z*g[1]*AC.span,y=Math.max(o.y,groundHeight(x,z)+1);
+    if(C.stage<P.stages.length){explode(x,y,z,{scale:g[2],smokeSec:30,debris:4,glow:false,baseFade:0.14,boomDelay:camera.position.distanceTo(_wt.set(x,y,z))/340});fxLast=C.main;}
+    else fxMini(x,y,z,g[2]);
+    C.fireballs++;}
+  if(!C.card&&t>=C.cardAt){C.card=true;crashEl.classList.add('on');crashTopEl.classList.remove('on');}
+  if(C.shake>0)C.shake=Math.max(0,C.shake-dt);
+}
+// after impact the camera stops riding the airframe and settles about 3.5 airframe lengths off
+// the wreck (35 m at least, ~100 m for the C-130), 12 deg up, swinging round to the side the
+// wind blows from so the column drifts away from it. It watches the fireball first (up where
+// it happened, if that was in the air), then eases down onto the main wreck piece.
+// The first 0.6 s shake by scale.
+function crashCam(dt){
+  const C=CRASH,s=C.s,rs=Math.sqrt(s),T=2.5*rs,w=smooth(T*0.5,T*1.3,C.t);
+  const h=C.hull&&C.hull.life>0?C.hull.g.position:C.p,lk=(C.prof.look||0)*w,wy=lerp(C.p.y+4*rs,Math.max(h.y,C.gy)+2*s,w);
+  // settled, it looks a little below the wreck so the wreck sits above the card
+  _wt.set(lerp(C.p.x,h.x,w)+C.dir.x*lk,wy-C.dist*0.05*w,lerp(C.p.z,h.z,w)+C.dir.z*lk);
+  windVec(_fw);if(_fw.x*_fw.x+_fw.z*_fw.z>0.25){let d=Math.atan2(-_fw.z,-_fw.x)-C.az;d=Math.atan2(Math.sin(d),Math.cos(d));C.az+=d*(1-Math.exp(-0.9*dt));}
+  _wc.set(_wt.x+Math.cos(C.az)*C.dist,wy+C.dist*0.2126,_wt.z+Math.sin(C.az)*C.dist);
+  const cg=groundHeight(_wc.x,_wc.z)+2;if(_wc.y<cg)_wc.y=cg;
+  const a=1-Math.exp(-1.8*dt),b=1-Math.exp(-2.4*dt);
+  C.camP.lerp(_wc,a);C.look.lerp(_wt,b);C.up.lerp(_wY,b).normalize();C.fov+=(62-C.fov)*b;
+  camera.position.copy(C.camP);camera.up.copy(C.up);camera.lookAt(C.look);camera.fov=C.fov;
+  if(C.shake>0){const k=C.shake/0.6,A=(0.3+0.45*s)*k*k;
+    camera.position.x+=(Math.random()-0.5)*2*A;camera.position.y+=(Math.random()-0.5)*2*A;camera.position.z+=(Math.random()-0.5)*2*A;}
+}
+function wreckClear(){for(const p of WRK){p.life=0;p.g.visible=false;p.fl.visible=false;}}
+// a new flight: the wreck, its fire and smoke go, the card goes
+function crashClear(){
+  crashEl.classList.remove('on');crashTopEl.classList.remove('on');document.body.classList.remove('crashOn');
+  if(!CRASH.on)return;
+  CRASH.on=CRASH.cam=CRASH.card=false;wreckClear();fxClear();
+  for(const f of fires){f.on=false;f.sp.visible=false;}
+  for(const d of debris){d.life=0;d.m.visible=false;}
+}
+function crashFxInfo(){const C=CRASH,k={};let n=0,wingMax=0,trailMax=0;
+  for(const p of WRK){if(p.life<=0)continue;n++;k[p.kind]=(k[p.kind]||0)+1;
+    const d=Math.hypot(p.g.position.x-C.p.x,p.g.position.z-C.p.z);
+    if(p.kind==='wing')wingMax=Math.max(wingMax,d);if(p.kind==='trail')trailMax=Math.max(trailMax,d);}
+  return {type:C.type,scale:C.s,fireballs:C.fireballs,pieces:n,secondaries:C.prof?C.prof.sec:0,boomAt:C.boomAt,cardAt:C.cardAt,
+    on:C.on,t:C.t,card:C.card,kinds:k,wingMax:wingMax,trailMax:trailMax,planeVisible:plane.g.visible,
+    mainOn:!!(C.main&&C.main.on),mainScale:C.main?C.main.s:0,mainFire:C.main?C.main.fireSec:0,flames:WRK.filter(p=>p.fl.visible).length};}
 
 // ---- the range itself ----
 function buildRange(){
@@ -7647,8 +7845,9 @@ function impact(m,gh){
   strikeScore();
 }
 // s: blast scale. Bigger is louder, lower and carries further; 2 and up crackle after
+// dl0: arrival delay in s (a crash passes distance to the camera / 340); default from the aircraft
 let boomBuf=null,crackBuf=null;
-function boom(x,z,s){
+function boom(x,z,s,dl0){
   if(!actx||muted)return;s=s||1;
   try{const t=actx.currentTime,D=Math.hypot(x-st.pos.x,z-st.pos.z),d=clamp(1-D/(3500*Math.sqrt(s)),0,1);
     if(d<=0.02)return;
@@ -7656,7 +7855,7 @@ function boom(x,z,s){
       for(let i=0;i<n;i++)c[i]=(Math.random()*2-1)*Math.pow(1-i/n,2.6);
       const n2=sr*1.4|0;crackBuf=actx.createBuffer(1,n2,sr);const c2=crackBuf.getChannelData(0);
       for(let i=0;i<n2;i++)c2[i]=Math.random()<0.004?(Math.random()*2-1)*Math.pow(1-i/n2,1.5):c2[Math.max(0,i-1)]*0.55;}
-    const dl=Math.min(1.4,D/340),lo=Math.pow(s,-0.35),vol=Math.min(1.5,0.6+0.4*s);
+    const dl=dl0!==undefined?Math.max(0,dl0):Math.min(1.4,D/340),lo=Math.pow(s,-0.35),vol=Math.min(1.5,0.6+0.4*s);
     const src=actx.createBufferSource(),f=actx.createBiquadFilter(),g=actx.createGain();
     src.buffer=boomBuf;src.playbackRate.value=Math.max(0.6,lo);
     f.type='lowpass';f.frequency.setValueAtTime(1400*lo,t+dl);f.frequency.exponentialRampToValueAtTime(60*lo,t+dl+1.6);
@@ -7790,8 +7989,7 @@ function tick(t,skipRender){
     updateControls(dt);f16Flaps();lessonTick(dt);rookieAssist(dt,ts);if(!gap)acc+=dt;
     if(_ipS!==st){_ipS=st;_ipPos.copy(st.pos);_ipQ.copy(st.quat);}
     while(acc>=DT){_ipPos.copy(st.pos);_ipQ.copy(st.quat);autopilot(st,DT,events);step(st,DT,events);acc-=DT;if(st.crashed)break;}
-    if(st.crashed&&LES.on){const k=(acType==='alpha'?'alpha':'cessna')+':'+LES.on;if(!schoolBest[k]){schoolBest[k]='F';try{localStorage.setItem('kgeuSchool',JSON.stringify(schoolBest));}catch(e){}}lesEnd();}
-    if(st.crashed){$('crashWhy').textContent=st.crashReason;crashEl.classList.add('on');say('Glendale Tower 121.0','Crash, crash, crash. Emergency vehicles are rolling.',['t_crash']);}
+    if(st.crashed)onCrash();
     else atcUpdate();
   }
   while(events.length){const ev=events.shift();if(LES.on)lessonEvent(ev);
@@ -7827,7 +8025,7 @@ function tick(t,skipRender){
       // time on target: the ball locked onto an actual target, not a ground point
       if(SENSOR.tgt&&!SENSOR.tgt.dead)STRIKE.tot=(STRIKE.tot||0)+dt;}
   }
-  {const fdt=paused?0:dt;fireUpdate(fdt);smokeUpdate(fdt);debrisUpdate(fdt);fxUpdate(fdt);}
+  {const fdt=paused?0:dt;fireUpdate(fdt);smokeUpdate(fdt);debrisUpdate(fdt);fxUpdate(fdt);crashTick(fdt);wreckUpdate(fdt);}
   plane.g.position.copy(dp);plane.g.quaternion.copy(q);
   const on=running&&!s.crashed;   // the free camera shows the live prop; pause and photo freeze it
   propUpdate(plane,on,s.power,paused?0:dt);
@@ -7836,7 +8034,7 @@ function tick(t,skipRender){
   const gh=groundHeight(dp.x,dp.z),agl=dp.y-GEAR-gh;
   abUpdate(plane,on,s.power,paused?0:dt,dp,q,agl);
   _cf.set(0,0,-1).applyQuaternion(q);_cu.set(0,1,0).applyQuaternion(q);
-  shadow.position.set(dp.x,gh+0.13,dp.z);shadow.rotation.y=Math.atan2(-_cf.x,-_cf.z);shadow.material.opacity=clamp(1-agl/120,0,1);shadow.visible=agl<120;
+  shadow.position.set(dp.x,gh+0.13,dp.z);shadow.rotation.y=Math.atan2(-_cf.x,-_cf.z);shadow.material.opacity=clamp(1-agl/120,0,1);shadow.visible=agl<120&&!s.crashed;
   aclUpdate(plane.lights,dp,q,agl,s);
   rebuildTerrain(s.pos.x,s.pos.z);
   // windsocks
@@ -7852,6 +8050,7 @@ function tick(t,skipRender){
   else if(FREECAM){snapCamera=false;// test hook: camera at an offset in the aircraft frame, looking at an offset in the same frame
     _co.set(FREECAM.p[0],FREECAM.p[1],FREECAM.p[2]).applyQuaternion(q).add(dp);camera.position.copy(_co);
     _ct.set(FREECAM.t[0],FREECAM.t[1],FREECAM.t[2]).applyQuaternion(q).add(dp);camera.up.set(0,1,0);camera.lookAt(_ct);camera.fov=FREECAM.fov||30;}
+  else if(CRASH.cam){crashCam(paused?0:dt);snapCamera=false;DCAM.chLive=false;}   // after impact: a steady view of the wreck
   else if(camMode===0)dcCamera(q,dp,_cf,dt);   // chase, plus the C-130 drop views on top of it
   else if(camMode===1){_co.set(AC.cam1[0],AC.cam1[1],AC.cam1[2]).applyQuaternion(q).add(dp);camera.position.copy(_co);camera.quaternion.copy(q);camera.rotateX(-0.05);camera.fov=64;camera.up.set(0,1,0);snapCamera=false;}
   else if(camMode===2){
@@ -7944,6 +8143,9 @@ window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,tou
     return out;},
   fxSlots:()=>FX.filter(o=>o.on).map(o=>{let n=0,mx=0,mz=0;for(const m of o.sm){if(!m.sp.visible)continue;n++;mx+=m.sp.position.x-o.x;mz+=m.sp.position.z-o.z;}
     return {t:o.t,scale:o.s,smokeN:n,mean:n?[mx/n,mz/n]:[0,0],wind:windVec(new V3()).toArray()};}),
+  // crash FX (3.9): force a crash here and now, and read back what it threw
+  crashNow:why=>{if(!running||st.crashed)return false;crash(st,why||'Crashed.');onCrash();return true;},
+  crashFx:()=>crashFxInfo(),
   fxCaps:{FX_N:FX_N,FX_FB:FX_FB,FX_SM:FX_SM,FX_MINI:FX_MINI,FIRE_MAX:FIRE_MAX},
   pylonsVisible:()=>(plane.pylons||[]).map(p=>p.visible),
   // point the ball at a target the way a slew would, so the real lock path is exercised
