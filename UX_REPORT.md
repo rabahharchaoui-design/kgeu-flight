@@ -48,7 +48,7 @@ headless Chromium at iPhone landscape sizes (667x375, 844x390, 932x430).
 | `orbit_test` | 1 fail: "f16 cw holds the radius". This failed before this session too (it's in the pre-overnight notes), and the physics is byte for byte unchanged |
 | No console errors | pass, in every check above |
 | No fps regression | pass. Measured back to back on this machine: pre-ux 3.2 / 3.1 / 3.1 / 3.4 / 3.1 fps, ux 3.1 / 3.2 / 3.2 / 3.2 / 3.1 (Cessna, F-16, MQ-9A, MQ-9B, C-130), 96 to 104 percent, within the 1/8 fps resolution of the sample. Headless Chromium renders in software, so only the ratio means anything; real iPhone frame rate is still unmeasured |
-| Live site after push (`live_check`) | LIVE_PLACEHOLDER |
+| Live site after push (`live_check`) | pass: all 47 checks on the deployed https site. The title and manifest read Pocket Flight Sim, the home screen name is Pocket Sim, icons resolve, FLY then GO starts a flight, auto takeoff runs, every aircraft spawns, all 111 radio clips decode, no errors |
 
 Along the way, the older tests were updated for the new UI: they start past
 the first launch screen, find controls where they now live, and expect the base
