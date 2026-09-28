@@ -4057,7 +4057,7 @@ const RWY_ENDS=[].concat(...RUNWAYS.map(r=>r.ends));
 // ---------- state & input ----------
 const $=id=>document.getElementById(id);
 let st=createState('runway'),running=false,paused=false,camMode=0,muted=false,FREECAM=null;
-let sensorMode=false,strikeBtn=null,camBump=0,camLean=0,strikeBest=null;
+let sensorMode=false,strikeBtn=null,camBump=0,strikeBest=null;
 try{strikeBest=JSON.parse(localStorage.getItem('kgeuStrikeBest')||'null');}catch(e){}
 const keys={},events=[];
 let acType='reaper';try{const t=localStorage.getItem('kgeuType');if(t&&TYPES[t])acType=t;}catch(e){}
@@ -6428,20 +6428,30 @@ function resize(){const w=window.innerWidth,h=window.innerHeight;renderer.setSiz
 window.addEventListener('resize',resize);resize();
 const mtsEl=$('mts'),mtsTxt=$('mtsTxt'),_mtsE=new THREE.Euler(),hIas=$('hIas'),hAlt=$('hAlt'),hWindT=$('hWindT'),hWindA=$('hWindA'),hAp=$('hAp'),bAuto=$('bAuto'),bAutoT=$('bAutoT'),warnEl=$('warn'),hVs=$('hVs'),hHdg=$('hHdg');
 const APN={to:'AUTO T/O',hold:'ALT HOLD',land:'AUTOLAND',orbit:'ORBIT'},APP={climb:'CLIMB',nav:'NAV',loc:'FINAL',orb:'DESCEND'};
-const _cf=new V3(),_cu=new V3(),_co=new V3(),_ct=new V3(),_cr=new V3(),_eu=new THREE.Euler(0,0,0,'YXZ'),_el=new THREE.Euler(0,0,0,'YXZ');
+const _cf=new V3(),_cu=new V3(),_co=new V3(),_ct=new V3(),_eu=new THREE.Euler(0,0,0,'YXZ');
+// render interpolation: physics runs at 120 Hz, the screen at 60, so draw between the last two substeps
+const _ipPos=new V3(),_ipQ=new THREE.Quaternion(),_dPos=new V3(),_dQ=new THREE.Quaternion();let _ipS=null;
+// chase camera attitude: trails the aircraft quaternion, slerp only (no Euler, no blended ups)
+const camQ=new THREE.Quaternion(),_cqT=new THREE.Quaternion();const CAM_K=5,CAM_LAG=1.0;
 const TOWER=new V3(wX(1290,-470),24.5,wZ(1290,-470)),CROWD=new V3(wX(1590,-196),2.8,wZ(1590,-196));
-let frameN=0,gearWarn=false,snapCamera=true,last=performance.now(),acc=0,hudT=0,mapT=0;const DT=1/120;
+let frameN=0,gearWarn=false,snapCamera=true,last=performance.now(),acc=0,hudT=0,mapT=0,loopHeld=false;const DT=1/120;
 const BOOT_T=performance.now();
 function splashDone(){const sp=$('splash');if(!sp||sp.classList.contains('done'))return;
   setTimeout(()=>{sp.classList.add('done');setTimeout(()=>sp.classList.add('gone'),480);},Math.max(0,700-(performance.now()-BOOT_T)));}
 function frame(t){
   requestAnimationFrame(frame);
-  const dt=Math.min(0.1,(t-last)/1000);last=t;const ts=t/1000;
+  if(!loopHeld)tick(t);
+}
+function tick(t,skipRender){
+  const rdt=(t-last)/1000,dt=Math.min(0.1,rdt);last=t;const ts=t/1000;
+  // a long gap (tab hidden): drop the time instead of simulating it, and snap the camera
+  const gap=rdt>0.25;if(gap)snapCamera=true;
   sensorMode=camMode===2&&hasBall()&&!st.onGround&&!!st.ap&&running&&!paused&&!st.crashed;
   pollPad(dt);
   if(running&&!paused&&!st.crashed){
-    updateControls(dt);f16Flaps();lessonTick(dt);rookieAssist(dt,ts);acc+=dt;
-    while(acc>=DT){autopilot(st,DT,events);step(st,DT,events);acc-=DT;if(st.crashed)break;}
+    updateControls(dt);f16Flaps();lessonTick(dt);rookieAssist(dt,ts);if(!gap)acc+=dt;
+    if(_ipS!==st){_ipS=st;_ipPos.copy(st.pos);_ipQ.copy(st.quat);}
+    while(acc>=DT){_ipPos.copy(st.pos);_ipQ.copy(st.quat);autopilot(st,DT,events);step(st,DT,events);acc-=DT;if(st.crashed)break;}
     if(st.crashed&&LES.on){const k=(acType==='alpha'?'alpha':'cessna')+':'+LES.on;if(!schoolBest[k]){schoolBest[k]='F';try{localStorage.setItem('kgeuSchool',JSON.stringify(schoolBest));}catch(e){}}lesEnd();}
     if(st.crashed){$('crashWhy').textContent=st.crashReason;crashEl.classList.add('on');say('Glendale Tower 121.0','Crash, crash, crash. Emergency vehicles are rolling.',['t_crash']);}
     else atcUpdate();
@@ -6461,7 +6471,11 @@ function frame(t){
   {const show=!rookie()&&camMode===1&&(AC.id==='cessna'||AC.id==='alpha')&&running&&!st.crashed;
    if(spCan){spCan.classList.toggle('on',show);if(show)drawSixPack();}}
   radioUpdate(dt);cfgUpdate(dt);
-  const s=st,q=s.quat;
+  const s=st;
+  // display pose: interpolated between the last two substeps (teleports and snaps start fresh)
+  if(_ipS!==st||snapCamera){_ipS=st;_ipPos.copy(st.pos);_ipQ.copy(st.quat);}
+  {const al=clamp(acc/DT,0,1);_dPos.lerpVectors(_ipPos,st.pos,al);_dQ.slerpQuaternions(_ipQ,st.quat,al);}
+  const q=_dQ,dp=_dPos;
   // crowd flyby cheers and sound level
   cheerLevel=0;clusters.forEach(c=>{c.cool-=dt;if(c.cheer>0)c.cheer-=dt;
     const d=Math.hypot(c.x-s.pos.x,c.z-s.pos.z);if(running&&!s.crashed&&!s.onGround&&d<280&&s.agl<160&&s.ias>25&&c.cool<=0){c.cheer=4;c.cool=12;}
@@ -6476,41 +6490,42 @@ function frame(t){
   }
   if(STRIKE.built)fireUpdate(dt,ts);
   smokeUpdate(dt);debrisUpdate(dt);blastUpdate(dt);
-  plane.g.position.copy(s.pos);plane.g.quaternion.copy(q);
+  plane.g.position.copy(dp);plane.g.quaternion.copy(q);
   const on=running&&!s.crashed&&!FREECAM;   // the free camera is a model check, blades still
   if(plane.props){const o=on?0.3:0;for(let i=0;i<plane.props.length;i++){plane.props[i].rotation.z+=(on?107:0)*dt;plane.props[i].visible=!on;plane.discs[i].material.opacity=o;}}
   else if(plane.prop){plane.prop.rotation.z+=(on?199:0)*dt;plane.disc.material.opacity=on?0.3:0;plane.prop.visible=!on;}
   if(plane.canopy)plane.canopy.visible=camMode!==1;
   if(plane.gear){plane.gear.scale.y=Math.max(0.02,s.gearPos);plane.gear.visible=s.gearPos>0.03;}
   if(plane.ab){const a=on&&s.power>0.82;plane.ab.visible=a;if(a)plane.ab.scale.set(1,1,1.5+(s.power-0.82)*14+Math.random()*0.6);}
-  const gh=groundHeight(s.pos.x,s.pos.z),agl=s.pos.y-GEAR-gh;
+  const gh=groundHeight(dp.x,dp.z),agl=dp.y-GEAR-gh;
   _cf.set(0,0,-1).applyQuaternion(q);_cu.set(0,1,0).applyQuaternion(q);
-  shadow.position.set(s.pos.x,gh+0.13,s.pos.z);shadow.rotation.y=Math.atan2(-_cf.x,-_cf.z);shadow.material.opacity=clamp(1-agl/120,0,1);shadow.visible=agl<120;
+  shadow.position.set(dp.x,gh+0.13,dp.z);shadow.rotation.y=Math.atan2(-_cf.x,-_cf.z);shadow.material.opacity=clamp(1-agl/120,0,1);shadow.visible=agl<120;
   rebuildTerrain(s.pos.x,s.pos.z);
   // windsocks
   const wd=s.windDir*Math.PI/180,wkt=s.windKt*(1+s.gust);
   socks.forEach((p,i)=>{p.rotation.order='YXZ';p.rotation.y=Math.atan2(-(Math.cos(wd)),(-Math.sin(wd)))*1;p.rotation.z=-(1-clamp(wkt/15,0,1))*1.1+0.05*Math.sin(ts*3+i);});
   // cameras
   mtsEl.classList.toggle('on',camMode===2);glc.style.filter=camMode===2&&!PHOTO.on?'grayscale(1) contrast(1.12) brightness(0.86)':'';
-  if(PHOTO.on)photoCam();
-  else if(FREECAM){// test hook: camera at an offset in the aircraft frame, looking at an offset in the same frame
-    _co.set(FREECAM.p[0],FREECAM.p[1],FREECAM.p[2]).applyQuaternion(q).add(s.pos);camera.position.copy(_co);
-    _ct.set(FREECAM.t[0],FREECAM.t[1],FREECAM.t[2]).applyQuaternion(q).add(s.pos);camera.up.set(0,1,0);camera.lookAt(_ct);camera.fov=FREECAM.fov||30;}
-  else if(camMode===0){_co.set(0,AC.chase[0],AC.chase[1]).applyQuaternion(q).add(s.pos);const cg=groundHeight(_co.x,_co.z)+1.5;if(_co.y<cg)_co.y=cg;
-    // lean into the turn: a little sideways drift and a little extra roll with the wings
-    _el.setFromQuaternion(q,'YXZ');camLean+=((-_el.z)-camLean)*Math.min(1,dt*2.5);
-    _cr.set(1,0,0).applyQuaternion(q);_co.addScaledVector(_cr,camLean*2.2);
+  if(PHOTO.on){photoCam();snapCamera=false;}
+  else if(FREECAM){snapCamera=false;// test hook: camera at an offset in the aircraft frame, looking at an offset in the same frame
+    _co.set(FREECAM.p[0],FREECAM.p[1],FREECAM.p[2]).applyQuaternion(q).add(dp);camera.position.copy(_co);
+    _ct.set(FREECAM.t[0],FREECAM.t[1],FREECAM.t[2]).applyQuaternion(q).add(dp);camera.up.set(0,1,0);camera.lookAt(_ct);camera.fov=FREECAM.fov||30;}
+  else if(camMode===0){
+    // chase: camQ trails the aircraft attitude by a slerp, capped at CAM_LAG; the lag gives the lean
+    if(snapCamera)camQ.copy(q);
+    else{camQ.slerp(q,1-Math.exp(-CAM_K*dt));const lag=camQ.angleTo(q);if(lag>CAM_LAG)camQ.copy(_cqT.copy(q).slerp(camQ,CAM_LAG/lag));}
+    _co.set(0,AC.chase[0],AC.chase[1]).applyQuaternion(camQ).add(dp);const cg=groundHeight(_co.x,_co.z)+1.5;if(_co.y<cg)_co.y=cg;
     if(snapCamera){camera.position.copy(_co);snapCamera=false;}else camera.position.lerp(_co,1-Math.exp(-6*dt));
-    camera.up.set(0,1,0).lerp(_cu,0.3+0.24*clamp(Math.abs(camLean)/0.6,0,1)).normalize();
-    _ct.copy(s.pos).addScaledVector(_cf,40).addScaledVector(_cu,1.5);camera.lookAt(_ct);camera.fov=62;}
-  else if(camMode===1){_co.set(AC.cam1[0],AC.cam1[1],AC.cam1[2]).applyQuaternion(q).add(s.pos);camera.position.copy(_co);camera.quaternion.copy(q);camera.rotateX(-0.05);camera.fov=64;camera.up.set(0,1,0);}
+    camera.up.set(0,1,0).applyQuaternion(camQ);
+    _ct.copy(dp).addScaledVector(_cf,40).addScaledVector(camera.up,1.5);camera.lookAt(_ct);camera.fov=62;}
+  else if(camMode===1){_co.set(AC.cam1[0],AC.cam1[1],AC.cam1[2]).applyQuaternion(q).add(dp);camera.position.copy(_co);camera.quaternion.copy(q);camera.rotateX(-0.05);camera.fov=64;camera.up.set(0,1,0);snapCamera=false;}
   else if(camMode===2){
-    sensorOrigin(_co);camera.position.copy(_co);camera.up.set(0,1,0);
+    sensorOrigin(_co);camera.position.copy(_co);camera.up.set(0,1,0);snapCamera=false;
     sensorDir(SENSOR.az,SENSOR.el,_sd);
     _ct.copy(_co).addScaledVector(_sd,2000);camera.lookAt(_ct);
     camera.fov=SENSOR.zoom?4.5:14;
     mtsTxt.textContent=sensorText();}
-  else{const src=camMode===3?TOWER:CROWD;camera.position.copy(src);camera.up.set(0,1,0);camera.lookAt(s.pos);const d=src.distanceTo(s.pos);camera.fov=clamp(2*Math.atan(22/d)*180/Math.PI,4,60);}
+  else{const src=camMode===3?TOWER:CROWD;camera.position.copy(src);camera.up.set(0,1,0);snapCamera=false;camera.lookAt(s.pos);const d=src.distanceTo(s.pos);camera.fov=clamp(2*Math.atan(22/d)*180/Math.PI,4,60);}
   if(camBump>0){camBump=Math.max(0,camBump-dt*2.4);const k=camBump*camBump*1.3;
     camera.position.x+=(Math.random()-0.5)*k;camera.position.y+=(Math.random()-0.5)*k*1.5;camera.position.z+=(Math.random()-0.5)*k;}
   camera.updateProjectionMatrix();sky.position.copy(camera.position);
@@ -6542,7 +6557,8 @@ function frame(t){
   if(running&&!paused&&!s.crashed){if(s.aoaWarn)w='STALL';else if(gearWarn)w='GEAR UP';else if(kias>AC.vne)w='OVERSPEED';else if(s.flapIdx>0&&kias>AC.vfe)w='FLAP SPEED';}
   warnEl.textContent=w;warnEl.classList.toggle('on',!!w);
   updateAudio();frameN++;if(frameN===4)splashDone();
-  if(SHOW.on){renderer.setClearColor(0xF6C177,1);renderer.clear();showRender(dt,CARM);}
+  if(skipRender){}
+  else if(SHOW.on){renderer.setClearColor(0xF6C177,1);renderer.clear();showRender(dt,CARM);}
   else{if(!menu.classList.contains('on')||frameN<40)renderer.render(scene,camera);
     const po=pauseOv.classList.contains('on');document.body.classList.toggle('pauseOn',po);if(po)showRender(dt,CARP);}
 }
@@ -6552,7 +6568,9 @@ window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,tou
   setTOD:setTOD,isNight:isNight,TOD:()=>TOD,drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
   RADIO:RADIO,radioQ:()=>radioQ,radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,initAudio:initAudio,
-  ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),arcStart:arcStart,ARC:ARC,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&{apt:DEST.rwy.apt,num:DEST.num},fmOpen:fmOpen,fmClose:fmClose,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
+  // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
+  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&{apt:DEST.rwy.apt,num:DEST.num},fmOpen:fmOpen,fmClose:fmClose,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   MISS:MISS,DROPZ:DROPZ,LZ:LZ,lzUV:lzUV,lzX:lzX,lzZ:lzZ,missDrop:missDrop,missTouchdown:missTouchdown,
   // step the mission clock without waiting on rAF: the pallet takes 50 s to come down
   missTick:(n,dt)=>{for(let i=0;i<n;i++)missUpdate(dt);},
