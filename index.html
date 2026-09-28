@@ -196,6 +196,18 @@ body.touch #touch{ display:block; }
 #bBrake.held{ background:var(--caution); color:#15110a; } #bBrake.held i{ color:#15110a; }
 #bDrop{ border-color:var(--caution); } #bDrop i{ color:var(--caution); }
 #bFire{ border-color:var(--caution); } #bFire i{ color:var(--caution); }
+/* C-130 airdrop: the free look pad sits in the free top-right corner; the badges step left of it */
+#lookPad{ position:absolute; right:var(--padR); top:var(--padT); width:64px; height:64px; border-radius:50%; display:none;
+  flex-direction:column; align-items:center; justify-content:center; gap:1px; background:rgba(20,24,30,.42); border:2px solid rgba(255,255,255,.5);
+  box-shadow:0 0 0 1px rgba(0,0,0,.25); color:var(--ink); touch-action:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; cursor:grab; }
+#lookPad svg{ width:26px; height:26px; flex:none; pointer-events:none; }
+#lookPad i{ font-style:normal; font-size:9px; font-weight:800; letter-spacing:.06em; color:var(--soft); pointer-events:none; }
+#lookPad.held{ background:rgba(246,193,119,.35); border-color:var(--caution); }
+body.lookOn #lookPad{ display:flex; }
+body.lookOn:not(.touch) #lookPad{ top:calc(var(--padT) + var(--icon) + 8px); }
+body.lookOn.touch #badges{ top:var(--padT); right:calc(var(--padR) + 72px); }
+body.lookOn:not(.touch) #badges{ top:calc(var(--padT) + var(--icon) + 80px); }
+#bLookBack.lit{ background:rgba(246,193,119,.28); }
 #thr{ position:relative; flex:1; min-height:110px; border-radius:12px; background:var(--glass);
   border:1px solid rgba(255,255,255,.22); touch-action:none; overflow:hidden; }
 #thrFill{ position:absolute; left:0; right:0; bottom:0; background:linear-gradient(0deg,rgba(168,89,42,.9),rgba(217,138,61,.85)); }
@@ -542,6 +554,7 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
     <div id="ctlA" class="ccol">
       <button id="bAuto" title="Auto takeoff or land (O)" aria-label="Autopilot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M4 12h5l3 3 3-3h5"/></svg><i id="bAutoT">AUTO T/O</i></button>
       <button id="bCam" title="Camera (C)" aria-label="Camera"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg><i>VIEW</i></button>
+      <button id="bLookBack" hidden title="Look back from the ramp" aria-label="Look back from the cargo ramp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M3 5h11l7 14H3z"/><path d="M9 13l-3 3 3 3"/><path d="M6 16h7"/></svg><i>LOOK BACK</i></button>
       <button id="bSensor" hidden title="Sensor ball" aria-label="Sensor ball view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg><i>SENSOR</i></button>
       <button id="bMode" hidden title="Sensor mode (M)" aria-label="Sensor mode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg><i id="bModeT">DAY TV</i></button>
       <button id="bZoom" hidden title="Sensor zoom (Z)" aria-label="Sensor zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="10" r="6"/><path d="M14.5 14.5L20 20M10 7.5v5M7.5 10h5"/></svg><i id="bZoomT">ZOOM x1</i></button>
@@ -558,6 +571,7 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
     </div>
     <div id="ctlB" class="ccol" hidden></div>
   </div>
+  <div id="lookPad" role="slider" aria-label="Free look, drag to swing the camera"><svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13c2-3.2 4.3-4.8 7-4.8s5 1.6 7 4.8c-2 3.2-4.3 4.8-7 4.8S8 16.2 6 13z"/><circle cx="13" cy="13" r="2" fill="currentColor"/><path d="M13 1.5v3M11.5 3l1.5-1.5L14.5 3M13 24.5v-3M11.5 23l1.5 1.5 1.5-1.5M1.5 13h3M3 11.5L1.5 13 3 14.5M24.5 13h-3M23 11.5l1.5 1.5-1.5 1.5"/></svg><i>LOOK</i></div>
   <div id="warn"></div>
   <div id="atc" class="card"></div>
   <div id="toast"></div>
@@ -4365,7 +4379,10 @@ let best=loadBest();
 function showBest(){}
 const CAMS=['Chase','Nose camera','Sensor ball'];
 // chase, nose, and the ball on the aircraft that carry one
-function cycleCam(){camMode=(camMode+1)%(hasBall()?3:2);
+function cycleCam(){
+  // VIEW out of the ramp view or the pallet ride goes straight back to the chase camera
+  if(camMode===0&&DCAM.mode!=='chase'){dcSet('chase',0);toast('Camera: '+CAMS[0]);return;}
+  camMode=(camMode+1)%(hasBall()?3:2);
   toast('Camera: '+(camMode===1?AC.cam1Name:CAMS[camMode]));snapCamera=true;
   // the ball is only useful with something else flying, so hand the aircraft to the orbit
   if(camMode===2)sensorAP();}
@@ -4848,10 +4865,10 @@ function missHud(title,sub,warn){
 }
 function missReset(){
   if(MISS.pallet){scene.remove(MISS.pallet.g);MISS.pallet=null;}
-  MISS.on=false;MISS.kind='';MISS.armed=false;MISS.dropped=false;MISS.result=null;MISS.td=null;MISS.stopT=0;
-  missHud(null);
+  MISS.on=false;MISS.kind='';MISS.armed=false;MISS.dropped=false;MISS.result=null;MISS.td=null;MISS.stopT=0;MISS.cardT=0;
+  missHud(null);dcReset();
 }
-function missStart(kind){MISS.on=true;MISS.kind=kind;MISS.armed=false;MISS.dropped=false;MISS.result=null;MISS.td=null;MISS.stopT=0;}
+function missStart(kind){MISS.on=true;MISS.kind=kind;MISS.armed=false;MISS.dropped=false;MISS.result=null;MISS.td=null;MISS.stopT=0;MISS.cardT=0;}
 // ---- the pallet: a CDS bundle under a 26 ft ring slot canopy ----
 function makePallet(){
   const g=new THREE.Group();
@@ -4875,6 +4892,7 @@ function missDrop(){
   p.g.position.copy(p.pos);
   MISS.pallet=p;MISS.dropped=true;
   toast('Load away');
+  if(dcOn())dcSet('pallet',0.5);                       // ride the bundle down
   radioQ.unshift(L(AC.cs,'pilot',AC.cs+', load away, one bundle.',[csP(),'p_load_away']));
 }
 const _pw=new V3();
@@ -4910,12 +4928,17 @@ function missUpdate(dt){
         p.pos.y=gh+0.95;p.down=true;p.chute.visible=false;p.line.visible=false;
         const d=Math.hypot(p.pos.x-DROPZ.x,p.pos.z-DROPZ.z);
         MISS.result={kind:'drop',dist:d};
-        missScore(MISS.result);
+        // the result card waits while the camera holds on the bundle and comes back
+        MISS.cardT=2.5;
+        missHud('LANDED '+Math.round(d)+' m from center',d<DROPZ.r?'Inside the scoring circle':'Outside the scoring circle',d>=DROPZ.r);
       }
+      else{const d=Math.hypot(p.pos.x-DROPZ.x,p.pos.z-DROPZ.z);
+        missHud('TO CENTER: '+Math.round(d)+' m',p.open?'Under canopy, drifting with the wind':'Load away',d>=DROPZ.r);}
       p.g.position.copy(p.pos);
       if(p.open)p.g.rotation.y+=dt*0.4;
     }
     if(p&&p.down&&!MISS.result)missHud(null);
+    if(MISS.cardT>0){MISS.cardT-=dt;if(MISS.cardT<=0)missScore(MISS.result);}
   }
   else if(MISS.kind==='short'){
     const Z=lzUV(st.pos.x,st.pos.z);
@@ -4972,6 +4995,98 @@ function missScore(r){
   missHud(null);missOv.classList.add('on');paused=true;
   logMission(r,letter);
 }
+
+// ---- C-130 drop camera ----
+// Three things on top of the chase view during the airdrop: the LOOK pad swings the chase
+// camera around the aircraft (springs back on release), LOOK BACK puts the eye at the ramp
+// hinge looking aft, and after DROP the camera rides behind the pallet down to the ground.
+// The chase camera keeps running underneath (camQ and its smoothed position), so every
+// switch is a blend from wherever the camera was to the live pose of the new view.
+const DCAM={mode:'chase',yaw:0,pitch:0,drag:null,bt:1,bd:0.5,hold:0,
+  from:new V3(),fromQ:new THREE.Quaternion(),fromFov:62,dir:new V3(1,0,0),chP:new V3(),chLive:false};
+const RAMP_EYE=[0,1.3,5.4];                            // station 19.6 (ramp hinge), 1.5 m above the cargo floor
+const RAMP_Q=new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.30,Math.PI,0,'YXZ'));   // aft, 17 deg down
+const LOOK_K=0.9*Math.PI/180,LOOK_YAW=Math.PI,LOOK_UP=30*Math.PI/180,LOOK_DN=-70*Math.PI/180;
+const _dl=new V3(),_dq=new THREE.Quaternion(),_de=new THREE.Euler(0,0,0,'YXZ'),_dv=new V3();
+function dcOn(){return !!(running&&MISS.on&&MISS.kind==='drop'&&AC.id==='c130'&&!st.crashed);}
+// switch view, blending over dur seconds from the pose the camera has right now
+function dcSet(mode,dur){
+  if(camMode!==0){camMode=0;snapCamera=true;}
+  DCAM.from.copy(camera.position).sub(_dPos);DCAM.fromQ.copy(camera.quaternion);DCAM.fromFov=camera.fov;
+  DCAM.bt=dur>0?0:1;DCAM.bd=dur||0.5;DCAM.mode=mode;DCAM.hold=0;
+  if(mode==='pallet'&&MISS.pallet){const p=MISS.pallet;DCAM.dir.set(p.pos.x-DROPZ.x,0,p.pos.z-DROPZ.z);
+    if(DCAM.dir.lengthSq()<1)DCAM.dir.set(-p.vel.x,0,-p.vel.z);if(DCAM.dir.lengthSq()<1e-4)DCAM.dir.set(1,0,0);DCAM.dir.normalize();}
+}
+function dcReset(){DCAM.mode='chase';DCAM.yaw=DCAM.pitch=0;DCAM.drag=null;DCAM.bt=1;DCAM.hold=0;$('lookPad').classList.remove('held');}
+function lookBack(){if(!dcOn())return;
+  if(DCAM.mode==='ramp'){dcSet('chase',0.4);toast('Camera: Chase');}
+  else{DCAM.yaw=DCAM.pitch=0;dcSet('ramp',0.4);toast('Camera: Cargo ramp');}}
+// the pallet ride: behind and above the bundle, on the side away from the DZ and leaning
+// against its drift, looking a quarter of the way from the pallet toward the bullseye
+function dcPallet(dt){const p=MISS.pallet,P=p.pos;
+  _dv.set(P.x-DROPZ.x,0,P.z-DROPZ.z);const far=_dv.length();
+  if(far>1)_dv.multiplyScalar(1/far);else _dv.set(0,0,0);
+  const vh=Math.hypot(p.vel.x,p.vel.z);if(vh>0.5)_dv.addScaledVector(_dl.set(-p.vel.x/vh,0,-p.vel.z/vh),far>40?0.4:1);
+  if(_dv.lengthSq()>1e-4){_dv.normalize();DCAM.dir.lerp(_dv,1-Math.exp(-1.5*dt)).normalize();}
+  camera.position.copy(P).addScaledVector(DCAM.dir,28);camera.position.y+=22;
+  const cg=groundHeight(camera.position.x,camera.position.z)+2;if(camera.position.y<cg)camera.position.y=cg;
+  // aim between the bundle (under its canopy) and the bullseye, never more than 4 deg off the bundle, so the canopy clears the HUD
+  _dl.copy(P);_dl.y+=3.5;_dl.sub(camera.position).normalize();
+  _dv.set(DROPZ.x,groundHeight(DROPZ.x,DROPZ.z),DROPZ.z).sub(camera.position).normalize();
+  const ang=Math.acos(clamp(_dl.dot(_dv),-1,1));
+  if(ang>1e-3)_dl.lerp(_dv,Math.min(0.5,0.07/ang)).normalize();
+  _dl.add(camera.position);
+  camera.up.set(0,1,0);camera.lookAt(_dl);camera.fov=66;
+}
+// the camera part of tick() in chase mode: q, dp the display attitude and position, cf the nose
+function dcCamera(q,dp,cf,dt){
+  // chase: camQ trails the aircraft attitude by a slerp, capped at CAM_LAG; the lag gives the lean
+  if(snapCamera)camQ.copy(q);
+  else{camQ.slerp(q,1-Math.exp(-CAM_K*dt));const lag=camQ.angleTo(q);if(lag>CAM_LAG)camQ.copy(_cqT.copy(q).slerp(camQ,CAM_LAG/lag));}
+  // free look: the pad swings the orbit offset (yaw about up, pitch about the wing), springs back
+  if(!DCAM.drag){const k=Math.exp(-9*dt);DCAM.yaw*=k;DCAM.pitch*=k;if(Math.abs(DCAM.yaw)<1e-3)DCAM.yaw=0;if(Math.abs(DCAM.pitch)<1e-3)DCAM.pitch=0;}
+  const lk=DCAM.yaw||DCAM.pitch;
+  _co.set(0,AC.chase[0],AC.chase[1]);if(lk)_co.applyQuaternion(_dq.setFromEuler(_de.set(DCAM.pitch,DCAM.yaw,0,'YXZ')));
+  _co.applyQuaternion(camQ).add(dp);const cg=groundHeight(_co.x,_co.z)+1.5;if(_co.y<cg)_co.y=cg;
+  if(!DCAM.chLive)DCAM.chP.copy(camera.position);   // carry on from wherever the camera was
+  if(snapCamera){DCAM.chP.copy(_co);snapCamera=false;}else DCAM.chP.lerp(_co,1-Math.exp(-6*dt));
+  DCAM.chLive=true;
+  camera.position.copy(DCAM.chP);
+  camera.up.set(0,1,0).applyQuaternion(camQ);
+  _ct.copy(dp).addScaledVector(cf,40).addScaledVector(camera.up,1.5);
+  // looking around, the camera turns to keep the aircraft in the middle
+  if(lk){_dl.copy(dp).addScaledVector(camera.up,1.5);_ct.lerp(_dl,clamp(Math.max(Math.abs(DCAM.yaw),Math.abs(DCAM.pitch))/0.3,0,1));}
+  camera.lookAt(_ct);camera.fov=62;
+  // the other views sit on top of the live chase pose
+  if(DCAM.mode==='ramp'){
+    if(!dcOn())DCAM.mode='chase';
+    else{camera.position.set(RAMP_EYE[0],RAMP_EYE[1],RAMP_EYE[2]).applyQuaternion(q).add(dp);
+      camera.quaternion.copy(q).multiply(RAMP_Q);camera.up.set(0,1,0).applyQuaternion(q);camera.fov=70;}}
+  else if(DCAM.mode==='pallet'){
+    const p=MISS.pallet;
+    if(!p||!MISS.on)DCAM.mode='chase';
+    else{dcPallet(dt);
+      // down: hold on the bundle for two seconds, then back to the aircraft
+      if(p.down){DCAM.hold+=dt;if(DCAM.hold>=2)dcSet('chase',0.5);}}}
+  if(DCAM.bt<1){
+    DCAM.bt=Math.min(1,DCAM.bt+dt/DCAM.bd);const w=smooth(0,1,DCAM.bt);
+    _dl.copy(DCAM.from).add(dp);camera.position.lerpVectors(_dl,camera.position,w);
+    camera.quaternion.slerpQuaternions(DCAM.fromQ,camera.quaternion,w);camera.fov+=(DCAM.fromFov-camera.fov)*(1-w);}
+}
+(function(){
+  const pad=$('lookPad');
+  pad.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'&&e.button!==0)return;e.preventDefault();
+    if(DCAM.drag||!dcOn())return;
+    if(DCAM.mode!=='chase'||camMode!==0)dcSet('chase',0.4);
+    DCAM.drag={id:e.pointerId,x:e.clientX,y:e.clientY,yaw:DCAM.yaw,pitch:DCAM.pitch};pad.classList.add('held');
+    try{pad.setPointerCapture(e.pointerId);}catch(_){}});
+  pad.addEventListener('pointermove',e=>{const d=DCAM.drag;if(!d||e.pointerId!==d.id)return;
+    DCAM.yaw=clamp(d.yaw-(e.clientX-d.x)*LOOK_K,-LOOK_YAW,LOOK_YAW);
+    DCAM.pitch=clamp(d.pitch-(e.clientY-d.y)*LOOK_K,LOOK_DN,LOOK_UP);});
+  const up=e=>{if(!DCAM.drag||e.pointerId!==DCAM.drag.id)return;DCAM.drag=null;pad.classList.remove('held');};
+  pad.addEventListener('pointerup',up);pad.addEventListener('pointercancel',up);pad.addEventListener('lostpointercapture',up);
+  pad.addEventListener('touchend',e=>{if(e.cancelable)e.preventDefault();},{passive:false});
+})();
 
 // ---------- touch controls ----------
 (function(){
@@ -5080,6 +5195,7 @@ function sensorView(){if(!running||st.crashed||!hasBall())return;
   tapBtn($('bCam'),()=>cycleCam());
   tapBtn($('bSensor'),()=>sensorView());
   tapBtn($('bDrop'),()=>missDrop(),true);
+  tapBtn($('bLookBack'),()=>lookBack());
   tapBtn($('bMode'),()=>sensorModeStep());
   tapBtn($('bZoom'),()=>sensorZoomStep(0));
   tapBtn($('bLock'),()=>sensorLock());
@@ -5088,15 +5204,17 @@ function sensorView(){if(!running||st.crashed||!hasBall())return;
   tapBtn($('bFlapDn'),()=>{if(running&&!st.crashed)setFlaps(st.flapIdx+1);});
   const dock=$('dock'),A=$('ctlA'),B=$('ctlB');
   // top to bottom; BRAKE is always last, nearest the thumb
-  const ORDER=['bAuto','bCam','bSensor','bMode','bZoom','bLock','bFire','bDrop','bGear','flapGrp','bBrake'].map(id=>$(id));
+  const ORDER=['bAuto','bCam','bLookBack','bSensor','bMode','bZoom','bLock','bFire','bDrop','bGear','flapGrp','bBrake'].map(id=>$(id));
   const HT={flapGrp:112},GAP=6;
   let lkey='',dockH=0;
   const reH=()=>{dockH=0;};window.addEventListener('resize',reH);if(window.visualViewport)visualViewport.addEventListener('resize',reH);
   window.layoutCtl=function(){
     const P=!rookie(),dropOn=!!(MISS.on&&MISS.kind==='drop'&&!MISS.dropped&&running);
     // in the ball view the aircraft flies itself: the sensor buttons replace gear, flaps and brake
-    const sv=sensorMode;
-    const show={bAuto:1,bCam:1,bSensor:hasBall(),bMode:sv,bZoom:sv,bLock:sv,bFire:sv&&STRIKE.active,bDrop:dropOn,
+    const sv=sensorMode,lo=dcOn()&&!MISS.result;
+    if(lo!==document.body.classList.contains('lookOn')){document.body.classList.toggle('lookOn',lo);if(!lo&&DCAM.drag){DCAM.drag=null;$('lookPad').classList.remove('held');}}
+    $('bLookBack').classList.toggle('lit',DCAM.mode==='ramp');
+    const show={bAuto:1,bCam:1,bLookBack:lo,bSensor:hasBall(),bMode:sv,bZoom:sv,bLock:sv,bFire:sv&&STRIKE.active,bDrop:dropOn,
       bGear:P&&!!AC.retract&&!sv,flapGrp:P&&AC.id!=='f16'&&!sv,bBrake:isTouch&&!sv};
     const H=dockH||(dockH=dock.clientHeight);
     const key=Object.keys(show).map(k=>show[k]?1:0).join('')+'|'+H;
@@ -7011,18 +7129,12 @@ function tick(t,skipRender){
    if(sv!==sensOn){sensOn=sv;hudSens.classList.toggle('on',sv);document.body.classList.toggle('sensorOn',sv);}
    const flt=sv&&SENSOR.mode==='tv'?'saturate(0.75) contrast(1.05)':'';if(glc.style.filter!==flt)glc.style.filter=flt;
    sensorFxUpdate(sv,ts);}
+  if(camMode!==0||PHOTO.on||FREECAM)DCAM.chLive=false;
   if(PHOTO.on){photoCam();snapCamera=false;}
   else if(FREECAM){snapCamera=false;// test hook: camera at an offset in the aircraft frame, looking at an offset in the same frame
     _co.set(FREECAM.p[0],FREECAM.p[1],FREECAM.p[2]).applyQuaternion(q).add(dp);camera.position.copy(_co);
     _ct.set(FREECAM.t[0],FREECAM.t[1],FREECAM.t[2]).applyQuaternion(q).add(dp);camera.up.set(0,1,0);camera.lookAt(_ct);camera.fov=FREECAM.fov||30;}
-  else if(camMode===0){
-    // chase: camQ trails the aircraft attitude by a slerp, capped at CAM_LAG; the lag gives the lean
-    if(snapCamera)camQ.copy(q);
-    else{camQ.slerp(q,1-Math.exp(-CAM_K*dt));const lag=camQ.angleTo(q);if(lag>CAM_LAG)camQ.copy(_cqT.copy(q).slerp(camQ,CAM_LAG/lag));}
-    _co.set(0,AC.chase[0],AC.chase[1]).applyQuaternion(camQ).add(dp);const cg=groundHeight(_co.x,_co.z)+1.5;if(_co.y<cg)_co.y=cg;
-    if(snapCamera){camera.position.copy(_co);snapCamera=false;}else camera.position.lerp(_co,1-Math.exp(-6*dt));
-    camera.up.set(0,1,0).applyQuaternion(camQ);
-    _ct.copy(dp).addScaledVector(_cf,40).addScaledVector(camera.up,1.5);camera.lookAt(_ct);camera.fov=62;}
+  else if(camMode===0)dcCamera(q,dp,_cf,dt);   // chase, plus the C-130 drop views on top of it
   else if(camMode===1){_co.set(AC.cam1[0],AC.cam1[1],AC.cam1[2]).applyQuaternion(q).add(dp);camera.position.copy(_co);camera.quaternion.copy(q);camera.rotateX(-0.05);camera.fov=64;camera.up.set(0,1,0);snapCamera=false;}
   else if(camMode===2){
     sensorOrigin(_co);camera.position.copy(_co);camera.up.set(0,1,0);snapCamera=false;
@@ -7092,6 +7204,9 @@ window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,tou
   isPaved:isPaved,riverX:riverX,FWY_X:FWY_X,I10_Z:I10_Z,APC:APC,LUKE:LUKE,
   smokeCount:()=>smoke.filter(p=>p.life>0).length,smokeMax:SMOKE_MAX,
   camMode:()=>camMode,sensorMode:()=>sensorMode,
+  dropCam:()=>{const p=MISS.pallet;return {mode:DCAM.mode==='chase'&&(DCAM.drag||DCAM.yaw||DCAM.pitch)?'look':DCAM.mode,
+    yaw:+(DCAM.yaw*180/Math.PI).toFixed(2),pitch:+(DCAM.pitch*180/Math.PI).toFixed(2),
+    toCenter:p?Math.hypot(p.pos.x-DROPZ.x,p.pos.z-DROPZ.z):null,pallet:p?p.pos.toArray():null,down:!!(p&&p.down),blend:DCAM.bt};},
   sensor:()=>({mode:SENSOR.mode,zoomIdx:SENSOR.zoom,fov:SENSOR_FOV[SENSOR.zoom],lock:!!(SENSOR.tgt||SENSOR.track),
     az:+(SENSOR.az*180/Math.PI).toFixed(2),el:+(SENSOR.el*180/Math.PI).toFixed(2),ap:!!st.ap}),
   setSensorMode:setSensorMode,sensorZoom:()=>sensorZoomStep(0),sensorLock:()=>sensorLock(),

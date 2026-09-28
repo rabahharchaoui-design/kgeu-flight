@@ -15,6 +15,7 @@ GROUPS = [
     ('badge',   '.badge.on',                       True),
     ('stick',   '#stickZone, #stick.on',           True),
     ('slider',  '#thr, input[type=range]',         True),
+    ('lookpad', '#lookPad',                        True),   # C-130 airdrop free look pad
     ('hudcard', '#hud .card',                      False),
     ('minimap', '#map',                            True),
     ('dest',    '#hDest:not([hidden])',            True),
