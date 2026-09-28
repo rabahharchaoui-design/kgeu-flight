@@ -4789,10 +4789,11 @@ function start(mode){
 }
 function openMenu(){if(running&&!st.crashed){paused=true;document.getElementById('bPause').textContent='Resume';}menu.classList.add('on');tiltDiag();}
 function togglePause(){paused=!paused;document.getElementById('bPause').textContent=paused?'Resume':'Pause';}
-document.getElementById('bRunway').onclick=()=>start('runway');document.getElementById('bRamp').onclick=()=>start('ramp');document.getElementById('bFinal').onclick=()=>start('final');
-document.getElementById('bStrike').onclick=()=>{pickType('reaper');start('range');};
-document.getElementById('bDrop').onclick=()=>{pickType('c130');start('drop');};
-document.getElementById('bShort').onclick=()=>{pickType('c130');start('short');};
+function freeStart(mode){pickType(savedType);try{localStorage.setItem('kgeuPos',mode);}catch(e){}start(mode);}
+document.getElementById('bRunway').onclick=()=>freeStart('runway');document.getElementById('bRamp').onclick=()=>freeStart('ramp');document.getElementById('bFinal').onclick=()=>freeStart('final');
+document.getElementById('bStrike').onclick=()=>{pickType('reaper',1);start('range');};
+document.getElementById('bDrop').onclick=()=>{pickType('c130',1);start('drop');};
+document.getElementById('bShort').onclick=()=>{pickType('c130',1);start('short');};
 document.getElementById('mRetry').onclick=()=>{missOv.classList.remove('on');start(MISS.kind==='drop'?'drop':'short');};
 document.getElementById('mOther').onclick=()=>{missOv.classList.remove('on');start(MISS.kind==='drop'?'short':'drop');};
 document.getElementById('mFree').onclick=()=>{missOv.classList.remove('on');missReset();start('runway');};
@@ -4879,7 +4880,7 @@ function schoolList(){
     b.onclick=()=>startLesson(l.id);el.appendChild(b);});
 }
 function startLesson(id){
-  if(acType!=='cessna'&&acType!=='alpha'){pickType('cessna');toast('Flight school uses the C172 or the Alpha');}
+  if(acType!=='cessna'&&acType!=='alpha'){pickType('cessna',1);toast('Flight school uses the C172 or the Alpha');}
   const S=SCH[acType];gradeOv.classList.remove('on');
   start(id==='pattern'?'runway':'final');A.land=1;
   LES.on=id;LES.t=0;LES.ph=0;LES.d={};LES.name=LESSONS.find(l=>l.id===id).name;lesT.textContent='Flight school: '+LES.name;lesEl.classList.add('on');
@@ -5006,12 +5007,17 @@ function pickBase(id){SPAWN_BASE=BASES[id]?id:'kgeu';try{localStorage.setItem('k
   document.querySelectorAll('.pick[data-b]').forEach(b=>b.classList.toggle('sel',b.dataset.b===SPAWN_BASE));}
 document.querySelectorAll('.pick[data-b]').forEach(b=>b.addEventListener('click',()=>pickBase(b.dataset.b)));
 document.querySelectorAll('.pick[data-tod]').forEach(b=>b.addEventListener('click',()=>setTOD(b.dataset.tod)));
-function pickType(id){acType=TYPES[id]?id:'reaper';try{localStorage.setItem('kgeuType',acType);}catch(e){}
-  pickBase(HOME(acType));
-  document.querySelectorAll('.pick').forEach(b=>b.classList.toggle('sel',b.dataset.t===acType));
+// Every menu choice is independent: aircraft, base, time of day and start position
+// each keep their own saved value. A mission may borrow an aircraft for one flight
+// (temp), which never touches the saved pick.
+let savedType=acType;
+function pickType(id,temp){acType=TYPES[id]?id:'reaper';best=loadBest();
+  if(temp)return;
+  savedType=acType;try{localStorage.setItem('kgeuType',acType);}catch(e){}
+  document.querySelectorAll('.pick[data-t]').forEach(b=>b.classList.toggle('sel',b.dataset.t===acType));
   const T=TYPES[acType];document.getElementById('regTitle').textContent=T.title;document.getElementById('acSub').textContent=T.sub;document.getElementById('tips').textContent=T.tips;
   best=loadBest();showBest();resumeBtn.style.display=(running&&!st.crashed&&st.type===acType)?'':'none';}
-document.querySelectorAll('.pick').forEach(b=>b.onclick=()=>pickType(b.dataset.t));
+document.querySelectorAll('.pick[data-t]').forEach(b=>b.onclick=()=>pickType(b.dataset.t));
 pickType(acType);setType(acType);useModel(acType);sizeShadow();st=createState('runway',SPAWN_BASE);st.type=acType;
 document.getElementById('bPause').onclick=()=>{if(running&&!st.crashed)togglePause();};
 document.getElementById('bMenu').onclick=openMenu;
@@ -5738,7 +5744,7 @@ window.__kgeu={tilt:tilt,setTilt:setTilt,state:()=>st,toast:toast,start:start,pl
   setTOD:setTOD,isNight:isNight,TOD:()=>TOD,drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
   RADIO:RADIO,radioQ:()=>radioQ,radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,initAudio:initAudio,
-  pick:pickType,pickBase:pickBase,togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},pick:pickType,pickBase:pickBase,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   MISS:MISS,DROPZ:DROPZ,LZ:LZ,lzUV:lzUV,lzX:lzX,lzZ:lzZ,missDrop:missDrop,missTouchdown:missTouchdown,
   // step the mission clock without waiting on rAF: the pallet takes 50 s to come down
   missTick:(n,dt)=>{for(let i=0;i<n;i++)missUpdate(dt);},
