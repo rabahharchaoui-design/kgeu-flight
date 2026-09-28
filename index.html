@@ -393,6 +393,11 @@ label.sens b{ color:var(--ink); min-width:74px; }
 .mcard .sc{ display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:var(--sand); margin-top:2px; }
 .mcard .sc em{ font-style:normal; color:#f0d6ad; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .stars{ font-style:normal; color:var(--orange); letter-spacing:1px; font-size:13px; } .stars u{ text-decoration:none; color:rgba(246,193,119,.22); }
+#arcCards{ grid-template-columns:1fr 1fr; }
+#menu .mcard.feat{ grid-column:1 / -1; background:linear-gradient(90deg,var(--rust),var(--brown)); }
+#menu .mcard.feat .ac{ color:var(--sand); } #menu .mcard.feat .d{ color:#ffe9cc; }
+.aStars{ margin:0; font-size:54px; line-height:1; color:var(--orange); letter-spacing:4px; } .aStars u{ text-decoration:none; color:rgba(246,193,119,.22); }
+#arcOv .sheet{ max-width:560px; } #arcOv #aLines{ margin:0 0 12px; font-size:15px; } #arcOv button{ min-height:44px; }
 .sc.soon{ color:var(--orange); letter-spacing:.08em; text-transform:uppercase; font-size:11px; }
 .schAc{ flex:none; } #menu .schAc .chip{ min-height:44px; padding:0 12px; } #menu .schAc .chip b{ font-size:14px; }
 /* the lessons: one learning path, finished ones ticked, the next one lit */
@@ -619,6 +624,12 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
   <div class="mbar br"><button id="mapOut" aria-label="Zoom out">&minus;</button><button id="mapIn" aria-label="Zoom in">+</button></div>
   <div class="mbar bc"><span id="mapInfo"></span><button id="mapClear">Clear destination</button></div>
 </div>
+<div class="overlay" id="arcOv"><div class="sheet">
+  <p class="aStars" id="aStars"></p>
+  <p class="sub" id="aTitle"></p>
+  <div id="aLines"></div>
+  <div class="row"><button class="primary big" id="aRetry">Try again</button><button id="aHub">Arcade</button><button id="aFree">Keep flying</button></div>
+</div></div>
 <div class="overlay" id="gradeOv"><div class="sheet">
   <p class="gLetter" id="gLetter">A</p>
   <p class="sub" id="gTitle"></p>
@@ -4412,7 +4423,8 @@ const REC_ROWS=[
   ['mq9b','MQ-9B SkyGuardian','mq9b','Best landing',r=>r.letter+'   '+r.pts+' pts,  '+r.fpm+' fpm'],
   ['reaper','MQ-9A Reaper','reaper','Loiter and strike',r=>r.pts+' pts,  '+r.hits+'/4 hits,  '+r.avg+' m,  '+r.tot+' s on target'],
   ['c130d','C-130H Hercules','c130:drop','Airdrop',r=>r.letter+'   '+r.dist+' m from centre'],
-  ['c130s','','c130:short','Short field',r=>r.letter+'   stopped in '+r.stopFt+' ft, touched at '+r.tdFt+' ft']
+  ['c130s','','c130:short','Short field',r=>r.letter+'   stopped in '+r.stopFt+' ft, touched at '+r.tdFt+' ft'],
+  ['arcl','Arcade','arc:landing','Landing challenge',r=>r.pts+' pts,  '+fmtT(r.secs)+',  '+r.ac]
 ];
 function scUI(){
   const el=document.getElementById('recBody');if(!el)return;
@@ -5003,6 +5015,64 @@ function rookieAssist(dt,t){
   const dest=navDest();
   guideShow(dest&&destNear(dest)?dest:((rookie()||LES.on==='first')&&!st.ap?approachEnd():null),t);
 }
+// ================= Arcade: landing challenge against the clock, and a daily challenge =================
+// You start in the air a few miles out and the clock runs until the wheels touch the
+// target runway. Score is par over your time, weighted by the landing grade.
+const ARC={on:false,kind:'',t0:0,end:null,par:0,done:false,dist:0};
+const ARC_TARGETS=()=>RWY_ENDS.filter(e=>e.rwy.code==='KGEU'||e.rwy.code==='KLUF');
+function todayKey(){const d=new Date();return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();}
+function dayRng(k){let s=(k*2654435761)>>>0;return ()=>{s=(s+0x6D2B79F5)>>>0;let t=s;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
+// the same challenge for everyone on a given day
+function dailySpec(){const r=dayRng(todayKey()),T=ARC_TARGETS();
+  return {type:CAR[Math.floor(r()*CAR.length)],end:T[Math.floor(r()*T.length)],dist:6500+r()*4000,off:(r()*2-1)*1.3,alt:1800+r()*1600};}
+function placeAir(x,z,aglFt,h,kt){
+  const y=Math.max(0,groundHeight(x,z))+aglFt/M2FT+GEAR,V=kt/MS2KT/Math.sqrt(1.097*Math.exp(-y/9200)/1.225);
+  st.pos.set(x,y,z);st.vel.set(Math.sin(h)*V,0,-Math.cos(h)*V);st.quat.setFromEuler(new THREE.Euler(0.02,-h,0,'YXZ'));st.w.set(0,0,0);
+  st.onGround=false;st.airTime=30;st.flapIdx=0;st.throttle=st.power=AC.thrC;st.gearDown=!AC.retract;st.gearPos=AC.retract?0:1;
+  st.ezCfg='clean';st.ez=0;st.ias=kt/MS2KT;snapCamera=true;
+}
+function arcStart(kind){
+  const sp=kind==='daily'?dailySpec():{type:savedType,end:RWY_ENDS.find(e=>e.rwy.code==='KGEU'&&e.num==='1'),dist:9000,off:0.9,alt:2500};
+  pickType(sp.type,1);start('runway',sp.end.rwy.code==='KLUF'?'luke':'kgeu');
+  const e=sp.end,back=Math.atan2(-Math.sin(e.h),Math.cos(e.h))+sp.off;         // bearing from the threshold out along the approach, swung aside
+  const x=e.x+Math.sin(back)*sp.dist,z=e.z-Math.cos(back)*sp.dist,h=Math.atan2(e.x-x,-(e.z-z));
+  placeAir(x,z,sp.alt,h,AC.vapp*MS2KT*1.35);st.mode='arcade';A.land=1;A.tko=1;
+  Object.assign(ARC,{on:true,kind:kind,t0:st.time,end:e,done:false,dist:sp.dist,par:Math.round((sp.dist+2500)/(AC.vapp*1.3)+25)});
+  DEST=e;document.body.classList.add('hasDest');destUI(true);
+  toast((kind==='daily'?'Daily challenge: ':'Landing challenge: ')+e.rwy.apt+' runway '+e.num+'. Go!');
+}
+function arcTick(){
+  if(!ARC.on||ARC.done)return;
+  const t=st.time-ARC.t0;missHud((ARC.kind==='daily'?'Daily: ':'')+fmtT(t)+'  (par '+fmtT(ARC.par)+')',ARC.end.rwy.apt+' runway '+ARC.end.num,t>ARC.par);
+}
+function arcTouchdown(ev){
+  if(!ARC.on||ARC.done)return;
+  const g=gradeLanding(ev),secs=st.time-ARC.t0;ARC.done=true;
+  const fix=runwayFix(ev.x,ev.z),right=fix&&ARC.end&&(fix.name.indexOf(ARC.end.rwy.code==='KGEU'?'Glendale':'Luke')>=0);
+  setTimeout(()=>{if(running&&ARC.on)arcResult(g,secs,right);},2600);
+}
+const GF={A:1,B:0.9,C:0.8,D:0.7,F:0};
+function arcResult(g,secs,right){
+  const letter=g?g.letter:'F',pts=right?Math.round(1000*Math.min(1.5,ARC.par/secs)*GF[letter]):0;
+  const stars=!right||letter==='F'?0:secs<=ARC.par&&'AB'.includes(letter)?3:secs<=ARC.par*1.3?2:1;
+  const key=ARC.kind==='daily'?'arc:daily:'+todayKey():'arc:landing';
+  const rec={pts:pts,secs:Math.round(secs),letter:letter,stars:stars,ac:AC.name};
+  const better=pts>0&&scRecord(key,rec);
+  $('aStars').innerHTML='★'.repeat(stars)+'<u>'+'★'.repeat(3-stars)+'</u>';
+  $('aTitle').textContent=!right?'Wrong runway. Target was '+ARC.end.rwy.apt+' '+ARC.end.num:letter==='F'?'Too rough to count':(better?'New best! ':'')+pts+' points';
+  $('aLines').innerHTML=[['Time',fmtT(secs)+'  (par '+fmtT(ARC.par)+')'],['Landing',g?letter+'  '+g.line:'off the runway'],['Aircraft',AC.name],
+    ['Best',SCORE.best[key]?SCORE.best[key].pts+' pts, '+fmtT(SCORE.best[key].secs):'none yet']].map(l=>'<div class="gl"><span>'+l[0]+'</span><b>'+l[1]+'</b></div>').join('');
+  missHud(null);paused=true;$('arcOv').classList.add('on');
+}
+function arcStop(){if(ARC.on&&DEST===ARC.end){DEST=null;document.body.classList.remove('hasDest');destUI(true);}ARC.on=false;ARC.done=false;}
+$('aRetry').onclick=()=>{$('arcOv').classList.remove('on');arcStart(ARC.kind);};
+$('aHub').onclick=()=>{$('arcOv').classList.remove('on');arcStop();openMenu();nav('sArc');};
+$('aFree').onclick=()=>{$('arcOv').classList.remove('on');arcStop();paused=false;};
+function arcScore(id){
+  if(id==='landing'){const r=SCORE.best['arc:landing'];return r?[r.stars,r.pts+' pts, '+fmtT(r.secs)]:[0,''];}
+  if(id==='daily'){const r=SCORE.best['arc:daily:'+todayKey()];return r?[r.stars,r.pts+' pts today']:[0,''];}
+  return [0,''];
+}
 // ---------- menus ----------
 const menu=document.getElementById('menu'),crashEl=document.getElementById('crash');
 function start(mode,base){
@@ -5011,7 +5081,7 @@ function start(mode,base){
   st=createState(mode,base||SPAWN_BASE);st.type=acType;ROOK.to=false;guideShow(null);st.easy=easy;st.noPF=isTouch||easy;document.body.classList.toggle('easy',easy);A={};running=true;paused=false;events.length=0;cfgReset();camBump=0;
   menuClose();crashEl.classList.remove('on');pauseOv.classList.remove('on');$('storyOv').classList.remove('on');snapCamera=true;
   if((mode==='ramp'&&camMode>2)||(camMode===2&&AC.id!=='reaper'))camMode=0;
-  STRIKE.active=false;lesEnd();gradeOv.classList.remove('on');
+  STRIKE.active=false;lesEnd();gradeOv.classList.remove('on');arcStop();$('arcOv').classList.remove('on');
   missReset();missOv.classList.remove('on');landOv.classList.remove('on');
   document.getElementById('recOv').classList.remove('on');DASH.on=false;badgeHide();
   if(mode==='range')strikeStart();
@@ -5443,7 +5513,7 @@ function scoreOf(id){
     return [p===null?1:p>=80?3:p>=55?2:1,(p!==null?p+' pts':r.hits+'/4 hits')];}
   if(id==='school'){const g=LESSONS.map(l=>schoolBest[schoolAc+':'+l.id]).filter(Boolean),pass=g.filter(x=>x!=='F').length,a=g.filter(x=>x==='A').length;
     return g.length?[a>=5?3:a>=3?2:pass?1:0,pass+' of 5 passed']:[0,''];}
-  if(window.arcScore)return arcScore(id);
+  if(id==='landing'||id==='daily')return arcScore(id);
   return [0,''];
 }
 function cardHTML(o){const sc=o.score||scoreOf(o.id);
@@ -5458,7 +5528,11 @@ function misList(){
     {id:'dash',ac:'F-16C Viper',name:'Luke to Glendale dash',desc:'Wheels up at Luke, down at Glendale. Beat 3 minutes.',go:()=>{pickType('f16',1);start('runway','luke');}}]);
 }
 function arcList(){
+  const D=dailySpec(),DI=AC_INFO[D.type];
   fillCards($('arcCards'),[
+    {id:'dogfight',ac:'Featured',name:'Red Flag Dogfight',desc:'F-16 against F-16 over the range.',soon:1,cls:'feat',go:()=>toast('Red Flag Dogfight is coming soon')},
+    {id:'landing',ac:AC_INFO[savedType][1],name:'Landing challenge',desc:'Start 5 miles out. Beat the clock to runway 1.',go:()=>arcStart('landing')},
+    {id:'daily',ac:'Daily challenge',name:DI[1]+' to '+(D.end.rwy.code==='KGEU'?'Glendale ':'Luke ')+D.end.num,desc:'New every day. Same one for everyone.',go:()=>arcStart('daily')},
     {id:'drop',ac:'C-130H Hercules',name:'Airdrop challenge',desc:'Put the bundle on the drop zone.',go:()=>{pickType('c130',1);start('drop');}},
     {id:'range',ac:'MQ-9A Reaper',name:'Strike range',desc:'Find the targets, lock on, four missiles.',go:()=>{pickType('reaper',1);start('range');}}]);
 }
@@ -6207,7 +6281,7 @@ function frame(t){
   }
   while(events.length){const ev=events.shift();if(LES.on)lessonEvent(ev);
     if(ev.type==='touchdown'){ev.vx=st.vel.x;ev.vz=st.vel.z;const f=ev.fpm,g=f<120?'Butter':f<300?'Smooth':f<500?'Firm':'Hard';toast(`Touchdown ${f} fpm. ${g}.`);
-      missTouchdown(ev);onLanding(ev);
+      missTouchdown(ev);onLanding(ev);arcTouchdown(ev);
       camBump=clamp(f/620,0.12,1);
       if(ev.paved&&(best===null||f<best)){best=f;try{localStorage.setItem(bestKey(),String(f));}catch(e){}showBest();}
       atcTouchdown(ev);clusters.forEach(c=>{if(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)<1800){c.cheer=4.5;}});}
@@ -6216,7 +6290,7 @@ function frame(t){
     if(ev.type==='liftoff') clusters.forEach(c=>{if(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)<1500){c.cheer=4;}});
   }
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.classList.remove('on');}
-  missUpdate(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);
+  missUpdate(dt);if(running&&!paused)arcTick();logTime(dt);dashUpdate(dt);bannerUpdate(dt);
   {const show=!rookie()&&camMode===1&&(AC.id==='cessna'||AC.id==='alpha')&&running&&!st.crashed;
    if(spCan){spCan.classList.toggle('on',show);if(show)drawSixPack();}}
   radioUpdate(dt);cfgUpdate(dt);
@@ -6310,7 +6384,7 @@ window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,tou
   setTOD:setTOD,isNight:isNight,TOD:()=>TOD,drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
   RADIO:RADIO,radioQ:()=>radioQ,radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,initAudio:initAudio,
-  ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,setDest:e=>setDest(e),dest:()=>DEST&&{apt:DEST.rwy.apt,num:DEST.num},fmOpen:fmOpen,fmClose:fmClose,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,arcStart:arcStart,ARC:ARC,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&{apt:DEST.rwy.apt,num:DEST.num},fmOpen:fmOpen,fmClose:fmClose,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   MISS:MISS,DROPZ:DROPZ,LZ:LZ,lzUV:lzUV,lzX:lzX,lzZ:lzZ,missDrop:missDrop,missTouchdown:missTouchdown,
   // step the mission clock without waiting on rAF: the pallet takes 50 s to come down
   missTick:(n,dt)=>{for(let i=0;i<n;i++)missUpdate(dt);},
