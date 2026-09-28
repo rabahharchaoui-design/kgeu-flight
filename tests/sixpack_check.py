@@ -78,6 +78,7 @@ async def main():
     await pg.route('**/three.min.js',lambda r:r.fulfill(body=THREE,content_type='application/javascript'))
     await pg.route('**/fonts.googleapis.com/**',lambda r:r.abort())
     await pg.goto(URL); await pg.wait_for_timeout(2200)
+    await pg.wait_for_function("()=>{const s=document.getElementById('splash');return !s||s.classList.contains('gone')}", timeout=30000)
     await pg.evaluate("()=>{window.__kgeu.setTOD('day');window.__kgeu.pick('cessna');window.__kgeu.start('final');}")
     await pg.wait_for_timeout(900)
     await pg.evaluate("()=>window.__kgeu.cycleCam()")        # chase -> cockpit

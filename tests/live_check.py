@@ -16,6 +16,7 @@ async def main():
     pg.on('pageerror',lambda e:errs.append(str(e)))
     pg.on('requestfailed',lambda r:reqfail.append(r.url+' '+str(r.failure)))
     await pg.goto(URL,wait_until='load'); await pg.wait_for_timeout(5000)
+    await pg.wait_for_function("()=>{const s=document.getElementById('splash');return !s||s.classList.contains('gone')}", timeout=30000)
     chk('page loads over https',(await pg.title()).startswith('Pocket Flight Sim'),await pg.title())
     chk('no page errors',not errs,str(errs[:2]))
     chk('no failed requests',not reqfail,str(reqfail[:3]))

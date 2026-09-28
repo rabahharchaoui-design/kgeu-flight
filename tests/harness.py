@@ -39,7 +39,8 @@ async def page(b, url, vp=IPHONE_SE, storage=None, touch=True):
             + ''.join(f'localStorage.setItem({k!r},{v!r});' for k, v in storage.items()) + '})()')
     await pg.goto(url)
     await pg.wait_for_function('()=>window.__kgeu', timeout=30000)
-    await pg.wait_for_timeout(600)
+    await splash_gone(pg)
+    await pg.wait_for_timeout(300)
     return pg
 
 class Checks:
@@ -57,3 +58,6 @@ async def finger(pg, sel):
     r = await pg.evaluate("(s)=>{const e=document.querySelector(s);if(!e)return null;const r=e.getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]}", sel)
     if not r: raise RuntimeError('no element ' + sel)
     await pg.touchscreen.tap(r[0], r[1])
+
+async def splash_gone(pg):
+    await pg.wait_for_function("()=>{const s=document.getElementById('splash');return !s||s.classList.contains('gone')}", timeout=30000)

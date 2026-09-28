@@ -458,11 +458,28 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
 #fRookie{ background:var(--rust); } #fRookie span{ color:#ffe9cc; }
 #storyOv .sheet{ background:var(--night); color:var(--sand); } #storyOv .reg{ font-size:30px; text-shadow:none; }
 #storyOv .sub{ color:#f0d6ad; font-size:16px; }
+#splash{ position:fixed; inset:0; z-index:60; background:#F6C177; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:clamp(8px,3vh,16px);
+  padding:var(--padT) var(--padR) var(--padB) var(--padL); transition:opacity .45s ease; }
+#splash.done{ opacity:0; pointer-events:none; }
+#splash.gone{ display:none; }
+.spIcon{ width:clamp(88px,30vh,150px); height:clamp(88px,30vh,150px); border-radius:22%; box-shadow:0 10px 30px rgba(42,22,8,.28); }
+.spTitle{ font:800 clamp(26px,8vh,40px) var(--font); color:#2A1608; letter-spacing:.01em; }
+.spBar{ width:min(240px,50vw); height:4px; border-radius:2px; background:rgba(42,22,8,.16); overflow:hidden; }
+.spBar i{ display:block; height:100%; width:0; background:#A8592A; border-radius:2px; animation:spLoad 5s cubic-bezier(.1,.7,.2,1) forwards; }
+#splash.done .spBar i{ width:100% !important; animation:none; transition:width .2s; }
+@keyframes spLoad{ to{ width:88%; } }
+@media (prefers-reduced-motion: reduce){ #splash{ transition:none; } }
 #rotate{ position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:24px; text-align:center; background:rgba(8,14,22,.92); z-index:20; font-size:22px; font-weight:700; }
 @media (orientation:portrait){ body.touch:not(.portraitok) #rotate{ display:flex; } }
 </style>
 </head>
 <body class="menuOn">
+<!-- splash: plain HTML so it paints before any script runs, then fades into the home screen -->
+<div id="splash" role="status" aria-label="Loading">
+  <img src="icons/icon-512.png" alt="" class="spIcon">
+  <div class="spTitle">Pocket Flight Sim</div>
+  <div class="spBar"><i></i></div>
+</div>
 <canvas id="gl"></canvas>
 <!-- everything in here is laid out inside the visual viewport, so nothing hides under
      the notch, the home indicator, or a host app header -->
@@ -1337,6 +1354,8 @@ const isTouch=coarse||(navigator.maxTouchPoints>0&&!(window.matchMedia&&window.m
 if(isTouch) document.body.classList.add('touch');
 const fontsReady=(document.fonts&&document.fonts.load)?Promise.race([document.fonts.load('800 60px "Saira Condensed"'),new Promise(r=>setTimeout(r,1500))]):Promise.resolve();
 fontsReady.then(init,init);
+// if the game fails to start, do not leave the splash up forever
+setTimeout(()=>{const sp=document.getElementById('splash');if(sp&&!sp.classList.contains('done')){sp.classList.add('done');setTimeout(()=>sp.classList.add('gone'),480);}},8000);
 
 // ---------- HD airframes (from the Hangar viewer, built to published dimensions) ----------
 // Wrapped in its own scope so its helpers never collide with the game's. The game renders
@@ -6332,6 +6351,9 @@ const APN={to:'AUTO T/O',hold:'ALT HOLD',land:'AUTOLAND',orbit:'ORBIT'},APP={cli
 const _cf=new V3(),_cu=new V3(),_co=new V3(),_ct=new V3(),_cr=new V3(),_eu=new THREE.Euler(0,0,0,'YXZ'),_el=new THREE.Euler(0,0,0,'YXZ');
 const TOWER=new V3(wX(1290,-470),24.5,wZ(1290,-470)),CROWD=new V3(wX(1590,-196),2.8,wZ(1590,-196));
 let frameN=0,gearWarn=false,snapCamera=true,last=performance.now(),acc=0,hudT=0,mapT=0;const DT=1/120;
+const BOOT_T=performance.now();
+function splashDone(){const sp=$('splash');if(!sp||sp.classList.contains('done'))return;
+  setTimeout(()=>{sp.classList.add('done');setTimeout(()=>sp.classList.add('gone'),480);},Math.max(0,700-(performance.now()-BOOT_T)));}
 function frame(t){
   requestAnimationFrame(frame);
   const dt=Math.min(0.1,(t-last)/1000);last=t;const ts=t/1000;
@@ -6439,7 +6461,7 @@ function frame(t){
   gearWarn=running&&!s.crashed&&AC.retract&&!s.onGround&&s.gearPos<0.99&&agl<120&&s.vel.y<-0.8;
   if(running&&!paused&&!s.crashed){if(s.aoaWarn)w='STALL';else if(gearWarn)w='GEAR UP';else if(kias>AC.vne)w='OVERSPEED';else if(s.flapIdx>0&&kias>AC.vfe)w='FLAP SPEED';}
   warnEl.textContent=w;warnEl.classList.toggle('on',!!w);
-  updateAudio();frameN++;
+  updateAudio();frameN++;if(frameN===4)splashDone();
   if(SHOW.on){renderer.setClearColor(0xF6C177,1);renderer.clear();showRender(dt,CARM);}
   else{if(!menu.classList.contains('on')||frameN<40)renderer.render(scene,camera);
     const po=pauseOv.classList.contains('on');document.body.classList.toggle('pauseOn',po);if(po)showRender(dt,CARP);}
