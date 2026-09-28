@@ -114,7 +114,7 @@ body.missOn #atc{ top:calc(var(--padT) + var(--icon) + 64px); }
 #bigcfg.on{ opacity:1; transition:opacity .08s; }
 
 /* ---------- mini map, top left ---------- */
-#map{ position:absolute; left:var(--padL); top:var(--padT); border-radius:12px; cursor:pointer; box-shadow:0 0 0 1px rgba(246,193,119,.25); touch-action:none; }
+#map{ position:absolute; left:var(--padL); top:var(--padT); border-radius:12px; cursor:pointer; box-shadow:0 0 0 1px rgba(255,255,255,.2),0 2px 10px rgba(0,0,0,.35); touch-action:none; }
 #hDest{ position:absolute; left:var(--padL); top:calc(var(--padT) + 126px); display:flex; align-items:center; gap:8px; min-height:44px; max-width:calc(36vw - var(--padL));
   padding:4px 10px 4px 6px; border-radius:10px; background:rgba(26,16,9,.78); border:1.5px solid var(--orange); color:var(--sand); font:700 13px var(--font); pointer-events:auto; cursor:pointer; touch-action:none; }
 #hDest[hidden]{ display:none; }
@@ -135,7 +135,7 @@ body.hasDest #stickZone{ top:calc(var(--padT) + 178px); }
 #mapLeg.min #mapLegT i{ transform:rotate(-135deg); }
 #mapLegL{ overflow-y:auto; padding:0 4px 4px; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
 #mapLeg.min #mapLegL{ display:none; }
-#mapOv .lrow{ display:flex; align-items:center; gap:8px; width:100%; min-height:27px; min-width:0; padding:2px 6px; border:0; border-radius:8px; background:transparent;
+#mapOv .lrow{ display:flex; align-items:center; gap:8px; width:100%; min-height:25px; min-width:0; padding:2px 6px; border:0; border-radius:8px; background:transparent;
   font:600 12.5px var(--font); color:#ebe6dc; text-align:left; white-space:nowrap; }
 #mapOv .lrow img{ width:22px; height:22px; flex:none; }
 #mapOv .lrow.on{ background:rgba(77,225,255,.18); color:#fff; }
@@ -7146,35 +7146,48 @@ function rwyPoly(ctx,r,P,minW){
   const dx=Math.sin(r.h),dz=-Math.cos(r.h),a=P(r.x-dx*r.len/2,r.z-dz*r.len/2),b=P(r.x+dx*r.len/2,r.z+dz*r.len/2);
   ctx.lineCap='butt';ctx.lineWidth=minW;ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();
 }
+// the mini map: the same tiles, runways and route as the full map, heading up, aircraft centred
 function drawMap(hdgT){
-  const W=mc.width,C=W/2,range=5500,k=C/range,ox=st.pos.x,oz=st.pos.z,h=hdgT*Math.PI/180,c=Math.cos(-h),s=Math.sin(-h);
-  // heading up: rotate the world about the aircraft
-  const P=(x,z)=>{const X=(x-ox)*k,Z=(z-oz)*k;return [C+X*c-Z*s,C+X*s+Z*c];};
-  mx.clearRect(0,0,W,W);mx.save();
+  if(FM.on)return;
+  const W=mc.width,C=W/2,range=5500,k=C/range,ox=st.pos.x,oz=st.pos.z,h=hdgT*Math.PI/180;
+  mx.setTransform(1,0,0,1,0,0);mx.clearRect(0,0,W,W);mx.save();
   const R=12*dpr;mx.beginPath();mx.roundRect?mx.roundRect(0,0,W,W,R):mx.rect(0,0,W,W);mx.clip();
-  mx.fillStyle='rgba(26,16,9,.52)';mx.fillRect(0,0,W,W);
-  mx.strokeStyle='rgba(127,212,255,.45)';mx.lineWidth=2*dpr;mx.beginPath();
-  for(let z=oz-range*1.5;z<=oz+range*1.5;z+=300){const q=P(riverX(z),z);z===oz-range*1.5?mx.moveTo(q[0],q[1]):mx.lineTo(q[0],q[1]);}mx.stroke();
-  // range ring, 2 nm
-  mx.strokeStyle='rgba(246,193,119,.35)';mx.lineWidth=1*dpr;mx.setLineDash([3*dpr,3*dpr]);mx.beginPath();mx.arc(C,C,3704*k,0,TAU);mx.stroke();mx.setLineDash([]);
-  // runways as clear strips, numbers at each end, kept upright
-  mx.strokeStyle='#f3efe6';
-  for(const r of RUNWAYS){if(Math.hypot(r.x-ox,r.z-oz)>range*1.6)continue;rwyPoly(mx,r,P,Math.max(3*dpr,r.wid*k*1.6));}
-  mx.fillStyle='#fff';mx.font=`800 ${9*dpr}px ${F}`;mx.textAlign='center';mx.textBaseline='middle';
-  for(const e of RWY_ENDS){if(Math.hypot(e.x-ox,e.z-oz)>range*1.3)continue;
-    const q=P(e.x-Math.sin(e.h)*380,e.z+Math.cos(e.h)*380);mx.fillText(e.num,q[0],q[1]);}
-  // destination
-  if(DEST){const q=P(DEST.x,DEST.z),dq=Math.hypot(q[0]-C,q[1]-C);mx.lineCap='round';
-    mx.strokeStyle='rgba(6,10,16,.75)';mx.lineWidth=5*dpr;mx.beginPath();mx.moveTo(C,C);mx.lineTo(q[0],q[1]);mx.stroke();
+  mx.fillStyle=MPAL.out;mx.fillRect(0,0,W,W);
+  mx.translate(C,C);mx.rotate(-h);
+  const P=(x,z)=>[(x-ox)*k,(z-oz)*k],r=range*1.45;
+  if(MBASE.c){MT.d=Math.min(window.devicePixelRatio||1,2);mtDraw(mx,k,ox-r,oz-r,ox+r,oz+r,P,k/MT.d);mtPump(4);}
+  // haboob dust
+  if(HB.on)hbMapPoly(mx,P,1);
+  // runways
+  mx.strokeStyle='#f4f1ea';
+  for(const rw of RUNWAYS){if(Math.hypot(rw.x-ox,rw.z-oz)>range*1.8)continue;rwyPoly(mx,rw,P,Math.max(2*dpr,rw.wid*k*1.4));}
+  // the route and its pin
+  if(DEST){const q=P(DEST.x,DEST.z);mx.lineCap='round';
+    mx.strokeStyle='rgba(6,10,16,.75)';mx.lineWidth=5*dpr;mx.beginPath();mx.moveTo(0,0);mx.lineTo(q[0],q[1]);mx.stroke();
     mx.strokeStyle='#4de1ff';mx.lineWidth=2.5*dpr;mx.stroke();
-    if(dq<C){mx.fillStyle='#4de1ff';mx.strokeStyle='#06121c';mx.lineWidth=1.5*dpr;mx.beginPath();mx.arc(q[0],q[1],4.5*dpr,0,TAU);mx.fill();mx.stroke();}}
+    if(Math.hypot(q[0],q[1])<C*1.4){mx.fillStyle='#4de1ff';mx.strokeStyle='#06121c';mx.lineWidth=1.5*dpr;mx.beginPath();mx.arc(q[0],q[1],4.5*dpr,0,TAU);mx.fill();mx.stroke();}}
   mx.fillStyle='#7fd4ff';TRAFFIC.forEach(o=>{const a=P(o.m.g.position.x,o.m.g.position.z);mx.beginPath();mx.arc(a[0],a[1],2.2*dpr,0,TAU);mx.fill();});
-  // the aircraft, always pointing up
-  mx.translate(C,C);mx.fillStyle='#F6C177';mx.strokeStyle='#2A1608';mx.lineWidth=1.2*dpr;mx.beginPath();
-  mx.moveTo(0,-7*dpr);mx.lineTo(5*dpr,6*dpr);mx.lineTo(0,3*dpr);mx.lineTo(-5*dpr,6*dpr);mx.closePath();mx.fill();mx.stroke();mx.restore();
-  // north tick on the rim
-  const nx=C+Math.sin(-h)*(C-8*dpr),ny=C-Math.cos(-h)*(C-8*dpr);mx.fillStyle='#eef2f6';mx.font=`700 ${9*dpr}px ${F}`;mx.textAlign='center';mx.textBaseline='middle';mx.fillText('N',nx,ny);
-  mx.fillStyle='rgba(246,193,119,.8)';mx.font=`700 ${8*dpr}px ${F}`;mx.textAlign='left';mx.fillText('2 NM',4*dpr,W-7*dpr);
+  mx.setTransform(1,0,0,1,0,0);
+  // range ring, 2 nm
+  mx.strokeStyle='rgba(244,241,234,.28)';mx.lineWidth=1*dpr;mx.setLineDash([3*dpr,3*dpr]);mx.beginPath();mx.arc(C,C,3704*k,0,TAU);mx.stroke();mx.setLineDash([]);
+  // the aircraft, always pointing up, in the full map's yellow
+  mx.translate(C,C);mx.fillStyle='#ffd640';mx.strokeStyle='#15110a';mx.lineWidth=1.6*dpr;mx.lineJoin='round';mx.beginPath();
+  mx.moveTo(0,-7.5*dpr);mx.lineTo(5.5*dpr,6*dpr);mx.lineTo(0,3*dpr);mx.lineTo(-5.5*dpr,6*dpr);mx.closePath();mx.stroke();mx.fill();mx.restore();
+  // north on the rim, and the ring's size
+  const nx=C+Math.sin(-h)*(C-8*dpr),ny=C-Math.cos(-h)*(C-8*dpr);
+  mx.fillStyle='rgba(14,16,20,.85)';mx.beginPath();mx.arc(nx,ny,6.5*dpr,0,TAU);mx.fill();
+  mx.fillStyle='#f4f1ea';mx.font=`800 ${9*dpr}px ${F}`;mx.textAlign='center';mx.textBaseline='middle';mx.fillText('N',nx,ny+0.5*dpr);
+  mx.font=`700 ${8*dpr}px ${F}`;mx.textAlign='left';mx.lineWidth=3*dpr;mx.strokeStyle='rgba(14,16,20,.85)';mx.strokeText('2 NM',4*dpr,W-7*dpr);mx.fillStyle='rgba(244,241,234,.85)';mx.fillText('2 NM',4*dpr,W-7*dpr);
+}
+// the haboob on a map: its dust from the curved front wall back through its depth
+function hbMapPoly(ctx,P,dp){
+  const pts=[],n=16;
+  for(let i=0;i<=n;i++){const s=-HB.W/2+HB.W*i/n,al=-s*s/(2*HB.R);pts.push([HB.C.x+HB.T.x*al+HB.Lat.x*s,HB.C.z+HB.T.z*al+HB.Lat.z*s]);}
+  for(let i=n;i>=0;i--){const s=-HB.W/2+HB.W*i/n,al=-s*s/(2*HB.R)-HB.DEPTH;pts.push([HB.C.x+HB.T.x*al+HB.Lat.x*s,HB.C.z+HB.T.z*al+HB.Lat.z*s]);}
+  ctx.beginPath();pts.forEach((p,i)=>{const q=P(p[0],p[1]);i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]);});ctx.closePath();
+  ctx.fillStyle='rgba(176,122,62,.38)';ctx.fill();
+  ctx.beginPath();for(let i=0;i<=n;i++){const q=P(pts[i][0],pts[i][1]);i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]);}
+  ctx.strokeStyle='rgba(226,170,100,.9)';ctx.lineWidth=2.5*dp;ctx.setLineDash([6*dp,4*dp]);ctx.stroke();ctx.setLineDash([]);
 }
 // ---- the map look: an opaque base (land cover and hillshade), cached as tiles ----
 // Charcoal city, muted desert, deep blue black water, faint green parks, and the game's
@@ -7250,8 +7263,8 @@ function mtRender(L,i,j){
   return c;
 }
 // draw the tiles under a view. P maps world to screen px; returns true when every tile was cached
-function mtDraw(ctx,sc,wx0,wz0,wx1,wz1,P){
-  const L=mtLevel(sc),span=256/(MT.base*Math.pow(2,L));let full=true;
+function mtDraw(ctx,sc,wx0,wz0,wx1,wz1,P,lsc){
+  const L=mtLevel(lsc||sc),span=256/(MT.base*Math.pow(2,L));let full=true;
   for(let i=Math.floor(wx0/span);i<=Math.floor(wx1/span);i++)for(let j=Math.floor(wz0/span);j<=Math.floor(wz1/span);j++){
     const a=P(i*span,j*span),w=span*sc;let t=mtTile(L,i,j);
     if(t){ctx.drawImage(t,a[0],a[1],w+0.5,w+0.5);continue;}
@@ -7281,7 +7294,7 @@ function fmOpen(){
   let x0=Math.min(st.pos.x,...AIRPORTS.map(a=>a[2])),x1=Math.max(st.pos.x,...AIRPORTS.map(a=>a[2])),z0=Math.min(st.pos.z,...AIRPORTS.map(a=>a[3])),z1=Math.max(st.pos.z,...AIRPORTS.map(a=>a[3]));
   FM.scale=Math.min((innerWidth-150-legW())/(x1-x0+4000),(innerHeight-170)/(z1-z0+4000));
   FM.cx=(x0+x1)/2+legW()/2/FM.scale;FM.cz=(z0+z1)/2;
-  fmSize();lblUI();fmDraw();
+  FM.infoK=null;fmSize();lblUI();fmDraw();
 }
 function fmClose(){FM.on=false;$('mapOv').classList.remove('on');document.body.classList.remove('mapOn');paused=FM.wasPaused;}
 function fmSize(){const d=Math.min(window.devicePixelRatio||1,2);fmc.width=innerWidth*d;fmc.height=innerHeight*d;fmc.style.width=innerWidth+'px';fmc.style.height=innerHeight+'px';FM.d=d;}
@@ -7393,10 +7406,16 @@ function fmDraw(){
   fx.strokeStyle='#f4f1ea';for(const r of RUNWAYS)rwyPoly(fx,r,fmP,Math.max(2,r.wid*sc));
   if(sc>0.06){fx.strokeStyle='rgba(40,40,44,.9)';fx.setLineDash([Math.max(3,30*sc),Math.max(3,20*sc)]);
     for(const r of RUNWAYS)rwyPoly(fx,r,fmP,Math.max(1,0.9*sc));fx.setLineDash([]);}   // centre line stripes when close
+  if(HB.on)hbMapPoly(fx,fmP,1);
   // the route: a bright line from the aircraft to the waypoint
   if(DEST){const a=fmP(st.pos.x,st.pos.z),b=fmP(DEST.x,DEST.z);fx.lineCap='round';
     fx.strokeStyle='rgba(6,10,16,.75)';fx.lineWidth=8;fx.beginPath();fx.moveTo(a[0],a[1]);fx.lineTo(b[0],b[1]);fx.stroke();
     fx.strokeStyle='rgba(77,225,255,.35)';fx.lineWidth=6;fx.stroke();fx.strokeStyle='#4de1ff';fx.lineWidth=3;fx.stroke();}
+  // the route card first: its size is a keep out box for the labels
+  {const k=DEST?destName(DEST)+'|'+routeInfo():'';if(k!==FM.infoK){FM.infoK=k;
+    if(DEST){$('mapInfo').innerHTML='<b></b><span></span>';$('mapInfo').firstChild.textContent=destName(DEST);$('mapInfo').lastChild.textContent=routeInfo();}
+    else $('mapInfo').textContent='Tap a runway end or an icon for a waypoint';
+    $('mapClear').hidden=!DEST;lblUI();}}
   // scale bar: a nice round distance about 60 to 140 px long, bottom left
   const R=rookie(),unit=R?1609.34:1852,un=R?'mi':'nm',steps=[0.1,0.2,0.25,0.5,1,2,5,10,20];let n=steps[0];
   for(const v of steps)if(v*unit*sc<=140)n=v;const bw=n*unit*sc,bx=FM.padL+8,by=H-FM.padB-10;
@@ -7407,9 +7426,6 @@ function fmDraw(){
   fx.fillStyle='rgba(14,16,20,.82)';rrect(fx,bx-8,by-24,bw+16,32,8);fx.fill();
   fx.strokeStyle='#f4f1ea';fx.lineWidth=2;fx.lineCap='butt';fx.beginPath();fx.moveTo(bx,by-5);fx.lineTo(bx,by);fx.lineTo(bx+bw,by);fx.lineTo(bx+bw,by-5);fx.stroke();
   haloText(fx,n+' '+un,bx+bw/2,by-13,'700 11px '+F,'#f4f1ea');
-  if(DEST){const r=routeInfo();$('mapInfo').innerHTML='<b></b><span></span>';$('mapInfo').firstChild.textContent=destName(DEST);$('mapInfo').lastChild.textContent=r;}
-  else $('mapInfo').textContent='Tap a runway end or an icon for a waypoint';
-  $('mapClear').hidden=!DEST;
 }
 // every label and icon that could show at this zoom
 function fmCands(C,sc,inView){
