@@ -550,6 +550,7 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
 .setFoot{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex:none; flex-wrap:nowrap; }
 .setFoot #a2hs{ flex:1; min-width:0; }
 .setFoot .credit{ flex:none; order:2; }
+#osmCredit{ order:3; flex:none; margin:0; font:600 11px var(--font); color:#8a5a33; max-width:92px; line-height:1.15; }
 #rotate{ position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:24px; text-align:center; background:rgba(8,14,22,.92); z-index:20; font-size:22px; font-weight:700; }
 @media (orientation:portrait){ body.touch:not(.portraitok) #rotate{ display:flex; } }
 </style>
@@ -704,6 +705,7 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
    </div>
   </div>
   <div class="setFoot"><a class="credit" href="https://www.youtube.com/@OhRabah" target="_blank" rel="noopener"><svg class="yt" viewBox="0 0 28 20" aria-hidden="true"><path d="M27.4 3.1A3.5 3.5 0 0 0 24.9.6C22.7 0 14 0 14 0S5.3 0 3.1.6A3.5 3.5 0 0 0 .6 3.1C0 5.3 0 10 0 10s0 4.7.6 6.9a3.5 3.5 0 0 0 2.5 2.5C5.3 20 14 20 14 20s8.7 0 10.9-.6a3.5 3.5 0 0 0 2.5-2.5C28 14.7 28 10 28 10s0-4.7-.6-6.9Z" fill="#FF0000"/><path d="M11.2 14.3 18.4 10l-7.2-4.3v8.6Z" fill="#FFFFFF"/></svg><span>Made by @OhRabah</span></a>
+  <p id="osmCredit">Map data &copy; OpenStreetMap contributors</p>
   <p id="a2hs"><b>Play it full screen.</b> Tap <span class="shr"></span> <b>Share</b> in Safari, then <b>Add to Home Screen</b>.</p></div>
  </div>
  <div class="scr" id="sHelp">
@@ -7051,6 +7053,65 @@ function drawSixPack(){
    spLabel(x,cx,cy+30,'FPM x100');}
 }
 
+// ---------- map data: real Phoenix roads, water and parks from OpenStreetMap ----------
+// Built once, at build time, by tools/build_map_data.py into assets/map/phx.bin. The game
+// never calls Overpass. World metres (+X east, +Z south from KGEU), 2 m integers,
+// delta and varint coded. Map data (c) OpenStreetMap contributors, credited in Settings.
+const MAPD={ready:false,roads:[],shields:[],polys:[],wlines:[],taxi:[],apron:[],urban:null,cell:4000,idx:null};
+function mapParse(buf){
+  const u=new Uint8Array(buf),dv=new DataView(buf);let o=0;
+  const U8=()=>u[o++],U16=()=>{const v=dv.getUint16(o,true);o+=2;return v;},U32=()=>{const v=dv.getUint32(o,true);o+=4;return v;},
+        I16=()=>{const v=dv.getInt16(o,true);o+=2;return v;};
+  const V=()=>{let r=0,s=0,b;do{b=u[o++];r+=(b&127)*Math.pow(2,s);s+=7;}while(b&128);return (r%2)?-(r+1)/2:r/2;};
+  if(String.fromCharCode(u[0],u[1],u[2],u[3])!=='KGM2')return false;o=4;
+  const Q=U16()/100;U8();
+  // one polyline: Float32 x,z pairs plus its bounding box
+  const line=()=>{const n=V(),a=new Float32Array(n*2);let x=0,z=0,x0=1e9,z0=1e9,x1=-1e9,z1=-1e9;
+    for(let i=0;i<n;i++){x+=V();z+=V();const X=x*Q,Z=z*Q;a[i*2]=X;a[i*2+1]=Z;if(X<x0)x0=X;if(X>x1)x1=X;if(Z<z0)z0=Z;if(Z>z1)z1=Z;}
+    return {p:a,b:[x0,z0,x1,z1]};};
+  const list=()=>{const n=U32(),out=[];for(let i=0;i<n;i++)out.push(line());return out;};
+  for(let n=U8();n--;){const c=U8();MAPD.roads[c]=list();}
+  for(let n=U16();n--;){const x=I16()*Q,z=I16()*Q,l=U8();let r='';for(let i=0;i<l;i++)r+=String.fromCharCode(U8());MAPD.shields.push({x:x,z:z,ref:r});}
+  for(let n=U8();n--;){const k=U8();MAPD.polys[k]=list();}
+  for(let n=U8();n--;){const k=U8();MAPD.wlines[k]=list();}
+  MAPD.taxi=list();MAPD.apron=list();
+  const W=U16(),H=U16(),G=U16(),gx=I16()*Q,gz=I16()*Q,len=U32();
+  MAPD.urbanZ={W:W,H:H,G:G,x0:gx,z0:gz,data:u.subarray(o,o+len)};o+=len;
+  return true;
+}
+// the density grid is deflated; the browser's own DecompressionStream inflates it
+function mapInflate(){
+  const g=MAPD.urbanZ;if(!g)return Promise.resolve();
+  if(typeof DecompressionStream==='undefined'){MAPD.urban=Object.assign({},g,{data:null});return Promise.resolve();}
+  const ds=new Blob([g.data]).stream().pipeThrough(new DecompressionStream('deflate'));
+  return new Response(ds).arrayBuffer().then(b=>{MAPD.urban=Object.assign({},g,{data:new Uint8Array(b)});}).catch(()=>{MAPD.urban=Object.assign({},g,{data:null});});
+}
+// a coarse grid of which features touch each 4 km cell, so a map tile only walks its own
+function mapIndex(){
+  const C=MAPD.cell,idx=new Map(),add=(layer,i,b)=>{
+    for(let cx=Math.floor(b[0]/C);cx<=Math.floor(b[2]/C);cx++)for(let cz=Math.floor(b[1]/C);cz<=Math.floor(b[3]/C);cz++){
+      const k=cx*1000+cz;let a=idx.get(k);if(!a){a=[];idx.set(k,a);}a.push(layer,i);}};
+  const layers=MAPD.layers=[];
+  const reg=(name,arr)=>{if(!arr)return;const L=layers.length;layers.push({name:name,f:arr});arr.forEach((f,i)=>add(L,i,f.b));};
+  MAPD.roads.forEach((a,c)=>reg('r'+c,a));MAPD.polys.forEach((a,k)=>reg('p'+k,a));MAPD.wlines.forEach((a,k)=>reg('w'+k,a));
+  reg('taxi',MAPD.taxi);reg('apron',MAPD.apron);
+  MAPD.idx=idx;MAPD.seen=layers.map(L=>new Uint32Array(L.f.length));MAPD.stamp=0;
+}
+// every feature of the named layers whose box meets x0,z0..x1,z1, each once
+function mapQuery(x0,z0,x1,z1,cb){
+  if(!MAPD.idx)return;const C=MAPD.cell,st=++MAPD.stamp;
+  for(let cx=Math.floor(x0/C);cx<=Math.floor(x1/C);cx++)for(let cz=Math.floor(z0/C);cz<=Math.floor(z1/C);cz++){
+    const a=MAPD.idx.get(cx*1000+cz);if(!a)continue;
+    for(let i=0;i<a.length;i+=2){const L=a[i],f=a[i+1];if(MAPD.seen[L][f]===st)continue;MAPD.seen[L][f]=st;
+      const F=MAPD.layers[L].f[f],b=F.b;if(b[2]<x0||b[0]>x1||b[3]<z0||b[1]>z1)continue;cb(MAPD.layers[L].name,F);}}
+}
+function mapLoad(){
+  fetch('assets/map/phx.bin?v=1').then(r=>r.ok?r.arrayBuffer():null).then(b=>{
+    if(!b||!mapParse(b))return;return mapInflate().then(()=>{mapIndex();MAPD.ready=true;if(window.mapDataReady)mapDataReady();});
+  }).catch(()=>{});
+}
+mapLoad();
+
 // ---------- maps: a heading up mini map, and a full north up map with destinations ----------
 const mc=document.getElementById('map'),mx=mc.getContext('2d');let ms=92;
 const LANDMARKS=[
@@ -8404,7 +8465,7 @@ function tick(t,skipRender){
     const po=pauseOv.classList.contains('on');document.body.classList.toggle('pauseOn',po);if(po)showRender(dt,CARP);}
 }
 // test hook: headless UI checks need to reach a few internals
-window.__kgeu={TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,
+window.__kgeu={MAPD:MAPD,TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
   lights:()=>({KGEU:AL.KGEU.count(),KLUF:AL.KLUF.count(),uLights:AL_MAT.uniforms.uLights.value,
     layers:AL_LAYERS.map(L=>({name:L.pts&&L.pts.name,visible:!!(L.pts&&L.pts.visible),inScene:!!(L.pts&&L.pts.parent)})),
