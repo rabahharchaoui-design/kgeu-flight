@@ -92,7 +92,7 @@ async def main():
     chk('records screen is reachable', await pg.is_visible('#bRecords'))
     chk('C-130 missions are offered', await pg.is_visible('#bDrop') and await pg.is_visible('#bShort'))
     n0=len(errs)
-    for t in ['cessna','f16','reaper','c130']:
+    for t in ['cessna','f16','reaper','mq9b','c130']:
         await pg.evaluate(f"()=>{{window.__kgeu.pick('{t}');window.__kgeu.start('runway');}}")
         await pg.wait_for_timeout(2000)
         s2=await pg.evaluate("()=>{const s=window.__kgeu.state();return [s.type,s.crashed,s.base];}")
