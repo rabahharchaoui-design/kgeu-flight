@@ -16,7 +16,7 @@ async def main():
     pg.on('pageerror',lambda e:errs.append(str(e)))
     pg.on('requestfailed',lambda r:reqfail.append(r.url+' '+str(r.failure)))
     await pg.goto(URL,wait_until='load'); await pg.wait_for_timeout(5000)
-    chk('page loads over https',(await pg.title()).startswith('Haboob'),await pg.title())
+    chk('page loads over https',(await pg.title()).startswith('Pocket Flight Sim'),await pg.title())
     chk('no page errors',not errs,str(errs[:2]))
     chk('no failed requests',not reqfail,str(reqfail[:3]))
     # three.js came from the CDN and the scene is alive
@@ -28,7 +28,7 @@ async def main():
       if(!l)return null;const r=await fetch(l.href);return await r.json();}""")
     chk('manifest is linked and fetchable',m is not None)
     if m:
-        chk('manifest name is Haboob',m.get('name')=='Haboob' and m.get('short_name')=='Haboob',str(m.get('name')))
+        chk('manifest name is Pocket Flight Sim',m.get('name')=='Pocket Flight Sim' and m.get('short_name')=='Pocket Sim',str(m.get('name')))
         chk('display is fullscreen',m.get('display')=='fullscreen',str(m.get('display')))
         chk('orientation is landscape',m.get('orientation')=='landscape',str(m.get('orientation')))
         sizes=[i.get('sizes') for i in m.get('icons',[])]
@@ -46,7 +46,7 @@ async def main():
       vp:(document.querySelector('meta[name=viewport]')||{}).content})""")
     chk('apple-mobile-web-app-capable is yes',tags['cap']=='yes',str(tags['cap']))
     chk('status bar is black-translucent',tags['bar']=='black-translucent',str(tags['bar']))
-    chk('home screen title set',tags['title']=='Haboob',str(tags['title']))
+    chk('home screen title set',tags['title']=='Pocket Sim',str(tags['title']))
     chk('viewport-fit=cover for the notch','viewport-fit=cover' in (tags['vp'] or ''),str(tags['vp']))
     r=await pg.evaluate("async(u)=>{const r=await fetch(u);return r.status;}",tags['icon'])
     chk('apple-touch-icon resolves',r==200,str(r))
@@ -56,7 +56,7 @@ async def main():
       title:(document.querySelector('meta[property="og:title"]')||{}).content,
       card:(document.querySelector('meta[name="twitter:card"]')||{}).content})""")
     chk('og:image is present',bool(og['img']),str(og['img']))
-    chk('og:title is present',og['title']=='Haboob',str(og['title']))
+    chk('og:title is present',og['title']=='Pocket Flight Sim',str(og['title']))
     chk('twitter card is the large image kind',og['card']=='summary_large_image',str(og['card']))
     if og['img']:
         r=await pg.evaluate("async(u)=>{const r=await fetch(u);return r.status;}",og['img'])
