@@ -140,7 +140,10 @@ body.hasDest #stickZone{ top:calc(var(--padT) + 178px); }
 #mapOv .lrow img{ width:22px; height:22px; flex:none; }
 #mapOv .lrow.on{ background:rgba(77,225,255,.18); color:#fff; }
 #mapOv #mapClear{ font-size:14px; padding:0 14px; } #mapOv #mapClear[hidden]{ display:none; }
-#mapInfo{ font:700 14px var(--font); color:#f4f1ea; background:rgba(14,16,20,.9); border:1px solid rgba(255,255,255,.12); padding:8px 12px; border-radius:10px; white-space:nowrap; }
+#mapInfo{ font:700 14px var(--font); color:#f4f1ea; background:rgba(14,16,20,.9); border:1px solid rgba(255,255,255,.12); padding:6px 12px; border-radius:10px; white-space:nowrap;
+  max-width:calc(100vw - 2 * var(--padL) - 380px); overflow:hidden; text-overflow:ellipsis; display:flex; flex-direction:column; line-height:1.2; min-height:44px; justify-content:center; box-sizing:border-box; }
+#mapInfo b{ overflow:hidden; text-overflow:ellipsis; } #mapInfo span{ font-size:13px; color:#4de1ff; }
+#mapOv #mapClear{ color:#4de1ff; border-color:rgba(77,225,255,.5); }
 #mapOv .mt{ position:absolute; top:var(--padT); left:var(--padL); font:800 18px var(--font); letter-spacing:.14em; text-transform:uppercase; color:#f4f1ea; background:rgba(14,16,20,.9); border:1px solid rgba(255,255,255,.12); padding:9px 14px; border-radius:10px; }
 
 /* ---------- sensor ball overlay: thin mono readouts in the four corners of the view ---------- */
@@ -772,7 +775,7 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
   <div id="mapLeg" class="mkeep"><button id="mapLegT" aria-expanded="true"><span>Legend</span><i></i></button><div id="mapLegL"></div></div>
   <div class="mbar tr mkeep"><button id="mapX" aria-label="Close map">&#x2715;</button></div>
   <div class="mbar br mkeep"><button id="mapOut" aria-label="Zoom out">&minus;</button><button id="mapIn" aria-label="Zoom in">+</button></div>
-  <div class="mbar bc mkeep"><span id="mapInfo"></span><button id="mapClear">Clear destination</button></div>
+  <div class="mbar bc mkeep"><span id="mapInfo"></span><button id="mapClear">Clear</button></div>
 </div>
 <div class="overlay" id="photoOv"><div id="photoPad"></div>
   <p class="phHint">Drag to orbit, pinch to zoom</p>
@@ -7160,9 +7163,10 @@ function drawMap(hdgT){
   for(const e of RWY_ENDS){if(Math.hypot(e.x-ox,e.z-oz)>range*1.3)continue;
     const q=P(e.x-Math.sin(e.h)*380,e.z+Math.cos(e.h)*380);mx.fillText(e.num,q[0],q[1]);}
   // destination
-  if(DEST){const q=P(DEST.x,DEST.z),dq=Math.hypot(q[0]-C,q[1]-C);mx.strokeStyle='#D98A3D';mx.lineWidth=2*dpr;mx.setLineDash([4*dpr,3*dpr]);
-    mx.beginPath();mx.moveTo(C,C);mx.lineTo(q[0],q[1]);mx.stroke();mx.setLineDash([]);
-    if(dq<C){mx.fillStyle='#D98A3D';mx.beginPath();mx.arc(q[0],q[1],4*dpr,0,TAU);mx.fill();}}
+  if(DEST){const q=P(DEST.x,DEST.z),dq=Math.hypot(q[0]-C,q[1]-C);mx.lineCap='round';
+    mx.strokeStyle='rgba(6,10,16,.75)';mx.lineWidth=5*dpr;mx.beginPath();mx.moveTo(C,C);mx.lineTo(q[0],q[1]);mx.stroke();
+    mx.strokeStyle='#4de1ff';mx.lineWidth=2.5*dpr;mx.stroke();
+    if(dq<C){mx.fillStyle='#4de1ff';mx.strokeStyle='#06121c';mx.lineWidth=1.5*dpr;mx.beginPath();mx.arc(q[0],q[1],4.5*dpr,0,TAU);mx.fill();mx.stroke();}}
   mx.fillStyle='#7fd4ff';TRAFFIC.forEach(o=>{const a=P(o.m.g.position.x,o.m.g.position.z);mx.beginPath();mx.arc(a[0],a[1],2.2*dpr,0,TAU);mx.fill();});
   // the aircraft, always pointing up
   mx.translate(C,C);mx.fillStyle='#F6C177';mx.strokeStyle='#2A1608';mx.lineWidth=1.2*dpr;mx.beginPath();
@@ -7324,6 +7328,10 @@ function mIconSprite(kind,size){
 }
 function mIcon(x,kind,cx,cy,size){const c=mIconSprite(kind,size),o=size/2+2;x.drawImage(c,cx-o,cy-o,size+4,size+4);}
 const destName=e=>e.rwy?e.rwy.apt+' runway '+e.num:e.name;
+// distance and time to the waypoint, in the units the HUD uses
+function routeInfo(){const dist=Math.hypot(DEST.x-st.pos.x,DEST.z-st.pos.z),gs=Math.hypot(st.vel.x,st.vel.z),ete=dist/Math.max(gs,1);
+  return rookie()?(dist/1609.34).toFixed(1)+' mi \u00b7 '+(gs>5?Math.max(1,Math.round(ete/60))+' min':'--')
+                 :(dist/1852).toFixed(1)+' nm \u00b7 '+(gs>5?fmtT(ete):'--:--');}
 // ---- labels: every label and icon is a screen box. Highest priority places first, at the
 // first of its candidate spots that is clear of the map's own buttons and of every box
 // already placed; if none is clear it hides. So nothing ever overlaps, at any zoom. ----
@@ -7384,6 +7392,10 @@ function fmDraw(){
   fx.strokeStyle='#f4f1ea';for(const r of RUNWAYS)rwyPoly(fx,r,fmP,Math.max(2,r.wid*sc));
   if(sc>0.06){fx.strokeStyle='rgba(40,40,44,.9)';fx.setLineDash([Math.max(3,30*sc),Math.max(3,20*sc)]);
     for(const r of RUNWAYS)rwyPoly(fx,r,fmP,Math.max(1,0.9*sc));fx.setLineDash([]);}   // centre line stripes when close
+  // the route: a bright line from the aircraft to the waypoint
+  if(DEST){const a=fmP(st.pos.x,st.pos.z),b=fmP(DEST.x,DEST.z);fx.lineCap='round';
+    fx.strokeStyle='rgba(6,10,16,.75)';fx.lineWidth=8;fx.beginPath();fx.moveTo(a[0],a[1]);fx.lineTo(b[0],b[1]);fx.stroke();
+    fx.strokeStyle='rgba(77,225,255,.35)';fx.lineWidth=6;fx.stroke();fx.strokeStyle='#4de1ff';fx.lineWidth=3;fx.stroke();}
   // scale bar: a nice round distance about 60 to 140 px long, bottom left
   const R=rookie(),unit=R?1609.34:1852,un=R?'mi':'nm',steps=[0.1,0.2,0.25,0.5,1,2,5,10,20];let n=steps[0];
   for(const v of steps)if(v*unit*sc<=140)n=v;const bw=n*unit*sc,bx=FM.padL+8,by=H-FM.padB-10;
@@ -7394,12 +7406,19 @@ function fmDraw(){
   fx.fillStyle='rgba(14,16,20,.82)';rrect(fx,bx-8,by-24,bw+16,32,8);fx.fill();
   fx.strokeStyle='#f4f1ea';fx.lineWidth=2;fx.lineCap='butt';fx.beginPath();fx.moveTo(bx,by-5);fx.lineTo(bx,by);fx.lineTo(bx+bw,by);fx.lineTo(bx+bw,by-5);fx.stroke();
   haloText(fx,n+' '+un,bx+bw/2,by-13,'700 11px '+F,'#f4f1ea');
-  $('mapInfo').textContent=DEST?'Destination: '+destName(DEST):'Tap a runway end to fly there';
+  if(DEST){const r=routeInfo();$('mapInfo').innerHTML='<b></b><span></span>';$('mapInfo').firstChild.textContent=destName(DEST);$('mapInfo').lastChild.textContent=r;}
+  else $('mapInfo').textContent='Tap a runway end or an icon for a waypoint';
   $('mapClear').hidden=!DEST;
 }
 // every label and icon that could show at this zoom
 function fmCands(C,sc,inView){
   const now=performance.now(),hl=FM.hl&&now-FM.hl.t0<4500?FM.hl.kind:null;
+  // the waypoint pin
+  if(DEST){const q=fmP(DEST.x,DEST.z);C.push({pri:950,x:q[0],y:q[1],w:24,h:32,kind:'pin',spots:[[0,-15]],draw:(x,cx,cy)=>{const ty=cy+15;
+    x.fillStyle='rgba(0,0,0,.4)';x.beginPath();x.ellipse(cx,ty,5,2,0,0,TAU);x.fill();
+    x.fillStyle='#4de1ff';x.strokeStyle='#06121c';x.lineWidth=2;x.beginPath();x.moveTo(cx,ty);x.bezierCurveTo(cx-4,ty-8,cx-11,ty-12,cx-11,ty-20);
+    x.arc(cx,ty-20,11,Math.PI,0);x.bezierCurveTo(cx+11,ty-12,cx+4,ty-8,cx,ty);x.closePath();x.stroke();x.fill();
+    x.fillStyle='#06121c';x.beginPath();x.arc(cx,ty-20,4,0,TAU);x.fill();}});}
   // the aircraft: always wins
   {const p=fmP(st.pos.x,st.pos.z),yaw=-new THREE.Euler().setFromQuaternion(st.quat,'YXZ').y;
    C.push({pri:1000,x:p[0],y:p[1],w:30,h:30,kind:'player',draw:(x,cx,cy)=>{x.save();x.translate(cx,cy);x.rotate(yaw);
@@ -8755,7 +8774,7 @@ window.__kgeu={MAPD:MAPD,TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setIn
   RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicLoad:musicLoadList,musicTick:musicTick,MUSIC:MUSIC,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
-  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&{apt:DEST.rwy.apt,num:DEST.num},fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   // @OhRabah easter eggs (3.10): where each one is, whether its lights are on, and the tow banner
   eggs:()=>EGG.list.map(o=>{const p=o.getWorldPosition(new V3()),r={name:o.name,x:p.x,y:p.y,z:p.z,ry:o.rotation.y,lit:(o.name==='egg_billboard'||o.name==='egg_rooftop')&&EGG.lit,visible:o.visible};
     if(o.name==='egg_tow'){const b=EGG.tow.ban.getWorldPosition(new V3()),f=new V3(0,0,-1).applyQuaternion(o.quaternion);r.banner={x:b.x,y:b.y,z:b.z};r.fwd=[f.x,f.y,f.z];}return r;}),
