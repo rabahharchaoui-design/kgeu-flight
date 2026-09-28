@@ -1,7 +1,8 @@
 import asyncio,os,sys
 from playwright.async_api import async_playwright
-URL='file://'+os.path.abspath('/Users/rabahharchaoui/Desktop/cc-test/kgeu/index.html')
-THREE=open('/Users/rabahharchaoui/Desktop/cc-test/kgeu/node_modules/three/build/three.min.js').read()
+ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+URL='file://'+os.path.join(ROOT,'index.html')
+THREE=open(os.path.join(ROOT,'node_modules/three/build/three.min.js')).read()
 IOS='Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
 CHROME_IOS='Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/126.0 Mobile/15E148 Safari/604.1'
 MAC='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'

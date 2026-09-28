@@ -61,6 +61,8 @@ TOWER = {
     'report_initial': 'report initial.',
     'crash':          'Crash, crash, crash. Emergency vehicles are rolling.',
     'luke_security':  'you just landed at Luke Air Force Base. Hold position, security is on the way.',
+    'haboob_luke':     'Attention all aircraft, Luke Tower, visibility one half mile in blowing dust, wind gusting five zero knots, use caution.',
+    'haboob_glendale': 'Attention all aircraft, Glendale Tower, visibility one half mile in blowing dust, wind gusting five zero knots, use caution.',
 
     'wind':   'wind',
     'at':     'at',
@@ -79,11 +81,17 @@ TOWER = {
     'tfc_vipers': 'a flight of two F-sixteens.',
     'tfc_c17':    'a C-seventeen.',
     'tfc_reaper': 'an M Q nine.',
+    'tfc_banner': 'a banner tow plane.',
 
     'gila_range':  'Gila Range Control,',
     'cleared_hot': 'you are cleared hot. Range is clear, four targets.',
     'range_cold':  'range is cold.',
     'of_four':     'of four.',
+    'good_hit':    'good hit, good hit, target destroyed.',
+    'miss':        'miss,',
+    'meters':      'meters.',
+    'long':        'long.',
+    'reset_again': 'reset and try again.',
 
     'n_0': 'zero',  'n_1': 'one',   'n_2': 'two',    'n_3': 'three',
     'n_4': 'four',  'n_5': 'five',  'n_6': 'six',    'n_7': 'seven',
@@ -99,6 +107,7 @@ PILOT = {
     'rb_roger':        'Roger,',
     'rb_traffic':      'Looking for the traffic,',
     'load_away':       'load away, one bundle.',
+    'rifle':           'Rifle,',
 }
 
 # ---- background chatter, recorded whole because these lines never change ----

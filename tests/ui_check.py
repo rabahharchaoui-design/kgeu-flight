@@ -15,6 +15,7 @@ GROUPS = [
     ('badge',   '.badge.on',                       True),
     ('stick',   '#stickZone, #stick.on',           True),
     ('slider',  '#thr, input[type=range]',         True),
+    ('lookpad', '#lookPad',                        True),   # C-130 airdrop free look pad
     ('hudcard', '#hud .card',                      False),
     ('minimap', '#map',                            True),
     ('dest',    '#hDest:not([hidden])',            True),
@@ -97,32 +98,44 @@ async def main():
         if skill == 'rookie': await pg.screenshot(path=f'tests/shot_{w}x{h}.png')
         await go(f"{K}.pick('cessna');{K}.pickBase('kgeu');{K}.start('final')", 1800)
         await audit(pg, f'{skill}, C172 on final, radio up', w, h)
-        await go("document.getElementById('bFlaps').click()", 300)
-        await audit(pg, f'{skill}, flap selector open', w, h)
-        await go("document.getElementById('bFlaps').click()", 200)
+        # the full column: C-130 has gear and flaps
+        await go(f"{K}.pick('c130');{K}.pickBase('kgeu');{K}.start('final')", 1500)
+        await audit(pg, f'{skill}, C-130 on final, button column', w, h)
+        if skill == 'pilot': await pg.screenshot(path=f'tests/shot_{w}x{h}_column.png')
+
+        box = await pg.evaluate("()=>{const r=document.getElementById('stickZone').getBoundingClientRect();return [r.x,r.y,r.width,r.height];}")
+        for fx, fy in [(0.5,0.5),(0.08,0.92),(0.92,0.08)]:
+            x = box[0] + box[2]*fx; y = box[1] + box[3]*fy
+            await pg.evaluate("""([x,y])=>{document.getElementById('stickZone').dispatchEvent(new PointerEvent('pointerdown',{pointerId:7,clientX:x,clientY:y,bubbles:true}));}""", [x,y])
+            await pg.wait_for_timeout(150)
+            await audit(pg, f'{skill}, stick down at {fx:g},{fy:g}', w, h)
+            if fx == 0.5 and skill == 'rookie': await pg.screenshot(path=f'tests/shot_{w}x{h}_stick.png')
+            await pg.evaluate("""()=>document.getElementById('stickZone').dispatchEvent(new PointerEvent('pointerup',{pointerId:7,bubbles:true}))""")
+            await pg.wait_for_timeout(250)
+
+        # weapon buttons sit left of the column, only when a mission needs them
+        await go(f"{K}.mission('range')", 2500)
+        await go(f"{K}.state().ap||{K}.auto();for(let i=0;i<4;i++)if({K}.camMode()!==2){K}.cycleCam()", 1500)
+        await audit(pg, f'{skill}, Reaper strike, sensor ball', w, h)
+        if skill == 'pilot': await pg.screenshot(path=f'tests/shot_strike_{w}x{h}.png')
+        await go(f"{K}.mission('drop')", 2000)
+        await audit(pg, f'{skill}, C-130 airdrop', w, h)
+        # the crash card (3.9): RETRY and MENU at the bottom, the flight controls gone
+        await go(f"{K}.pick('f16');{K}.pickBase('kgeu');{K}.start('final')", 800)
+        await go(f"{K}.crashNow('Hard impact at 1240 fpm. Keep the sink rate under 750 fpm.');for(let i=0;i<110;i++){K}.stepFrame(1/30,false,true);{K}.stepFrame(1/60);{K}.stepFrame(0,true)", 300)
+        await pg.wait_for_function("()=>getComputedStyle(document.getElementById('crash')).opacity==='1'", timeout=10000)
+        cc = await pg.evaluate("()=>['cRetry','cMenu'].map(id=>{const e=document.getElementById(id),r=e.getBoundingClientRect();return r.width>=44&&r.height>=44&&e.offsetParent!==null})")
+        if not all(cc):
+            failures.append(f'{w}x{h} {skill}: crash card RETRY/MENU missing or small'); print(f'  FAIL {w}x{h} {skill}: crash card buttons {cc}')
+        await audit(pg, f'{skill}, crash card', w, h)
+        if skill == 'rookie': await pg.screenshot(path=f'tests/shot_{w}x{h}_crash.png')
+
+      await go(f"{K}.pick('cessna');{K}.pickBase('kgeu');{K}.start('final')", 1800)
       await go(f"{K}.setDest({K}.RWY_ENDS[3])", 600)
       await audit(pg, 'destination set', w, h)
       await go(f"{K}.setDest(null);{K}.gradeBadge({{letter:'B',line:'Firm, left of centerline'}})", 1500)
       await audit(pg, 'grade badge showing', w, h)
       await pg.screenshot(path=f'tests/shot_{w}x{h}_air.png')
-
-      box = await pg.evaluate("()=>{const r=document.getElementById('stickZone').getBoundingClientRect();return [r.x,r.y,r.width,r.height];}")
-      for fx, fy in [(0.5,0.5),(0.08,0.92),(0.92,0.08)]:
-          x = box[0] + box[2]*fx; y = box[1] + box[3]*fy
-          await pg.evaluate("""([x,y])=>{document.getElementById('stickZone').dispatchEvent(new PointerEvent('pointerdown',{pointerId:7,clientX:x,clientY:y,bubbles:true}));}""", [x,y])
-          await pg.wait_for_timeout(150)
-          await audit(pg, f'stick down at {fx:g},{fy:g}', w, h)
-          if fx == 0.5: await pg.screenshot(path=f'tests/shot_{w}x{h}_stick.png')
-          await pg.evaluate("""()=>document.getElementById('stickZone').dispatchEvent(new PointerEvent('pointerup',{pointerId:7,bubbles:true}))""")
-          await pg.wait_for_timeout(250)
-
-      # the lower right carries weapon buttons only when a mission needs them
-      await go(f"{K}.mission('range')", 2500)
-      await go(f"{K}.state().ap||{K}.auto();for(let i=0;i<4;i++)if({K}.camMode()!==2){K}.cycleCam()", 1500)
-      await audit(pg, 'Reaper strike, sensor ball', w, h)
-      await pg.screenshot(path=f'tests/shot_strike_{w}x{h}.png')
-      await go(f"{K}.mission('drop')", 2000)
-      await audit(pg, 'C-130 airdrop', w, h)
 
       if pg.errs:
           failures.append(f'{w}x{h}: page errors ' + '; '.join(pg.errs[:3]))

@@ -1,3 +1,4 @@
+import os
 # Verify the deployed site over https, as an iPhone-sized client would see it.
 import asyncio,sys
 from playwright.async_api import async_playwright
@@ -81,7 +82,7 @@ async def main():
     await pg.tap('#bAuto'); await pg.wait_for_timeout(6000)
     ap=await pg.evaluate("()=>{const s=__kgeu.state();return {ap:s.ap?s.ap.mode:null,ias:Math.round(s.ias*1.944),alt:Math.round(s.pos.y*3.28084+1071)};}")
     chk('auto takeoff runs on the live site',ap['ap'] in ('to','hold'),str(ap))
-    await pg.screenshot(path='/Users/rabahharchaoui/Desktop/cc-test/kgeu/tests/live_iphone.png')
+    await pg.screenshot(path=os.path.join(os.path.dirname(os.path.abspath(__file__)),'live_iphone.png'))
     chk('no errors after play',not errs,str(errs[:2]))
     # ---- overnight build ----
     print('-- overnight build --')

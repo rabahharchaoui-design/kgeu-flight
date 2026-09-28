@@ -99,9 +99,10 @@ async def main():
       return {tgt:S.tgt?S.tgt.kind:null, slant:Math.round(S.slant), valid:S.valid};}""")
     chk('locks the bunker under the crosshair', lock['tgt']=='bunker', str(lock))
     chk('slant range is in the firing window', 700 <= lock['slant'] <= 8200, f"{lock['slant']} m")
-    txt = await pg.inner_text('#mtsTxt')
-    chk('sensor display shows laser, slant and IN RANGE',
-        'LASER' in txt and 'SLANT' in txt and 'IN RANGE' in txt, repr(txt.replace('\n',' | ')[:110]))
+    await pg.wait_for_timeout(100)
+    txt = await pg.inner_text('#sensorHud')
+    chk('sensor display shows lock, slant and IN RANGE',
+        'LOCK' in txt and 'SLANT' in txt and 'IN RANGE' in txt, repr(txt.replace('\n',' | ')[:110]))
 
     await pg.evaluate("()=>window.__kgeu.fire()")
     await pg.wait_for_timeout(400)
@@ -172,17 +173,16 @@ async def main():
     chk('firing with empty rails is refused',
         (await pg.evaluate("()=>{window.__kgeu.fire();return window.__kgeu.STRIKE.shots;}"))==4)
 
-    # the zoom toggle sits with FIRE and TRACK in the lower right, only in sensor mode
-    zvis = await pg.evaluate("()=>{const b=document.getElementById('wC');return !b.hidden&&b.dataset.a==='zoom'}")
-    chk('zoom toggle is offered in sensor mode', zvis)
+    # ZOOM sits with FIRE and LOCK in the button dock, only in sensor mode
+    zvis = await pg.evaluate("()=>{const b=document.getElementById('bZoom');return !b.hidden&&b.offsetParent!==null}")
+    chk('zoom button is offered in sensor mode', zvis)
+    chk('FIRE is offered during the strike', await pg.evaluate("()=>document.getElementById('bFire').offsetParent!==null"))
     if zvis:
         z0 = await pg.evaluate("()=>window.__kgeu.SENSOR.zoom")
-        await pg.evaluate("()=>document.getElementById('wC').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}))"); await pg.wait_for_timeout(250)
+        await pg.evaluate("()=>document.getElementById('bZoom').click()"); await pg.wait_for_timeout(250)
         z1 = await pg.evaluate("()=>window.__kgeu.SENSOR.zoom")
-        chk('zoom toggles wide and narrow', z0 != z1, f'{z0} -> {z1}')
-        fov = await pg.evaluate("()=>window.__kgeu.SENSOR.zoom")
-        await pg.wait_for_timeout(200)
-        chk('narrow field is selected', fov == 1, str(fov))
+        chk('zoom steps in', z0 != z1, f'{z0} -> {z1}')
+        chk('the second field is selected', z1 == 1, str(z1))
 
     await pg.screenshot(path='tests/shot_strike.png')
     chk('no page errors', not errs, str(errs[:2]))
