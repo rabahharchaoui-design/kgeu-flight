@@ -71,12 +71,10 @@ async def main():
     sw=await pg.evaluate("async()=>{if(!navigator.serviceWorker)return 0;const rs=await navigator.serviceWorker.getRegistrations();return rs.length;}")
     chk('no service worker registered',sw==0,str(sw)+' registrations')
     # actually play it
-    # home -> FLY -> Next -> Next -> GO, by finger
+    # home -> FLY -> GO: two taps, by finger
     if await pg.is_visible('#funnel'): await pg.tap('#fPilot'); await pg.wait_for_timeout(300)
     await pg.evaluate("()=>{__kgeu.pick('reaper');__kgeu.pickPos('runway');}")
     await pg.tap('#hFly'); await pg.wait_for_timeout(800)
-    await pg.tap('.acard[data-t="reaper"] .pickme'); await pg.wait_for_timeout(400)
-    await pg.tap('#f2Next'); await pg.wait_for_timeout(400)
     await pg.tap('#bGo'); await pg.wait_for_timeout(1800)
     st=await pg.evaluate("()=>{const s=__kgeu.state();return {running:!!s,type:s.type,ias:Math.round(s.ias*1.944)};}")
     chk('a flight starts from the runway',st['type']=='reaper',str(st))
@@ -91,9 +89,9 @@ async def main():
     await pg.evaluate("()=>window.__kgeu.openMenu()")
     await pg.wait_for_timeout(600)
     for t in ['cessna','alpha','f16','reaper','mq9b','c130']:
-        ok = await pg.query_selector(f'.acard[data-t="{t}"]') is not None
+        ok = await pg.query_selector(f'#carMain .pick[data-t="{t}"]') is not None
         chk(f'{t} is offered in the carousel', ok)
-    await pg.evaluate("()=>window.__kgeu.nav('sFly2')")
+    await pg.evaluate("()=>window.__kgeu.nav('sFly')")
     chk('spawn picker is there', await pg.is_visible('.pick[data-b="luke"]'))
     chk('time of day picker is there', await pg.is_visible('.pick[data-tod="night"]'))
     await pg.evaluate("()=>window.__kgeu.nav('sSet')")
@@ -102,6 +100,10 @@ async def main():
     chk('records screen is reachable', await pg.is_visible('#hRec'))
     await pg.evaluate("()=>window.__kgeu.nav('sMis')")
     chk('C-130 short field is offered', await pg.is_visible('#misCards [data-m="short"]'))
+    await pg.evaluate("()=>window.__kgeu.nav('sArc')")
+    chk('arcade hub has the landing challenge', await pg.is_visible('#arcCards [data-m="landing"]'))
+    chk('creator credit links to the channel', await pg.evaluate("()=>document.querySelector('#sSet .credit').href")=='https://www.youtube.com/@OhRabah')
+    chk('no tilt anywhere', await pg.evaluate("()=>!/tilt/i.test(document.body.innerText)&&!document.querySelector('[data-a=tilt]')"))
     n0=len(errs)
     for t in ['cessna','f16','reaper','mq9b','c130']:
         await pg.evaluate(f"()=>{{window.__kgeu.pick('{t}');window.__kgeu.start('runway');}}")

@@ -81,7 +81,7 @@ async def main():
             ok = await pg.evaluate(f"()=>!!(window.TYPES_TEST&&window.TYPES_TEST['{t}'])")
             if not ok:
                 # fall back: the picker button is the public contract
-                ok = await pg.query_selector(f'.acard[data-t="{t}"]') is not None
+                ok = await pg.query_selector(f'#carMain .pick[data-t="{t}"]') is not None
             chk(f'{t}: type exists', ok)
             if not ok:
                 continue
