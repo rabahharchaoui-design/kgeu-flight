@@ -94,4 +94,5 @@ async def main():
     print('aircraft_fps: ' + ('all passed' if not fails and not [e for e in errs if e.startswith('new')] else 'FAILED ' + ', '.join(fails)))
     sys.exit(1 if fails else 0)
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

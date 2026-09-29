@@ -9991,6 +9991,14 @@ const APP_VER='2026-09-29-scores';          // keep version.json in step when sh
     m.g.visible=true;if(m.gear){m.gear.visible=true;m.gear.scale.y=1;}
     m.label.sp.visible=true;m.label.sp.position.copy(m.g.position);m.label.sp.position.y+=Math.max(4,(TYPES[G.ac]||{}).span||8)*0.45+2;
   }
+  // start the board's run with a ghost flying path {n,f}
+  function ghostStart(b,cs,ac,creator,path){
+    const B=BOARDS[b],m=ghostModel(ac);if(!m||!B||!B.go)return false;
+    ghostLabel(m,cs,creator);B.go();
+    E.ghost={b:b,m:m,path:path,cs:cs,ac:ac,t0:null,st:st};
+    const run=E.runs[b];if(run&&run.st===st)E.ghost.t0=run.t0;
+    return true;
+  }
   // Race the leader: fetch the #1 path of this board and mode, start the run, fly beside it
   function race(b,mode){
     const B=BOARDS[b];if(!B||!B.ghost||!B.go)return;
@@ -9998,11 +10006,7 @@ const APP_VER='2026-09-29-scores';          // keep version.json in step when sh
     api('/ghost?b='+encodeURIComponent(b)+'&m='+(mode||'hard')).then(j=>{
       if(!j.ghost){toast('No leader to race on this board yet');return;}
       return decodePath(j.ghost.path).then(path=>{
-        const m=ghostModel(j.ghost.ac);if(!m){toast('Could not build the ghost');return;}
-        ghostLabel(m,j.ghost.cs,j.ghost.creator);
-        B.go();
-        E.ghost={b:b,m:m,path:path,cs:j.ghost.cs,ac:j.ghost.ac,t0:null,st:st};
-        const run=E.runs[b];if(run&&run.st===st)E.ghost.t0=run.t0;
+        if(!ghostStart(b,j.ghost.cs,j.ghost.ac,j.ghost.creator,path)){toast('Could not build the ghost');return;}
         setTimeout(()=>toast('Racing '+j.ghost.cs+': '+fmtS(b,j.ghost.score),4),600);
       });
     },()=>toast('Offline. Racing the leader needs a connection'));
@@ -10242,7 +10246,7 @@ const APP_VER='2026-09-29-scores';          // keep version.json in step when sh
   function armFree(){E.armed=true;}
   return {E:E,BOARDS:BOARDS,ORDER:ORDER,board:board,runStart:runStart,runEnd:runEnd,runCancel:runCancel,frame:frame,reset:reset,armFree:armFree,
     boot:boot,paintModel:paintModel,paintAll:paintAll,lbOpen:lbOpen,lbRender:lbRender,race:race,ui:ui,flush:flush,csOpen:csOpen,dice:dice,
-    fameDraw:fameDraw,fameFetch:fameFetch,decodePath:decodePath,rankSVG:rankSVG,utcDay:utcDay,fmtS:fmtS,showBadge:showBadge,ghostOff:ghostOff,
+    fameDraw:fameDraw,fameFetch:fameFetch,ghostStart:ghostStart,decodePath:decodePath,rankSVG:rankSVG,utcDay:utcDay,fmtS:fmtS,showBadge:showBadge,ghostOff:ghostOff,
     get P(){return E.P;}};
 })();
 
