@@ -33,7 +33,7 @@ async def main():
                 ok(f'{tag} {sid} fits with no scrolling, 44 px targets, no overlaps', not bad, bad[:4])
             if vp['width'] == 667:
                 home = await pg.evaluate("""()=>{window.__kgeu.nav('sHome',true);return [...document.querySelectorAll('#sHome button')].map(b=>b.id)}""")
-                ok('home has only FLY, FLIGHT SCHOOL, MISSIONS, ARCADE plus Records and Settings', sorted(home) == sorted(['hRec','hSet','hFly','hSch','hMis','hArc']), home)
+                ok('home has only FLY, FLIGHT SCHOOL, MISSIONS, ARCADE, LEADERBOARDS plus Records and Settings', sorted(home) == sorted(['hRec','hSet','hFly','hSch','hMis','hArc','hLb']), home)
                 keys = await pg.evaluate("()=>{window.__kgeu.nav('sHelp');const k=document.querySelector('.keys');return getComputedStyle(k).display}")
                 ok('keyboard and controller chart is hidden on a touch device', keys == 'none', keys)
                 # two taps from opening the app to flying: FLY, then GO
@@ -95,7 +95,7 @@ async def main():
                 await finger(pg, '.scr.on .back'); await pg.wait_for_timeout(200)
                 await finger(pg, '#hMis'); await pg.wait_for_timeout(300)
                 n = await pg.evaluate("()=>[...document.querySelectorAll('#misCards .mcard')].map(c=>[c.dataset.m,!!c.querySelector('svg.ico'),!!c.querySelector('.stars')])")
-                ok('mission cards have an icon and stars', [x[0] for x in n] == ['short', 'dash'] and all(x[1] and x[2] for x in n), n)
+                ok('mission cards have an icon and stars', [x[0] for x in n] == ['daily', 'short', 'dash'] and all(x[1] and x[2] for x in n), n)
                 await finger(pg, '#misCards [data-m="short"]'); await pg.wait_for_timeout(1200)
                 s = await pg.evaluate("()=>({t:window.__kgeu.state().type,saved:window.__kgeu.prefs().type,kind:window.__kgeu.MISS.kind})")
                 ok('a mission card starts it without changing the saved aircraft', s == {'t': 'c130', 'saved': 'alpha', 'kind': 'short'}, s)
