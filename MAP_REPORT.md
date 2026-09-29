@@ -46,7 +46,7 @@ The player is a bright yellow heading arrow.
 The legend is a panel on the right that lists each icon type, and it collapses to its header. Tapping a type pulses those icons (or airport cards) for a few seconds, lets them win any label collision, and flies the map to the nearest one.
 
 ### 7. Waypoint and route
-Tap any runway end, airport card or icon to drop a waypoint. A pin marks it, and a bright cyan route line runs from the aircraft to it. The card at the bottom gives the name, the distance and the time at your ground speed: nm and m:ss for Pilot, miles and minutes for Rookie. It has a Clear button. The mini map draws the same line and pin, and the HUD destination readout works for any waypoint. The approach guide path still only appears for runway ends.
+Tap any runway end, airport card or icon to drop a waypoint. A pin marks it, and a bright cyan route line runs from the aircraft to it. The card at the bottom gives the name, the distance and the time at your ground speed: nm and m:ss for Hard, miles and minutes for Easy. It has a Clear button. The mini map draws the same line and pin, and the HUD destination readout works for any waypoint. The approach guide path still only appears for runway ends.
 
 ### 8. Controls
 - Pinch to zoom and drag to pan, as before.
