@@ -642,6 +642,8 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
 .csCode{ font-size:clamp(24px,7.4vh,36px); font-weight:800; letter-spacing:.06em; color:var(--night); background:#fff4e0; border:3px dashed var(--rust); border-radius:12px; padding:8px 14px; text-align:center; -webkit-user-select:text; user-select:text; }
 .csActs{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
 #csOv [hidden]{ display:none !important; }
+/* typing: the iOS keyboard takes the lower half in landscape, so the form moves to the top and the patch steps aside */
+#csOv.kb{ padding-top:max(6px,var(--padT)); } #csOv.kb .patch,#csOv.kb #csP{ display:none; } #csOv.kb .csWrap{ margin:0 auto; } #csOv.kb .csForm{ gap:6px; } #csOv.kb .csForm h1{ font-size:24px; }
 /* rank badges and the creator mark */
 .rk{ display:inline-block; width:1.25em; height:1.25em; vertical-align:-.25em; flex:none; }
 .creator{ display:inline-block; margin-left:6px; padding:0 6px; border-radius:6px; background:linear-gradient(180deg,#ffe28a,#d4a017); color:#3a2500; font:800 11px/1.6 var(--font); letter-spacing:.08em; vertical-align:2px; box-shadow:0 0 0 1px #8a6400 inset; }
@@ -10115,6 +10117,8 @@ const APP_VER='2026-09-29-scores';          // keep version.json in step when sh
       stat(j.reason==='taken'?v+' is taken. Try another or roll the dice':j.reason==='profanity'?'That callsign is not allowed':j.reason==='not available'?'That callsign is not available':(j.reason||'Not allowed'),'bad');
     },()=>{if(seq===CS.seq)stat('No connection. Try again when you are online','bad');}),320);
   }
+  $('csOv').addEventListener('focusin',e=>{if(e.target.tagName==='INPUT'&&isTouch)$('csOv').classList.add('kb');});
+  $('csOv').addEventListener('focusout',()=>setTimeout(()=>{if(!$('csOv').contains(document.activeElement)||document.activeElement.tagName!=='INPUT')$('csOv').classList.remove('kb');},50));
   csIn.addEventListener('input',()=>{const v=clean(csIn.value);if(csIn.value!==v)csIn.value=v;patch(v||(CS.mode==='rename'&&E.P?E.P.cs:''));check();});
   csSec.addEventListener('input',()=>{if(CS.reserved)$('csGo').disabled=!csSec.value;});
   csCodeIn.addEventListener('input',check);
