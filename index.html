@@ -574,6 +574,11 @@ body.menuOn #tutArrow, body.pauseOn #tutArrow{ display:none !important; }
 #menu #a2hs b{ color:var(--rust); }
 #menu #a2hs .shr::before{ border-color:var(--rust); } #menu #a2hs .shr::after{ background:var(--rust); box-shadow:-3px 3.2px 0 -0.2px var(--rust), 3px 3.2px 0 -0.2px var(--rust); }
 .helpBody{ flex:1; min-height:0; display:flex; align-items:center; }
+#sCredits .helpBody{ align-items:stretch; width:100%; }
+.creditsList{ list-style:none; margin:0; padding:2px 2px 2px 0; width:100%; height:100%; overflow-y:auto; display:flex; flex-direction:column; gap:6px; }
+.creditsList li{ display:flex; align-items:baseline; gap:8px; font-size:15px; color:var(--brown); min-height:28px; }
+.creditsList b{ color:var(--night); font-weight:700; }
+.creditsList span{ font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--rust); flex:none; }
 #menu .keys{ font-size:14px; gap:2px 14px; margin:0; } #menu .keys dt{ color:var(--rust); }
 #menu .touchnote{ color:var(--night); font-size:clamp(14px,4.2vh,17px); line-height:1.4; margin:0; max-width:760px; }
 body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArrow, body.pauseOn #uiroot, body.pauseOn #badges, body.pauseOn #sixpack, body.menuOn #uiroot, body.menuOn #badges, body.menuOn #sixpack, body.menuOn #miss, body.menuOn #lesson{ display:none !important; }
@@ -769,6 +774,7 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
     <div class="srow"><span>Pitch</span><div class="chips"><button class="tog oInv">Invert pitch: Off</button></div></div>
     <div class="srow"><span>Sound</span><div class="chips"><button class="tog" id="oSound">Sound: On</button></div></div>
     <div class="srow"><span>Help</span><div class="chips" id="helpRow"><button id="bHelp">Controls help</button><button id="bReplay">Replay first flight</button></div></div>
+    <div class="srow"><span></span><div class="chips"><button id="bCredits">Music credits</button></div></div>
    </div>
   </div>
   <div class="setFoot"><a class="credit" href="https://www.youtube.com/@OhRabah" target="_blank" rel="noopener"><svg class="yt" viewBox="0 0 28 20" aria-hidden="true"><path d="M27.4 3.1A3.5 3.5 0 0 0 24.9.6C22.7 0 14 0 14 0S5.3 0 3.1.6A3.5 3.5 0 0 0 .6 3.1C0 5.3 0 10 0 10s0 4.7.6 6.9a3.5 3.5 0 0 0 2.5 2.5C5.3 20 14 20 14 20s8.7 0 10.9-.6a3.5 3.5 0 0 0 2.5-2.5C28 14.7 28 10 28 10s0-4.7-.6-6.9Z" fill="#FF0000"/><path d="M11.2 14.3 18.4 10l-7.2-4.3v8.6Z" fill="#FFFFFF"/></svg><span>Made by @OhRabah</span></a>
@@ -792,6 +798,12 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
    </dl>
   </div>
  </div>
+ <div class="scr" id="sCredits">
+  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Music credits</h2><span class="steps"></span></header>
+  <div class="helpBody">
+   <ul class="creditsList" id="creditsList"></ul>
+  </div>
+ </div>
 </div>
 <div class="overlay" id="funnel"><div class="fun">
   <h1>How do you want to fly?</h1>
@@ -811,7 +823,8 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
    <button class="primary" id="pResume">Resume</button><button id="pPhoto" class="ph"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>Photo</button><button id="pRestart">Restart</button><button id="pSet">Settings</button><button id="pMenu">Main menu</button>
   </div>
   <div class="pzR">
-   <div class="pzT pzH"><span>Change flight</span><div class="pzMus"><button class="tog oMusic" id="pMusic">Music: On</button><input type="range" class="oMvol" id="pMvol" min="0" max="10" step="1" value="6" aria-label="Music volume"><button class="oMnext" id="pMnext">Next song</button></div></div>
+   <div class="pzT pzH"><span class="mbTitle" id="pMusTitle">&mdash;</span><div class="pzMus"><button id="pPrev" aria-label="Previous song">Prev</button><button class="tog playPause" id="pMusic" aria-label="Play or pause music">Pause</button><button class="oMnext" id="pMnext">Next</button></div></div>
+   <div class="pzT pzH"><span>Change flight</span></div>
    <div class="carx compact" id="carPause"></div>
    <div class="frows">
    <div class="frow"><div class="grp g2"><span class="glbl">Base</span>
@@ -6150,8 +6163,22 @@ function radioUI(){
 // fetched until music would actually play, one track at a time (plus the next one),
 // and a missing or broken file is skipped quietly: no errors, one try per session.
 // MUSIC.forced (the Red Flag Dogfight, when that mode exists) loops one file instead.
-const MUSIC={on:true,vol:0.6,free:false,forced:null,list:null,urls:Object.create(null),bad:Object.create(null),queue:[],last:null,
-  played:0,errors:0,hist:[],cache:Object.create(null),slots:[null,null],cur:-1,busy:false,tok:0,offAt:-1,tgt:-1,want:null,duckE:0,loading:false};
+const MUSIC={on:true,vol:0.6,free:false,forced:null,list:null,titles:Object.create(null),urls:Object.create(null),bad:Object.create(null),queue:[],last:null,
+  played:0,errors:0,hist:[],cache:Object.create(null),cacheOrder:[],slots:[null,null],cur:-1,busy:false,tok:0,offAt:-1,tgt:-1,want:null,duckE:0,loading:false};
+const MUSIC_CACHE_CAP=10;
+function musicTitle(name){return (name&&MUSIC.titles[name])||name||'';}
+function musicTitleUI(name){const t=document.getElementById('pMusTitle');if(t)t.textContent=name?musicTitle(name):'—';}
+// LRU-ish: the 10 most recently played/queued stay decoded, oldest evicted first;
+// whatever is actually in a slot right now is never evicted, however old it gets
+function musicCacheTouch(name){
+  const o=MUSIC.cacheOrder,i=o.indexOf(name);if(i>=0)o.splice(i,1);o.push(name);
+  let guard=o.length;
+  while(o.length>MUSIC_CACHE_CAP&&guard-->0){
+    const victim=o[0];
+    if(MUSIC.slots.some(s=>s&&s.name===victim)){o.push(o.shift());continue;}
+    o.shift();delete MUSIC.cache[victim];
+  }
+}
 try{const v=localStorage.getItem('kgeuMusicVol');if(v!==null&&v!==''&&isFinite(+v))MUSIC.vol=Math.max(0,Math.min(1,+v));
     const o=localStorage.getItem('kgeuMusicOn');if(o!==null)MUSIC.on=o==='1';
     MUSIC.free=localStorage.getItem('kgeuMusicFree')==='1';}catch(e){}
@@ -6180,7 +6207,12 @@ function musicWanted(){
 function musicManifest(){
   if(MUSIC.loading)return;MUSIC.loading=true;
   fetch(MUSIC_DIR+'playlist.json',{cache:'no-cache'}).then(r=>r.ok?r.json():[]).then(l=>{
-    if(MUSIC.list===null)MUSIC.list=Array.isArray(l)?l.filter(n=>typeof n==='string'&&n):[];
+    if(MUSIC.list!==null)return;
+    const arr=Array.isArray(l)?l:[];MUSIC.list=[];MUSIC.titles=Object.create(null);
+    arr.forEach(e=>{
+      if(typeof e==='string'&&e)MUSIC.list.push(e);
+      else if(e&&typeof e==='object'&&typeof e.file==='string'&&e.file){MUSIC.list.push(e.file);if(typeof e.title==='string'&&e.title)MUSIC.titles[e.file]=e.title;}
+    });
   }).catch(()=>{if(MUSIC.list===null)MUSIC.list=[];});
 }
 function musicLoadBuf(name){
@@ -6190,7 +6222,7 @@ function musicLoadBuf(name){
     .then(a=>new Promise((res,rej)=>{try{const q=actx.decodeAudioData(a,res,rej);if(q&&q.catch)q.catch(rej);}catch(e){rej(e);}}))
     .catch(()=>{MUSIC.bad[name]=1;MUSIC.errors++;delete MUSIC.cache[name];
       const i=MUSIC.queue.indexOf(name);if(i>=0)MUSIC.queue.splice(i,1);return null;});
-  MUSIC.cache[name]=p;return p;
+  MUSIC.cache[name]=p;musicCacheTouch(name);return p;
 }
 function musicForcedName(){return MUSIC.forced&&!MUSIC.bad[MUSIC.forced]?MUSIC.forced:null;}
 // the next track: the forced loop, else the head of the shuffle (dealt again when empty,
@@ -6207,7 +6239,7 @@ function musicNextName(){
   return MUSIC.queue[0];
 }
 function musicKill(i){const s=MUSIC.slots[i];if(!s)return;MUSIC.slots[i]=null;try{s.src.stop();}catch(e){}try{s.src.disconnect();s.g.disconnect();}catch(e){}}
-function musicStop(){MUSIC.tok++;MUSIC.busy=false;musicKill(0);musicKill(1);MUSIC.cur=-1;}
+function musicStop(){MUSIC.tok++;MUSIC.busy=false;musicKill(0);musicKill(1);MUSIC.cur=-1;musicTitleUI(null);}
 // start a track at audio time T in the free slot, crossfading out whatever is playing
 function musicStart(name,buf,loop,T){
   const old=MUSIC.cur>=0?MUSIC.slots[MUSIC.cur]:null,i=MUSIC.cur===0?1:0,now=actx.currentTime;
@@ -6218,6 +6250,7 @@ function musicStart(name,buf,loop,T){
   if(old){const v=old.g.gain.value;aHold(old.g.gain,now);musicRamp(old.g.gain,v,false,T);
     try{old.src.stop(T+MUSIC_XF+0.05);}catch(e){}old.end=Math.min(old.end,T+MUSIC_XF);}
   MUSIC.played++;MUSIC.last=name;MUSIC.hist.push(name);if(MUSIC.hist.length>40)MUSIC.hist.shift();
+  musicTitleUI(name);if(!loop)try{toast('Now playing: '+musicTitle(name),3);}catch(e){}
 }
 function musicAdvance(T){
   const name=musicNextName();if(!name)return;
@@ -6227,10 +6260,7 @@ function musicAdvance(T){
     if(!buf||!musicWanted())return;                    // a bad file: the next tick tries the next one
     if(!loop){const k=MUSIC.queue.indexOf(name);if(k>=0)MUSIC.queue.splice(k,1);}
     musicStart(name,buf,loop,Math.max(actx.currentTime+0.03,T));
-    // keep only what is playing and the next one decoded; songs are big
-    const nx=musicNextName(),keep={};MUSIC.slots.forEach(s=>{if(s)keep[s.name]=1;});if(nx)keep[nx]=1;
-    for(const k in MUSIC.cache)if(!keep[k])delete MUSIC.cache[k];
-    if(nx)musicLoadBuf(nx);
+    musicCacheTouch(name);
   }).catch(()=>{if(tok===MUSIC.tok)MUSIC.busy=false;});
 }
 // five times a second: the level for this screen, song changes, the forced loop
@@ -6249,12 +6279,26 @@ function musicTick(){
     const s=MUSIC.cur>=0?MUSIC.slots[MUSIC.cur]:null,f=musicForcedName();
     if(!s||now>=s.end){musicAdvance(now);return;}
     if((f&&s.name!==f)||(!f&&s.loop)){musicAdvance(now);return;}   // into or out of the dogfight loop
-    if(!s.loop&&now>=s.end-MUSIC_XF-0.3)musicAdvance(Math.max(now,s.end-MUSIC_XF));
+    if(!s.loop&&now>=s.end-MUSIC_XF-0.3){musicAdvance(Math.max(now,s.end-MUSIC_XF));return;}
+    // one file at a time: the next one only starts downloading 20 s before this one ends
+    if(!s.loop&&s.end-now<=20&&s.end-now>MUSIC_XF+0.3){
+      const nx=musicNextName();if(nx&&!MUSIC.cache[nx])musicLoadBuf(nx);
+    }
   }catch(e){}
 }
 function musicNext(){
   if(!actx||!musicGain||MUSIC.busy||MUSIC.cur<0||!MUSIC.slots[MUSIC.cur]||!musicWanted())return;
   musicAdvance(actx.currentTime+0.03);                 // the forced loop just starts again
+}
+// back up to whatever played before this, if the shuffle history has one
+function musicPrev(){
+  if(!actx||!musicGain||MUSIC.busy||MUSIC.cur<0||!MUSIC.slots[MUSIC.cur]||!musicWanted()||musicForcedName())return;
+  const cur=MUSIC.slots[MUSIC.cur].name,h=MUSIC.hist;let prev=null;
+  for(let i=h.length-2;i>=0;i--){if(h[i]!==cur){prev=h[i];break;}}
+  if(!prev||MUSIC.bad[prev])return;
+  const k=MUSIC.queue.indexOf(prev);if(k>=0)MUSIC.queue.splice(k,1);
+  MUSIC.queue.unshift(prev);
+  musicAdvance(actx.currentTime+0.03);
 }
 // the tower's voice: down to 35% over a quarter second, back up over 0.8 s after
 function musicDuck(t0,end){
@@ -6270,13 +6314,15 @@ function setMusicVol(v){MUSIC.vol=Math.max(0,Math.min(1,v));try{localStorage.set
 function setMusicFree(v){MUSIC.free=!!v;try{localStorage.setItem('kgeuMusicFree',MUSIC.free?'1':'0');}catch(e){}musicUI();musicTick();}
 function musicUI(){
   document.querySelectorAll('.oMusic').forEach(b=>{b.textContent='Music: '+(MUSIC.on?'On':'Off');b.classList.toggle('on',MUSIC.on);});
+  document.querySelectorAll('.playPause').forEach(b=>{b.textContent=MUSIC.on?'Pause':'Play';b.classList.toggle('on',MUSIC.on);});
   document.querySelectorAll('.oMvol').forEach(r=>r.value=String(Math.round(MUSIC.vol*10)));
   document.querySelectorAll('.oMvolV').forEach(v=>v.textContent=Math.round(MUSIC.vol*100)+'%');
   const f=document.getElementById('oMfree');if(f){f.textContent='In free flight: '+(MUSIC.free?'On':'Off');f.classList.toggle('on',MUSIC.free);}
+  const s=MUSIC.cur>=0?MUSIC.slots[MUSIC.cur]:null;musicTitleUI(s?s.name:null);
 }
 function musicState(){
   const s=MUSIC.cur>=0?MUSIC.slots[MUSIC.cur]:null,m=musicGain?musicGain.gain.value:0,d=musicDuckG?musicDuckG.gain.value:1;
-  return {on:MUSIC.on,vol:MUSIC.vol,free:MUSIC.free,playing:s?s.name:null,queueLen:MUSIC.queue.length,played:MUSIC.played,forced:MUSIC.forced,
+  return {on:MUSIC.on,vol:MUSIC.vol,free:MUSIC.free,playing:s?s.name:null,title:s?musicTitle(s.name):null,queueLen:MUSIC.queue.length,played:MUSIC.played,forced:MUSIC.forced,
     gain:m*d,master:m,duck:d,ducked:!!(actx&&MUSIC.duckE>actx.currentTime),errors:MUSIC.errors,want:musicWanted(),hist:MUSIC.hist.slice(),
     xf:MUSIC.slots.map(x=>x?{name:x.name,g:x.g.gain.value}:null),list:MUSIC.list&&MUSIC.list.slice()};
 }
@@ -6287,8 +6333,9 @@ function musicState(){
   ev.forEach(e=>window.addEventListener(e,f,{capture:true,passive:true}));})();
 // tests: swap the manifest for a given list of {name,url} (or plain names)
 function musicLoadList(list){
-  musicStop();MUSIC.urls=Object.create(null);MUSIC.bad=Object.create(null);MUSIC.cache=Object.create(null);MUSIC.queue=[];MUSIC.last=null;MUSIC.errors=0;MUSIC.loading=true;
-  MUSIC.list=(list||[]).map(o=>{if(typeof o==='string')return o;MUSIC.urls[o.name]=o.url;return o.name;});
+  musicStop();MUSIC.urls=Object.create(null);MUSIC.bad=Object.create(null);MUSIC.cache=Object.create(null);MUSIC.cacheOrder=[];MUSIC.queue=[];MUSIC.last=null;MUSIC.errors=0;MUSIC.loading=true;
+  MUSIC.titles=Object.create(null);
+  MUSIC.list=(list||[]).map(o=>{if(typeof o==='string')return o;MUSIC.urls[o.name]=o.url;if(o.title)MUSIC.titles[o.name]=o.title;return o.name;});
   musicTick();
 }
 
@@ -6745,6 +6792,7 @@ $('oMfree').onclick=()=>{initAudio();setMusicFree(!MUSIC.free);};
 $('oMnext').onclick=()=>{initAudio();musicNext();};
 tapBtn($('pMusic'),()=>{initAudio();setMusicOn(!MUSIC.on);});
 tapBtn($('pMnext'),()=>{initAudio();musicNext();});
+tapBtn($('pPrev'),()=>{initAudio();musicPrev();});
 document.querySelectorAll('.oMvol').forEach(r=>r.addEventListener('input',e=>{initAudio();setMusicVol(+e.target.value/10);}));
 easyUI();stickUI();radioUI();soundUI();musicUI();
 // Add to Home Screen tip. iOS has no install prompt a page can trigger, so the
@@ -7007,6 +7055,17 @@ function menuClose(){menu.classList.remove('on','see3d');SHOW.on=false;document.
 document.querySelectorAll('#menu .back').forEach(b=>b.onclick=navBack);
 $('hFly').onclick=()=>nav('sFly');$('hSch').onclick=()=>nav('sSchool');$('hMis').onclick=()=>nav('sMis');$('hArc').onclick=()=>nav('sArc');
 $('hRec').onclick=()=>recOpen();$('hSet').onclick=()=>nav('sSet');$('bHelp').onclick=()=>nav('sHelp');
+$('bCredits').onclick=()=>{creditsRender();nav('sCredits');};
+let creditsLoaded=false;
+function creditsRender(){
+  const ul=document.getElementById('creditsList');if(!ul||creditsLoaded)return;
+  fetch(MUSIC_DIR+'playlist.json',{cache:'no-cache'}).then(r=>r.ok?r.json():[]).then(l=>{
+    creditsLoaded=true;const arr=Array.isArray(l)?l:[];
+    const items=arr.map(e=>typeof e==='string'?{file:e,title:e}:e).filter(e=>e&&e.title);
+    items.push({file:'dogfight.m4a',title:'Pocket Sim Original — Dogfight',tag:'Dogfight mode'});
+    ul.innerHTML=items.map(e=>`<li><b>${e.title.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</b>${e.tag?`<span>${e.tag}</span>`:''}</li>`).join('');
+  }).catch(()=>{creditsLoaded=true;ul.innerHTML='<li><b>Music credits unavailable offline</b></li>';});
+}
 $('bGo').onclick=()=>freeStart();
 $('pSet').onclick=()=>{pauseOv.classList.remove('on');menu.classList.add('on');nav('sSet',true);fromPause=true;};
 $('storyX').onclick=()=>$('storyOv').classList.remove('on');
@@ -9041,7 +9100,7 @@ window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runM
     wallVisible:!!(HB.g&&HB.g.visible),C:[HB.C.x,HB.C.z],T:[HB.T.x,HB.T.z],sunDisc:!!(HB.sun&&HB.sun.visible),dustDir:st.dustDir,windDir:st.windDir}),
   haboobJump:(m)=>{if(HB.on){hbPlace(m);hbUpdate(0);}},drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
-  RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicLoad:musicLoadList,musicTick:musicTick,MUSIC:MUSIC,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
+  RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,musicTick:musicTick,MUSIC:MUSIC,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
   stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,

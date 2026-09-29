@@ -1,16 +1,20 @@
-# 3.13 Music system. (a) With the real, empty assets/music/playlist.json: tapping
-# through the menus, a flight, pause and resume makes no errors and no sound.
+# 3.13 Music system. (a) With the real assets/music/playlist.json: tapping through
+# the menus, a flight, pause and resume makes no errors and no sound (free flight
+# is off by default), and the manifest read in the page matches the file on disk.
 # (b) With generated tones swapped in through __kgeu.musicLoad: it starts on the home
 # screen after a tap, deals every track before repeating, crossfades on Next song,
 # dips under the tower, follows the free flight toggle, and the Settings and pause
 # controls change and persist. Also a fit check of both at 667x375.
 # Run: .venv/bin/python tests/music_check.py
-import asyncio, sys, io, math, struct, base64, wave
+import asyncio, sys, io, math, struct, base64, wave, os, json
 from playwright.async_api import async_playwright
-from harness import serve, page, Checks, finger
+from harness import serve, page, Checks, finger, ROOT
 ok = Checks()
 M = "()=>window.__kgeu.music()"
 SR = 8000
+with open(os.path.join(ROOT, 'assets/music/playlist.json')) as _f:
+    REAL_PLAYLIST = json.load(_f)
+REAL_FILES = [e['file'] if isinstance(e, dict) else e for e in REAL_PLAYLIST]
 
 def tone(freq, secs):
     b = io.BytesIO(); w = wave.open(b, 'wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR)
@@ -63,8 +67,8 @@ async def main():
         await pg.evaluate("()=>window.__kgeu.togglePause()"); await pg.wait_for_timeout(500)
         await finger(pg, '#pResume'); await pg.wait_for_timeout(800)
         s = await m(pg)
-        ok('(a) empty playlist: manifest read as an empty list', s['list'] == [], s['list'])
-        ok('(a) empty playlist: nothing playing, no errors', s['playing'] is None and s['errors'] == 0 and s['played'] == 0, s)
+        ok('(a) real playlist.json: manifest matches the file on disk', s['list'] == REAL_FILES, (s['list'], REAL_FILES))
+        ok('(a) real playlist.json: free flight default off, nothing playing, no errors', s['playing'] is None and s['errors'] == 0, s)
         ok('(a) no page errors and no console errors', not pg.errs, pg.errs[:3])
         await pg.context.close()
 
@@ -152,17 +156,32 @@ async def main():
         bad = await pg.evaluate(FIT, '#sSet')
         ok('(b) Settings at 667x375: fits, 44 px targets, no overlaps', not bad, bad[:4])
 
+        # Settings > Music credits: every playlist title, plus dogfight
+        await finger(pg, '#bCredits'); await pg.wait_for_timeout(300)
+        titles = await pg.evaluate("()=>[...document.querySelectorAll('#creditsList li b')].map(e=>e.textContent)")
+        ok('(b) Music credits lists every playlist title plus dogfight', len(titles) == len(REAL_FILES) + 1 and titles[-1].endswith('Dogfight'), (len(titles), titles[:3], titles[-1] if titles else None))
+        await finger(pg, '#sCredits .back'); await pg.wait_for_timeout(300)
+
         # pause menu controls, in a mission
         await pg.evaluate("()=>window.__kgeu.mission('drop')"); await pg.wait_for_timeout(600)
         await pg.evaluate("()=>window.__kgeu.togglePause()"); await pg.wait_for_timeout(400)
-        await finger(pg, '#pMusic'); await slider(pg, '#pMvol', 8)
+        await finger(pg, '#pMusic'); await pg.evaluate("()=>window.__kgeu.setMusicVol(0.8)")
         s = await wait_for(pg, lambda s: s['playing'], 3000)
-        ok('(b) pause: Music on and 80 percent', s['on'] and abs(s['vol'] - 0.8) < 1e-6 and s['playing'], (s['on'], s['vol'], s['playing']))
+        ok('(b) pause: play/pause turns music back on, 80 percent', s['on'] and abs(s['vol'] - 0.8) < 1e-6 and s['playing'], (s['on'], s['vol'], s['playing']))
+        pp = await pg.evaluate("()=>document.getElementById('pMusic').textContent")
+        ok('(b) pause: play/pause button reads Pause while playing', pp == 'Pause', pp)
         await pg.wait_for_timeout(1700)
-        p0 = (await m(pg))['playing']
+        s = await m(pg)
+        p0, title0 = s['playing'], s['title']
+        shown0 = await pg.evaluate("()=>document.getElementById('pMusTitle').textContent")
+        ok('(b) pause: now-playing title is shown', bool(title0) and shown0 == title0, (shown0, title0))
         await finger(pg, '#pMnext')
         s = await wait_for(pg, lambda s: s['playing'] != p0, 1500)
-        ok('(b) pause: Next song changes the track', s['playing'] and s['playing'] != p0, (p0, s['playing']))
+        ok('(b) pause: Next changes the track', s['playing'] and s['playing'] != p0, (p0, s['playing']))
+        await pg.wait_for_timeout(400)
+        await finger(pg, '#pPrev')
+        s = await wait_for(pg, lambda s: s['playing'] == p0, 1500)
+        ok('(b) pause: Previous returns to the track before it', s['playing'] == p0, s['playing'])
         bad = await pg.evaluate(FIT, '#pauseOv .pz')
         ok('(b) pause sheet at 667x375: fits, 44 px targets, no overlaps', not bad, bad[:4])
         ok('(b) no page errors and no console errors', not pg.errs, pg.errs[:3])
@@ -170,9 +189,9 @@ async def main():
         await pg.reload(); await pg.wait_for_function('()=>window.__kgeu', timeout=30000); await pg.wait_for_timeout(500)
         s = await m(pg)
         ls = await pg.evaluate("()=>[localStorage.getItem('kgeuMusicOn'),localStorage.getItem('kgeuMusicVol'),localStorage.getItem('kgeuMusicFree')]")
-        ui = await pg.evaluate("()=>[document.getElementById('oMusic').textContent,document.getElementById('pMvol').value,document.getElementById('oMfree').textContent]")
+        ui = await pg.evaluate("()=>[document.getElementById('oMusic').textContent,document.getElementById('oMvolV').textContent,document.getElementById('oMfree').textContent,document.getElementById('pMusic').textContent]")
         ok('(b) reload keeps on, volume and the free flight toggle', s['on'] and abs(s['vol'] - 0.8) < 1e-6 and not s['free'] and ls == ['1', '0.8', '0'], (ls, ui))
-        ok('(b) controls show the saved values after reload', ui == ['Music: On', '8', 'In free flight: Off'], ui)
+        ok('(b) controls show the saved values after reload', ui == ['Music: On', '80%', 'In free flight: Off', 'Pause'], ui)
         await b.close()
     srv.shutdown()
     sys.exit(ok.done('music_check'))
