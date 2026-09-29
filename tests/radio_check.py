@@ -71,7 +71,10 @@ async def main():
     chk('800 Hz and 1.5 kHz are both in the passband', spec['800'] > band*0.4, f"800 Hz {spec['800']/band:.3f}")
     # a real line: takeoff clearance for the C-130 at Luke
     await pg.evaluate("()=>{window.__kgeu.pick('c130');window.__kgeu.pickBase('luke');window.__kgeu.start('runway');}")
-    await pg.wait_for_timeout(2500)
+    # the tower calls at 0.6 s of sim time; this harness runs at ~3 fps with dt capped
+    # at 0.1 s, so that is about 2-3 s of wall time. Wait for the call, not a fixed 2.5 s.
+    try: await pg.wait_for_function("()=>/cleared for takeoff/.test(document.getElementById('atc').textContent)", timeout=15000)
+    except Exception: pass
     line=await pg.evaluate("()=>{const e=document.getElementById('atc');return {on:e.classList.contains('on'),txt:e.textContent};}")
     chk('takeoff clearance is transmitted', line['on'] and 'cleared for takeoff' in line['txt'], repr(line['txt'][:110]))
     chk('it names the right tower and runway', 'Luke Tower' in line['txt'] and '03L' in line['txt'], repr(line['txt'][:110]))

@@ -6379,7 +6379,7 @@ function missDrop(){
   MISS.pallet=p;MISS.dropped=true;dzDest(false);   // the route clears once the load is away
   toast('Load away');
   if(dcOn())dcSet('pallet',0.5);                       // ride the bundle down
-  radioQ.unshift(L(AC.cs,'pilot',AC.cs+', load away, one bundle.',[csP(),'p_load_away']));
+  vqAdd(L(AC.cs,'pilot',AC.cs+', load away, one bundle.',[csP(),'p_load_away']),{front:1,ttl:10});
 }
 const _pw=new V3();
 function missUpdate(dt){
@@ -6547,7 +6547,7 @@ function dzStart(){
   dzRunIn();
   dzDest(rookie());
   $('dzHint').classList.add('on');
-  radioQ.push(L('Drop Zone Control','tower',AC.cs+', drop zone is marked. Head for the red smoke.',['t_cs_herky','t_dz_smoke']));
+  vqAdd(L('Drop Zone Control','tower',AC.cs+', drop zone is marked. Head for the red smoke.',['t_cs_herky','t_dz_smoke']));
 }
 // the best run in: into the wind at 1,000 ft and 140 kt, released where the drift puts the bundle
 // on the centre. Worked out again whenever the wind shifts (a haboob swings it hard).
@@ -6572,7 +6572,10 @@ function dzStop(){
   for(const id of ['dzHint','dzMark','dzArrow','jumpLt'])$(id).classList.remove('on');$('bDrop').classList.remove('jgreen');
 }
 const _dzv=new V3();
-function dzSay(id,text){radioQ.unshift(L('Loadmaster','crew',text,[id]));}
+// the jump calls are crew-critical and time-critical: priority 1 like the instructor, so a
+// tower call on the air gives way to them, in order (never front-inserted, so "Ten seconds"
+// can't end up after "Green light"). The lights and the DROP button never wait on them.
+function dzSay(id,text){vqAdd(L('Loadmaster','crew',text,[id]),{pri:1,ttl:10});}
 function dzUpdate(dt){
   if(!DZ.on||!DZ.g)return;
   const E=rookie(),live=running&&!paused,gh=groundHeight(DROPZ.x,DROPZ.z),night=TOD.night||TOD.lights>0.6,dusty=HB.on&&HB.d>0.2;
@@ -7282,12 +7285,12 @@ function radioLoad(){
     for(let k=0;k<6;k++)next();                 // six at a time, not 103 at once
   }).catch(()=>{RADIO.err=-1;});
 }
-function radioSquelch(t){
+function radioSquelch(t,dst){
   if(!actx||!radioIn)return;
   const n=(actx.sampleRate*0.05)|0,b=actx.createBuffer(1,n,actx.sampleRate),d=b.getChannelData(0);
   for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,2);
   const s=actx.createBufferSource();s.buffer=b;const g=actx.createGain();g.gain.value=0.45;
-  s.connect(g);g.connect(radioIn);s.start(t);
+  s.connect(g);g.connect(dst||radioIn);s.start(t);
 }
 // returns how long the radio is busy, so the queue paces itself either way
 // one transmission at a time: a new one (a call to us cutting in, or a new flight)
@@ -7300,7 +7303,8 @@ function radioLive(){return running&&!paused&&!menu.classList.contains('on');}
 let radioFadeTok=0,radioWasLive=false;
 function radioFade(ms){
   radioWasLive=false;
-  try{if(window.speechSynthesis)speechSynthesis.cancel();}catch(e){}
+  const c=VQ.cur;if(c&&!c.line.offAir){if(c.speech){try{speechSynthesis.cancel();}catch(e){}}vqClose(c,vqNow()+(ms||120)/1000);}
+  if(!c||!c.line.offAir){try{if(window.speechSynthesis)speechSynthesis.cancel();}catch(e){}}
   if(!actx||!radioGain){radioHush();return;}
   const now=actx.currentTime,tc=(ms||120)/4000;          // four time constants in ms: ~2% left
   radioGain.gain.cancelScheduledValues(now);radioGain.gain.setTargetAtTime(0,now,tc);
@@ -7310,17 +7314,19 @@ function radioFade(ms){
 }
 function radioSpeak(clips,textLen){
   const est=Math.max(1.6,textLen*0.052)+0.5;
-  radioHush();
+  radioHush();RADIO.lineG=null;RADIO.aEnd=0;
   if(!actx||!radioIn||muted||!RADIO.on)return est;
+  // one gain per transmission, so a call that gets cut can fade in 80 ms instead of clicking off
+  const lg=actx.createGain();lg.connect(radioIn);
   const t0=actx.currentTime+0.04;
-  radioSquelch(t0);
   let t=t0+0.10,any=false;
   for(const id of clips||[]){const b=RADIO.buf[id];if(!b)continue;any=true;
-    const s=actx.createBufferSource();s.buffer=b;s.connect(radioIn);s.start(t);RADIO.src.push(s);
+    const s=actx.createBufferSource();s.buffer=b;s.connect(lg);s.start(t);RADIO.src.push(s);
     s.onended=()=>{const i=RADIO.src.indexOf(s);if(i>=0)RADIO.src.splice(i,1);};t+=b.duration+0.025;}
-  if(!any)return est;
-  const end=t+0.05;
-  radioSquelch(end);musicDuck(t0,end+0.07);
+  if(!any){try{lg.disconnect();}catch(e){}radioSquelch(t0);return est;}   // nothing loaded: the click and the text
+  radioSquelch(t0,lg);
+  const end=t+0.05;RADIO.lineG=lg;RADIO.aStart=t0;RADIO.aEnd=end+0.07;
+  radioSquelch(end,lg);musicDuck(t0,end+0.07);
   const g=staticG.gain;
   g.cancelScheduledValues(t0);g.setValueAtTime(0,t0);
   g.linearRampToValueAtTime(0.011,t0+0.06);
@@ -7349,18 +7355,108 @@ function plainOf(l){
   if(/security/.test(t))return 'Tower says: you landed at an air force base. Stop, security is coming!';
   return who==='Range'?'Range control is talking to you.':'';
 }
+// ---- one voice at a time: every voice in the game goes through this queue ----
+// Priority 0: a safety call from the instructor ("Stall!"), which cuts anything at once.
+// 1: the instructor. 2: the tower, ground, range, crew and our own readbacks.
+// 3: other traffic. A higher priority line cuts a lower one with a short fade unless
+// that one is nearly done (under 1.5 s left), in which case it waits. A cut tower call
+// is requeued; cut chatter is dropped. Queued lines expire (ttl, or ok() going false,
+// or the line they answer being dropped), so a stale "cleared for takeoff" never
+// plays after you are airborne. The clock is sim time and only runs on the air, so a
+// pause does not age the queue. The cockpit horn (stall, gear) is a tone, not a voice,
+// and stays outside the queue: it always sounds.
+const VQ={clock:0,cur:null,tok:0,log:[],lastSay:null};
+const vqNow=()=>actx?actx.currentTime:performance.now()/1000;
+function vqAdd(l,o){o=o||{};
+  l.pri=o.pri!=null?o.pri:2;l.exp=VQ.clock+(o.ttl||(l.pri>=3?6:l.pri<=1?10:25));
+  l.ok=o.ok||(o.dep&&o.dep.ok)||null;l.dep=o.dep||null;l.dead=false;l.offAir=!!o.offAir;l.cut=!!o.cut;
+  let i=radioQ.findIndex(q=>(q.pri!=null?q.pri:2)>l.pri||(o.front&&(q.pri!=null?q.pri:2)===l.pri));
+  if(i<0)i=radioQ.length;radioQ.splice(i,0,l);
+  vqPump();return l;
+}
+function vqStale(l){return l.exp<VQ.clock||(l.ok&&!l.ok())||(l.dep&&l.dep.dead);}
+function vqDone(c){
+  if(c.speech)return c.fin||VQ.clock>=c.end||(c.line.offAir&&performance.now()/1000>=c.rEnd);
+  // paced on the sim clock, which never runs ahead of the audio on a phone (dt is capped);
+  // a test stepping the sim faster than real time just gets a hard cut from radioHush
+  return VQ.clock>=c.end;
+}
+function vqClose(c,a1){const e=c.rec;if(e&&e.a1==null)e.a1=a1!=null?a1:c.speech?vqNow():Math.max(vqNow(),c.aEnd||0);if(VQ.cur===c)VQ.cur=null;}
+// cut the line on the air: an 80 ms fade on the radio, a cancel on the synthesised voice
+function vqCut(requeue){
+  const c=VQ.cur;if(!c)return;const n=vqNow();
+  if(c.speech){try{speechSynthesis.cancel();}catch(e){}musicUnduck();vqClose(c,n);}
+  else{const g=RADIO.lineG;
+    if(g&&actx){try{g.gain.setTargetAtTime(0,n,0.02);}catch(e){}
+      if(staticG){staticG.gain.cancelScheduledValues(n);staticG.gain.setTargetAtTime(0,n,0.02);}
+      const src=RADIO.src.splice(0);for(const s of src){try{s.stop(n+0.1);}catch(e){}}RADIO.lineG=null;musicUnduck();}
+    vqClose(c,n+0.1);}
+  const l=c.line;
+  if(requeue&&l.pri===2&&!vqStale(l)){const i=radioQ.findIndex(q=>(q.pri!=null?q.pri:2)>=2);radioQ.splice(i<0?radioQ.length:i,0,l);}
+  else l.dead=true;
+  radioBusy=0;
+}
+function vqPump(){
+  const live=radioLive(),c=VQ.cur;
+  if(c&&vqDone(c))vqClose(c);
+  // drop what went stale while it waited
+  for(let i=0;i<radioQ.length;i++){const l=radioQ[i];if(l.pri==null)l.pri=2;if(l.exp==null)l.exp=VQ.clock+25;
+    if(vqStale(l)){l.dead=true;radioQ.splice(i--,1);}}
+  const h=radioQ[0];if(!h)return;
+  if(VQ.cur){const k=VQ.cur;
+    if(!(h.pri<k.pri||(h.cut&&h.pri===k.pri)))return;               // same or lower priority waits its turn
+    if(h.pri>0&&!(h.cut&&h.pri===k.pri)&&k.estEnd-VQ.clock<1.5)return;   // nearly done: let it finish
+    vqCut(!(h.cut&&h.pri===k.pri));}                               // a superseding call drops the old one
+  if(!live&&!h.offAir)return;                                      // off the air: it plays after Resume
+  playLine(radioQ.shift());
+}
 function playLine(l){
-  if(!radioLive()){radioQ.unshift(l);return;}   // off the air: it plays after Resume
+  l.cut=false;l.dead=false;
+  const live=radioLive(),sp=l.who==='Instructor';
   RADIO.log.push({who:l.who,kind:l.kind,text:l.text,clips:Array.isArray(l.clips)?l.clips.slice():l.clips,t:st?+st.time.toFixed(2):0,amb:CHAT.some(p=>p.indexOf(l)>=0),type:AC.id});
   if(RADIO.log.length>200)RADIO.log.shift();
-  atcEl.innerHTML='';const b=document.createElement('b');b.textContent=l.who;atcEl.appendChild(b);
-  atcEl.appendChild(document.createTextNode(l.text));
-  const pl=rookie()?plainOf(l):'';atcEl.classList.toggle('hasPlain',!!pl);
-  if(pl){const e=document.createElement('span');e.className='plain';e.textContent=pl;atcEl.appendChild(e);}
-  atcEl.classList.add('on');
-  radioBusy=radioSpeak(l.clips,l.text.length);atcT=Math.max(5,radioBusy+1.2);
+  if(live){                                                        // the grade card speaks without a subtitle
+    atcEl.innerHTML='';const b=document.createElement('b');b.textContent=l.who;atcEl.appendChild(b);
+    atcEl.appendChild(document.createTextNode(l.text));
+    const pl=rookie()?plainOf(l):'';atcEl.classList.toggle('hasPlain',!!pl);
+    if(pl){const e=document.createElement('span');e.className='plain';e.textContent=pl;atcEl.appendChild(e);}
+    atcEl.classList.add('on');}
+  const c={line:l,pri:l.pri,t0:VQ.clock,speech:sp,tok:++VQ.tok,fin:false};
+  c.rec={pri:l.pri,who:l.who,text:l.text,speech:sp,a0:vqNow(),a1:null};VQ.log.push(c.rec);if(VQ.log.length>100)VQ.log.shift();
+  let d;
+  if(sp){d=coachSpeak(c,l.sp||l.text);c.estEnd=VQ.clock+d;c.end=VQ.clock+(c.voiced?d*1.6+1:d);c.rEnd=performance.now()/1000+d*1.6+1;}
+  else{try{if(window.speechSynthesis&&speechSynthesis.speaking)speechSynthesis.cancel();}catch(e){}
+    d=radioSpeak(l.clips,l.text.length);c.aEnd=RADIO.aEnd;if(RADIO.aEnd)c.rec.a0=RADIO.aStart;c.estEnd=c.end=VQ.clock+d;}
+  VQ.cur=c;radioBusy=d;atcT=Math.max(5,d+1.2);
 }
-function say(who,text,clips){radioQ.length=0;playLine({who:who,text:text,clips:clips});}
+// The instructor sits beside you rather than transmitting, so this one voice is
+// still synthesised and deliberately bypasses the radio filter. Its lines are
+// built at runtime from measured numbers and cannot be pre-recorded. It holds the
+// air until the speech engine says it ended, or a generous estimate if it never does.
+function coachSpeak(c,text){
+  const est=0.4+text.length*0.062;c.voiced=false;
+  radioHush();                                                     // belt and braces: no clip left under the voice
+  if(muted||!RADIO.on||!window.speechSynthesis)return est;         // silent: the subtitle still gets its time
+  try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);
+    u.rate=1.02;u.volume=0.9*RADIO.vol;
+    u.onend=u.onerror=()=>{if(VQ.cur===c){c.fin=true;if(c.rec.a1==null)c.rec.a1=vqNow();musicUnduck();}};
+    speechSynthesis.speak(u);c.voiced=true;
+    if(actx){const n=actx.currentTime;musicDuck(n,n+est*1.6+1);}}catch(e){}
+  return est;
+}
+// a new instruction replaces the one before it; tower calls waiting behind it keep waiting
+function coach2(t,sp,o){o=o||{};
+  for(let i=radioQ.length-1;i>=0;i--)if(radioQ[i].pri<=1&&radioQ[i].who==='Instructor'){radioQ[i].dead=true;radioQ.splice(i,1);}
+  const l={who:'Instructor',text:t,sp:sp,clips:null};
+  vqAdd(l,{pri:o.urgent?0:1,cut:true,offAir:o.offAir});
+}
+function vqReset(){radioQ.length=0;if(VQ.cur){const c=VQ.cur;if(c.speech){try{speechSynthesis.cancel();}catch(e){}}vqClose(c,vqNow());}radioBusy=0;}
+// a tower call to us: it drops pending chatter, supersedes a tower line on the air (whose
+// readback goes with it), and goes ahead of other tower lines, but waits for an instruction
+function say(who,text,clips,o){o=o||{};
+  for(let i=radioQ.length-1;i>=0;i--)if(radioQ[i].pri>=3){radioQ[i].dead=true;radioQ.splice(i,1);}
+  return VQ.lastSay=vqAdd({who:who,text:text,clips:clips},{cut:true,front:1,ok:o.ok,ttl:o.ttl});
+}
 const L=(who,kind,text,clips)=>({who,kind,text,clips});
 
 // ---- clip helpers ----
@@ -7409,15 +7505,19 @@ const CHAT=[
   L('Viper 21','fighter','Cleared to land, Viper 21.',['p_ch_p12'])]
 ];
 const _rp=new V3();
+// one exchange of other traffic, lowest priority: it only waits a few seconds for the air
+function chatNow(){const p=CHAT[chatI++%CHAT.length];let prev=null;
+  p.forEach((l,i)=>{prev=vqAdd(l,{pri:3,ttl:6+i*6,dep:prev});});}
 function radioUpdate(dt){
   if(atcT>0){atcT-=dt;if(atcT<=0)atcEl.classList.remove('on');}
-  if(radioBusy>0)radioBusy-=dt;
-  if(!radioLive()){if(radioWasLive)radioFade(120);return;}   // end screens, photo mode, the map: same fade
+  if(!radioLive()){if(radioWasLive)radioFade(120);
+    const c=VQ.cur;if(c&&c.line.offAir&&!gradeOv.classList.contains('on'))vqCut(false);   // the grade card closed to a menu
+    vqPump();radioBusy=VQ.cur?Math.max(0,VQ.cur.end-VQ.clock):0;return;}   // end screens, photo mode, the map: same fade
   if(!radioWasLive){radioWasLive=true;radioFadeTok++;radioVolApply();}   // back on the air, whatever the path back was
-  if(radioBusy<=0&&radioQ.length){playLine(radioQ.shift());return;}
+  VQ.clock+=dt;vqPump();radioBusy=VQ.cur?Math.max(0,VQ.cur.end-VQ.clock):0;
   // other traffic waits until the tower has made its opening call to us and we have read it back
   const opened=st.mode==='runway'?A.tko:st.mode==='ramp'?A.taxi:st.mode==='final'?A.land:1;
-  chatT-=dt;if(chatT<=0&&opened&&!st.crashed&&!radioQ.length&&radioBusy<=0){chatT=16+Math.random()*16;CHAT[chatI++%CHAT.length].forEach(l=>radioQ.push(l));}
+  chatT-=dt;if(chatT<=0&&opened&&!st.crashed&&!radioQ.length&&!VQ.cur){chatT=16+Math.random()*16;chatNow();}
   advT-=dt;if(advT<=0&&!st.onGround&&!st.crashed){advT=2;
     const hdg=-_euH.setFromQuaternion(st.quat,'YXZ').y;const seen={};
     for(const o of TRAFFIC){if(seen[o.grp]||(o.cool=(o.cool||0)-2)>0||!o.kind)continue;
@@ -7434,10 +7534,11 @@ function radioUpdate(dt){
           ktC(mi),[mi>1?'t_miles':'t_mile'],
           near?['t_same_alt']:altC(ft).concat([dy>0?'t_above':'t_below']),
           [TFCC[o.kind]].filter(Boolean));
-        radioQ.unshift(L(twr,'tower',`${AC.csS}, traffic ${clk} o'clock, ${mi} mile${mi>1?'s':''}, ${alt}, ${o.kind}.`,clips));
+        vqAdd(L(twr,'tower',`${AC.csS}, traffic ${clk} o'clock, ${mi} mile${mi>1?'s':''}, ${alt}, ${o.kind}.`,clips),{front:1,ttl:8});
         break;}}}
 }
 let A={};
+const onGnd=()=>st.onGround&&!st.crashed,inAir=()=>!st.onGround&&!st.crashed;   // when a queued clearance still means something
 // a readback after a clearance, in the pilot's voice, the way a real exchange goes
 function readback(kind){
   const T={to:['Cleared for takeoff, ','p_rb_cleared_to'],
@@ -7445,7 +7546,7 @@ function readback(kind){
            wilco:['Wilco, ','p_rb_wilco'],
            roger:['Roger, ','p_rb_roger'],
            tfc:['Looking for the traffic, ','p_rb_traffic']}[kind];
-  radioQ.push(L(AC.cs,'pilot',T[0]+AC.cs+'.',[T[1],csP()]));
+  vqAdd(L(AC.cs,'pilot',T[0]+AC.cs+'.',[T[1],csP()]),{dep:VQ.lastSay});   // dropped with the call it answers
 }
 function atcUpdate(){
   const s=st,u=toU(s.pos.x,s.pos.z),v=toV(s.pos.x,s.pos.z);
@@ -7454,23 +7555,23 @@ function atcUpdate(){
   const twrC='t_'+B.twrClip, gndC='t_'+B.gndClip, rwyC='t_'+B.rwyClip;
   if(s.mode==='runway'&&!A.tko&&s.time>0.6){A.tko=1;
     say(B.twr,AC.cs+', '+B.twr.split(' ').slice(0,2).join(' ')+', '+windTxt()+', runway '+B.rwy+', cleared for takeoff.',
-        [csT(),twrC].concat(windC(),[rwyC,'t_cleared_to']));readback('to');}
+        [csT(),twrC].concat(windC(),[rwyC,'t_cleared_to']),{ok:onGnd});readback('to');}
   if(s.mode==='ramp'&&!A.taxi&&s.time>0.6){A.taxi=1;
     say(B.gnd,AC.cs+', '+B.gnd.split(' ').slice(0,2).join(' ')+', runway '+B.rwy+', taxi to the active via Alpha.',
         [csT(),gndC,rwyC,'t_taxi_alpha']);readback('wilco');}
   if(s.mode==='ramp'&&A.taxi&&!A.tko&&s.onGround&&s.base==='kgeu'&&v>-70&&v<-20&&u<560){A.tko=1;
-    say(B.twr,AC.cs+', runway '+B.rwy+', cleared for takeoff.',[csT(),rwyC,'t_cleared_to']);readback('to');}
+    say(B.twr,AC.cs+', runway '+B.rwy+', cleared for takeoff.',[csT(),rwyC,'t_cleared_to'],{ok:onGnd});readback('to');}
   if(s.mode==='final'&&!A.land&&s.time>0.6){A.land=1;
     say(B.twr,AC.cs+', '+B.twr.split(' ').slice(0,2).join(' ')+', '+windTxt()+', runway '+B.rwy+', cleared to land.',
-        [csT(),twrC].concat(windC(),[rwyC,'t_cleared_land']));readback('land');}
+        [csT(),twrC].concat(windC(),[rwyC,'t_cleared_land']),{ok:inAir});readback('land');}
   if(!A.pattern&&A.ground&&!s.onGround&&s.agl>240){A.pattern=1;
-    say(B.twr,AC.csS+', make right closed traffic, runway '+B.rwy+'.',[csTs(),'t_closed_traffic',rwyC]);}
+    say(B.twr,AC.csS+', make right closed traffic, runway '+B.rwy+'.',[csTs(),'t_closed_traffic',rwyC],{ok:inAir});}
   const hdg=((-new THREE.Euler().setFromQuaternion(s.quat,'YXZ').y*180/Math.PI)%360+360)%360;
   // lined up on the home base's runway, u from its threshold (Glendale 1 or Luke 03L)
   const lk=s.base==='luke',K=lk?lukeUV(s.pos.x,s.pos.z):null,pu=lk?K[0]+1510.5:u-THR01,pv=lk?K[1]+152.5:v;
   if(!A.land&&A.pattern&&!s.onGround&&s.agl<420&&pu<150&&pu>-7000-THR01&&Math.abs(pv)<450&&Math.abs(((hdg-B.hdg+540)%360)-180)<35){A.land=1;
     say(B.twr,AC.csS+', runway '+B.rwy+', check wheels down, cleared to land.',
-        [csTs(),twrC,rwyC,'t_wheels_down','t_cleared_land']);readback('land');}
+        [csTs(),twrC,rwyC,'t_wheels_down','t_cleared_land'],{ok:inAir});readback('land');}
 }
 function atcTouchdown(e){
   const u=toU(e.x,e.z),v=toV(e.x,e.z),K=lukeUV(e.x,e.z);
@@ -7657,7 +7758,7 @@ function start(mode,base){
   if(FM.on)fmClose();
   initAudio();
   if(ARC.prevTod){const p=ARC.prevTod;ARC.prevTod=null;setTOD(p);}
-  setType(acType);useModel(acType);sizeShadow();radioQ.length=0;radioHush();radioFadeTok++;radioVolApply();radioBusy=0;chatT=9;atcT=0;atcEl.classList.remove('on');TK.paused=false;TK.open=false;
+  setType(acType);useModel(acType);sizeShadow();vqReset();radioHush();radioFadeTok++;radioVolApply();chatT=9;atcT=0;atcEl.classList.remove('on');TK.paused=false;TK.open=false;
   const spawn=mode;if(mode==='final1')mode='final';
   st=createState(mode,base||SPAWN_BASE,spawn==='final1'?1852:0);st.type=acType;st.spawn=spawn;
   // 1 mile final: Easy is already configured to land (gear down, landing flaps); Hard is set up the way the
@@ -7779,15 +7880,6 @@ const altMSL=()=>(st.pos.y-GEAR)*M2FT+FIELD_FT,aglFt=()=>st.agl*M2FT,kts=()=>st.
 const angD=(a,b)=>Math.abs((((a-b)%360)+540)%360-180);
 const dev=f=>(f>=0?'+':'')+Math.round(f)+' ft',h3=h=>String(Math.round(h)%360||360).padStart(3,'0');
 function lesShow(i,m){if(lesI.textContent!==i)lesI.textContent=i;lesM.textContent=m;}
-// The instructor sits beside you rather than transmitting, so this one voice is
-// still synthesised and deliberately bypasses the radio filter. Its lines are
-// built at runtime from measured numbers and cannot be pre-recorded.
-function coach2(t,sp){
-  radioQ.length=0;playLine({who:'Instructor',text:t,clips:null});
-  if(muted||!RADIO.on||!window.speechSynthesis)return;
-  try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(sp||t);
-    u.rate=1.02;u.volume=0.9*RADIO.vol;speechSynthesis.speak(u);}catch(e){}
-}
 function airStart(u,v,altFt,hdg,kt,flap,thr){
   const y=(altFt-FIELD_FT)/M2FT+GEAR,h=hdg*Math.PI/180,V=kt/MS2KT/Math.sqrt(1.097*Math.exp(-y/9200)/1.225);
   st.pos.set(wX(u,v),y,wZ(u,v));st.vel.set(Math.sin(h)*V,0,-Math.cos(h)*V);st.quat.setFromEuler(new THREE.Euler(0.03,-h,0,'YXZ'));st.w.set(0,0,0);
@@ -7845,7 +7937,7 @@ function grade(score,title,lines,failWhy){
   if(id==='first'&&L2!=='F'){try{localStorage.setItem('kgeuTut','1');}catch(e){}}
   const nx=nextLesson(id),gn=$('gNext');gn.hidden=!nx||(L2==='F'&&nx.id!==id);if(nx)gn.textContent='Next lesson: '+nx.name;gn.dataset.l=nx?nx.id:'';
   gradeOv.classList.add('on');
-  coach2(L2==='A'?'Excellent. That is checkride standard.':L2==='F'?'Unsatisfactory. Let us try that again.':'Not bad. Grade '+L2+'.');
+  coach2(L2==='A'?'Excellent. That is checkride standard.':L2==='F'?'Unsatisfactory. Let us try that again.':'Not bad. Grade '+L2+'.',null,{offAir:1});
 }
 document.getElementById('gRetry').onclick=()=>startLesson(LES.last);
 $('gNext').onclick=()=>startLesson($('gNext').dataset.l);
@@ -7891,7 +7983,7 @@ function lessonTick(dt){
   }
   else if(id==='stall'){
     if(LES.ph===0){lesShow('Idle. Hold altitude, keep easing back until it stalls.',kt.toFixed(0)+' kt   '+dev(alt-3500)+(st.throttle>0.2?'   keep the power at idle':''));
-      if(st.stalled){LES.ph=1;d.a0=alt;d.amin=alt;d.t=0;d.pwr=null;d.bmax=0;warnFlash();coach2('Stall! Nose down, full power, wings level.');}
+      if(st.stalled){LES.ph=1;d.a0=alt;d.amin=alt;d.t=0;d.pwr=null;d.bmax=0;warnFlash();coach2('Stall! Nose down, full power, wings level.',null,{urgent:1});}
       if(LES.t>90)grade(0,'',[[0,'It never stalled. Pull back further with the power at idle.']],'no stall');}
     else if(LES.ph===1){d.t+=dt;d.amin=Math.min(d.amin,alt);d.bmax=Math.max(d.bmax,Math.abs(a.bank));if(d.pwr===null&&st.throttle>0.9)d.pwr=d.t;
       lesShow('Recover: nose down, full power, wings level.','Lost '+Math.round(d.a0-alt)+' ft   Bank '+Math.abs(a.bank).toFixed(0)+'\u00b0   '+kt.toFixed(0)+' kt');
@@ -7905,7 +7997,7 @@ function lessonTick(dt){
   }
   else if(id==='engine'){
     if(LES.ph===0){lesShow('Cruising at 2,500 ft AGL. Stand by.',kt.toFixed(0)+' kt');
-      if(LES.t>4){LES.ph=1;d.sum=0;d.n=0;warnFlash();coach2('Engine failure! Pitch for '+S.glide+' knots, best glide, and turn toward the field.');}}
+      if(LES.t>4){LES.ph=1;d.sum=0;d.n=0;warnFlash();coach2('Engine failure! Pitch for '+S.glide+' knots, best glide, and turn toward the field.',null,{urgent:1});}}
     else{st.throttle=0;
       const dx=wX(THR01+RWY_LEN/2,0)-st.pos.x,dz=wZ(THR01+RWY_LEN/2,0)-st.pos.z,nm=Math.hypot(dx,dz)/1852;
       if(!d.td&&st.agl*M2FT>200){d.sum+=Math.abs(kt-S.glide);d.n++;}
@@ -9771,7 +9863,7 @@ function fireMissile(){
   m.dir.set(0,0,-1).applyQuaternion(st.quat);
   STRIKE.missiles.push(m);
   m.mesh.g.visible=true;m.mesh.g.position.copy(m.pos);
-  radioQ.push(L(AC.cs,'uav','Rifle, '+AC.csS+'.',['p_rifle',csPs()]));
+  vqAdd(L(AC.cs,'uav','Rifle, '+AC.csS+'.',['p_rifle',csPs()]));
   toast('Rifle. Hold the laser on it');
 }
 function missileUpdate(dt){
@@ -9837,7 +9929,7 @@ function impact(m,gh){
   STRIKE.missSum+=Math.min(miss,999);
   const md=miss<999?Math.round(miss)+' m':'long';
   toast(killed?('Good hit. '+hit.name+' destroyed'):('Miss by '+md+(m.trackLost?'. Track broke':'')));
-  radioQ.push(killed
+  vqAdd(killed
     ?L('Gila Range Control','tower',AC.csS+', good hit, good hit, target destroyed.',[csTs(),'t_good_hit'])
     :L('Gila Range Control','tower',AC.csS+', miss, '+md+'. Reset and try again.',[csTs(),'t_miss'].concat(miss<999?ktC(Math.round(miss)).concat(['t_meters']):['t_long'],['t_reset_again'])));
   strikeScore();
@@ -9881,7 +9973,7 @@ function strikeScore(){
     (sc.hits===strikeBest.hits&&sc.avg===strikeBest.avg&&sc.t<strikeBest.t);
   if(better){strikeBest=sc;try{localStorage.setItem('kgeuStrikeBest',JSON.stringify(sc));}catch(e){}}
   toast(`${sc.hits} of 4 hits. Average miss ${sc.avg} m, ${sc.t} s${better?'. New best':''}`);
-  radioQ.push(L('Gila Range Control','tower',
+  vqAdd(L('Gila Range Control','tower',
     `${AC.csS}, range is cold. ${sc.hits} of 4.`,
     [csTs(),'t_gila_range','t_range_cold','t_n_'+sc.hits,'t_of_four']));
 }
@@ -9904,7 +9996,7 @@ function strikeStart(){
   fxClear();
   apEngage(st,'orbit',{cx:RANGE.x,cz:RANGE.z,r:2400,y:st.pos.y-GEAR,v:AC.vcruise,dir:1});st.ap.sensor=true;
   camMode=2;snapCamera=true;
-  radioQ.push(L('Gila Range Control','tower',
+  vqAdd(L('Gila Range Control','tower',
     AC.cs+', Gila range control, you are cleared hot. Range is clear, four targets.',
     [csT(),'t_gila_range','t_cleared_hot']));
 }
@@ -10601,7 +10693,7 @@ window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runM
     wallVisible:!!(HB.g&&HB.g.visible),C:[HB.C.x,HB.C.z],T:[HB.T.x,HB.T.z],sunDisc:!!(HB.sun&&HB.sun.visible),dustDir:st.dustDir,windDir:st.windDir}),
   haboobJump:(m)=>{if(HB.on){hbPlace(m);hbUpdate(0);}},drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
-  RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,ticker:()=>{const e=document.getElementById('tk'),c=document.getElementById('tkCtl');return {on:e.classList.contains('on'),paused:e.classList.contains('paused'),anim:getComputedStyle(document.getElementById('tkT')).animationName,scroll:e.classList.contains('scroll'),open:c.classList.contains('on'),text:e.querySelector('#tkT i').textContent,vis:e.offsetParent!==null&&getComputedStyle(e).display!=='none',ctlVis:c.offsetParent!==null};},tickerForce:n=>{TK.force=n||null;tkUI();},tickerOpen:()=>tkOpen(),musicTick:musicTick,MUSIC:MUSIC,actx:()=>actx,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
+  RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,ticker:()=>{const e=document.getElementById('tk'),c=document.getElementById('tkCtl');return {on:e.classList.contains('on'),paused:e.classList.contains('paused'),anim:getComputedStyle(document.getElementById('tkT')).animationName,scroll:e.classList.contains('scroll'),open:c.classList.contains('on'),text:e.querySelector('#tkT i').textContent,vis:e.offsetParent!==null&&getComputedStyle(e).display!=='none',ctlVis:c.offsetParent!==null};},tickerForce:n=>{TK.force=n||null;tkUI();},tickerOpen:()=>tkOpen(),musicTick:musicTick,MUSIC:MUSIC,actx:()=>actx,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,VQ:VQ,vqLog:clear=>{const r=VQ.log.map(e=>Object.assign({},e));if(clear)VQ.log.length=0;return r;},vqAdd:(who,kind,text,clips,o)=>vqAdd(L(who,kind,text,clips),o),coach2:coach2,chatNow:()=>chatNow(),atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
   stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,

@@ -86,7 +86,8 @@ async def main():
                       for(let j=0;j<15;j++){{K.stepFrame(1/30,false,true);
                         if(!K.MISS.dropped){{const gh=K.groundHeight(s.pos.x,s.pos.z);s.pos.y+=(gh+305-s.pos.y)*0.05;}}}}}}""")
                     # the wind swung (leaving the haboob's dust) and the run in moved behind us: fly a fresh pass
-                    if not dropped and await pg.evaluate(f"()=>{K}.DZ.tRel>90&&{K}.DZ.tRel<1e8"):
+                    # (or it swung so far the release point is already well behind us)
+                    if not dropped and await pg.evaluate(f"()=>{K}.DZ.tRel>90&&{K}.DZ.tRel<1e8||{K}.DZ.tRel<-15&&{K}.DZ.err>1500"):
                         await pg.evaluate(PLACE)
                     st = await pg.evaluate(f"()=>({{l:{K}.DZ.light,t:{K}.DZ.tRel,jl:document.getElementById('jumpLt').className,pulse:document.getElementById('bDrop').classList.contains('jgreen'),dz:{K}.MISS.dropped}})")
                     if st['l']: seen.add(st['l'])
