@@ -93,6 +93,49 @@ button.on{ background:var(--caution); color:#15110a; border-color:transparent; }
 #bPause{ position:absolute; top:var(--padT); left:50%; transform:translateX(-50%); width:var(--icon); height:var(--icon); padding:0; display:grid; place-items:center; touch-action:none; }
 #bPause svg{ width:18px; height:18px; }
 
+/* ---------- now playing ticker, top right ----------
+   The top row right of pause is otherwise empty on a phone: the badges sit in the row
+   below, the throttle and the button column start two rows down, and the mission card
+   and the tower's subtitle own the centre column under pause. The button is a 44 pt
+   target; the pill inside it is small. A long title scrolls as one CSS transform on one
+   element (two copies, translateX(-50%) loops seamlessly), only while it is shown.
+   Tapping it swaps it for Prev / Play-Pause / Next in the same spot, with no pause. */
+#tk,#tkCtl{ position:absolute; top:var(--padT); right:var(--padR); height:var(--icon); display:none; }
+#tk{ min-width:var(--icon); max-width:min(210px, calc(50% - var(--icon) / 2 - 16px - var(--padR))); padding:0; background:none; border:0; border-radius:0; align-items:center; justify-content:flex-end; }
+#tk.on{ display:flex; }
+#tk .tkP{ display:flex; align-items:center; gap:5px; max-width:100%; height:24px; padding:0 9px 0 7px; border-radius:12px; background:var(--glass); border:1px solid rgba(255,255,255,.08); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+#tk svg{ width:11px; height:11px; flex:none; color:var(--caution); }
+#tkV{ overflow:hidden; min-width:0; flex:1 1 auto; }
+#tkT{ display:inline-flex; white-space:nowrap; font-size:11px; font-weight:600; letter-spacing:.03em; color:var(--soft); line-height:24px; }
+#tkT i{ font-style:normal; }
+#tkT i + i{ display:none; }
+#tk.scroll #tkT i{ padding-right:28px; }
+#tk.scroll #tkT i + i{ display:inline; }
+#tk.scroll #tkT{ animation:tkM 12s linear infinite; will-change:transform; }
+@keyframes tkM{ 0%,14%{ transform:translateX(0); } 100%{ transform:translateX(-50%); } }
+@media (prefers-reduced-motion: reduce){ #tk.scroll #tkT{ animation:none; } #tk.scroll #tkT i + i{ display:none; } #tkV{ text-overflow:ellipsis; } }
+/* paused from the strip or the pause sheet: dimmed, a play icon, the title still */
+#tk .tkPl{ display:none; }
+#tk.paused .tkPl{ display:block; } #tk.paused .tkN{ display:none; }
+#tk.paused .tkP{ opacity:.6; }
+#tk.paused #tkT{ animation:none !important; } #tk.paused #tkT i + i{ display:none !important; } #tk.paused #tkV{ text-overflow:ellipsis; }
+#tkCtl.on{ display:flex; gap:4px; }
+#tkCtl button{ min-width:var(--icon); height:var(--icon); padding:0 6px; font-size:12px; font-weight:800; }
+/* C-130 airdrop: the free look pad owns the corner; desktop: Full screen does */
+/* C-130 airdrop (touch): the look pad owns the corner and the badges take the top row left
+   of it, so the ticker and its strip step down one row, still left of the pad, above the
+   button column, and short of the mission card (30vw wide, centred) and of the tower's
+   subtitle (its max-width, #atc). The badges stay one
+   line there so they never grow down into it. */
+body.lookOn.touch #tk, body.lookOn.touch #tkCtl{ top:calc(var(--padT) + var(--icon) + 8px); right:calc(var(--padR) + 72px); }
+body.lookOn.touch #tk{ max-width:min(210px, calc(35% - 80px - var(--padR)), calc(50% - 80px - var(--padR) - min(220px, max(75px, 50% - var(--padL) - var(--map) - 162px)))); }
+body.lookOn.touch .badge span{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+body.lookOn.touch .badge{ max-height:48px; }
+body:not(.touch) #tk, body:not(.touch) #tkCtl{ right:calc(var(--padR) + 118px); }
+/* portrait: the readout cards reach past the middle, so keep clear of them instead */
+@media (orientation:portrait){ #tk{ max-width:max(88px, calc(100% - var(--padL) - var(--map) - 176px - var(--padR))); } }
+body.sensorOn #tk, body.sensorOn #tkCtl, body.crashOn #tk, body.crashOn #tkCtl{ display:none !important; }
+
 /* ---------- full screen, top right, desktop only ---------- */
 #bFull{ position:absolute; top:var(--padT); right:var(--padR); min-height:var(--icon); }
 body.touch #bFull{ display:none; }
@@ -729,6 +772,8 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
   </div>
   <button id="hDest" hidden aria-label="Destination, tap to clear"><svg id="dArrow" viewBox="0 0 24 24"><path d="M12 2 L20 20 L12 15.5 L4 20Z" fill="#D98A3D" stroke="#2A1608" stroke-width="1.2" stroke-linejoin="round"/></svg><span id="dTxt"></span></button>
   <button id="bPause" title="Pause (P)" aria-label="Pause"><svg viewBox="0 0 20 20"><rect x="4" y="3" width="4" height="14" rx="1" fill="currentColor"/><rect x="12" y="3" width="4" height="14" rx="1" fill="currentColor"/></svg></button>
+  <button id="tk" aria-label="Now playing, tap for music controls"><span class="tkP"><svg class="tkPl" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 1 11 6l-8.5 5z" fill="currentColor"/></svg><svg class="tkN" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 1.5 11 0v8.2a1.9 1.6 0 1 1-1.2-1.5V2.4L5.7 3.3v6.4a1.9 1.6 0 1 1-1.2-1.5z" fill="currentColor"/></svg><span id="tkV"><span id="tkT"><i></i><i aria-hidden="true"></i></span></span></span></button>
+  <div id="tkCtl" role="group" aria-label="Music"><button id="tkPrev" aria-label="Previous song">Prev</button><button class="playPause" id="tkPlay" aria-label="Play or pause music">Pause</button><button id="tkNext" aria-label="Next song">Next</button></div>
   <button id="bFull" class="donly" title="Full screen">Full screen</button>
   <!-- the flight buttons, just left of the throttle. layoutCtl() shows the right ones and
        deals them into column A (nearest the throttle) and, if needed, column B -->
@@ -6957,7 +7002,44 @@ const MUSIC={on:true,vol:0.6,free:false,forced:null,list:null,titles:Object.crea
   allowed:false,gest:false,lab:null,played:0,errors:0,hist:[],cache:Object.create(null),cacheOrder:[],slots:[null,null],cur:-1,busy:false,tok:0,offAt:-1,tgt:-1,want:null,duckE:0,loading:false};
 const MUSIC_CACHE_CAP=10;
 function musicTitle(name){return (name&&MUSIC.titles[name])||name||'';}
-function musicTitleUI(name){const t=document.getElementById('pMusTitle');if(t)t.textContent=name?musicTitle(name):'—';}
+function musicTitleUI(name){const t=document.getElementById('pMusTitle');if(t)t.textContent=name?musicTitle(name):'—';tkUI();}
+// the flight screen's now playing ticker (#tk) and its Prev / Play / Next strip (#tkCtl).
+// Called from musicTick (5 Hz) and on every track change; it only touches the DOM when
+// something changed, and measures the title only when the title changes or it reappears.
+const TK={on:false,fit:false,open:false,paused:false,pz:false,closeAt:0,name:null,force:null,el:null};
+function tkUI(){
+  const el=TK.el||(TK.el=document.getElementById('tk'));if(!el)return;
+  const s=MUSIC.cur>=0?MUSIC.slots[MUSIC.cur]:null,now=performance.now();
+  const name=TK.force||(s?musicTitle(s.name):TK.name);
+  const play=!!TK.force||(!!s&&musicWanted());
+  if(TK.open&&(!running||now>TK.closeAt))TK.open=false;
+  if(play)TK.paused=false;
+  // paused by the player from the strip or the pause sheet: it stays, dimmed, for the rest
+  // of this flight, so Play is one tap. Off in Settings, or never playing: it goes.
+  const pz=!play&&TK.paused&&!musicPlaying();
+  const show=running&&(play||pz||TK.open)&&!!name,tick=show&&!TK.open;
+  if(pz!==TK.pz){TK.pz=pz;el.classList.toggle('paused',pz);
+    el.setAttribute('aria-label',(pz?'Music paused: ':'Now playing: ')+(name||'')+(pz?'. Tap to play':'. Tap for music controls'));}
+  const fresh=name!==TK.name;
+  if(fresh){TK.name=name;const c=el.querySelectorAll('#tkT i');c[0].textContent=c[1].textContent=name||'';
+    el.setAttribute('aria-label',(TK.pz?'Music paused: ':'Now playing: ')+(name||'')+(TK.pz?'. Tap to play':'. Tap for music controls'));}
+  if(tick!==TK.on)el.classList.toggle('on',tick);
+  // measured only when it can be seen: a title that changed under the pause sheet or a
+  // menu, or a rotation, is measured again when the flight screen comes back
+  const seen=tick&&!/\b(menuOn|pauseOn|mapOn|photoOn|crashOn|sensorOn)\b/.test(document.body.className);
+  if(seen&&(fresh||!TK.fit)){tkFit(el);TK.fit=true;}else if(fresh||!seen)TK.fit=false;
+  TK.on=tick;
+  const c=document.getElementById('tkCtl');if(c.classList.contains('on')!==(show&&TK.open))c.classList.toggle('on',show&&TK.open);
+}
+function tkFit(el){
+  el.classList.remove('scroll');
+  const v=document.getElementById('tkV'),t=document.getElementById('tkT'),w=t.firstChild.offsetWidth;
+  if(w>v.clientWidth+1){el.classList.add('scroll');setSty(t,'animationDuration',(2+(w+28)/26).toFixed(1)+'s');}
+}
+window.addEventListener('resize',()=>{TK.fit=false;tkUI();});
+// a Pause the player pressed in flight (not the Settings switch) keeps the ticker, dimmed
+function tkPausedBy(){if(running&&!MUSIC.on&&TK.name)TK.paused=true;tkUI();}
+function tkOpen(){TK.open=true;TK.closeAt=performance.now()+4500;tkUI();}
 // LRU-ish: the 10 most recently played/queued stay decoded, oldest evicted first;
 // whatever is actually in a slot right now is never evicted, however old it gets
 function musicCacheTouch(name){
@@ -7092,6 +7174,7 @@ function musicTick(){
       aHold(musicGain.gain,now);musicGain.gain.setTargetAtTime(tgt,now,tc);MUSIC.tgt=tgt;}
     MUSIC.want=want;
     if(MUSIC.lab!==musicPlaying())musicUI();
+    tkUI();
     // backgrounded: fade, but keep the track, so it carries on where it was on return
     if(!want&&document.hidden&&MUSIC.allowed&&MUSIC.on&&musicCtx()){MUSIC.offAt=-1;return;}
     if(!want){if(MUSIC.offAt<0)MUSIC.offAt=now;else if(now-MUSIC.offAt>MUSIC_XF+0.1&&(MUSIC.cur>=0||MUSIC.busy))musicStop();return;}
@@ -7574,7 +7657,7 @@ function start(mode,base){
   if(FM.on)fmClose();
   initAudio();
   if(ARC.prevTod){const p=ARC.prevTod;ARC.prevTod=null;setTOD(p);}
-  setType(acType);useModel(acType);sizeShadow();radioQ.length=0;radioHush();radioFadeTok++;radioVolApply();radioBusy=0;chatT=9;atcT=0;atcEl.classList.remove('on');
+  setType(acType);useModel(acType);sizeShadow();radioQ.length=0;radioHush();radioFadeTok++;radioVolApply();radioBusy=0;chatT=9;atcT=0;atcEl.classList.remove('on');TK.paused=false;TK.open=false;
   const spawn=mode;if(mode==='final1')mode='final';
   st=createState(mode,base||SPAWN_BASE,spawn==='final1'?1852:0);st.type=acType;st.spawn=spawn;
   // 1 mile final: Easy is already configured to land (gear down, landing flaps); Hard is set up the way the
@@ -7648,12 +7731,17 @@ function soundUI(){const b=$('oSound');b.textContent='Sound: '+(muted?'Off':'On'
 try{muted=localStorage.getItem('kgeuMuted')==='1';}catch(e){}
 function setMuted(v){muted=!!v;if(muted&&window.speechSynthesis)speechSynthesis.cancel();try{localStorage.setItem('kgeuMuted',muted?'1':'0');}catch(e){}soundUI();}
 $('oSound').onclick=()=>{initAudio();setMuted(!muted);};
-$('oMusic').onclick=()=>{initAudio();setMusicOn(!MUSIC.on);};
+$('oMusic').onclick=()=>{initAudio();TK.paused=false;setMusicOn(!MUSIC.on);};
 $('oMfree').onclick=()=>{initAudio();setMusicFree(!MUSIC.free);};
 $('oMnext').onclick=()=>{initAudio();musicNext();};
-tapBtn($('pMusic'),()=>{initAudio();musicPlayPause();});
+tapBtn($('pMusic'),()=>{initAudio();musicPlayPause();tkPausedBy();});
 tapBtn($('pMnext'),()=>{initAudio();musicNext();});
 tapBtn($('pPrev'),()=>{initAudio();musicPrev();});
+// portrait has no room for the strip beside the readouts: the pause sheet's music row instead
+tapBtn($('tk'),()=>{initAudio();if(TK.paused&&!musicPlaying()){musicUserPlay();TK.paused=false;tkUI();}else if(innerHeight>innerWidth){if(running&&!st.crashed&&!paused)togglePause();}else tkOpen();});
+tapBtn($('tkPrev'),()=>{initAudio();tkOpen();musicPrev();});
+tapBtn($('tkPlay'),()=>{initAudio();tkOpen();musicPlayPause();tkPausedBy();});
+tapBtn($('tkNext'),()=>{initAudio();tkOpen();musicNext();});
 document.querySelectorAll('.oMvol').forEach(r=>r.addEventListener('input',e=>{initAudio();setMusicVol(+e.target.value/10);}));
 easyUI();stickUI();radioUI();soundUI();musicUI();
 // Add to Home Screen tip. iOS has no install prompt a page can trigger, so the
@@ -10513,7 +10601,7 @@ window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runM
     wallVisible:!!(HB.g&&HB.g.visible),C:[HB.C.x,HB.C.z],T:[HB.T.x,HB.T.z],sunDisc:!!(HB.sun&&HB.sun.visible),dustDir:st.dustDir,windDir:st.windDir}),
   haboobJump:(m)=>{if(HB.on){hbPlace(m);hbUpdate(0);}},drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
-  RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,musicTick:musicTick,MUSIC:MUSIC,actx:()=>actx,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
+  RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,ticker:()=>{const e=document.getElementById('tk'),c=document.getElementById('tkCtl');return {on:e.classList.contains('on'),paused:e.classList.contains('paused'),anim:getComputedStyle(document.getElementById('tkT')).animationName,scroll:e.classList.contains('scroll'),open:c.classList.contains('on'),text:e.querySelector('#tkT i').textContent,vis:e.offsetParent!==null&&getComputedStyle(e).display!=='none',ctlVis:c.offsetParent!==null};},tickerForce:n=>{TK.force=n||null;tkUI();},tickerOpen:()=>tkOpen(),musicTick:musicTick,MUSIC:MUSIC,actx:()=>actx,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
   stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,

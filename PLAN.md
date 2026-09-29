@@ -73,7 +73,7 @@ Orchestrated run: builder subagent implements, tester subagent verifies at iPhon
 ### P1 AUDIO
 - [x] 5. Music must not start at app open. Start it only after the callsign screen is done (or on the first launch after a callsign already exists).
 - [x] 6. The pause menu Prev/Play/Next buttons do nothing, and pausing kills the music with no way back. Make them work, and make play state survive pause, resume, and backgrounding the app.
-- [ ] 7. Add a small now playing ticker at the top of the screen that scrolls the track name. Keep it compact, it must not overlap the mission card or the tower subtitle, and tapping it opens the music controls.
+- [x] 7. Add a small now playing ticker at the top of the screen that scrolls the track name. Keep it compact, it must not overlap the mission card or the tower subtitle, and tapping it opens the music controls.
 - [ ] 8. Flight school instructions get talked over by radio chatter. Build an audio priority queue: instruction voice first, then tower and radio chatter. Chatter waits or ducks while an instruction plays. Voices never overlap each other.
 
 ### P1 FLIGHT FEEL
