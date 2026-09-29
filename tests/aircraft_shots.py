@@ -37,7 +37,7 @@ async def main():
                 if tod == 'haboob':
                     await pg.evaluate(f"()=>{K}.haboobJump(-600)"); await step(3)
                 await pg.evaluate(SETUP_ALT, [CRUISE_KT[t], 300])
-                await step(90)
+                await step(260)
                 await shot(f'{t}_{tod}')
             await pg.evaluate(f"()=>{{{K}.setTOD('day');{K}.start('runway');}}")
             await pg.wait_for_timeout(300); await cam(1); await step(20)

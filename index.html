@@ -2282,6 +2282,60 @@ function tyreGeo(R,W,seg){
   const g=new THREE.LatheGeometry(pts,seg||18);g.rotateZ(Math.PI/2);return g;
 }
 
+// ---- drone markings: lit decals that lie on the skin -----------------------
+// Lit, so light grey lettering on the gunmetal drones dims with the scene at night
+// instead of glowing. Double sided: winding never hides a marking.
+MAT.decalLit=function(map){return new THREE.MeshStandardMaterial({map:map,transparent:true,depthWrite:false,side:THREE.DoubleSide,
+  metalness:0.1,roughness:0.6,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4});};
+const MARK='#c9ced3';            // light grey that reads on #4A4E54 by day, dusk and in the dust
+function markTex(w,h,draw){return TEX.canvas(w,h,(x,W,H)=>{x.clearRect(0,0,W,H);draw(x,W,H);});}
+// star and bar in one colour, with the thin outline the low-visibility insignia keep
+function starBar(col){return markTex(512,256,(x,w,h)=>{
+  const cy=h/2,r=h*0.42,cx=w*0.5;x.fillStyle=col;x.strokeStyle=col;x.lineWidth=h*0.035;
+  x.beginPath();x.arc(cx,cy,r,0,6.283);x.stroke();
+  x.fillRect(cx-r*2.05,cy-r*0.36,r*4.1,r*0.72);
+  x.clearRect(cx-r*0.95,cy-r*0.30,r*1.9,r*0.60);
+  x.beginPath();for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,rr=i%2?r*0.40:r*0.96;const px=cx+Math.cos(a)*rr,py=cy+Math.sin(a)*rr;i?x.lineTo(px,py):x.moveTo(px,py);}
+  x.closePath();x.fill();
+  x.strokeRect(cx-r*2.05,cy-r*0.36,r*4.1,r*0.72);});}
+// A patch that follows a superellipse fuselage (the FUS tables of the MQ-9 builders),
+// s0..s1 along, y0..y1 up, on the side sgn. u reads nose-ward on the right, tail-ward
+// on the left, so an unmirrored canvas reads the right way round on both sides.
+function fusPatch(FUS,Z,sgn,s0,s1,y0,y1,mat,parent){
+  const secAt=s=>{let i=1;while(i<FUS.length-1&&FUS[i][0]<s)i++;
+    const a=FUS[i-1],b=FUS[i],f=clamp((s-a[0])/(b[0]-a[0]),0,1);return [0,1,2,3,4].map(k=>AERO.lerp(a[k],b[k],f));};
+  const skinX=(s,y)=>{const f=secAt(s),yc=(f[2]+f[3])/2,h=y>=yc?(f[2]-yc):(yc-f[3]),v=clamp(Math.abs(y-yc)/h,0,1);
+    return f[1]*Math.pow(1-Math.pow(v,f[4]),1/f[4])+0.010;};
+  const K=12,J=6,pos=[],uv=[],idx=[];
+  for(let i=0;i<=K;i++){const s=AERO.lerp(s0,s1,i/K);
+    for(let j=0;j<=J;j++){const y=AERO.lerp(y0,y1,j/J);pos.push(sgn*skinX(s,y),y,Z(s));uv.push(sgn>0?1-i/K:i/K,j/J);}}
+  for(let i=0;i<K;i++)for(let j=0;j<J;j++){const a=i*(J+1)+j,b=a+J+1;idx.push(a,b,a+1,a+1,b,b+1);}
+  const gg=new THREE.BufferGeometry();
+  gg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));gg.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  gg.setIndex(idx);gg.computeVertexNormals();
+  const m=new THREE.Mesh(gg,mat);m.castShadow=false;m.renderOrder=2;parent.add(m);return m;
+}
+// A patch on one face of a tail surface built by the MQ-9 vSurface() (span along +X,
+// thickness along Y, chord along Z, all in the surface's own frame); added as a child
+// so it follows the cant. side: +1 / -1 face. u0..u1 chord, t0..t1 span, both 0..1.
+// flipU reverses the reading direction, upRoot puts the top of the lettering at the root.
+function tailPatch(surf,S,side,u0,u1,t0,t1,mat,flipU,upRoot){
+  const yt=u=>5*S.thick*(0.2969*Math.sqrt(u)-0.1260*u-0.3516*u*u+0.2843*u*u*u-0.1015*u*u*u*u);
+  const K=10,J=4,pos=[],uv=[],idx=[];
+  for(let i=0;i<=K;i++){const u=AERO.lerp(u0,u1,i/K);
+    for(let j=0;j<=J;j++){const t=AERO.lerp(t0,t1,j/J),c=AERO.lerp(S.rootC,S.tipC,t);
+      pos.push(t*S.len,side*(yt(u)*c+0.004),t*S.leRake+u*c);
+      uv.push(flipU?1-i/K:i/K,upRoot?1-j/J:j/J);}}
+  for(let i=0;i<K;i++)for(let j=0;j<J;j++){const a=i*(J+1)+j,b=a+J+1;idx.push(a,b,a+1,a+1,b,b+1);}
+  const gg=new THREE.BufferGeometry();
+  gg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));gg.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  gg.setIndex(idx);gg.computeVertexNormals();
+  const m=new THREE.Mesh(gg,mat);m.castShadow=false;m.renderOrder=2;surf.add(m);return m;
+}
+// the drones' gunmetal: #4A4E54, matte with a slight metallic sheen
+MAT.gunmetal=new THREE.MeshStandardMaterial({map:MAT.skinB,vertexColors:true,metalness:0.30,roughness:0.46,envMapIntensity:1.0});
+MAT.spinnerAlu=new THREE.MeshStandardMaterial({color:0xc4c8cc,metalness:0.85,roughness:0.25});
+
 // =========================================================================
 //  F-16C Fighting Falcon, Block 50/52
 //  Stations are quoted as s = metres aft of the nose tip, converted to the
@@ -2705,8 +2759,10 @@ function buildMQ9HD(opt){
   const gear=new THREE.Group(); gear.name='gear'; g.add(gear);
   const weapons=new THREE.Group(); weapons.name='weapons'; g.add(weapons);
 
-  const C_BASE=new THREE.Color('#b3b8bc'), C_TOP=new THREE.Color('#a2a8ad'),
-        C_LOW =new THREE.Color('#bdc2c6');
+  // gunmetal #4A4E54 all over, a shade darker on top, a shade lighter underneath
+  // (albedo set a touch above #4A4E54 so the lit airframe reads as #4A4E54 on screen)
+  const C_BASE=new THREE.Color('#5d626a'), C_TOP=new THREE.Color('#585d64'),
+        C_LOW =new THREE.Color('#656970');
   function skin(x,y,z,nx,ny,nz,out){
     const t=smooth(AERO.clamp(ny/1.1+0.5,0,1));
     out.copy(C_LOW).lerp(C_TOP,t);
@@ -2719,17 +2775,18 @@ function buildMQ9HD(opt){
   }
 
   // ---- fuselage: bulbous nose, slim waist, deepening tail boom ---------
+  // the SATCOM dome stands well proud of the fuselage behind it, as in refs/mq9a
   const FUS=[
-    [0.00,0.075,0.26,0.05,2.2],[0.18,0.220,0.40,-0.08,2.1],[0.45,0.335,0.55,-0.21,2.1],
-    [0.85,0.405,0.64,-0.29,2.2],[1.35,0.430,0.69,-0.33,2.3],[1.95,0.423,0.67,-0.35,2.5],
-    [2.60,0.402,0.62,-0.36,2.7],[3.40,0.382,0.58,-0.36,2.8],[4.30,0.362,0.56,-0.35,2.8],
-    [5.20,0.340,0.56,-0.33,2.8],[6.10,0.310,0.57,-0.30,2.7],[7.00,0.272,0.57,-0.26,2.6],
-    [7.90,0.236,0.55,-0.22,2.5],[8.70,0.204,0.52,-0.18,2.4],[9.40,0.180,0.46,-0.14,2.3],
-    [9.95,0.162,0.39,-0.10,2.2],[10.35,0.150,0.31,-0.05,2.2]
+    [0.00,0.080,0.22,0.03,2.2],[0.15,0.220,0.44,-0.10,2.1],[0.40,0.340,0.67,-0.22,2.1],
+    [0.80,0.430,0.85,-0.30,2.2],[1.30,0.460,0.94,-0.34,2.3],[1.85,0.455,0.92,-0.355,2.4],
+    [2.50,0.430,0.82,-0.365,2.6],[3.20,0.400,0.68,-0.365,2.8],[4.00,0.378,0.615,-0.36,2.8],
+    [4.90,0.358,0.595,-0.345,2.8],[5.80,0.338,0.585,-0.32,2.7],[6.70,0.305,0.565,-0.28,2.6],
+    [7.60,0.260,0.535,-0.23,2.5],[8.50,0.218,0.49,-0.18,2.4],[9.30,0.186,0.43,-0.14,2.3],
+    [9.95,0.162,0.37,-0.10,2.2],[10.35,0.150,0.31,-0.05,2.2]
   ];
   const fusSec=FUS.map(f=>{const yc=(f[2]+f[3])/2;
     return AERO.ring(Z(f[0]),f[1],f[2]-yc,yc-f[3],yc,f[4],24);});
-  mesh(skinned(AERO.loft(fusSec,{uScale:P,vScale:P})),MAT.mq9Skin,g);
+  mesh(skinned(AERO.loft(fusSec,{uScale:P,vScale:P})),MAT.gunmetal,g);
 
   // ---- EO/IR sensor turret under the forward fuselage ------------------
   {
@@ -2744,14 +2801,14 @@ function buildMQ9HD(opt){
   // ---- engine inlet on the spine and exhaust stubs ---------------------
   {
     const inl=AERO.loft([
-      AERO.ring(Z(6.00),0.105,0.045,0.02,0.585,2.3,14),
-      AERO.ring(Z(6.30),0.135,0.105,0.02,0.605,2.3,14),
-      AERO.ring(Z(7.05),0.140,0.095,0.02,0.600,2.3,14),
-      AERO.ring(Z(7.55),0.115,0.030,0.02,0.575,2.3,14)],{uScale:P,vScale:P,capStart:false,capEnd:false});
-    mesh(skinned(inl),MAT.mq9Skin,g);
-    const mouth=new THREE.CylinderGeometry(0.098,0.088,0.08,14);
-    mouth.rotateX(Math.PI/2);
-    const mm=mesh(mouth,MAT.ductDark,g); mm.position.set(0,0.635,Z(6.00));
+      AERO.ring(Z(5.80),0.150,0.100,0.03,0.625,2.3,16),
+      AERO.ring(Z(6.10),0.200,0.200,0.03,0.655,2.3,16),
+      AERO.ring(Z(7.00),0.205,0.180,0.03,0.650,2.3,16),
+      AERO.ring(Z(7.70),0.150,0.050,0.03,0.585,2.3,16)],{uScale:P,vScale:P,capStart:false,capEnd:false});
+    mesh(skinned(inl),MAT.gunmetal,g);
+    const mouth=new THREE.CylinderGeometry(0.15,0.13,0.08,16);
+    mouth.rotateX(Math.PI/2);mouth.scale(1.1,0.95,1);
+    const mm=mesh(mouth,MAT.ductDark,g); mm.position.set(0,0.705,Z(5.82));
     for(const sgn of [1,-1]){
       const ex=new THREE.CylinderGeometry(0.052,0.060,0.20,10);
       ex.rotateX(Math.PI/2);
@@ -2773,7 +2830,7 @@ function buildMQ9HD(opt){
     wSec.push(AERO.foil(-a,wLE(a),wC(a),0.135,wY(a),18));}
   for(let i=1;i<wXs.length;i++){const a=wXs[i];
     wSec.push(AERO.foil(a,wLE(a),wC(a),0.135,wY(a),18));}
-  mesh(skinned(AERO.loft(wSec,{uScale:P,vScale:P})),MAT.mq9Skin,g);
+  mesh(skinned(AERO.loft(wSec,{uScale:P,vScale:P})),MAT.gunmetal,g);
   // aileron and flap breaks
   function hingeQ(x0,z0,x1,z1,y0,y1,wide){
     const dx=x1-x0,dz=z1-z0,len=Math.hypot(dx,dz);
@@ -2806,17 +2863,21 @@ function buildMQ9HD(opt){
     }
     return AERO.loft(sec,{uScale:P,vScale:P});
   }
+  const VT={rootC:TL_ROOT_C,tipC:TL_TIP_C,len:TL_LEN,thick:0.10,leRake:0.50},vTails={};
   for(const sgn of [1,-1]){
     const geo=vSurface(TL_ROOT_C,TL_TIP_C,TL_LEN,0.10,0.50);
-    const m=mesh(skinned(geo),MAT.mq9Skin,g);
+    const m=mesh(skinned(geo),MAT.gunmetal,g);
     m.position.set(sgn*0.11,0.40,TL_LE);
     m.rotation.z=sgn>0?(Math.PI/2-TL_CANT):(Math.PI/2+TL_CANT);
+    vTails[sgn]=m;
   }
+  // the ventral fin: deep, swept, carrying the serial
+  const VF={rootC:0.98,tipC:0.58,len:0.86,thick:0.11,leRake:0.36};let ventral;
   {
-    const geo=vSurface(0.74,0.44,0.70,0.11,0.30);
-    const m=mesh(skinned(geo),MAT.mq9Skin,g);
-    m.position.set(0,-0.20,TL_LE+0.22);
-    m.rotation.z=-Math.PI/2;
+    const geo=vSurface(VF.rootC,VF.tipC,VF.len,VF.thick,VF.leRake);
+    ventral=mesh(skinned(geo),MAT.gunmetal,g);
+    ventral.position.set(0,-0.14,TL_LE+0.16);
+    ventral.rotation.z=-Math.PI/2;
   }
 
   // ---- pusher propeller ------------------------------------------------
@@ -2826,7 +2887,7 @@ function buildMQ9HD(opt){
     const spin=new THREE.Group();
     const sp=new THREE.ConeGeometry(0.135,0.34,16);
     sp.rotateX(-Math.PI/2);
-    const spm=mesh(sp,MAT.mq9Skin,spin); AERO.paint(sp,(x,y,z,o)=>o.copy(C_BASE));
+    const spm=mesh(sp,MAT.spinnerAlu,spin);
     spm.position.z=0.17;
     mesh(propParts('reaper').geo,propParts('reaper').mat,spin).userData.blade=1;   // 3 twisted blades, matte black, yellow mid band and tip
     prop.add(spin); prop.userData.spin=spin;
@@ -2855,9 +2916,9 @@ function buildMQ9HD(opt){
     strut(new V3(0,-0.34,Z(2.05)),new V3(0,-1.28,Z(1.98)),0.050,MAT.gearLeg,gear);
     wheelAt(0,-1.28,Z(1.98),NR,0.10,gear);
     for(const sgn of [1,-1]){
-      strut(new V3(sgn*0.30,-0.32,Z(4.55)),new V3(sgn*0.92,-1.22,Z(4.62)),0.055,MAT.gearLeg,gear);
-      strut(new V3(sgn*0.26,-0.30,Z(5.05)),new V3(sgn*0.86,-1.08,Z(4.68)),0.030,MAT.gearLeg,gear);
-      wheelAt(sgn*0.92,-1.22,Z(4.62),MR,0.125,gear);
+      strut(new V3(sgn*0.30,-0.32,Z(4.55)),new V3(sgn*1.12,-1.22,Z(4.66)),0.055,MAT.gearLeg,gear);
+      strut(new V3(sgn*0.26,-0.30,Z(5.10)),new V3(sgn*1.05,-1.08,Z(4.72)),0.030,MAT.gearLeg,gear);
+      wheelAt(sgn*1.12,-1.22,Z(4.66),MR,0.125,gear);
     }
   }
 
@@ -2872,47 +2933,66 @@ function buildMQ9HD(opt){
       const pg=new THREE.ExtrudeGeometry(sh,{depth:0.075,bevelEnabled:true,bevelSize:0.016,
         bevelThickness:0.016,bevelSegments:1,curveSegments:1,steps:1});
       pg.translate(0,0,-0.0375); pg.rotateY(-Math.PI/2);
-      const m=mesh(pg,MAT.mq9Skin,weapons);
+      const m=mesh(pg,MAT.gunmetal,weapons);
       AERO.paint(m.geometry,(x,y2,z,o)=>o.copy(C_BASE));
       m.position.set(sgn*px,y-0.04,0);
       // AGM-114 Hellfire, 1.63 m long
       const msl=buildStore(1.63,0.178,0.33,{nose:0.24});
       msl.position.set(sgn*px,y-0.42,le+c*0.45);
       weapons.add(msl);pylons.push({px:px,sgn:sgn,m:msl});
-      const rail=mesh(new THREE.BoxGeometry(0.09,0.07,0.55),MAT.mq9Skin,weapons);
+      const rail=mesh(new THREE.BoxGeometry(0.09,0.07,0.55),MAT.gunmetal,weapons);
       AERO.paint(rail.geometry,(x,y2,z,o)=>o.copy(C_BASE));
       rail.position.set(sgn*px,y-0.29,le+c*0.45);
     }
   }
 
-  // ---- markings --------------------------------------------------------
-  function halfDecal(w,h,map,right,r){
-    const dg=new THREE.PlaneGeometry(w,h,12,1);
-    if(r){const pp=dg.attributes.position;
-      for(let i=0;i<pp.count;i++){const x=pp.getX(i);pp.setZ(i,r-Math.sqrt(Math.max(r*r-x*x,0)));}
-      dg.computeVertexNormals();}
-    const uv=dg.attributes.uv;
-    for(let i=0;i<uv.count;i++)uv.setX(i,uv.getX(i)*0.5+(right?0.5:0));
-    const m=new THREE.Mesh(dg,MAT.decal(map)); m.castShadow=false; return m;
-  }
+  // ---- antennas: the angled satcom mast and the small dome on the spine, nose probes ----
   {
-    const num=TEX.stencil('AF 02-4002',46,'rgba(92,98,104,0.92)');
+    const mast=new THREE.Shape();mast.moveTo(0,0);mast.lineTo(0.30,0);mast.lineTo(0.12,0.20);mast.lineTo(-0.10,0.24);mast.lineTo(-0.12,0.20);mast.lineTo(0.02,0.16);
+    const mg=new THREE.ExtrudeGeometry(mast,{depth:0.03,bevelEnabled:false});mg.translate(0,0,-0.015);mg.rotateY(-Math.PI/2);
+    const mm=mesh(mg,MAT.gunmetal,g);AERO.paint(mg,(x,y,z,o)=>o.copy(C_TOP));mm.position.set(0,0.60,Z(3.45));
+    const dome=new THREE.SphereGeometry(0.11,14,8,0,Math.PI*2,0,Math.PI/2);dome.scale(1,0.8,1.3);
+    const dm=mesh(dome,MAT.gunmetal,g);AERO.paint(dome,(x,y,z,o)=>o.copy(C_TOP));dm.position.set(0,0.60,Z(4.05));
+    for(const sgn of [1,-1]){const pr=new THREE.CylinderGeometry(0.006,0.01,0.34,6);pr.rotateX(Math.PI/2);
+      const pm=mesh(pr,MAT.spinnerAlu,g);pm.position.set(sgn*0.05,0.12,Z(-0.12));}
+  }
+  // ---- markings, light grey on the gunmetal, where the Air Force puts them ----
+  {
+    const lit=m=>MAT.decalLit(m);
+    // serial on the ventral fin: AF over the fiscal year, then the number
+    const ser=lit(markTex(512,256,(x,w,h)=>{const F='"Saira Condensed","Arial Narrow",sans-serif';x.fillStyle=MARK;
+      x.textBaseline='middle';x.textAlign='center';x.font='700 '+(h*0.30|0)+'px '+F;x.fillText('AF',w*0.15,h*0.30);x.fillText('02',w*0.15,h*0.66);
+      x.font='800 '+(h*0.62|0)+'px '+F;x.textAlign='left';x.fillText('4002',w*0.30,h*0.50);}));
+    tailPatch(ventral,VF,1,0.22,0.94,0.14,0.62,ser,true,true);
+    tailPatch(ventral,VF,-1,0.22,0.94,0.14,0.62,ser,false,true);
+    // tail code and squadron on the outer face of each tail surface
+    const code=lit(markTex(512,256,(x,w,h)=>{const F='"Saira Condensed","Arial Narrow",sans-serif';x.fillStyle=MARK;
+      x.textBaseline='middle';x.textAlign='center';x.font='800 '+(h*0.58|0)+'px '+F;x.fillText('CH',w*0.5,h*0.36);
+      x.font='700 '+(h*0.22|0)+'px '+F;x.fillText('42 ATKS',w*0.5,h*0.80);}));
+    tailPatch(vTails[1],VT,-1,0.16,0.80,0.34,0.74,code,true,false);
+    tailPatch(vTails[-1],VT,1,0.16,0.80,0.34,0.74,code,false,false);
+    // red tip bands, both faces
+    const band=lit(markTex(64,64,(x,w,h)=>{x.fillStyle='#b3302a';x.fillRect(0,0,w,h);}));
+    for(const sgn of [1,-1])for(const side of [1,-1])tailPatch(vTails[sgn],VT,side,0.0,1.0,0.90,0.96,band,false,false);
+    // star and bar on the aft fuselage, the unit badge under the wing root
+    const sb=lit(starBar(MARK));
+    for(const sgn of [1,-1])fusPatch(FUS,Z,sgn,6.35,7.35,0.02,0.48,sb,g);
+    const badge=lit(markTex(256,256,(x,w,h)=>{x.strokeStyle=MARK;x.fillStyle=MARK;x.lineWidth=w*0.06;
+      x.beginPath();x.arc(w/2,h/2,w*0.42,0,6.283);x.stroke();
+      x.beginPath();x.moveTo(w*0.5,h*0.2);x.lineTo(w*0.76,h*0.66);x.lineTo(w*0.5,h*0.56);x.lineTo(w*0.24,h*0.66);x.closePath();x.fill();
+      x.beginPath();x.arc(w/2,h*0.78,w*0.05,0,6.283);x.fill();}));
+    for(const sgn of [1,-1])fusPatch(FUS,Z,sgn,3.05,3.45,0.12,0.52,badge,g);
+    // star and bar on the upper wings, out near the tips
+    const yt=u=>5*0.135*(0.2969*Math.sqrt(u)-0.1260*u-0.3516*u*u+0.2843*u*u*u-0.1015*u*u*u*u);
     for(const sgn of [1,-1]){
-      const d=halfDecal(1.00,0.12,num,false);
-      d.position.set(sgn*0.228,0.14,Z(8.85));
-      d.rotation.y=sgn*Math.PI/2; g.add(d);
-    }
-    const st=TEX.stencil('U.S. AIR FORCE',44,'rgba(96,102,108,0.9)');
-    for(const sgn of [1,-1]){
-      const d=halfDecal(0.95,0.125,st,false);
-      d.position.set(sgn*0.408,0.14,Z(3.60));
-      d.rotation.y=sgn*Math.PI/2; g.add(d);
-    }
-    const warn=TEX.stencil('RESCUE',30,'rgba(190,60,50,0.85)');
-    for(const sgn of [1,-1]){
-      const d=halfDecal(0.46,0.08,warn,false);
-      d.position.set(sgn*0.438,0.26,Z(1.60));
-      d.rotation.y=sgn*Math.PI/2; g.add(d);
+      const pos=[],uv=[],idx=[],K=8,J=6,x0=6.6,x1=8.4;
+      for(let i=0;i<=K;i++){const ax=AERO.lerp(x0,x1,i/K);
+        for(let j=0;j<=J;j++){const u=AERO.lerp(0.12,0.88,j/J),c=wC(ax);pos.push(sgn*ax,wY(ax)+yt(u)*c+0.004,wLE(ax)+u*c);
+          uv.push(sgn>0?i/K:1-i/K,1-j/J);}}
+      for(let i=0;i<K;i++)for(let j=0;j<J;j++){const a=i*(J+1)+j,b=a+J+1;idx.push(a,b,a+1,a+1,b,b+1);}
+      const gg=new THREE.BufferGeometry();gg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+      gg.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));gg.setIndex(idx);gg.computeVertexNormals();
+      const m=new THREE.Mesh(gg,sb);m.castShadow=false;m.renderOrder=2;g.add(m);
     }
   }
 
@@ -3923,6 +4003,8 @@ function setTOD(id){
   for(const L of AL_LAYERS)if(L.pts)L.pts.visible=TOD.lights>0;
   EGG.lit=TOD.lights>0;EGG.litMat.emissiveIntensity=TOD.night?1:TOD.lights*0.6;EGG.mat.emissiveIntensity=TOD.night?0:0.3*(1-TOD.lights);   // @OhRabah signs: off by day, dim at sunset
   if(cloudMat){const c=CLOUD_TOD[TOD.id]||CLOUD_TOD.day;cloudMat.color.setHex(c[0]);cloudMat.emissive.setHex(c[1]);}
+  // the gunmetal drones: a faint lift at dusk and night so the airframe still reads against a dark sky
+  if(HD&&HD.MAT.gunmetal)HD.MAT.gunmetal.emissive.setHex(0x1f242b).multiplyScalar(TOD.night?1:TOD.id==='sunset'?0.35:0);
   const b=document.getElementById('todV');if(b)b.textContent=TOD.name;
   hbSync(false);
   document.querySelectorAll('.pick[data-tod]').forEach(e=>e.classList.toggle('sel',e.dataset.tod===TOD.id));
@@ -4282,7 +4364,7 @@ const AC_LIGHTS={
   // MQ-9A: nav + strobe at each tip, white aft on the tail cone, red beacon aft of the SATCOM
   // bulge, a dim taxi lamp on the nose gear on the ground only
   reaper:[acNav(-10.12,0.97,-0.8),acNav(10.12,0.97,-0.8),acStrobe(-10.12,0.97,-0.45),acStrobe(10.12,0.97,-0.45),
-    acAft(0,0.27,5.84),acBeacon(0,0.72,1.2),acTaxi(0,-0.95,-3.02,{on:'ground',dim:1})],
+    acAft(0,0.27,5.84),acBeacon(0,0.64,0.45),acTaxi(0,-0.95,-3.02,{on:'ground',dim:1})],
   // MQ-9B: the same on the winglets
   mq9b:[acNav(-11.68,1.11,-0.8),acNav(11.68,1.11,-0.8),acStrobe(-11.68,1.11,-0.5),acStrobe(11.68,1.11,-0.5),
     acAft(0,0.28,6.53),acBeacon(0,0.77,1.5),acTaxi(0,-0.95,-3.17,{on:'ground',dim:1})],
