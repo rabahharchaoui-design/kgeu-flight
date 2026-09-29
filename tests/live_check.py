@@ -71,6 +71,11 @@ async def main():
     # no service worker registered, so updates are instant
     sw=await pg.evaluate("async()=>{if(!navigator.serviceWorker)return 0;const rs=await navigator.serviceWorker.getRegistrations();return rs.length;}")
     chk('no service worker registered',sw==0,str(sw)+' registrations')
+    # a fresh device: the leaderboard Worker answers and the callsign card is up after the splash
+    await pg.wait_for_timeout(3000)
+    cs=await pg.evaluate("()=>({on:document.getElementById('csOv').classList.contains('on'),lb:!!(window.__kgeu.LB&&window.__kgeu.LB.E.enabled),online:window.__kgeu.LB&&window.__kgeu.LB.E.online})")
+    chk('leaderboards on, the Worker answers, the callsign card is up',cs=={'on':True,'lb':True,'online':True},str(cs))
+    await pg.evaluate("()=>document.getElementById('csOv').classList.remove('on')")   # tests/live_scores_check.py signs up for real
     # actually play it
     # home -> FLY -> GO: two taps, by finger
     if await pg.is_visible('#funnel'): await pg.tap('#fPilot'); await pg.wait_for_timeout(300)

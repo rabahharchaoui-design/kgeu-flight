@@ -23,6 +23,13 @@ The trade is that there is no offline play and no install prompt on Android.
 Every change to the game gets committed and pushed, so the live app tracks the
 repo. `tests/live_check.py` verifies the deployed URL end to end.
 
+## Leaderboards
+
+Global high scores, callsigns, ranks, ghosts and the worldwide daily challenge run through a
+Cloudflare Worker and D1 database in `server/` (https://pfs-scores.rabahharchaoui.workers.dev).
+Everything about it, every score formula and the admin commands are in `LEADERBOARD.md`.
+When shipping a change to the game, bump `APP_VER` in index.html and `version.json` together.
+
 ## Running the tests
 
 ```
@@ -45,6 +52,11 @@ node tests/bound.js         # theoretical lower bound on autoland time
 .venv/bin/python tests/desktop_check.py  # Mac smoke test
 .venv/bin/python tests/live_check.py     # the deployed https site, end to end
 .venv/bin/python tests/a2hs_check.py     # Add to Home Screen tip shows only where it should
+.venv/bin/python tests/scores_check.py   # leaderboards end to end against wrangler dev (localhost:8765)
+.venv/bin/python tests/upgrade_check.py  # in place upgrade from the prescores build
+.venv/bin/python tests/scores_fps.py <prescores_root> . 1   # frame rate A/B with leaderboards in play
+.venv/bin/python tests/live_scores_check.py  # the deployed game and Worker, fresh profile, cleans up
+(cd server && npm test && npm run test:live) # the Worker API, local then live
 ```
 
 All of the above pass as of the Task 4 commit.
