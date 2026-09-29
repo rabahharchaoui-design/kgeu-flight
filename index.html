@@ -4297,6 +4297,36 @@ const tCol=new Float32Array(tPos.count*3);tGeo.setAttribute('color',new THREE.Bu
 const detail=tex(256,256,(x,w,h)=>{x.fillStyle='#f2f1ec';x.fillRect(0,0,w,h);
   for(let i=0;i<1400;i++){const s=Math.random();x.fillStyle=s<0.5?'rgba(150,140,115,.25)':s<0.85?'rgba(120,125,90,.3)':'rgba(90,95,65,.38)';const r=s<0.85?1+Math.random()*1.5:2+Math.random()*2.5;x.beginPath();x.arc(Math.random()*w,Math.random()*h,r,0,6.283);x.fill();}},[T_SIZE/160,T_SIZE/160]);
 const terrain=new THREE.Mesh(tGeo,new THREE.MeshLambertMaterial({vertexColors:true,map:detail}));scene.add(terrain);
+// The height of the terrain MESH, not of groundHeight: the mesh is flat triangles between
+// vertices T_STEP apart (400 m on a phone), on a lattice fixed in the world (rebuildTerrain
+// snaps to 4 km), so groundHeight at the lattice points interpolated the way PlaneGeometry
+// splits each cell (diagonal from (i,k+1) to (i+1,k)). A decal laid on groundHeight floats
+// over or sinks into that mesh. cache: an optional Map for the lattice heights.
+const T_STEP=T_SIZE/T_SEG;
+function terrainMeshH(x,z,cache){
+  const gx=x/T_STEP,gz=z/T_STEP,i=Math.floor(gx),k=Math.floor(gz),fx=gx-i,fz=gz-k;
+  const H=(a,b)=>{if(!cache)return groundHeight(a*T_STEP,b*T_STEP);const key=a*100003+b;let v=cache.get(key);
+    if(v===undefined){v=groundHeight(a*T_STEP,b*T_STEP);cache.set(key,v);}return v;};
+  const h00=H(i,k),h01=H(i,k+1),h10=H(i+1,k);
+  if(fx+fz<=1)return h00+(h10-h00)*fx+(h01-h00)*fz;
+  const h11=H(i+1,k+1);return h11+(h01-h11)*(1-fx)+(h10-h11)*(1-fz);
+}
+// Ground decals (crash scorch, blast rings, the aircraft shadow, the landing light pool).
+// The renderer uses a logarithmic depth buffer, which writes gl_FragDepth per fragment, and
+// polygonOffset does nothing to a written depth: on iPhone a decal a few cm over the ground
+// fought it and flickered. Instead the decal's depth is pulled 0.05% of its range toward the
+// camera (1 cm at 20 m, 1.5 m at 3 km), which only changes depth, never where it draws.
+// polygonOffset stays on for a GPU without frag depth, where the log depth is per vertex.
+const GD_BIAS='0.9995';
+function gdCompile(sh){sh.vertexShader=sh.vertexShader.replace('#include <logdepthbuf_vertex>',
+  '#include <logdepthbuf_vertex>\n#if defined( USE_LOGDEPTHBUF ) && defined( USE_LOGDEPTHBUF_EXT )\n\tvFragDepth = 1.0 + gl_Position.w * '+GD_BIAS+';\n#endif');}
+function groundDecalMat(m){m.depthWrite=false;m.polygonOffset=true;m.polygonOffsetFactor=-4;m.polygonOffsetUnits=-4;m.onBeforeCompile=gdCompile;return m;}
+// how far a ground decal sits over the mesh: 10 cm (over the runway and apron layers, which
+// lie up to 7.5 cm up), plus 2 cm a km for depth precision at range. Kept small on purpose:
+// seen at a grazing angle a real lift slides the decal off its spot (1 m at 2.5 km moved it a
+// third of its own apparent height); the depth bias above is what holds it far away.
+function gdLift(x,y,z){return 0.1+0.00002*camera.position.distanceTo(_gdL.set(x,y,z));}
+const _gdL=new THREE.Vector3();
 // heat in the IR sensor view (userData.heat, 0 cold to 1 hot; irVar: how much the texture shows)
 terrain.userData.heat=0.15;terrain.userData.irVar=0.35;
 const _c=new THREE.Color(),_c2=new THREE.Color();
@@ -4344,7 +4374,9 @@ function endTex(lenM,dispM,num,npi){
 flatLocal(30.5,330,lam(0xffffff,{map:endTex(330,THR01,'1',false)}),165,0,0.07);
 flatLocal(30.5,460,lam(0xffffff,{map:endTex(460,305.1,'19',true)}),RWY_LEN-230,0,0.07,180);
 const aimTex=tex(128,190,(x,w,h)=>{x.clearRect(0,0,w,h);x.fillStyle='#f1f1ec';x.fillRect(w/2-6*PPM-6*PPM,0,6*PPM,h);x.fillRect(w/2+6*PPM,0,6*PPM,h);});
-flatLocal(30.5,45,lam(0xffffff,{map:aimTex,transparent:true}),THR19-311-22,0,0.075,180);
+// renderOrder -1: first of the transparent things, so the ground decals (scorch, shadow) blend
+// over it; at 0 the distance sort put it after them some frames and a scorch on it flickered
+flatLocal(30.5,45,lam(0xffffff,{map:aimTex,transparent:true}),THR19-311-22,0,0.075,180).renderOrder=-1;
 // taxiway, connectors, pads
 const twTex=tex(64,128,(x,w,h)=>{asphalt(x,w,h,'#45474a');x.fillStyle='#e8b923';x.fillRect(w/2-1.5,0,3,h);},[1,2300/30]);
 flatLocal(15.2,2300,lam(0xffffff,{map:twTex}),RWY_LEN/2,-120,0.05);
@@ -4590,7 +4622,7 @@ const ACL_POOL=(function(){
     gr.addColorStop(0,'rgba(255,238,208,1)');gr.addColorStop(0.4,'rgba(255,228,190,0.5)');gr.addColorStop(1,'rgba(255,220,180,0)');
     x.fillStyle=gr;x.fillRect(0,0,w,h);});
   const geo=new THREE.PlaneGeometry(1,1);geo.rotateX(-Math.PI/2);
-  const m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,opacity:0}));
+  const m=new THREE.Mesh(geo,groundDecalMat(new THREE.MeshBasicMaterial({map:t,transparent:true,blending:THREE.AdditiveBlending,fog:false,opacity:0})));
   m.name='landingPool';m.renderOrder=1;m.visible=false;scene.add(m);return m;})();
 const ACL_STATE={on:false,pool:0};
 const _aclF=new V3();
@@ -4611,7 +4643,7 @@ function aclUpdate(L,dp,q,agl,s){
       let d=dn>0.01?(h+1.5)/dn*hz:900;d=Math.min(d,900);
       const len=Math.min(25+h*1.5,120),wid=Math.min(9+h*0.6,45),fx=_aclF.x/hz,fz=_aclF.z/hz;
       const cx=dp.x+fx*(d+len*0.3),cz=dp.z+fz*(d+len*0.3);
-      ACL_POOL.position.set(cx,groundHeight(cx,cz)+0.3,cz);ACL_POOL.rotation.set(0,Math.atan2(-fx,-fz),0);
+      {const h=terrainMeshH(cx,cz);ACL_POOL.position.set(cx,h+0.2+gdLift(cx,h,cz),cz);}ACL_POOL.rotation.set(0,Math.atan2(-fx,-fz),0);
       ACL_POOL.scale.set(wid,1,len);
     }
   }
@@ -5467,7 +5499,13 @@ function warmTick(){
   setTimeout(warmTick,60);
 }
 const shadowTex=tex(128,128,(x)=>{const gr=x.createRadialGradient(64,64,4,64,64,62);gr.addColorStop(0,'rgba(0,0,0,0.55)');gr.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=gr;x.fillRect(0,0,128,128);});
-const shadow=new THREE.Mesh(flatQuad,new THREE.MeshBasicMaterial({map:shadowTex,transparent:true,depthWrite:false}));shadow.scale.set(22,1,13);scene.add(shadow);
+const shadow=new THREE.Mesh(flatQuad,groundDecalMat(new THREE.MeshBasicMaterial({map:shadowTex,transparent:true})));shadow.scale.set(22,1,13);scene.add(shadow);
+// the shadow lies on the terrain mesh, tilted to the triangle under it; lattice heights cached
+const SHC=new Map(),_shN=new THREE.Vector3(),_shQ=new THREE.Quaternion(),_shY=new THREE.Quaternion(),_shU=new THREE.Vector3(0,1,0);
+function shadowLay(x,z,yaw){if(SHC.size>256)SHC.clear();
+  const h=terrainMeshH(x,z,SHC),hx=terrainMeshH(x+1,z,SHC)-h,hz=terrainMeshH(x,z+1,SHC)-h;
+  shadow.position.set(x,h+gdLift(x,h,z),z);
+  _shN.set(-hx,1,-hz).normalize();_shQ.setFromUnitVectors(_shU,_shN);_shY.setFromAxisAngle(_shU,yaw);shadow.quaternion.multiplyQuaternions(_shQ,_shY);}
 function sizeShadow(){shadow.scale.set(AC.span*1.1,1,AC.len*1.1);}
 // parked aircraft on the ramp
 const liveries=[[0xc8102e,0x222222,'N738GE'],[0x2a6f97,0xf2a900,'N52614'],[0x3c6e47,0xe0e0e0,'N172SP'],[0x6d2e46,0xd4a017,'N9433K'],[0x222222,0xc8102e,'N65GL'],[0xe07a1f,0x1d3557,'N4412R'],[0x1d3557,0xc8102e,'N20484'],[0x7a7a7a,0x2a6f97,'N6155Q']];
@@ -9020,14 +9058,20 @@ const fxGlowTex=tex(64,64,(x,w,h)=>{const g=x.createRadialGradient(32,32,1,32,32
 const FX=[],FX_M=[];
 {const ringG=new THREE.RingGeometry(0.86,1,48);ringG.rotateX(-Math.PI/2);
  const dustG=new THREE.RingGeometry(0.45,1,40);dustG.rotateX(-Math.PI/2);
- const scG=new THREE.CircleGeometry(1,24);scG.rotateX(-Math.PI/2);
+ // the scorch: a unit disc in rings, its heights set per explosion to follow the terrain mesh
+ const scDisc=()=>{const NR=4,NS=24,P=[0,0,0],I=[];
+   for(let r=1;r<=NR;r++)for(let j=0;j<NS;j++){const a=j/NS*6.2832,q=r/NR;P.push(Math.cos(a)*q,0,Math.sin(a)*q);}
+   const v=(r,j)=>r?1+(r-1)*NS+(j%NS):0;
+   for(let j=0;j<NS;j++)I.push(0,v(1,j+1),v(1,j));
+   for(let r=1;r<NR;r++)for(let j=0;j<NS;j++)I.push(v(r,j),v(r,j+1),v(r+1,j+1),v(r,j),v(r+1,j+1),v(r+1,j));
+   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));g.setIndex(I);return g;};
  const glG=new THREE.PlaneGeometry(1,1);glG.rotateX(-Math.PI/2);
  // every sprite sits on layer 1, so the IR view draws it in its second pass as itself: soft,
  // the fire white hot (or black), the smoke lukewarm grey, instead of hard override discs
  const spr=(map,add,fog,heat)=>{const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:map,transparent:true,opacity:0,depthWrite:false,
    fog:fog,blending:add?THREE.AdditiveBlending:THREE.NormalBlending}));sp.visible=false;sp.userData.heat=heat;sp.userData.add=add;sp.layers.set(1);scene.add(sp);return sp;};
  const decal=(g,c,add,ro)=>{const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:c,map:add?fxGlowTex:null,transparent:true,opacity:0,depthWrite:false,
-   side:THREE.DoubleSide,fog:!add,blending:add?THREE.AdditiveBlending:THREE.NormalBlending}));m.visible=false;m.renderOrder=ro;scene.add(m);return m;};
+   side:THREE.DoubleSide,fog:!add,blending:add?THREE.AdditiveBlending:THREE.NormalBlending}));groundDecalMat(m.material);m.visible=false;m.renderOrder=ro;scene.add(m);return m;};
  for(let k=0;k<FX_N;k++){const o={on:false,t:0,end:0,x:0,y:0,z:0,gy:0,s:1,T:2.5,H:250,smokeSec:60,fireSec:0,glow:true,frames:0,fb:[],sm:[],sec:[],secN:0};
   for(let i=0;i<FX_FB;i++){const core=i<FX_CORE;
     const sp=spr(core?fxCoreTex:fxBallTex,core,false,1);if(core)sp.renderOrder=3;   // the hot core draws over the bodies
@@ -9037,7 +9081,7 @@ const FX=[],FX_M=[];
     o.sm.push({sp:sp,live:false,p:0,a:0,j:0,x:0,y:0,z:0,sz:1,spin:0,shade:0});}
   for(let i=0;i<3;i++)o.sec.push({t:0,dx:0,dz:0,done:true});
   o.ring=decal(ringG,0xfff0d0,false,1);o.dust=decal(dustG,0xc2ad88,false,1);
-  o.scorch=decal(scG,0x1c1914,false,0);o.glowM=decal(glG,0xffffff,true,2);
+  o.scorch=decal(scDisc(),0x1c1914,false,0);o.glowM=decal(glG,0xffffff,true,2);
   FX.push(o);}
  for(let k=0;k<FX_MINI;k++){const m={on:false,t:0,x:0,y:0,z:0,s:1,fb:[]};
   for(let i=0;i<3;i++)m.fb.push({sp:spr(i?fxBallTex:fxCoreTex,!i,false,1),dx:0,dy:0,dz:0,sz:1});
@@ -9076,10 +9120,10 @@ function explode(x,y,z,opt){opt=opt||{};
   o.flash.visible=true;o.flash.position.set(x,o.y+3*Math.sqrt(s),z);
   // the column: phases spread evenly along it, so it is continuous from the base up
   for(let i=0;i<FX_SM;i++){const m=o.sm[i];m.live=true;m.p=(i+Math.random()*0.6)/FX_SM;fxPuff(m);m.sp.visible=false;}
-  o.ring.visible=o.dust.visible=true;o.ring.position.set(x,gy+0.6,z);o.dust.position.set(x,gy+0.45,z);
+  o.ring.visible=o.dust.visible=true;const my=terrainMeshH(x,z);o.ring.position.set(x,my+0.6,z);o.dust.position.set(x,my+0.45,z);
   o.ring.scale.setScalar(0.01);o.dust.scale.setScalar(0.01);
-  o.scorch.visible=true;o.scorch.position.set(x,gy+0.15,z);o.scorch.scale.setScalar((13+Math.random()*4)*Math.pow(s,0.8));o.scorch.material.opacity=0.8;
-  o.glowM.position.set(x,gy+0.35,z);o.glowM.visible=false;
+  fxScorchLay(o.scorch,x,z,(13+Math.random()*4)*Math.pow(s,0.8));o.scorch.material.opacity=0.8;
+  o.glowM.position.set(x,my+0.35,z);o.glowM.visible=false;
   const n=Math.min(3,opt.secondary||0);o.secN=n;
   for(let i=0;i<3;i++){const e=o.sec[i];e.done=i>=n;e.t=0.4+Math.random()*1.1;
     const a=Math.random()*6.283,d=(6+Math.random()*10)*Math.sqrt(s);e.dx=Math.cos(a)*d;e.dz=Math.sin(a)*d;}
@@ -9089,6 +9133,18 @@ function explode(x,y,z,opt){opt=opt||{};
   irDirty=true;
   return o;
 }
+// Lay the scorch disc on the terrain mesh under it (every vertex, not just the centre, so it
+// neither sinks into a slope nor floats off it) plus a range-scaled lift set each frame.
+// Where a vertex is near a concave crease between two terrain triangles it is raised by how
+// far the mesh bends up around it, so the crease cannot poke up between vertices; on a plane
+// that is zero. About 9 groundHeight calls per explosion (the lattice heights are cached).
+function fxScorchLay(m,x,z,r){const P=m.geometry.attributes.position,C=new Map(),e=r/8,H=(a,b)=>terrainMeshH(a,b,C);
+  const base=H(x,z);
+  for(let i=0;i<P.count;i++){const vx=x+P.getX(i)*r,vz=z+P.getZ(i)*r,h=H(vx,vz);
+    const bend=Math.max(0,(H(vx+e,vz)+H(vx-e,vz))/2-h,(H(vx,vz+e)+H(vx,vz-e))/2-h);
+    P.setY(i,h+bend-base);}
+  P.needsUpdate=true;m.geometry.computeBoundingSphere();
+  m.scale.set(r,1,r);m.userData.base=base;m.userData.r=r;m.position.set(x,base+gdLift(x,base,z),z);m.visible=true;}
 function fxPuff(m){m.a=Math.random()*6.283;m.j=Math.random();m.sz=0.85+Math.random()*0.3;
   m.spin=(Math.random()-0.5)*0.25;m.shade=Math.random()*0.06;m.sp.material.rotation=Math.random()*6.283;}
 // a smaller burst: a cooking-off secondary, or anything that wants a pop without a column
@@ -9145,6 +9201,7 @@ function fxUpdate(dt){
     o.ring.material.color.setRGB(rl,0.94*rl,0.82*rl);o.dust.material.color.setRGB(0.76*rl,0.68*rl,0.53*rl);
     {const k=clamp(t/0.8,0,1);o.ring.scale.setScalar(Math.max(0.01,120*s*(1-(1-k)*(1-k))));o.ring.material.opacity=0.75*(1-k);if(k>=1)o.ring.visible=false;
      const d=clamp(t/3.5,0,1);o.dust.scale.setScalar(Math.max(0.01,48*s*(1-(1-d)*(1-d)*(1-d))));o.dust.material.opacity=0.5*Math.pow(1-d,1.5);if(d>=1)o.dust.visible=false;}
+    {const sc=o.scorch;sc.position.y=sc.userData.base+gdLift(sc.position.x,sc.userData.base,sc.position.z);}
     if(t>o.end*0.75)o.scorch.material.opacity=0.8*clamp((o.end-t)/(o.end*0.25),0,1);
     // night: the fireball lights the ground, then the wreck flickers
     let gl=0;
@@ -9835,7 +9892,7 @@ function tick(t,skipRender){
   const gh=groundHeight(dp.x,dp.z),agl=dp.y-GEAR-gh;
   abUpdate(plane,on,s.power,paused?0:dt,dp,q,agl);
   _cf.set(0,0,-1).applyQuaternion(q);_cu.set(0,1,0).applyQuaternion(q);
-  shadow.position.set(dp.x,gh+0.13,dp.z);shadow.rotation.y=Math.atan2(-_cf.x,-_cf.z);shadow.material.opacity=clamp(1-agl/120,0,1);shadow.visible=agl<120&&!s.crashed;
+  shadow.visible=agl<120&&!s.crashed;if(shadow.visible)shadowLay(dp.x,dp.z,Math.atan2(-_cf.x,-_cf.z));shadow.material.opacity=clamp(1-agl/120,0,1);
   aclUpdate(plane.lights,dp,q,agl,s);
   rebuildTerrain(s.pos.x,s.pos.z);
   // windsocks
@@ -10425,7 +10482,7 @@ window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runM
     if(o&&o.on){let n=0,mx=0,mz=0,top=0;for(const m of o.sm){if(!m.sp.visible)continue;n++;mx+=m.sp.position.x-o.x;mz+=m.sp.position.z-o.z;top=Math.max(top,m.y-o.y);}
       out.smokeN=n;out.smokeTop=top;out.mean=n?[mx/n,mz/n]:[0,0];}
     return out;},
-  fxSlots:()=>FX.filter(o=>o.on).map(o=>{let n=0,mx=0,mz=0;for(const m of o.sm){if(!m.sp.visible)continue;n++;mx+=m.sp.position.x-o.x;mz+=m.sp.position.z-o.z;}
+  fxScorch:()=>FX.filter(o=>o.on&&o.scorch.visible).map(o=>o.scorch),terrainMeshH:terrainMeshH,gdLift:gdLift,fxSlots:()=>FX.filter(o=>o.on).map(o=>{let n=0,mx=0,mz=0;for(const m of o.sm){if(!m.sp.visible)continue;n++;mx+=m.sp.position.x-o.x;mz+=m.sp.position.z-o.z;}
     return {t:o.t,scale:o.s,smokeN:n,mean:n?[mx/n,mz/n]:[0,0],wind:windVec(new V3()).toArray()};}),
   // crash FX (3.9): force a crash here and now, and read back what it threw
   crashNow:why=>{if(!running||st.crashed)return false;crash(st,why||'Crashed.');onCrash();return true;},
