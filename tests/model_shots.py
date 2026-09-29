@@ -65,7 +65,7 @@ def photo_angle(t, L, span):
     return {'alpha':  {'p': [d * 0.93, L * 0.05, -d * 0.36], 't': [0, 0.0, 0.05 * L], 'fov': 30},
             'cessna': {'p': [-d, L * 0.30, -d * 0.05], 't': [0, 0.02 * L, 0.05 * L], 'fov': 30},
             'reaper': {'p': [-d * 0.55, L * 0.55, -d * 0.35], 't': [0, 0, 0.05 * L], 'fov': 34},
-            'mq9b':   {'p': [-d * 0.62, L * 0.40, d * 0.35], 't': [0, 0, 0], 'fov': 34}}.get(t)
+            'mq9b':   {'p': [d * 0.60, L * 0.62, d * 0.40], 't': [0, 0, -0.05 * L], 'fov': 34}}.get(t)
 
 async def main():
     os.makedirs(OUT, exist_ok=True)
