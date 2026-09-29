@@ -9498,7 +9498,9 @@ function frame(t){
   if(!loopHeld)tick(t);
 }
 function tick(t,skipRender){
-  const rdt=(t-last)/1000,dt=Math.min(0.1,rdt);last=t;const ts=t/1000;
+  // never negative: a released test hold can leave last a hair ahead of the next rAF stamp,
+  // and a negative step walks the traffic paths below 0
+  const rdt=Math.max(0,(t-last)/1000),dt=Math.min(0.1,rdt);last=t;const ts=t/1000;
   // a long gap (stutter): snap the camera; dt is capped at 0.1 s so at most 12 substeps run (hidden tab pauses via visibilitychange)
   const gap=rdt>0.25;if(gap)snapCamera=true;
   sensorMode=camMode===2&&hasBall()&&!st.onGround&&!!st.ap&&running&&!paused&&!st.crashed;
