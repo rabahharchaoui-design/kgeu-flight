@@ -5435,6 +5435,37 @@ function getModel(id){
 }
 let plane=getModel('reaper');plane.g.visible=true;
 function useModel(id){plane.g.visible=false;plane=getModel(id);plane.g.visible=true;}
+// ---- warm up while the menu is up ----
+// Every aircraft and the drop zone are built, their shaders compiled and their textures
+// uploaded one piece at a time while the menu (or the pause sheet) is showing. Left to
+// start(), the first event with a new aircraft built it on the tap and compiled its programs
+// on the first flying frame: the phone froze with the menu gone and nothing else painted yet.
+const WARM={i:0,done:false},WARM_TEX=['map','normalMap','roughnessMap','metalnessMap','emissiveMap','alphaMap','aoMap','bumpMap','lightMap','specularMap'];
+function warmObj(root){
+  root.traverse(o=>{const ms=o.material?(Array.isArray(o.material)?o.material:[o.material]):[];
+    for(const mt of ms)for(const k of WARM_TEX){const t=mt[k];
+      if(!t||!t.isTexture||t.isCubeTexture||t.userData.warm||!t.image)continue;
+      if(!(t.isDataTexture||t.image.nodeName||(typeof ImageBitmap!=='undefined'&&t.image instanceof ImageBitmap)))continue;
+      t.userData.warm=1;try{renderer.initTexture(t);}catch(e){}}});
+  try{renderer.compile(scene,camera);}catch(e){}
+  // one draw into a 4 px target, framed on it, uploads its vertex buffers too (same programs:
+  // no tone mapping and linear output either way)
+  try{const v=root.visible;root.visible=true;const s=new THREE.Box3().setFromObject(root).getBoundingSphere(new THREE.Sphere());
+    WARM.cam.position.copy(s.center).add(_warmOff.set(0.6,0.5,0.62).multiplyScalar(Math.max(4,s.radius)*2.2));WARM.cam.lookAt(s.center);
+    WARM.cam.far=Math.max(4,s.radius)*6;WARM.cam.updateProjectionMatrix();
+    renderer.setRenderTarget(WARM.rt);renderer.render(scene,WARM.cam);renderer.setRenderTarget(null);root.visible=v;}catch(e){renderer.setRenderTarget(null);}
+}
+WARM.rt=new THREE.WebGLRenderTarget(4,4);WARM.cam=new THREE.PerspectiveCamera(50,1,0.5,400);const _warmOff=new THREE.Vector3();
+const WARM_STEPS=['reaper','mq9b','f16','cessna','alpha','c130'].map(id=>()=>warmObj(getModel(id).g))
+  .concat([()=>{if(!DZ.built)dzBuild();warmObj(DZ.g);}]);
+function warmTick(){
+  if(WARM.done)return;
+  // flying: wait. The steps belong to the menu and the pause sheet, never to a flying frame
+  if(running&&!paused&&!menu.classList.contains('on')){setTimeout(warmTick,1500);return;}
+  try{WARM_STEPS[WARM.i]();}catch(e){console.warn('warm',e);}
+  if(++WARM.i>=WARM_STEPS.length){WARM.done=true;return;}
+  setTimeout(warmTick,60);
+}
 const shadowTex=tex(128,128,(x)=>{const gr=x.createRadialGradient(64,64,4,64,64,62);gr.addColorStop(0,'rgba(0,0,0,0.55)');gr.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=gr;x.fillRect(0,0,128,128);});
 const shadow=new THREE.Mesh(flatQuad,new THREE.MeshBasicMaterial({map:shadowTex,transparent:true,depthWrite:false}));shadow.scale.set(22,1,13);scene.add(shadow);
 function sizeShadow(){shadow.scale.set(AC.span*1.1,1,AC.len*1.1);}
@@ -6603,8 +6634,12 @@ function dcCamera(q,dp,cf,dt){
   zone.addEventListener('pointermove',e=>{if(e.pointerId===sid)mv(e);});
   const up=e=>{if(e.pointerId!==sid)return;sid=null;touchIn.active=false;touchIn.ail=0;touchIn.elev=0;
     knob.classList.add('spring');knob.style.transform='';setTimeout(()=>{if(sid===null)stick.classList.remove('on');},160);};
-  zone.addEventListener('pointerup',up);zone.addEventListener('pointercancel',up);
-  window.stickReset=()=>{sid=null;touchIn.active=false;touchIn.ail=touchIn.elev=0;knob.style.transform='';stick.classList.remove('on');};
+  // lostpointercapture too: a zone hidden under a thumb (crash card, menu) never sends the pointerup,
+  // and a finger id left behind would refuse every later touch with sid!==null
+  zone.addEventListener('pointerup',up);zone.addEventListener('pointercancel',up);zone.addEventListener('lostpointercapture',up);
+  // every control finger lets go: the stick, the throttle and the brake (pause, and each new flight)
+  window.stickReset=()=>{sid=null;touchIn.active=false;touchIn.ail=touchIn.elev=0;knob.style.transform='';stick.classList.remove('on');
+    tid=null;if(bid!==null){bid=null;touchIn.brake=false;bb.classList.remove('held');}};
 
   // ---- throttle: a vertical slider on the right edge, with detents you can tap ----
   let tid=null,tMoved=false,tStart=0;
@@ -6627,13 +6662,14 @@ function dcCamera(q,dp,cf,dt){
     else{apOffThr();tset(e);}
   };
   thr.addEventListener('pointerup',tup);thr.addEventListener('pointercancel',()=>tid=null);
+  thr.addEventListener('lostpointercapture',e=>{if(e.pointerId===tid)tid=null;});
   window.thrUI=()=>{const v=st.throttle;$('thrFill').style.height=(v*100)+'%';grip.style.top=((1-v)*100)+'%';thr.setAttribute('aria-valuenow',Math.round(v*100));};
 
   // ---- brake: hold. Owns only the finger that pressed it ----
   const bb=$('bBrake');let bid=null;
   bb.addEventListener('pointerdown',e=>{e.preventDefault();if(bid!==null)return;bid=e.pointerId;touchIn.brake=true;bb.classList.add('held');try{bb.setPointerCapture(bid);}catch(_){}});
   const brel=e=>{if(e.pointerId!==bid)return;bid=null;touchIn.brake=false;bb.classList.remove('held');};
-  bb.addEventListener('pointerup',brel);bb.addEventListener('pointercancel',brel);
+  bb.addEventListener('pointerup',brel);bb.addEventListener('pointercancel',brel);bb.addEventListener('lostpointercapture',brel);
 
   // ---- sensor view buttons: labels follow the ball state; layoutCtl decides which show ----
   window.updateCtx=function(){
@@ -6694,7 +6730,8 @@ function sensorView(){if(!running||st.crashed||!hasBall())return;
   const HT={flapGrp:112},GAP=6;
   let lkey='',dockH=0;
   const reH=()=>{dockH=0;};window.addEventListener('resize',reH);if(window.visualViewport)visualViewport.addEventListener('resize',reH);
-  window.layoutCtl=function(){
+  window.layoutCtl=function(remeasure){
+    if(remeasure)dockH=0;
     const P=!rookie(),dropOn=!!(MISS.on&&MISS.kind==='drop'&&!MISS.dropped&&running);
     // in the ball view the aircraft flies itself: the sensor buttons replace gear, flaps and brake
     const sv=sensorMode,lo=dcOn()&&!MISS.result;
@@ -7402,6 +7439,7 @@ $('pPhoto').onclick=photoOpen;$('phX').onclick=photoClose;$('phSave').onclick=ph
 // ---------- menus ----------
 const menu=document.getElementById('menu'),crashEl=document.getElementById('crash'),crashTopEl=document.getElementById('crashTop');
 function start(mode,base){
+  if(FM.on)fmClose();
   initAudio();
   if(ARC.prevTod){const p=ARC.prevTod;ARC.prevTod=null;setTOD(p);}
   setType(acType);useModel(acType);sizeShadow();radioQ.length=0;radioHush();radioFadeTok++;radioVolApply();radioBusy=0;chatT=9;atcT=0;atcEl.classList.remove('on');
@@ -7411,6 +7449,10 @@ function start(mode,base){
   // 3 mile final is, gear down and approach flaps, and the last stage of flap is the pilot's
   if(spawn==='final1'&&easy){st.flapIdx=AC.landFlap;st.gearDown=true;st.gearPos=1;}ROOK.to=false;guideShow(null);st.easy=easy;st.noPF=isTouch||easy;document.body.classList.toggle('easy',easy);A={};running=true;paused=false;RUN.easyEver=easy;RUN.t0=Date.now();events.length=0;cfgReset();camBump=0;
   menuClose();crashClear();pauseOv.classList.remove('on');$('storyOv').classList.remove('on');snapCamera=true;
+  // the flight UI shows from this frame on: every class that hides it goes now (pauseOn is otherwise only
+  // cleared by the next rendered frame), and no finger from the tap that started this is still held
+  if(PHOTO.on){PHOTO.on=false;$('photoOv').classList.remove('on');}
+  document.body.classList.remove('menuOn','pauseOn','crashOn','photoOn','mapOn');if(window.stickReset)stickReset();
   if(camMode>1)camMode=0;   // the ball view is entered in flight, where its autopilot can take over
   STRIKE.active=false;lesEnd();gradeOv.classList.remove('on');arcStop();$('arcOv').classList.remove('on');
   MUSIC.forced=null;   // a mode with its own song (the Red Flag Dogfight: MUSIC.forced='dogfight.m4a') sets it after start()
@@ -7421,7 +7463,7 @@ function start(mode,base){
   if(mode==='drop')dzStart();
   hbSync(true);
   if(LB){LB.reset();if(mode==='range'||mode==='drop'||mode==='short')LB.runStart(mode==='range'?'arc:strike':mode==='drop'?'arc:drop':'mission:short');}
-  layoutCtl();
+  layoutCtl(true);
 }
 const pauseOv=$('pauseOv');
 function openMenu(scr){if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.forced=null;pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
@@ -10250,7 +10292,7 @@ const APP_VER='2026-09-29-scores';          // keep version.json in step when sh
     get P(){return E.P;}};
 })();
 
-window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,
+window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
   lights:()=>({KGEU:AL.KGEU.count(),KLUF:AL.KLUF.count(),uLights:AL_MAT.uniforms.uLights.value,
     layers:AL_LAYERS.map(L=>({name:L.pts&&L.pts.name,visible:!!(L.pts&&L.pts.visible),inScene:!!(L.pts&&L.pts.parent)})),
@@ -10332,6 +10374,7 @@ window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runM
 window.__kgeu.LB=LB;try{LB.boot();}catch(e){console.warn('leaderboards',e);}
 rebuildTerrain(st.pos.x,st.pos.z);
 requestAnimationFrame(frame);
+setTimeout(warmTick,900);
 }
 })();
 </script>

@@ -17,6 +17,12 @@ for t in prefs_check landing_check touch_check ui_check menu_check skill_check s
   echo "== $t (exit $code)"; echo "$out" | grep -E "FAIL|passed|clear|FAILS" | tail -4
   [[ $code -ne 0 ]] && fail+=("$t")
 done
+# every event start, 3 in a row here (the full 10 in a row: .venv/bin/python tests/event_start_check.py)
+for t in event_start_check; do
+  out=$($PY tests/$t.py --reps 3 2>&1); code=$?
+  echo "== $t (exit $code)"; echo "$out" | grep -E "FAIL|passed|clear|FAILS" | tail -4
+  [[ $code -ne 0 ]] && fail+=("$t")
+done
 for t in ab_check; do
   out=$($PY tests/$t.py --noshots 2>&1); code=$?
   echo "== $t (exit $code)"; echo "$out" | grep -E "FAIL|passed|clear|FAILS" | tail -4
