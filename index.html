@@ -264,7 +264,24 @@ body.lookOn:not(.touch) #badges{ top:calc(var(--padT) + var(--icon) + 80px); }
 .pick{ padding:10px 6px; line-height:1.15; text-align:center; }
 .pick b{ display:block; font-size:22px; font-weight:800; }
 .pick span{ font-size:13px; color:var(--soft); }
+.modeTag{ display:inline-block; margin-left:8px; padding:1px 7px; border-radius:6px; font:800 11px/1.5 var(--font); letter-spacing:.08em; vertical-align:2px; }
+.modeTag.easy{ background:#2fa36b; color:#fff; } .modeTag.hard{ background:#c93d33; color:#fff; }
 .pick.sel{ border-color:var(--caution); box-shadow:inset 0 0 0 2px var(--caution); }
+/* Easy / Hard: two cards on the fly screen, a two way toggle in Settings and the pause sheet */
+.modeCards{ display:flex; gap:10px; flex:none; }
+#menu .modeCard{ flex:1; min-width:0; min-height:58px; display:flex; align-items:center; gap:12px; text-align:left; padding:6px 14px; border-radius:14px; line-height:1.18; }
+.modeCard b{ font-size:24px; font-weight:900; letter-spacing:.06em; flex:none; }
+.modeCard span{ font-size:12.5px; font-weight:600; opacity:.88; }
+#menu .modeCard{ background:rgba(42,22,8,.1); color:var(--night); border:2px solid rgba(42,22,8,.18); }
+#menu .modeCard.sel{ background:var(--night); color:var(--sand); border-color:var(--night); box-shadow:0 0 0 3px var(--orange); }
+.modeSeg{ display:flex; gap:6px; align-items:center; }
+.modeSeg .chip{ flex:none; min-width:74px; }
+.modeDesc{ margin:0; font:600 12px/1.25 var(--font); color:var(--soft); }
+#sSet .modeSeg .modeDesc{ flex:1; min-width:0; max-width:230px; color:#6B3517; }
+#pauseOv .modeSeg .chip{ flex:1; min-width:0; min-height:44px; border-radius:10px; background:rgba(246,193,119,.1); color:var(--sand); border:2px solid rgba(246,193,119,.22); }
+#pauseOv .modeSeg .chip.sel{ background:var(--sand); color:var(--night); border-color:var(--sand); }
+#pauseOv .modeSeg .chip b{ font-size:15px; letter-spacing:.06em; text-transform:uppercase; }
+#pauseOv .modeDesc{ color:#e8cfa5; font-size:11.5px; margin-top:-2px; }
 .picks.bases{ grid-template-columns:repeat(2,1fr); margin-top:-6px; }
 .picks.tods{ grid-template-columns:repeat(3,1fr); }
 .gLetter{ font-size:84px; font-weight:900; line-height:1; margin:0; }
@@ -456,6 +473,7 @@ label.sens b{ color:var(--ink); min-width:74px; }
 .pzL,.pzR{ background:rgba(26,16,9,.9); border:1px solid rgba(246,193,119,.18); border-radius:16px; padding:10px 12px; display:flex; flex-direction:column; gap:8px; }
 .pzL{ flex:0 0 clamp(140px,22vw,200px); }
 .pzL button{ min-height:44px; font-size:16px; }
+@media (max-height:430px){ .pzL > .pzT{ display:none; } .pzL{ gap:5px; padding-top:8px; padding-bottom:8px; } .pzL button{ min-height:44px; } #pauseOv .modeSeg .chip{ min-height:44px; } #pauseOv .modeDesc{ font-size:11px; line-height:1.18; } }
 .pzR{ flex:1; min-width:0; }
 .pzT{ margin:0; font-size:17px; font-weight:800; color:var(--sand); letter-spacing:.02em; }
 #pauseOv .primary{ background:var(--rust); color:#fff4e0; border:none; }
@@ -679,6 +697,10 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
  </div>
  <div class="scr" id="sFly">
   <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Fly</h2><span class="steps" id="sumLine"></span></header>
+  <div class="modeCards" role="radiogroup" aria-label="Mode">
+   <button class="chip modeCard" data-skill="rookie" role="radio"><b>EASY</b><span>The plane helps you fly. Auto leveling, stall protection, and a glowing path to the runway.</span></button>
+   <button class="chip modeCard" data-skill="pilot" role="radio"><b>HARD</b><span>Real flying. No assists, full gauges, and full radio calls.</span></button>
+  </div>
   <div class="carx" id="carMain"></div>
   <div class="frows">
    <div class="frow"><div class="grp g2"><span class="glbl">Base</span>
@@ -706,7 +728,7 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
   <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Settings</h2><span class="steps"></span></header>
   <div class="setGrid">
    <div class="setCol">
-    <div class="srow"><span>Skill</span><div class="chips"><button class="pick chip sk" data-skill="rookie"><b>Rookie</b></button><button class="pick chip sk" data-skill="pilot"><b>Pilot</b></button></div></div>
+    <div class="srow"><span>Mode</span><div class="chips modeSeg" role="radiogroup" aria-label="Mode"><button class="pick chip sk" data-skill="rookie" role="radio"><b>Easy</b></button><button class="pick chip sk" data-skill="pilot" role="radio"><b>Hard</b></button><p class="modeDesc"></p></div></div>
     <div class="srow"><span>Radio</span><div class="chips"><button class="tog" id="oRadio">Radio: On</button>
       <label class="sens"><input type="range" id="oRvol" min="0" max="10" step="1" value="7" aria-label="Radio volume"><b id="oRvolV">70%</b></label></div></div>
     <div class="srow"><span>Music</span><div class="chips"><button class="tog oMusic" id="oMusic">Music: On</button>
@@ -729,7 +751,7 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
   <div class="helpBody">
    <p class="touchnote">Left thumb anywhere on the left half: a stick appears there. Push to roll and climb or dive, let go and it springs back. Right edge: the throttle, slide it or tap IDLE, CLIMB, FULL. BRAKE above it, hold on the ground. Top right: Auto takes off or lands for you, then gear, flaps and camera. Pause is top centre. Tap the grade badge after a landing to see the details.</p>
    <dl class="keys">
-    <dt>Arrows or W A S D</dt><dd>Fly. Rookie: let go and it levels out</dd>
+    <dt>Arrows or W A S D</dt><dd>Fly. Easy: let go and it levels out</dd>
     <dt>Mouse or trackpad</dt><dd>Click and drag on the scene like a yoke. Scroll for throttle</dd>
     <dt>Shift, Control</dt><dd>Throttle up, down (R and F also work)</dd>
     <dt>1  2  3</dt><dd>Throttle idle, climb, full</dd>
@@ -745,8 +767,8 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
 <div class="overlay" id="funnel"><div class="fun">
   <h1>How do you want to fly?</h1>
   <div class="funB">
-   <button id="fRookie"><b>New to flying</b><span>Plain words and plenty of help. Starts with a 60 second first flight.</span></button>
-   <button id="fPilot"><b>I'm a pilot</b><span>Real terms, six pack gauges, full ATC, no assists.</span></button>
+   <button id="fRookie"><b>EASY</b><span>The plane helps you fly. Auto leveling, stall protection, and a glowing path to the runway.</span></button>
+   <button id="fPilot"><b>HARD</b><span>Real flying. No assists, full gauges, and full radio calls.</span></button>
   </div>
   <p>You can change this any time in Settings.</p>
   <p class="a2hsTip" id="a2hsF"><b>Tip:</b> tap Share in Safari, then <b>Add to Home Screen</b>, to play full screen.</p>
@@ -755,6 +777,8 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
 <div class="overlay" id="pauseOv"><div class="pz">
   <div class="pzL">
    <p class="pzT">Paused</p>
+   <div class="modeSeg" role="radiogroup" aria-label="Mode"><button class="chip sk" data-skill="rookie" role="radio"><b>Easy</b></button><button class="chip sk" data-skill="pilot" role="radio"><b>Hard</b></button></div>
+   <p class="modeDesc"></p>
    <button class="primary" id="pResume">Resume</button><button id="pPhoto" class="ph"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>Photo</button><button id="pRestart">Restart</button><button id="pSet">Settings</button><button id="pMenu">Main menu</button>
   </div>
   <div class="pzR">
@@ -1227,6 +1251,10 @@ function easyFly(st,dt,ev){
     if(Math.abs(v)<25)st.ezLI=clamp((st.ezLI||0)+v*dt*0.00004,-0.06,0.06);
     bank=apBank(trk,RH-clamp(v*0.066/gsp,-0.8,0.8)-(st.ezLI||0),0.3*clamp(agl/40,0.2,1),gsp);}
   apAtt(st,p,bank,trk);
+  // switched into Easy mid flight: blend the assists in over 1.5 s from what the aircraft is
+  // already doing, so a bank or a pitch the pilot was holding is eased out, never snapped
+  if(st.ezBlend!==undefined&&st.ezBlend<1&&st.apW){st.ezBlend=Math.min(1,st.ezBlend+dt/1.5);const k=st.ezBlend*st.ezBlend*(3-2*st.ezBlend);
+    st.apW.set(st.w.x+(st.apW.x-st.w.x)*k,st.w.y+(st.apW.y-st.w.y)*k,st.w.z+(st.apW.z-st.w.z)*k);}
 }
 // ---------- Dubins shortest path: LSL, RSR, LSR, RSL ----------
 // Planner frame: X = world x, Y = -world z, theta = PI/2 - heading. Left turns are CCW in that frame.
@@ -5008,6 +5036,15 @@ const touchIn={elev:0,ail:0,active:false,brake:false};
 let SKILL=null;try{const v=localStorage.getItem('kgeuOnboard');if(v==='rookie'||v==='pilot')SKILL=v;}catch(e){}
 let easy=SKILL!=='pilot';
 const rookie=()=>SKILL!=='pilot';
+// ---- every run is tagged Easy or Hard. A run flown in Easy at any moment, even briefly
+// (or with the first flight lesson's assists on), counts as Easy for the whole run, so
+// records and future leaderboards can trust a Hard tag. ----
+const RUN={easyEver:false,t0:0};
+const runMode=()=>RUN.easyEver?'easy':'hard';
+function runLog(kind,res){try{const L=JSON.parse(localStorage.getItem('kgeuRuns')||'[]');
+  L.unshift(Object.assign({kind:kind,ac:acType,mode:runMode(),when:Date.now()},res||{}));L.length=Math.min(L.length,60);
+  localStorage.setItem('kgeuRuns',JSON.stringify(L));}catch(e){}}
+function modeTag(id){const el=document.getElementById(id);if(!el)return;const t=document.createElement('span');t.className='modeTag '+runMode();t.textContent=runMode()==='easy'?'EASY':'HARD';el.appendChild(t);}
 function autoSmart(){if(!running||paused||st.crashed)return;
   if(LES.on){toast('No autopilot in flight school. Tap End to quit the lesson');return;}
   // Reaper, airborne, nothing engaged: the first tap parks it in an orbit, the next lands it
@@ -5284,7 +5321,7 @@ function fmtT(s){const m=Math.floor(s/60);return m+':'+String(Math.round(s-m*60)
 // record a result under a key; returns true when it beat the stored one
 function scRecord(key,rec){
   const cmp=(REC[key.split(':')[0]]||{}).cmp||((a,b)=>a.pts>b.pts);
-  const old=SCORE.best[key];
+  const old=SCORE.best[key];rec.mode=rec.mode||runMode();
   const better=!old||cmp(rec,old);
   if(better){SCORE.best[key]=rec;scSave();}
   return better;
@@ -5368,15 +5405,15 @@ function onLanding(e){
   document.getElementById('lLetter').textContent=g.letter;
   document.getElementById('lLetter').className='gLetter g'+g.letter;
   document.getElementById('lTitle').textContent=g.pts+' points on '+g.where+
-    (g.xw>=10?'  ('+Math.round(g.xw)+' kt crosswind)':'');
+    (g.xw>=10?'  ('+Math.round(g.xw)+' kt crosswind)':'');modeTag('lTitle');
   const rows=g.parts.map(p=>'<div class="gl"><span>'+p[0]+'</span><b>'+p[1]+
     '<i class="pt'+(p[2]>=80?' good':p[2]<55?' bad':'')+'">'+p[2]+'</i></b></div>');
   if(dash)rows.push('<div class="gl"><span>Luke to Glendale</span><b>'+fmtT(dash.secs)+
     ',  '+dash.g.toFixed(1)+' G peak</b></div>');
   document.getElementById('lLines').innerHTML=rows.join('');
   // the full breakdown also goes to Records; the flight carries on through the rollout
-  SCORE.recent=(SCORE.recent||[]);SCORE.recent.unshift({ac:AC.name,letter:g.letter,pts:g.pts,where:g.where,line:g.line,
-    parts:g.parts.map(p=>[p[0],p[1],p[2]]),when:Date.now()});SCORE.recent.length=Math.min(SCORE.recent.length,10);scSave();
+  SCORE.recent=(SCORE.recent||[]);SCORE.recent.unshift({ac:AC.name,letter:g.letter,pts:g.pts,where:g.where,line:g.line,mode:runMode(),
+    parts:g.parts.map(p=>[p[0],p[1],p[2]]),when:Date.now()});runLog('landing',{letter:g.letter,pts:g.pts,where:g.where});SCORE.recent.length=Math.min(SCORE.recent.length,10);scSave();
   gradeBadge(g);
   if(better)bannerShow('NEW RECORD',REC[AC.id]?REC[AC.id].fmt(SCORE.best[AC.id]||g):'');
 }
@@ -5569,7 +5606,7 @@ function missScore(r){
            ['Strip length','3,000 ft']];
   }
   const le=document.getElementById('mLetter');le.textContent=letter;le.className='gLetter g'+letter;
-  document.getElementById('mTitle').textContent=title;
+  document.getElementById('mTitle').textContent=title;modeTag('mTitle');runLog('mission',{mission:r.kind,letter:letter});
   document.getElementById('mLines').innerHTML=lines.map(l=>'<div class="gl"><span>'+l[0]+'</span><b>'+l[1]+'</b></div>').join('');
   missHud(null);missOv.classList.add('on');paused=true;
   logMission(r,letter);
@@ -6380,6 +6417,7 @@ function arcResult(g,secs,right){
   $('aTitle').textContent=!right?'Wrong runway. Target was '+ARC.end.rwy.apt+' '+ARC.end.num:letter==='F'?'Too rough to count':(better?'New best! ':'')+pts+' points';
   $('aLines').innerHTML=[['Time',fmtT(secs)+'  (par '+fmtT(ARC.par)+')'],['Landing',g?letter+'  '+g.line:'off the runway'],['Aircraft',AC.name],
     ['Best',SCORE.best[key]?SCORE.best[key].pts+' pts, '+fmtT(SCORE.best[key].secs):'none yet']].map(l=>'<div class="gl"><span>'+l[0]+'</span><b>'+l[1]+'</b></div>').join('');
+  modeTag('aTitle');runLog('arcade',{game:ARC.kind,pts:pts,secs:Math.round(secs),letter:letter});
   missHud(null);paused=true;$('arcOv').classList.add('on');
 }
 function arcStop(){if(ARC.on&&DEST===ARC.end){DEST=null;document.body.classList.remove('hasDest');destUI(true);}ARC.on=false;ARC.done=false;}
@@ -6448,7 +6486,7 @@ const menu=document.getElementById('menu'),crashEl=document.getElementById('cras
 function start(mode,base){
   initAudio();
   setType(acType);useModel(acType);sizeShadow();radioQ.length=0;radioHush();radioFadeTok++;radioVolApply();radioBusy=0;chatT=9;atcT=0;atcEl.classList.remove('on');
-  st=createState(mode,base||SPAWN_BASE);st.type=acType;ROOK.to=false;guideShow(null);st.easy=easy;st.noPF=isTouch||easy;document.body.classList.toggle('easy',easy);A={};running=true;paused=false;events.length=0;cfgReset();camBump=0;
+  st=createState(mode,base||SPAWN_BASE);st.type=acType;ROOK.to=false;guideShow(null);st.easy=easy;st.noPF=isTouch||easy;document.body.classList.toggle('easy',easy);A={};running=true;paused=false;RUN.easyEver=easy;RUN.t0=Date.now();events.length=0;cfgReset();camBump=0;
   menuClose();crashClear();pauseOv.classList.remove('on');$('storyOv').classList.remove('on');snapCamera=true;
   if(camMode>1)camMode=0;   // the ball view is entered in flight, where its autopilot can take over
   STRIKE.active=false;lesEnd();gradeOv.classList.remove('on');arcStop();$('arcOv').classList.remove('on');
@@ -6490,10 +6528,15 @@ tapBtn($('cRetry'),crashRetry);
 tapBtn($('cMenu'),()=>{crashEl.classList.remove('on');crashTopEl.classList.remove('on');openMenu();});
 document.getElementById('bFull').onclick=()=>{const d=document.documentElement;if(document.fullscreenElement){document.exitFullscreen&&document.exitFullscreen();return;}
   const r=d.requestFullscreen||d.webkitRequestFullscreen;if(!r){toast('Full screen not available here');return;}try{const p=r.call(d);if(p&&p.catch)p.catch(()=>toast('Full screen is blocked in this view. Use Ctrl Cmd F'));}catch(e){toast('Full screen is blocked in this view');}};
-function easyUI(){document.querySelectorAll('[data-skill]').forEach(b=>b.classList.toggle('sel',b.dataset.skill===(SKILL||'rookie')));
+const MODE_DESC={rookie:'The plane helps you fly. Auto leveling, stall protection, and a glowing path to the runway.',pilot:'Real flying. No assists, full gauges, and full radio calls.'};
+function easyUI(){document.querySelectorAll('[data-skill]').forEach(b=>{const on=b.dataset.skill===(SKILL||'rookie');b.classList.toggle('sel',on);b.setAttribute('aria-checked',String(on));});
+  document.querySelectorAll('.modeDesc').forEach(p=>p.textContent=MODE_DESC[SKILL||'rookie']);
   document.body.classList.toggle('easy',easy);document.body.classList.toggle('pilot',!easy);hudLabels();}
-function setSkill(v){SKILL=v==='pilot'?'pilot':'rookie';easy=SKILL==='rookie';try{localStorage.setItem('kgeuOnboard',SKILL);}catch(e){}
-  easyUI();if(running){st.easy=easy;st.noPF=isTouch||easy;}layoutCtl();}
+// Easy is stored as 'rookie' and Hard as 'pilot', the values saved installs already hold, so a
+// player's choice carries over untouched. Switching mid flight changes only which assists run
+// from the next physics step; the aircraft state is left exactly as it is.
+function setSkill(v){SKILL=v==='pilot'?'pilot':'rookie';easy=SKILL==='rookie';if(running&&easy)RUN.easyEver=true;try{localStorage.setItem('kgeuOnboard',SKILL);}catch(e){}
+  easyUI();if(running){if(easy&&!st.easy&&!st.onGround)st.ezBlend=0;st.easy=easy;st.noPF=isTouch||easy;}layoutCtl();}
 // readout labels: plain English for rookies, the real abbreviations for pilots
 function hudLabels(){const R=rookie(),L=R?['Speed','Height','Climbing','Direction']:['KIAS','ALT','VS','HDG'];
   ['lIas','lAlt','lVs','lHdg'].forEach((id,i)=>{const e=$(id);if(e)e.textContent=L[i];});}
@@ -6606,7 +6649,7 @@ function grade(score,title,lines,failWhy){
   const key=(acType==='alpha'?'alpha':'cessna')+':'+LES.on,old=schoolBest[key];
   if(!old||'ABCDF'.indexOf(L2)<'ABCDF'.indexOf(old)){schoolBest[key]=L2;try{localStorage.setItem('kgeuSchool',JSON.stringify(schoolBest));}catch(e){}}
   const gl=document.getElementById('gLetter');gl.textContent=L2;gl.className='gLetter g'+L2;
-  document.getElementById('gTitle').textContent=LES.name+(failWhy?': '+failWhy:'. Score '+score+' of 100.');
+  document.getElementById('gTitle').textContent=LES.name+(failWhy?': '+failWhy:'. Score '+score+' of 100.');modeTag('gTitle');runLog('lesson',{lesson:LES.on,letter:L2,score:score});
   const box=document.getElementById('gLines');box.innerHTML='';
   lines.forEach(l=>{const d=document.createElement('div');d.className=l[0]?'ok':'no';d.textContent=l[1];box.appendChild(d);});
   const id=LES.on;LES.last=id;lesEnd();paused=true;
@@ -8549,7 +8592,7 @@ function strikeScore(){
   if(!done||STRIKE.cleared)return;
   STRIKE.cleared=true;
   const avg=STRIKE.shots?STRIKE.missSum/STRIKE.shots:0,secs=Math.round(st.time-STRIKE.t0);
-  const sc={hits:STRIKE.hits,avg:Math.round(avg),t:secs};
+  const sc={hits:STRIKE.hits,avg:Math.round(avg),t:secs,mode:runMode()};runLog('strike',{hits:sc.hits,avg:sc.avg,t:secs});
   const loit=loiterScore(sc);
   if(scRecord('reaper',loit))bannerShow('NEW RECORD',loit.pts+' pts,  '+loit.hits+'/4,  '+loit.tot+' s on target');
   const better=!strikeBest||sc.hits>strikeBest.hits||
@@ -8661,6 +8704,7 @@ function tick(t,skipRender){
   sensorMode=camMode===2&&hasBall()&&!st.onGround&&!!st.ap&&running&&!paused&&!st.crashed;
   pollPad(dt);
   if(running&&!paused&&!st.crashed){
+    if(st.easy)RUN.easyEver=true;
     updateControls(dt);f16Flaps();lessonTick(dt);rookieAssist(dt,ts);acc+=dt;
     if(_ipS!==st){_ipS=st;_ipPos.copy(st.pos);_ipQ.copy(st.quat);}
     while(acc>=DT){_ipPos.copy(st.pos);_ipQ.copy(st.quat);autopilot(st,DT,events);step(st,DT,events);acc-=DT;if(st.crashed)break;}
@@ -8671,6 +8715,7 @@ function tick(t,skipRender){
     if(ev.type==='touchdown'){ev.vx=st.vel.x;ev.vz=st.vel.z;const f=ev.fpm,g=f<120?'Butter':f<300?'Smooth':f<500?'Firm':'Hard';toast(`Touchdown ${f} fpm. ${g}.`);
       missTouchdown(ev);onLanding(ev);arcTouchdown(ev);
       camBump=clamp(f/620,0.12,1);
+      runLog('touchdown',{fpm:f,paved:!!ev.paved});
       if(ev.paved&&(best===null||f<best)){best=f;try{localStorage.setItem(bestKey(),String(f));}catch(e){}showBest();}
       atcTouchdown(ev);clusters.forEach(c=>{if(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)<1800){c.cheer=4.5;}});}
     // flap and gear changes announce themselves through the big readout, not a toast
@@ -8776,7 +8821,7 @@ function tick(t,skipRender){
     const po=pauseOv.classList.contains('on');document.body.classList.toggle('pauseOn',po);if(po)showRender(dt,CARP);}
 }
 // test hook: headless UI checks need to reach a few internals
-window.__kgeu={MAPD:MAPD,TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,
+window.__kgeu={MAPD:MAPD,runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
   lights:()=>({KGEU:AL.KGEU.count(),KLUF:AL.KLUF.count(),uLights:AL_MAT.uniforms.uLights.value,
     layers:AL_LAYERS.map(L=>({name:L.pts&&L.pts.name,visible:!!(L.pts&&L.pts.visible),inScene:!!(L.pts&&L.pts.parent)})),
