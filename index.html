@@ -6954,7 +6954,7 @@ function radioUI(){
 // and a missing or broken file is skipped quietly: no errors, one try per session.
 // MUSIC.forced (the Red Flag Dogfight, when that mode exists) loops one file instead.
 const MUSIC={on:true,vol:0.6,free:false,forced:null,list:null,titles:Object.create(null),urls:Object.create(null),bad:Object.create(null),queue:[],last:null,
-  played:0,errors:0,hist:[],cache:Object.create(null),cacheOrder:[],slots:[null,null],cur:-1,busy:false,tok:0,offAt:-1,tgt:-1,want:null,duckE:0,loading:false};
+  allowed:false,gest:false,played:0,errors:0,hist:[],cache:Object.create(null),cacheOrder:[],slots:[null,null],cur:-1,busy:false,tok:0,offAt:-1,tgt:-1,want:null,duckE:0,loading:false};
 const MUSIC_CACHE_CAP=10;
 function musicTitle(name){return (name&&MUSIC.titles[name])||name||'';}
 function musicTitleUI(name){const t=document.getElementById('pMusTitle');if(t)t.textContent=name?musicTitle(name):'—';}
@@ -6988,8 +6988,19 @@ function musicRamp(p,from,up,T){
   p.setValueAtTime(up?0:from,T);
   for(let k=1;k<=8;k++){const a=k/8*Math.PI/2;p.linearRampToValueAtTime(up?Math.sin(a):from*Math.cos(a),T+k/8*MUSIC_XF);}
 }
+// The one gate every start path goes through (tap unlock, menus, resume, visibilitychange,
+// Next/Prev, the forced loop): musicWanted() is false until MUSIC.allowed flips, and it
+// flips once, for the session, when the player has made a first gesture (a tap or key
+// after the page opened) and the leaderboard callsign card is not holding it: on a first
+// launch with leaderboards on, that is when the card is completed or skipped. The tap
+// still unlocks the AudioContext straight away (initAudio), it just plays nothing yet.
+function musicGate(){
+  if(MUSIC.allowed||!MUSIC.gest)return;
+  try{if(LB&&LB.csHold&&LB.csHold())return;}catch(e){}
+  MUSIC.allowed=true;musicTick();
+}
 function musicWanted(){
-  if(!MUSIC.on||muted||document.hidden)return false;
+  if(!MUSIC.allowed||!MUSIC.on||muted||document.hidden)return false;
   if(!running||menu.classList.contains('on'))return true;          // home and every menu screen
   if(LES.on||MISS.on||STRIKE.active||ARC.on||MUSIC.forced)return true;
   return MUSIC.free;                                                  // free flight: the player's choice
@@ -7113,13 +7124,14 @@ function musicUI(){
 function musicState(){
   const s=MUSIC.cur>=0?MUSIC.slots[MUSIC.cur]:null,m=musicGain?musicGain.gain.value:0,d=musicDuckG?musicDuckG.gain.value:1;
   return {on:MUSIC.on,vol:MUSIC.vol,free:MUSIC.free,playing:s?s.name:null,title:s?musicTitle(s.name):null,queueLen:MUSIC.queue.length,played:MUSIC.played,forced:MUSIC.forced,
-    gain:m*d,master:m,duck:d,ducked:!!(actx&&MUSIC.duckE>actx.currentTime),errors:MUSIC.errors,want:musicWanted(),hist:MUSIC.hist.slice(),
+    allowed:MUSIC.allowed,ctx:actx?actx.state:null,gain:m*d,master:m,duck:d,ducked:!!(actx&&MUSIC.duckE>actx.currentTime),errors:MUSIC.errors,want:musicWanted(),hist:MUSIC.hist.slice(),
     xf:MUSIC.slots.map(x=>x?{name:x.name,g:x.g.gain.value}:null),list:MUSIC.list&&MUSIC.list.slice()};
 }
-// The first tap anywhere, the home screen included, unlocks audio so the music can start
-// there. Passive and capture only: it never prevents, captures or blocks another control.
-(function(){const ev=['pointerup','click','keydown'],f=()=>{initAudio();
-  if(actx&&actx.state==='running')ev.forEach(e=>window.removeEventListener(e,f,true));};
+// The first tap anywhere, the home screen included, unlocks audio and opens the music gate
+// (musicGate) so the music can start there, unless the callsign card is still up. Passive
+// and capture only: it never prevents, captures or blocks another control.
+(function(){const ev=['pointerup','click','keydown'],f=()=>{initAudio();MUSIC.gest=true;musicGate();
+  if(actx&&actx.state==='running'&&MUSIC.allowed)ev.forEach(e=>window.removeEventListener(e,f,true));};
   ev.forEach(e=>window.addEventListener(e,f,{capture:true,passive:true}));})();
 // tests: swap the manifest for a given list of {name,url} (or plain names)
 function musicLoadList(list){
@@ -10271,6 +10283,10 @@ const APP_VER='2026-09-29-scores';          // keep version.json in step when sh
       if(r<0.35)s=pick(DESERT);else if(r<0.6)s=pick(DESERT)+(1+Math.floor(Math.random()*9));else if(r<0.85)s=pick(DESERT)+pick(AVI);else s=pick(AVI)+pick(DESERT);
       if(s.length>=3&&s.length<=12)return s;}return 'HABOOB'+(1+Math.floor(Math.random()*9));}
   const CS={mode:'pick',ok:false,reserved:false,seq:0,t:null,from:'launch',code:''};
+  // a first launch with no callsign holds the music (musicGate) until the card is done or
+  // skipped, or the Worker does not answer and no card will come
+  let csHold=E.enabled&&!E.P;
+  function csRelease(){if(!csHold)return;csHold=false;try{musicGate();}catch(e){}}
   const csIn=$('csIn'),csSec=$('csSec'),csCodeIn=$('csCodeIn');
   const clean=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,12);
   function stat(t,cls){const e=$('csStat');e.textContent=t||'';e.className='csStat'+(cls?' '+cls:'');}
@@ -10288,7 +10304,7 @@ const APP_VER='2026-09-29-scores';          // keep version.json in step when sh
       Pp.textContent='Save it now. It is the only way to get '+(E.P?E.P.cs:'your callsign')+' back if iOS clears this app’s storage, and it is shown only this once.';patch(E.P?E.P.cs:'');}
     go.disabled=mode!=='code';$('csOv').classList.add('on');
   }
-  function csClose(){$('csOv').classList.remove('on');try{csIn.blur();}catch(e){}}
+  function csClose(){$('csOv').classList.remove('on');try{csIn.blur();}catch(e){}csRelease();}
   function check(){
     const v=clean(csIn.value),seq=++CS.seq;CS.ok=false;CS.reserved=false;$('csSecRow').hidden=true;
     if(CS.mode==='restore'){$('csGo').disabled=!(v.length>=3&&csCodeIn.value.trim().split(/\s+/).length===4);stat('');return;}
@@ -10407,12 +10423,12 @@ const APP_VER='2026-09-29-scores';          // keep version.json in step when sh
       if(k!==j.v)location.reload();}).catch(()=>{});
     if(!E.enabled)return;
     api('/health',null,7000).then(()=>{
-      if(!E.P){const wait=()=>{const s=$('splash');if(s&&!s.classList.contains('done')){setTimeout(wait,150);return;}if(!E.P)csOpen('pick','launch');};wait();}
+      if(!E.P){const wait=()=>{const s=$('splash');if(s&&!s.classList.contains('done')){setTimeout(wait,150);return;}if(!E.P)csOpen('pick','launch');else csRelease();};wait();}
       else api('/me',auth()).then(j=>{if(j._s===401){toast('Your callsign was restored on another device',5);E.P=null;saveP();try{localStorage.removeItem('kgeuLB');}catch(e){}paintAll();ui();return;}
         if(j.cs){Object.assign(E.P,{cs:j.cs,xp:j.xp,creator:!!j.creator,renamed:j.renamed,renameAt:j.renameAt});saveP();ui();paintAll();}},()=>{});
       if(E.P){flush();topUpPool();}
       fameFetch();
-    },()=>{});
+    },()=>csRelease());
     addEventListener('online',()=>{flush();});
     setInterval(()=>{if(E.Q.length&&navigator.onLine!==false)flush();},60e3);
   }
@@ -10425,7 +10441,7 @@ const APP_VER='2026-09-29-scores';          // keep version.json in step when sh
   }
   function armFree(){E.armed=true;}
   return {E:E,BOARDS:BOARDS,ORDER:ORDER,board:board,runStart:runStart,runEnd:runEnd,runCancel:runCancel,frame:frame,reset:reset,armFree:armFree,
-    boot:boot,paintModel:paintModel,paintAll:paintAll,lbOpen:lbOpen,lbRender:lbRender,race:race,ui:ui,flush:flush,csOpen:csOpen,dice:dice,
+    boot:boot,csHold:()=>csHold,paintModel:paintModel,paintAll:paintAll,lbOpen:lbOpen,lbRender:lbRender,race:race,ui:ui,flush:flush,csOpen:csOpen,dice:dice,
     fameDraw:fameDraw,fameFetch:fameFetch,ghostStart:ghostStart,decodePath:decodePath,rankSVG:rankSVG,utcDay:utcDay,fmtS:fmtS,showBadge:showBadge,ghostOff:ghostOff,
     get P(){return E.P;}};
 })();
