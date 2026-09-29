@@ -6,7 +6,9 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 THREE = open(os.path.join(ROOT, 'node_modules/three/build/three.min.js')).read()
 IPHONE_SE = {'width': 667, 'height': 375}
 IPHONE_15 = {'width': 844, 'height': 390}
-IGNORE = ('ERR_FAILED', 'fonts.googleapis', 'ERR_ABORTED', 'ERR_NAME_NOT_RESOLVED')
+# ERR_CONNECTION_RESET / ERR_SOCKET_NOT_CONNECTED: the local test server dropping a request
+# still in flight when a page reloads or closes, not the game
+IGNORE = ('ERR_FAILED', 'fonts.googleapis', 'ERR_ABORTED', 'ERR_NAME_NOT_RESOLVED', 'ERR_CONNECTION_RESET', 'ERR_SOCKET_NOT_CONNECTED')
 
 class Quiet(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *a): pass
