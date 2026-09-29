@@ -1,9 +1,9 @@
 # Model screenshots: every aircraft from four fixed angles, in the game, on the runway.
 # Usage: .venv/bin/python tests/model_shots.py <outdir> [type ...] [--big]
-# Writes <outdir>/<type>_{side,front,top,quarter}.png and prints the triangle count
-# of each model. Reads the reference photo folder if present and lays each shot
-# next to it as <outdir>/<type>_sheet.png.
-import asyncio, os, sys, json, threading, functools, http.server, socketserver
+# Writes <outdir>/<type>_{side,left,front,rear,quarter,top}.png and prints the triangle
+# count of each model. Reads the reference photo folders in refs/ (gitignored) if present
+# and lays the shots next to them as <outdir>/<type>_sheet.png.
+import asyncio, os, sys, json, glob, threading, functools, http.server, socketserver
 from playwright.async_api import async_playwright
 
 def serve(root):
@@ -23,14 +23,28 @@ TYPES = args[1:] or ['c130', 'mq9b', 'f16', 'reaper', 'cessna', 'alpha']
 BIG = '--big' in sys.argv
 VIEW = {'width': 1200, 'height': 700} if BIG else {'width': 844, 'height': 390}
 
-# Reference photo per type, from refs/ (gitignored). The C-130 and MQ-9B refs were
-# supplied; the others are public domain / CC photos fetched by tests/../refs/SOURCES.md.
+# Reference photos per type, from refs/ (gitignored, never committed). A folder takes
+# every photo in it; WEBP and HEIC are read through a sips copy in /tmp if Pillow cannot.
 REFS = {
     'c130': ['refs/IMG_2834.WEBP', 'refs/IMG_2832.WEBP', 'refs/IMG_2836.WEBP', 'refs/IMG_2835.WEBP'],
-    'mq9b': ['refs/Pasted 2026-09-27 at 6.07.09 PM.png', 'refs/Pasted 2026-09-27 at 6.06.51 PM.png'],
-    'f16': ['refs/ref_f16.jpg'], 'reaper': ['refs/ref_mq9a.jpg'],
-    'cessna': ['refs/ref_c172.jpg'], 'alpha': ['refs/ref_alpha.jpg'],
+    'mq9b': ['refs/mq9b'], 'f16': ['refs/ref_f16.jpg'], 'reaper': ['refs/mq9a'],
+    'cessna': ['refs/cessna172'], 'alpha': ['refs/pipistrel'],
 }
+def ref_files(t):
+    out = []
+    for r in REFS.get(t, []):
+        if os.path.isdir(r):
+            out += sorted(f for f in glob.glob(r + '/*') if f.lower().rsplit('.', 1)[-1] in ('jpg', 'jpeg', 'png', 'webp', 'heic'))
+        elif os.path.exists(r): out.append(r)
+    return out
+def open_ref(path, Image):
+    try: return Image.open(path).convert('RGB')
+    except Exception:
+        tmp = '/tmp/model_shots_refs/' + os.path.basename(path).rsplit('.', 1)[0] + '.jpg'
+        os.makedirs(os.path.dirname(tmp), exist_ok=True)
+        if not os.path.exists(tmp): os.system(f'sips -s format jpeg "{path}" --out "{tmp}" >/dev/null 2>&1')
+        try: return Image.open(tmp).convert('RGB')
+        except Exception: return None
 
 # camera offsets in the aircraft frame, scaled by the type's length or span
 def angles(L, span):
@@ -38,9 +52,11 @@ def angles(L, span):
     w = max(L, span * 0.80) * 1.15          # front and top must fit the span
     return {
         'side':    {'p': [d, L * 0.10, 0.05 * L], 't': [0, 0.05 * L, 0.05 * L], 'fov': 34},
+        'left':    {'p': [-d, L * 0.10, 0.05 * L], 't': [0, 0.05 * L, 0.05 * L], 'fov': 34},
         'front':   {'p': [0, L * 0.12, -w * 1.05], 't': [0, 0.02 * L, 0], 'fov': 34},
-        'top':     {'p': [0.001, w * 1.25, 0.05 * L], 't': [0, 0, 0.05 * L], 'fov': 34},
+        'rear':    {'p': [0, L * 0.14, w * 1.05], 't': [0, 0.03 * L, 0], 'fov': 34},
         'quarter': {'p': [d * 0.75, L * 0.36, -d * 0.75], 't': [0, 0.06 * L, 0.05 * L], 'fov': 34},
+        'top':     {'p': [0.001, w * 1.25, 0.05 * L], 't': [0, 0, 0.05 * L], 'fov': 34},
     }
 
 async def main():
@@ -87,11 +103,11 @@ def sheets():
     except ImportError:
         print('Pillow not installed, no sheets'); return
     for t in TYPES:
-        shots = [f'{OUT}/{t}_{a}.png' for a in ('side', 'front', 'top', 'quarter')]
+        shots = [f'{OUT}/{t}_{a}.png' for a in ('side', 'left', 'front', 'rear', 'quarter', 'top')]
         if not all(os.path.exists(s) for s in shots): continue
         ims = [Image.open(s).convert('RGB') for s in shots]
         w = 640; ims = [i.resize((w, int(i.height * w / i.width))) for i in ims]
-        refs = [Image.open(r).convert('RGB') for r in REFS.get(t, []) if os.path.exists(r)]
+        refs = [i for i in (open_ref(r, Image) for r in ref_files(t)) if i is not None]
         refs = [r.resize((w, int(r.height * w / r.width))) for r in refs]
         hl = sum(i.height for i in ims) + 8 * (len(ims) + 1)
         hr = sum(r.height for r in refs) + 8 * (len(refs) + 1) if refs else 0
