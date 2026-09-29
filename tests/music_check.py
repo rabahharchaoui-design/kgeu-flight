@@ -112,6 +112,9 @@ async def main():
             await pg.wait_for_timeout(500)
         await pg.evaluate("()=>window.__kgeu.mission('drop')")
         await pg.wait_for_timeout(2500)
+        # the airdrop opens with the drop zone controller's call, which ducks the music: let it finish
+        await wait_for(pg, lambda s: not s['ducked'] and s['gain'] > 0.3, 15000)
+        await pg.wait_for_timeout(2500)   # and let the music ramp fully back up
         base = (await m(pg))['gain']
         await pg.evaluate("()=>{const K=window.__kgeu,ids=Object.keys(K.RADIO.buf).filter(k=>k.indexOf('t_')===0).slice(0,6);K.say('Tower','Skyhawk eight four zero one lima, runway one, cleared for takeoff.',ids)}")
         gs, dk = [], []

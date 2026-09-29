@@ -344,6 +344,30 @@ button.danger{ color:var(--warn); } button.danger.arm{ background:var(--warn); c
   display:none; flex-direction:column; gap:1px; text-align:center; z-index:5; pointer-events:none;
   border:2px solid #7fd4ff; max-width:min(560px,86vw); }
 #miss.on{ display:flex; }
+/* drop zone guidance */
+#dzHint{ position:fixed; left:50%; bottom:calc(var(--padB) + 70px); transform:translateX(-50%); z-index:5; pointer-events:none; display:none; white-space:nowrap;
+  font:800 22px var(--font); letter-spacing:.04em; color:#fff; text-shadow:0 0 3px #000,0 2px 10px rgba(0,0,0,.7),0 0 18px rgba(255,60,40,.55); }
+#dzHint.on{ display:block; animation:dzPulse 1.6s ease-in-out infinite; }
+@keyframes dzPulse{ 50%{ opacity:.7; } }
+#dzMark,#dzArrow{ position:fixed; left:0; top:0; z-index:4; pointer-events:none; display:none; }
+#dzMark.on,#dzArrow.on{ display:block; }
+#dzMark i{ position:absolute; left:-9px; top:-9px; width:18px; height:18px; border:2.5px solid #ff4a3a; border-radius:3px; transform:rotate(45deg); box-shadow:0 0 0 1.5px #fff,0 0 6px rgba(0,0,0,.6); }
+#dzMark b,#dzMark span{ position:absolute; left:0; transform:translateX(-50%); white-space:nowrap; color:#fff; text-shadow:0 0 3px #000,0 1px 4px #000; }
+#dzMark b{ top:-9px; left:16px; transform:none; font:800 13px var(--font); letter-spacing:.08em; } #dzMark span{ top:14px; font:700 12px var(--font); }
+#dzArrow svg{ position:absolute; left:-15px; top:-15px; filter:drop-shadow(0 1px 3px rgba(0,0,0,.7)); }
+#dzArrow span{ position:absolute; left:0; top:17px; transform:translateX(-50%); white-space:nowrap; font:700 12px var(--font); color:#fff; text-shadow:0 0 3px #000; }
+#jumpLt{ position:fixed; left:50%; top:calc(var(--padT) + var(--icon) + 80px); transform:translateX(-50%); z-index:5; pointer-events:none; display:none;
+  align-items:center; gap:8px; padding:5px 12px; }
+#jumpLt.on{ display:flex; }
+#jumpLt i{ width:18px; height:18px; border-radius:50%; background:#3a1a16; box-shadow:inset 0 0 0 2px rgba(255,255,255,.15); }
+#jumpLt i.g{ background:#16301f; }
+#jumpLt.red i.r{ background:#ff2a1a; box-shadow:0 0 12px 3px rgba(255,40,20,.8); }
+#jumpLt.green i.g{ background:#2bff6a; box-shadow:0 0 14px 4px rgba(40,255,100,.8); }
+#jumpLt b{ font:800 14px var(--font); letter-spacing:.08em; min-width:92px; }
+#jumpLt.red b{ color:#ff6a5a; } #jumpLt.green b{ color:#6bff9a; }
+#bDrop.jgreen{ animation:dropPulse .6s ease-in-out infinite alternate; border-color:#2bff6a !important; }
+#bDrop.jgreen i{ color:#6bff9a !important; }
+@keyframes dropPulse{ from{ box-shadow:0 0 0 0 rgba(43,255,106,.0); } to{ box-shadow:0 0 0 6px rgba(43,255,106,.55),0 0 18px rgba(43,255,106,.7); background:rgba(20,70,35,.9); } }
 #miss.warn{ border-color:var(--caution); }
 #miss b{ font-size:17px; letter-spacing:.02em; }
 #miss span{ font-size:14px; color:var(--soft); }
@@ -669,6 +693,10 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
 <div id="lesson" class="card"><div class="lesTop"><b id="lesT"></b><button id="lesQuit">End</button></div><div id="lesI"></div><div id="lesM"></div></div>
 </div>
 <div id="miss" class="card"><b id="missT"></b><span id="missS"></span></div>
+<div id="dzHint">Head for the red smoke</div>
+<div id="dzMark"><i></i><b>DZ</b><span></span></div>
+<div id="dzArrow"><svg viewBox="0 0 24 24" width="30" height="30"><path d="M7 3l10 9-10 9" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 3l10 9-10 9" fill="none" stroke="#ff4a3a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span></span></div>
+<div id="jumpLt" class="card"><i class="r"></i><i class="g"></i><b></b></div>
 <div id="badges"><div class="badge" id="gBadge" role="button" aria-label="Landing grade, tap for details"><b id="gbL"></b><span id="gbT"></span></div><div class="badge rec" id="banner" role="button" aria-label="New record, tap for records"></div></div>
 <canvas id="sixpack" width="300" height="200"></canvas>
 <div id="tutArrow"><svg viewBox="0 0 64 40"><path d="M2 14 H40 V3 L62 20 L40 37 V26 H2 Z" fill="#F6C177" stroke="#2A1608" stroke-width="2.5" stroke-linejoin="round"/></svg></div>
@@ -4282,7 +4310,7 @@ const DT_TOP={x:0,z:0,h:0,w:0,d:0};     // the tallest downtown Phoenix block, f
     x.clearRect(0,0,w,h);const c=w/2,R=m=>m*PPD;
     // a wash inside the scoring circle, so the DZ is findable from 1,000 ft
     x.beginPath();x.arc(c,c,R(150),0,6.283);x.fillStyle='rgba(232,114,31,.34)';x.fill();
-    x.beginPath();x.arc(c,c,R(20),0,6.283);x.fillStyle='#e8721f';x.fill();     // bullseye
+    x.beginPath();x.arc(c,c,R(20),0,6.283);x.fillStyle='#ece6d8';x.fill();     // bullseye, pale so the orange letter A reads on it
     const band=(m,lw,col)=>{x.beginPath();x.arc(c,c,R(m),0,6.283);x.strokeStyle=col;x.lineWidth=lw;x.stroke();};
     band(50,7,'#e8e3d6');
     band(100,7,'#e8e3d6');
@@ -5482,9 +5510,9 @@ function missHud(title,sub,warn){
 function missReset(){
   if(MISS.pallet){scene.remove(MISS.pallet.g);MISS.pallet=null;}
   MISS.on=false;MISS.kind='';MISS.armed=false;MISS.dropped=false;MISS.result=null;MISS.td=null;MISS.stopT=0;MISS.cardT=0;
-  missHud(null);dcReset();
+  missHud(null);dcReset();dzStop();
 }
-function missStart(kind){MISS.on=true;MISS.kind=kind;MISS.armed=false;MISS.dropped=false;MISS.result=null;MISS.td=null;MISS.stopT=0;MISS.cardT=0;}
+function missStart(kind){MISS.g=undefined;MISS.on=true;MISS.kind=kind;MISS.armed=false;MISS.dropped=false;MISS.result=null;MISS.td=null;MISS.stopT=0;MISS.cardT=0;}
 // ---- the pallet: a CDS bundle under a 26 ft ring slot canopy ----
 function makePallet(){
   const g=new THREE.Group();
@@ -5506,7 +5534,7 @@ function missDrop(){
   const back=new V3(0,-1.2,6).applyQuaternion(st.quat);
   p.pos.copy(st.pos).add(back);p.vel.copy(st.vel);
   p.g.position.copy(p.pos);
-  MISS.pallet=p;MISS.dropped=true;
+  MISS.pallet=p;MISS.dropped=true;dzDest(false);   // the route clears once the load is away
   toast('Load away');
   if(dcOn())dcSet('pallet',0.5);                       // ride the bundle down
   radioQ.unshift(L(AC.cs,'pilot',AC.cs+', load away, one bundle.',[csP(),'p_load_away']));
@@ -5518,7 +5546,9 @@ function missUpdate(dt){
   if(MISS.kind==='drop'){
     if(!MISS.dropped){
       const ft=st.agl*M2FT,kt=st.ias*MS2KT;
-      const inAlt=ft>500&&ft<1500,inSpd=kt<160,lvl=Math.abs(st.gload-1)<0.35;
+      // wings level and steady, judged on a smoothed g so turbulence (a haboob's buffet) does not flicker it
+      MISS.g=MISS.g===undefined?st.gload:MISS.g+(st.gload-MISS.g)*Math.min(1,dt*2);
+      const inAlt=ft>500&&ft<1500,inSpd=kt<160,lvl=Math.abs(MISS.g-1)<0.35;
       MISS.armed=inAlt&&inSpd&&lvl&&!st.onGround;
       const d=Math.hypot(st.pos.x-DROPZ.x,st.pos.z-DROPZ.z);
       const why=!inAlt?(ft<=500?'Too low, climb to 500 ft':'Too high, come down below 1,500 ft')
@@ -5592,7 +5622,7 @@ function missScore(r){
   if(r.kind==='drop'){
     const m=r.dist;
     letter=m<25?'A':m<50?'B':m<100?'C':m<150?'D':'F';
-    title=m<25?'Bullseye':m<50?'Good bundle':m<100?'On the DZ':m<150?'Inside the circle':'Off the drop zone';
+    title=(m<25?'Bullseye':m<50?'Good bundle':m<100?'On the DZ':m<150?'Inside the circle':'Off the drop zone')+', '+Math.round(m)+' m from the centre';
     lines=[['Distance from centre',Math.round(m)+' m  ('+Math.round(m*M2FT)+' ft)'],
            ['Scoring circle',DROPZ.r+' m'],
            ['Wind at drop',windTxt()]];
@@ -5610,6 +5640,150 @@ function missScore(r){
   document.getElementById('mLines').innerHTML=lines.map(l=>'<div class="gl"><span>'+l[0]+'</span><b>'+l[1]+'</b></div>').join('');
   missHud(null);missOv.classList.add('on');paused=true;
   logMission(r,letter);
+}
+
+// ================= Drop zone guidance =================
+// So nobody has to guess where the drop zone is: its icon on both maps with the waypoint
+// and route set to it, a floating marker and an edge chevron, orange panels in a big letter
+// A, a tall column of red smoke that drifts with the wind (red flares with a glow at night),
+// a faint run in line into the wind from 3 miles with glowing gates along it, and the jump
+// lights with the crew's one minute, ten seconds and green light calls.
+// Hard keeps only the map marker, the smoke, the panels and the jump lights.
+const DZ={on:false,built:false,g:null,smoke:[],flares:[],glow:null,letter:null,runG:null,gates:[],f:new V3(),rel:null,
+  t:0,simT:0,tRel:1e9,err:1e9,along:0,cross:0,light:'',c1:false,c10:false,cg:false,seen:false,uiT:0,lastL:''};
+const DZ_SMOKE=34,DZ_LIFE=46,DZ_ALT=305,DZ_KT=140,DZ_TOL={easy:140,hard:60};
+const DZ_DEST={x:DROPZ.x,z:DROPZ.z,name:'Drop zone',short:'DZ',kind:'drop',dz:true};
+const flareTex=tex(64,64,(x,w,h)=>{const g=x.createRadialGradient(32,32,1,32,32,31);
+  g.addColorStop(0,'rgba(255,235,225,1)');g.addColorStop(0.25,'rgba(255,70,50,.9)');g.addColorStop(1,'rgba(200,0,0,0)');x.fillStyle=g;x.fillRect(0,0,64,64);});
+function dzBuild(){
+  DZ.built=true;const g=new THREE.Group();DZ.g=g;scene.add(g);const gh=groundHeight(DROPZ.x,DROPZ.z);
+  // a letter A about 64 m tall in orange panels, north up, over the pale bullseye
+  const strokes=[[-23,-31,0,31],[23,-31,0,31],[-12,-3,12,-3]],P=[];
+  for(const s of strokes){const L=Math.hypot(s[2]-s[0],s[3]-s[1]),n=Math.round(L/6.8),a=Math.atan2(s[3]-s[1],s[2]-s[0]);
+    for(let i=0;i<=n;i++){const t=i/n;P.push([s[0]+(s[2]-s[0])*t,s[1]+(s[3]-s[1])*t,a]);}}
+  const pm=new THREE.MeshLambertMaterial({color:0xff7a1f,emissive:0x5a2000});
+  const im=new THREE.InstancedMesh(new THREE.BoxGeometry(6,0.35,2.6),pm,P.length),m=new THREE.Matrix4(),q=new Q4();
+  P.forEach((p,i)=>{q.setFromAxisAngle(new V3(0,1,0),p[2]);m.compose(new V3(DROPZ.x+p[0],gh+0.45,DROPZ.z-p[1]),q,new V3(1,1,1));im.setMatrixAt(i,m);});
+  g.add(im);DZ.letter=im;
+  // the smoke column: pooled puffs, drawn over the fog so it reads from miles out
+  for(let i=0;i<DZ_SMOKE;i++){const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:puffTex,color:0xc82820,transparent:true,opacity:0,depthWrite:false,fog:false}));
+    sp.visible=false;g.add(sp);DZ.smoke.push(sp);}
+  // night: flare pots at the letter's feet and apex and a wide red glow over them
+  for(const [x,y] of [[-23,-31],[23,-31],[0,31],[-12,-3],[12,-3],[0,-31]]){
+    const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:flareTex,color:0xffffff,transparent:true,opacity:0,depthWrite:false,fog:false,blending:THREE.AdditiveBlending}));
+    sp.position.set(DROPZ.x+x,gh+1.5,DROPZ.z-y);sp.visible=false;g.add(sp);DZ.flares.push(sp);}
+  DZ.glow=new THREE.Sprite(new THREE.SpriteMaterial({map:flareTex,color:0xff3020,transparent:true,opacity:0,depthWrite:false,fog:false,blending:THREE.AdditiveBlending}));
+  DZ.glow.position.set(DROPZ.x,gh+12,DROPZ.z);DZ.glow.visible=false;g.add(DZ.glow);
+  // Easy: gates along the run in, rebuilt with the line for each run's wind
+  const gm=new THREE.MeshBasicMaterial({color:0x6fffb0,transparent:true,opacity:0.5,depthWrite:false,fog:false,side:THREE.DoubleSide});
+  const bars=[[70,3,0,21],[70,3,0,-21],[3,45,-35,0],[3,45,35,0]].map(b=>{const bg=new THREE.PlaneGeometry(b[0],b[1]);bg.translate(b[2],b[3],0);return bg;});
+  const gg=eggMerge(bars);
+  for(let i=0;i<6;i++){const gt=new THREE.Mesh(gg,gm);gt.visible=false;g.add(gt);DZ.gates.push(gt);}
+  g.visible=false;
+}
+// where a bundle released now would land: the same fall, canopy and drift as the real one
+function dzPredict(px,py,pz,vx,vy,vz,out){
+  const wd=st.windDir*Math.PI/180,ws=Math.max(0,st.windKt*0.5144),wx=-Math.sin(wd)*ws,wz=Math.cos(wd)*ws,h=0.1;
+  let t=0;py-=1.2;
+  for(let i=0;i<1500;i++){t+=h;
+    if(t<=0.7)vy-=9.81*h;else{vy+=(-6-vy)*Math.min(1,h*2.2);vx+=(wx-vx)*Math.min(1,h*0.9);vz+=(wz-vz)*Math.min(1,h*0.9);}
+    px+=vx*h;py+=vy*h;pz+=vz*h;if(py<=groundHeight(px,pz)+0.95)break;}
+  out[0]=px;out[1]=pz;return out;
+}
+const _dzp=[0,0];
+function dzDest(on){
+  if(on&&!(DEST&&DEST.dz)){DEST=DZ_DEST;document.body.classList.add('hasDest');destUI(true);}
+  else if(!on&&DEST&&DEST.dz){DEST=null;document.body.classList.remove('hasDest');destUI(true);}
+}
+function dzStart(){
+  if(!DZ.built)dzBuild();
+  Object.assign(DZ,{on:true,t:0,simT:0,tRel:1e9,err:1e9,light:'',c1:false,c10:false,cg:false,seen:false,uiT:0,lastL:''});DZ.g.visible=true;
+  dzRunIn();
+  dzDest(rookie());
+  $('dzHint').classList.add('on');
+  radioQ.push(L('Drop Zone Control','tower',AC.cs+', drop zone is marked. Head for the red smoke.',['t_cs_herky','t_dz_smoke']));
+}
+// the best run in: into the wind at 1,000 ft and 140 kt, released where the drift puts the bundle
+// on the centre. Worked out again whenever the wind shifts (a haboob swings it hard).
+function dzRunIn(){
+  DZ.wDir=st.windDir;DZ.wKt=st.windKt;
+  const h=st.windDir*Math.PI/180,f=DZ.f.set(Math.sin(h),0,-Math.cos(h)),V=DZ_KT*KT,gh=groundHeight(DROPZ.x,DROPZ.z);
+  dzPredict(DROPZ.x,gh+DZ_ALT,DROPZ.z,f.x*V,0,f.z*V,_dzp);
+  DZ.rel={x:DROPZ.x-(_dzp[0]-DROPZ.x),z:DROPZ.z-(_dzp[1]-DROPZ.z)};
+  // the run in line on the ground, from 3 miles out to just past the centre
+  if(DZ.runG){DZ.g.remove(DZ.runG);DZ.runG.geometry.dispose();}
+  const pos=[],idx=[];let n=0;
+  for(let d=-4828;d<=300;d+=80){const x=DROPZ.x+f.x*d,z=DROPZ.z+f.z*d,y=groundHeight(x,z)+0.7;
+    pos.push(x-f.z*5,y,z+f.x*5,x+f.z*5,y,z-f.x*5);if(n)idx.push(2*n-2,2*n-1,2*n,2*n-1,2*n+1,2*n);n++;}
+  const lg=new THREE.BufferGeometry();lg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));lg.setIndex(idx);
+  DZ.runG=new THREE.Mesh(lg,new THREE.MeshBasicMaterial({color:0xfff2d8,transparent:true,opacity:0.3,depthWrite:false,side:THREE.DoubleSide}));DZ.g.add(DZ.runG);
+  // gates along it, at drop height, before the release point
+  [3600,2900,2200,1500,900,400].forEach((d,i)=>{const gt=DZ.gates[i],x=DZ.rel.x-f.x*d,z=DZ.rel.z-f.z*d;
+    gt.position.set(x,groundHeight(x,z)+DZ_ALT,z);gt.rotation.set(0,-h,0);});
+}
+function dzStop(){
+  if(!DZ.on)return;DZ.on=false;if(DZ.g)DZ.g.visible=false;dzDest(false);
+  for(const id of ['dzHint','dzMark','dzArrow','jumpLt'])$(id).classList.remove('on');$('bDrop').classList.remove('jgreen');
+}
+const _dzv=new V3();
+function dzSay(id,text){radioQ.unshift(L('Loadmaster','crew',text,[id]));}
+function dzUpdate(dt){
+  if(!DZ.on||!DZ.g)return;
+  const E=rookie(),live=running&&!paused,gh=groundHeight(DROPZ.x,DROPZ.z),night=TOD.night||TOD.lights>0.6,dusty=HB.on&&HB.d>0.2;
+  if(live)DZ.t+=dt;
+  // smoke: each puff rises and grows as it drifts downwind, so the column leans with the wind
+  windVec(_fw);const lit=fxLit(),tt=DZ.t;
+  DZ.smoke.forEach((sp,i)=>{const a=((tt/DZ_LIFE)+i/DZ_SMOKE)%1,s=a*DZ_LIFE;
+    // drift a touch exaggerated so even a light wind shows its direction
+    sp.position.set(DROPZ.x+_fw.x*s*1.3+Math.sin(tt*0.3+i)*a*25,gh+4+1100*Math.pow(a,0.8),DROPZ.z+_fw.z*s*1.3+Math.cos(tt*0.27+i*1.7)*a*25);
+    sp.scale.setScalar(110+a*420);sp.visible=true;
+    const base=night?0.5*(1-a)+0.08:1;
+    // thick all the way up; thinned when the camera is inside it, so flying through does not flood the screen
+    const near=clamp((sp.position.distanceTo(camera.position)-sp.scale.x*0.4)/250,0.12,1);
+    sp.material.opacity=(night?0.7:0.95)*Math.min(1,a/0.04)*Math.pow(1-a,0.6)*near*(dusty?0.6:1);
+    const k=night?base:Math.max(0.5,lit);sp.material.color.setRGB(0.85*k,0.13*k,0.11*k);});
+  DZ.flares.forEach((sp,i)=>{sp.visible=night;if(night){const fl=0.8+0.25*Math.sin(tt*13+i*2.1)+0.1*Math.sin(tt*31+i);sp.scale.setScalar(9*fl);sp.material.opacity=0.95;}});
+  DZ.glow.visible=night;if(night){DZ.glow.scale.setScalar(300+20*Math.sin(tt*3));DZ.glow.material.opacity=0.85;}
+  // Easy only: the run in line and the gates
+  const dropped=MISS.dropped;DZ.runG.visible=E&&!dropped;DZ.gates.forEach(gt=>{gt.visible=E&&!dropped;});
+  dzDest(E&&!dropped&&MISS.on);
+  if(!live)return;
+  if(!dropped&&(Math.abs(wrapPi((st.windDir-DZ.wDir)*Math.PI/180))>0.2||Math.abs(st.windKt-DZ.wKt)>6))dzRunIn();
+  DZ.uiT-=dt;if(DZ.uiT>0)return;DZ.uiT=0.05;
+  // is the drop zone on screen? then the hint can go, and Easy gets a floating marker, else an edge chevron
+  _dzv.set(DROPZ.x,gh+30,DROPZ.z);const dist=Math.hypot(st.pos.x-DROPZ.x,st.pos.z-DROPZ.z);_dzv.project(camera);
+  const W=innerWidth,H=innerHeight,front=_dzv.z<1,sx=(_dzv.x+1)/2*W,sy=(1-_dzv.y)/2*H,onS=front&&sx>30&&sx<W-30&&sy>30&&sy<H-30;
+  // the hint stays at least 6 s, until the drop zone is on screen and within 6 km
+  if(onS&&dist<6000&&DZ.t>6&&!DZ.seen){DZ.seen=true;$('dzHint').classList.remove('on');}
+  const dtxt=E?(dist/1609.34).toFixed(1)+' mi':(dist/1852).toFixed(1)+' nm';
+  const mk=$('dzMark'),ar=$('dzArrow'),show=E&&!dropped&&!st.crashed;
+  mk.classList.toggle('on',show&&onS);ar.classList.toggle('on',show&&!onS);
+  if(show&&onS){mk.style.transform='translate('+Math.round(sx)+'px,'+Math.round(sy)+'px)';mk.lastChild.textContent=dtxt;}
+  if(show&&!onS){let dx=_dzv.x,dy=-_dzv.y;if(!front){dx=-dx;dy=-dy;}if(Math.abs(dx)+Math.abs(dy)<1e-6)dy=1;
+    const cx=W/2,cy=H/2,m=48,kx=dx>0?(W-m-cx)/(dx*W/2):dx<0?(m-cx)/(dx*W/2):1e9,ky=dy>0?(H-m-cy)/(dy*H/2):dy<0?(m-cy)/(dy*H/2):1e9,k=Math.min(kx,ky);
+    ar.style.transform='translate('+Math.round(cx+dx*W/2*k)+'px,'+Math.round(cy+dy*H/2*k)+'px)';
+    ar.firstChild.style.transform='rotate('+Math.round(Math.atan2(dy*H,dx*W)*180/Math.PI)+'deg)';ar.lastChild.textContent=dtxt;}
+  // jump lights: predict the impact point every 0.2 s from the aircraft as it is flying now
+  let light='';
+  if(!dropped&&!st.onGround&&!st.crashed){
+    DZ.simT-=0.05;if(DZ.simT<=0){DZ.simT=0.2;
+      dzPredict(st.pos.x,st.pos.y,st.pos.z,st.vel.x,st.vel.y,st.vel.z,_dzp);
+      const gs=Math.max(1,Math.hypot(st.vel.x,st.vel.z)),tx=st.vel.x/gs,tz=st.vel.z/gs,ex=_dzp[0]-DROPZ.x,ez=_dzp[1]-DROPZ.z;
+      DZ.along=ex*tx+ez*tz;DZ.cross=-ex*tz+ez*tx;DZ.err=Math.hypot(ex,ez);DZ.tRel=-DZ.along/gs;}
+    const tol=DZ_TOL[E?'easy':'hard'],onLine=Math.abs(DZ.cross)<Math.max(tol*3,400);
+    if(DZ.tRel>75){DZ.c1=DZ.c10=DZ.cg=false;}                           // lined up for a fresh pass
+    if(DZ.err<tol&&MISS.armed)light='green';
+    else if(onLine&&DZ.tRel<=10.5&&DZ.along<-tol*0.5)light='red';
+    if(onLine&&!DZ.c1&&!DZ.c10&&DZ.tRel<=60&&DZ.tRel>15){DZ.c1=true;dzSay('p_j_1min','One minute.');}
+    if(onLine&&!DZ.c10&&DZ.tRel<=10.5&&DZ.tRel>2){DZ.c10=true;dzSay('p_j_10s','Ten seconds.');}
+    if(light==='green'&&!DZ.cg){DZ.cg=true;dzSay('p_j_green','Green light, green light.');}
+    const jl=$('jumpLt');jl.classList.toggle('on',light!==''||(onLine&&DZ.tRel<75&&DZ.tRel>0));
+    if(light!==DZ.lastL){DZ.lastL=light;jl.className=jl.className.replace(/ ?(red|green)/g,'')+(light?' '+light:'');
+      jl.lastChild.textContent=light==='green'?'GREEN LIGHT':light==='red'?'RED LIGHT':'';}
+    if(!light&&jl.classList.contains('on'))jl.lastChild.textContent=DZ.tRel>0&&DZ.tRel<75?'ONE MINUTE':'';
+  } else $('jumpLt').classList.remove('on','red','green');
+  $('bDrop').classList.toggle('jgreen',light==='green');
+  DZ.light=light;
 }
 
 // ---- C-130 drop camera ----
@@ -6177,6 +6351,8 @@ const CLOCK_W=['ahead','ahead, a little right','ahead and to the right','to your
 function plainOf(l){
   const t=l.text,mine=AC.cs&&(t.indexOf(AC.cs)>=0||(AC.csS&&t.indexOf(AC.csS)>=0)),who=/Ground/.test(l.who)?'Ground':/Range/.test(l.who)?'Range':/Approach/.test(l.who)?'Approach':'Tower';
   if(l.who==='Instructor')return '';
+  if(l.who==='Loadmaster')return 'Crew: '+l.text;
+  if(/red smoke/.test(l.text))return 'Drop zone says: fly to the red smoke.';
   if(l.who===AC.cs||l.kind==='pilot')return 'You: got it.';
   if(/^Crash/.test(t))return 'Tower says: crash! Fire trucks are on the way.';
   if(/Good hit/.test(t))return 'Range says: direct hit!';
@@ -6495,6 +6671,7 @@ function start(mode,base){
   document.getElementById('recOv').classList.remove('on');DASH.on=false;badgeHide();
   if(mode==='range')strikeStart();
   if(mode==='drop'||mode==='short')missStart(mode==='drop'?'drop':'short');
+  if(mode==='drop')dzStart();
   hbSync(true);
   layoutCtl();
 }
@@ -7211,6 +7388,10 @@ function drawMap(hdgT){
     if(Math.hypot(q[0],q[1])<C*1.4){mx.fillStyle='#4de1ff';mx.strokeStyle='#06121c';mx.lineWidth=1.5*dpr;mx.beginPath();mx.arc(q[0],q[1],4.5*dpr,0,TAU);mx.fill();mx.stroke();}}
   mx.fillStyle='#7fd4ff';TRAFFIC.forEach(o=>{const a=P(o.m.g.position.x,o.m.g.position.z);mx.beginPath();mx.arc(a[0],a[1],2.2*dpr,0,TAU);mx.fill();});
   mx.setTransform(1,0,0,1,0,0);
+  // the drop zone on an airdrop mission: upright, pinned to the rim when it is out of range
+  if(MISS.on&&MISS.kind==='drop'&&!MISS.dropped){const X=(DROPZ.x-ox)*k,Z=(DROPZ.z-oz)*k,ch=Math.cos(-h),sh=Math.sin(-h);
+    let sx=X*ch-Z*sh,sy=X*sh+Z*ch;const r=Math.hypot(sx,sy),lim=C-11*dpr;if(r>lim){sx*=lim/r;sy*=lim/r;}
+    mx.save();mx.scale(dpr,dpr);mIcon(mx,'drop',(C+sx)/dpr,(C+sy)/dpr,16);mx.restore();}
   // range ring, 2 nm
   mx.strokeStyle='rgba(244,241,234,.28)';mx.lineWidth=1*dpr;mx.setLineDash([3*dpr,3*dpr]);mx.beginPath();mx.arc(C,C,3704*k,0,TAU);mx.stroke();mx.setLineDash([]);
   // the aircraft, always pointing up, in the full map's yellow
@@ -8723,7 +8904,7 @@ function tick(t,skipRender){
     if(ev.type==='liftoff') clusters.forEach(c=>{if(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)<1500){c.cheer=4;}});
   }
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.classList.remove('on');}
-  missUpdate(dt);if(running&&!paused)arcTick();logTime(dt);dashUpdate(dt);bannerUpdate(dt);
+  missUpdate(dt);dzUpdate(dt);if(running&&!paused)arcTick();logTime(dt);dashUpdate(dt);bannerUpdate(dt);
   {const show=!rookie()&&camMode===1&&(AC.id==='cessna'||AC.id==='alpha')&&running&&!st.crashed;
    if(spCan){spCan.classList.toggle('on',show);if(show)drawSixPack();}}
   radioUpdate(dt);cfgUpdate(dt);
@@ -8821,7 +9002,7 @@ function tick(t,skipRender){
     const po=pauseOv.classList.contains('on');document.body.classList.toggle('pauseOn',po);if(po)showRender(dt,CARP);}
 }
 // test hook: headless UI checks need to reach a few internals
-window.__kgeu={MAPD:MAPD,runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,
+window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
   lights:()=>({KGEU:AL.KGEU.count(),KLUF:AL.KLUF.count(),uLights:AL_MAT.uniforms.uLights.value,
     layers:AL_LAYERS.map(L=>({name:L.pts&&L.pts.name,visible:!!(L.pts&&L.pts.visible),inScene:!!(L.pts&&L.pts.parent)})),

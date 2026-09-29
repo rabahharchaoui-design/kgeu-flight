@@ -31,6 +31,9 @@ Tag: pre-feel. Branch: feel. Report: FEEL_REPORT.md.
 ## MODES SESSION: Easy and Hard (tag preeasyhard, branch modes)
 - [x] (done: fly screen EASY/HARD cards, pause and Settings toggles with descriptions, first launch chooser, stored values unchanged; Easy assists blend in over 1.5 s when switched mid flight; RUN.easyEver run tagging, mode on records and the kgeuRuns log, EASY/HARD tag on result cards; modes_check.py) Rookie and Pilot renamed EASY and HARD everywhere players see them, behaviour unchanged.
 
+## DZ SESSION: C-130 drop zone guidance (tag predz, branch dz, DZ_REPORT.md)
+- [x] (done: DZ icon on both maps with the Easy route cleared after the drop; "Head for the red smoke" on screen and once on the radio; letter A panels; thick red smoke column leaning with the wind, red flares and glow at night; Easy run in line, gates, floating marker and edge chevron; jump lights with one minute, ten seconds and green light calls and a pulsing DROP; result card distance; dz_check.py) Drop zone guidance, items 1 to 7 plus the red smoke change.
+
 === STOP HERE UNLESS TOLD OTHERWISE ===
 (Rabah checks weekly usage in the morning. Only he moves this line.)
 
