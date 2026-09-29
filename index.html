@@ -475,7 +475,7 @@ label.sens b{ color:var(--ink); min-width:74px; }
 .frows{ display:flex; flex-direction:column; gap:6px; flex:none; }
 .frow{ display:flex; gap:10px; align-items:stretch; }
 .grp{ display:flex; gap:6px; align-items:center; flex:1; min-width:0; }
-.grp.g4{ flex:1.9; } .grp.g2{ flex:1.1; } .grp.g3{ flex:1.8; }
+.grp.g4{ flex:1.9; } .grp.g2{ flex:1.1; } .grp.g3{ flex:1.8; } .grp.g3.g4s{ flex:2.3; }
 .glbl{ writing-mode:vertical-rl; transform:rotate(180deg); font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--brown); flex:none; }
 .frows .chip{ flex:1; min-width:0; min-height:44px; height:44px; border-radius:12px; padding:0 4px; line-height:1; white-space:nowrap; }
 .frows .chip b{ display:block; font-size:clamp(13px,2.2vw,17px); font-weight:800; overflow:hidden; text-overflow:ellipsis; }
@@ -735,8 +735,8 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
      <button class="pick chip" data-b="kgeu"><b>Glendale</b></button><button class="pick chip" data-b="luke"><b>Luke AFB</b></button></div>
     <div class="grp g4"><span class="glbl">Time</span>
      <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><button class="pick chip" data-tod="haboob"><b>Haboob</b></button></div></div>
-   <div class="frow"><div class="grp g3"><span class="glbl">Start</span>
-     <button class="pick chip" data-pos="runway"><b>Runway</b></button><button class="pick chip" data-pos="ramp"><b>Ramp</b></button><button class="pick chip" data-pos="final"><b>3 mi final</b></button></div>
+   <div class="frow"><div class="grp g3 g4s"><span class="glbl">Start</span>
+     <button class="pick chip" data-pos="runway"><b>Runway</b></button><button class="pick chip" data-pos="ramp"><b>Ramp</b></button><button class="pick chip" data-pos="final1"><b>1 mi final</b></button><button class="pick chip" data-pos="final"><b>3 mi final</b></button></div>
     <button class="go" id="bGo">GO</button></div>
   </div>
  </div>
@@ -817,8 +817,8 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
      <button class="pick chip" data-b="kgeu"><b>Glendale</b></button><button class="pick chip" data-b="luke"><b>Luke AFB</b></button></div>
     <div class="grp g4"><span class="glbl">Time</span>
      <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><button class="pick chip" data-tod="haboob"><b>Haboob</b></button></div></div>
-   <div class="frow"><div class="grp g3"><span class="glbl">Start</span>
-     <button class="pick chip" data-pos="runway"><b>Runway</b></button><button class="pick chip" data-pos="ramp"><b>Ramp</b></button><button class="pick chip" data-pos="final"><b>3 mi final</b></button></div>
+   <div class="frow"><div class="grp g3 g4s"><span class="glbl">Start</span>
+     <button class="pick chip" data-pos="runway"><b>Runway</b></button><button class="pick chip" data-pos="ramp"><b>Ramp</b></button><button class="pick chip" data-pos="final1"><b>1 mi final</b></button><button class="pick chip" data-pos="final"><b>3 mi final</b></button></div>
     <button class="go apply" id="pApply">Apply</button></div>
   </div>
   </div>
@@ -1033,7 +1033,7 @@ function liftCoef(a,fl){
   else cl=AC.CL0+AC.CLa*a;
   return cl+fl.cl*(a>s?0.6:1);
 }
-function createState(mode,base){
+function createState(mode,base,finD){
   const st={pos:new V3(),vel:new V3(),quat:new Q4(),w:new V3(),throttle:0,flapIdx:0,trim:0.5,elev:0,ail:0,rud:0,steer:0,brake:false,
     onGround:true,crashed:false,crashReason:'',airTime:0,alpha:0,beta:0,aoaWarn:false,stalled:false,dropDir:1,gload:1,time:0,
     ias:0,agl:0,ap:null,apW:null,apPI:0,apTI:0,sfR:0,sfU:1,rpm:700,power:0,gearDown:true,gearPos:1,windDir:50,windKt:5,windBase:50,windPh:0,gust:0,gustT:0,gustTarget:0,gustAmp:0.35,dust:0,dustDir:150,tv:0,tvT:0,tvTarget:0,bp:0,br:0,noPF:false,mode:mode};
@@ -1045,8 +1045,10 @@ function createState(mode,base){
   st.windDir=st.windBase;
   const B=BASES[st.base]||BASES.kgeu, bh=B.hdg*Math.PI/180;
   if(mode==='ramp'){st.pos.set(B.ramp[0](),GEAR,B.ramp[1]());st.quat.setFromEuler(yaw(B.rampHdg));}
-  else if(mode==='final'){const V=AC.vapp/0.93,tg=Math.tan(GS),P=B.fin(5556);
-    st.pos.set(P[0],5556*tg+GEAR,P[1]);st.vel.set(Math.sin(bh)*V,-V*tg,-Math.cos(bh)*V);
+  else if(mode==='final'){const D=finD||5556,tg=Math.tan(GS),P=B.fin(D);   // 3 nm final, or 1 nm (about 318 ft on the 3 degree path)
+    // the 1 nm start flies at exactly the approach speed, indicated (true airspeed corrected for the air's density)
+    const V=finD?AC.vapp/Math.sqrt(1.097*Math.exp(-D*tg/9200)/1.225):AC.vapp/0.93;
+    st.pos.set(P[0],D*tg+GEAR,P[1]);st.vel.set(Math.sin(bh)*V,-V*tg,-Math.cos(bh)*V);
     st.quat.setFromEuler(new THREE.Euler(AC.finalPitch,-bh,0,'YXZ'));st.throttle=st.power=AC.finalThr;st.flapIdx=AC.finalFlap;st.trim=AC.finalTrim;st.onGround=false;st.airTime=10;}
   else if(mode==='range'){
     // already in orbit at about 7,000 ft MSL over the range
@@ -6662,7 +6664,11 @@ const menu=document.getElementById('menu'),crashEl=document.getElementById('cras
 function start(mode,base){
   initAudio();
   setType(acType);useModel(acType);sizeShadow();radioQ.length=0;radioHush();radioFadeTok++;radioVolApply();radioBusy=0;chatT=9;atcT=0;atcEl.classList.remove('on');
-  st=createState(mode,base||SPAWN_BASE);st.type=acType;ROOK.to=false;guideShow(null);st.easy=easy;st.noPF=isTouch||easy;document.body.classList.toggle('easy',easy);A={};running=true;paused=false;RUN.easyEver=easy;RUN.t0=Date.now();events.length=0;cfgReset();camBump=0;
+  const spawn=mode;if(mode==='final1')mode='final';
+  st=createState(mode,base||SPAWN_BASE,spawn==='final1'?1852:0);st.type=acType;st.spawn=spawn;
+  // 1 mile final: Easy is already configured to land (gear down, landing flaps); Hard is set up the way the
+  // 3 mile final is, gear down and approach flaps, and the last stage of flap is the pilot's
+  if(spawn==='final1'&&easy){st.flapIdx=AC.landFlap;st.gearDown=true;st.gearPos=1;}ROOK.to=false;guideShow(null);st.easy=easy;st.noPF=isTouch||easy;document.body.classList.toggle('easy',easy);A={};running=true;paused=false;RUN.easyEver=easy;RUN.t0=Date.now();events.length=0;cfgReset();camBump=0;
   menuClose();crashClear();pauseOv.classList.remove('on');$('storyOv').classList.remove('on');snapCamera=true;
   if(camMode>1)camMode=0;   // the ball view is entered in flight, where its autopilot can take over
   STRIKE.active=false;lesEnd();gradeOv.classList.remove('on');arcStop();$('arcOv').classList.remove('on');
@@ -6680,7 +6686,7 @@ function openMenu(scr){if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.
 // the pause button, P and a backgrounded app all land here; the sheet shows while paused
 function togglePause(){paused=!paused;pauseOv.classList.toggle('on',paused);if(paused){radioFade(120);CARP.sync();if(window.stickReset)stickReset();}}
 $('pResume').onclick=()=>{paused=false;pauseOv.classList.remove('on');initAudio();radioVolApply();};
-$('pRestart').onclick=()=>{pauseOv.classList.remove('on');start(st.mode==='final'||st.mode==='ramp'?st.mode:(MISS.on?MISS.kind:STRIKE.active?'range':'runway'));};
+$('pRestart').onclick=()=>{pauseOv.classList.remove('on');start(st.mode==='final'||st.mode==='ramp'?(st.spawn||st.mode):(MISS.on?MISS.kind:STRIKE.active?'range':'runway'));};
 $('pMenu').onclick=()=>openMenu();
 function freeStart(mode){pickType(savedType);pickPos(mode||SPAWN_POS);start(SPAWN_POS);}
 document.getElementById('mRetry').onclick=()=>{missOv.classList.remove('on');start(MISS.kind==='drop'?'drop':'short');};
@@ -6690,7 +6696,7 @@ function landDetails(){if(!running||st.crashed||menu.classList.contains('on'))re
 gBadge.addEventListener('click',landDetails);
 bannerEl.addEventListener('click',()=>{if(!running||menu.classList.contains('on'))return;badgeHide();if(!st.crashed){paused=true;}recOpen();});
 document.getElementById('lKeep').onclick=()=>{landOv.classList.remove('on');paused=false;};
-document.getElementById('lAgain').onclick=()=>{landOv.classList.remove('on');start(st.mode==='final'?'final':'runway');};
+document.getElementById('lAgain').onclick=()=>{landOv.classList.remove('on');start(st.mode==='final'?(st.spawn||'final'):'runway');};
 document.getElementById('lMenu').onclick=()=>{landOv.classList.remove('on');openMenu();};
 document.getElementById('lRec').onclick=()=>{landOv.classList.remove('on');recOpen();};
 document.getElementById('recClose').onclick=()=>{document.getElementById('recOv').classList.remove('on');};
@@ -6959,8 +6965,9 @@ function pickBase(id){SPAWN_BASE=BASES[id]?id:'kgeu';try{localStorage.setItem('k
   document.querySelectorAll('.pick[data-b]').forEach(b=>b.classList.toggle('sel',b.dataset.b===SPAWN_BASE));sumUI();}
 document.querySelectorAll('.pick[data-b]').forEach(b=>b.addEventListener('click',()=>pickBase(b.dataset.b)));
 document.querySelectorAll('.pick[data-tod]').forEach(b=>b.addEventListener('click',()=>{setTOD(b.dataset.tod);sumUI();}));
-let SPAWN_POS='runway';try{const v=localStorage.getItem('kgeuPos');if(v==='ramp'||v==='final')SPAWN_POS=v;}catch(e){}
-function pickPos(id){SPAWN_POS=id==='ramp'||id==='final'?id:'runway';try{localStorage.setItem('kgeuPos',SPAWN_POS);}catch(e){}
+const POS_OK=['runway','ramp','final1','final'];
+let SPAWN_POS='runway';try{const v=localStorage.getItem('kgeuPos');if(POS_OK.includes(v))SPAWN_POS=v;}catch(e){}
+function pickPos(id){SPAWN_POS=POS_OK.includes(id)?id:'runway';try{localStorage.setItem('kgeuPos',SPAWN_POS);}catch(e){}
   document.querySelectorAll('.pick[data-pos]').forEach(b=>b.classList.toggle('sel',b.dataset.pos===SPAWN_POS));sumUI();}
 document.querySelectorAll('.pick[data-pos]').forEach(b=>b.addEventListener('click',()=>pickPos(b.dataset.pos)));
 // Every menu choice is independent: aircraft, base, time of day and start position
@@ -7071,7 +7078,7 @@ function showRender(dt,c){
 }
 
 // ---- where, when and go ----
-const POS_TXT={runway:'on the runway',ramp:'at the ramp',final:'on 3 mile final'};
+const POS_TXT={runway:'on the runway',ramp:'at the ramp',final1:'on 1 mile final',final:'on 3 mile final'};
 // the pause sheet's change flight panel: same picks, Apply restarts at once
 $('pApply').onclick=()=>{pauseOv.classList.remove('on');freeStart();};
 function sumUI(){const el=$('sumLine');if(!el)return;const I=AC_INFO[savedType]||AC_INFO.cessna;
