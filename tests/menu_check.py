@@ -41,7 +41,7 @@ async def main():
                 await finger(pg, '#hFly'); await pg.wait_for_timeout(600)
                 ok('FLY goes straight to the one fly screen', await pg.evaluate("()=>window.__kgeu.curScr()") == 'sFly')
                 one = await pg.evaluate("()=>{const s=document.getElementById('sFly');return [!!s.querySelector('#carMain .cwin'),s.querySelectorAll('.pick[data-b]').length,s.querySelectorAll('.pick[data-tod]').length,s.querySelectorAll('.pick[data-pos]').length,!!s.querySelector('#bGo')]}")
-                ok('carousel, base, time, start and GO are all on that one screen', one == [True, 2, 4, 3, True], one)
+                ok('carousel, base, time, start and GO are all on that one screen', one == [True, 2, 4, 4, True], one)   # start: runway, ramp, 1 mi final, 3 mi final
                 await finger(pg, '#bGo'); await pg.wait_for_timeout(1400)
                 s1 = await pg.evaluate("()=>{const s=window.__kgeu.state();return [s.type,s.base,s.mode,document.getElementById('menu').classList.contains('on')]}")
                 ok('GO flies the saved picks (2 taps from home)', s1 == ['cessna', 'kgeu', 'runway', False], s1)

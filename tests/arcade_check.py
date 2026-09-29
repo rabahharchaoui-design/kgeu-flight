@@ -12,7 +12,7 @@ async def main():
         await pg.evaluate(f"()=>{{{K}.openMenu();{K}.nav('sArc')}}"); await pg.wait_for_timeout(300)
         cards = await pg.evaluate("()=>[...document.querySelectorAll('#arcCards .mcard')].map(c=>({id:c.dataset.m,ico:!!c.querySelector('svg.ico'),stars:!!c.querySelector('.stars'),soon:!!c.querySelector('.soon'),t:c.querySelector('b').textContent}))")
         ok('featured Red Flag Dogfight, coming soon, is first', cards[0]['id'] == 'dogfight' and cards[0]['soon'] and cards[0]['t'] == 'Red Flag Dogfight', cards[:1])
-        ok('airdrop, strike range, landing challenge and daily challenge cards', sorted(c['id'] for c in cards[1:]) == ['daily', 'drop', 'landing', 'range'], [c['id'] for c in cards])
+        ok('airdrop, strike range, 5 and 1 mile landing challenges and daily challenge cards', sorted(c['id'] for c in cards[1:]) == ['daily', 'drop', 'landing', 'landing1', 'range'], [c['id'] for c in cards])
         ok('every game card has an icon and a 1 to 3 star rating', all(c['ico'] and c['stars'] for c in cards[1:]))
         r = await pg.evaluate("()=>{const s=document.getElementById('sArc');const bad=[];if(s.scrollHeight>s.clientHeight+1)bad.push('scrolls');s.querySelectorAll('button').forEach(e=>{const r=e.getBoundingClientRect();if(r.bottom>innerHeight+0.5||r.right>innerWidth+0.5)bad.push('off '+e.textContent.slice(0,12));if(r.height<43.5)bad.push('small')});return bad}")
         ok('arcade fits one iPhone landscape screen with no scrolling', not r, r)
