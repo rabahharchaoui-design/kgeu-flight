@@ -59,6 +59,14 @@ def angles(L, span):
         'top':     {'p': [0.001, w * 1.25, 0.05 * L], 't': [0, 0, 0.05 * L], 'fov': 34},
     }
 
+# the camera of the main reference photo, where it differs from the fixed angles
+def photo_angle(t, L, span):
+    d = max(L * 1.15, span * 0.7 + L * 0.5)
+    return {'alpha':  {'p': [d * 0.93, L * 0.05, -d * 0.36], 't': [0, 0.0, 0.05 * L], 'fov': 30},
+            'cessna': {'p': [-d, L * 0.30, -d * 0.05], 't': [0, 0.02 * L, 0.05 * L], 'fov': 30},
+            'reaper': {'p': [-d * 0.55, L * 0.55, -d * 0.35], 't': [0, 0, 0.05 * L], 'fov': 34},
+            'mq9b':   {'p': [-d * 0.62, L * 0.40, d * 0.35], 't': [0, 0, 0], 'fov': 34}}.get(t)
+
 async def main():
     os.makedirs(OUT, exist_ok=True)
     async with async_playwright() as p:
@@ -84,7 +92,9 @@ async def main():
               const T=window.__kgeu.TYPES[window.__kgeu.state().type];return {tris:Math.round(n),draws:d,L:T.len,span:T.span};}""")
             tris[t] = info
             print(f'{t}: {info["tris"]} triangles, {info["draws"]} meshes')
-            for name, cam in angles(info['L'], info['span']).items():
+            A = angles(info['L'], info['span'])
+            if photo_angle(t, info['L'], info['span']): A['photo'] = photo_angle(t, info['L'], info['span'])
+            for name, cam in A.items():
                 await pg.evaluate("(c)=>window.__kgeu.freeCam(c)", cam)
                 await pg.wait_for_timeout(700)
                 await pg.screenshot(path=f'{OUT}/{t}_{name}.png')
