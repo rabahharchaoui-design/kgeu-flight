@@ -34,6 +34,9 @@ Tag: pre-feel. Branch: feel. Report: FEEL_REPORT.md.
 ## DZ SESSION: C-130 drop zone guidance (tag predz, branch dz, DZ_REPORT.md)
 - [x] (done: DZ icon on both maps with the Easy route cleared after the drop; "Head for the red smoke" on screen and once on the radio; letter A panels; thick red smoke column leaning with the wind, red flares and glow at night; Easy run in line, gates, floating marker and edge chevron; jump lights with one minute, ten seconds and green light calls and a pulsing DROP; result card distance; dz_check.py) Drop zone guidance, items 1 to 7 plus the red smoke change.
 
+## ONEMILE SESSION: 1 mile final (tag pre1mile, branch onemile, ONEMILE_REPORT.md)
+- [x] (done: '1 mi final' start (SPAWN_POS 'final1', createState finD 1852) on the fly screen and pause sheet for every aircraft at both bases, exact approach IAS, Easy gear down and landing flaps; 1 mile arcade landing challenge with its own best arc:landing1; refs photo folders gitignored; onemile_check.py) 1 mile final and the 1 mile landing challenge.
+
 === STOP HERE UNLESS TOLD OTHERWISE ===
 (Rabah checks weekly usage in the morning. Only he moves this line.)
 
