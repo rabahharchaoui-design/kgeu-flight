@@ -13,7 +13,7 @@ async def main():
         vis = await pg.evaluate("()=>document.getElementById('funnel').classList.contains('on')")
         ok('first launch shows the funnel', vis)
         btns = await pg.evaluate("()=>[...document.querySelectorAll('#funnel button')].map(b=>b.querySelector('b').textContent)")
-        ok('two big buttons: New to flying, I\'m a pilot', btns == ['New to flying', "I'm a pilot"], btns)
+        ok('two big buttons: EASY and HARD', btns == ['EASY', 'HARD'], btns)
         await finger(pg, '#fPilot'); await pg.wait_for_timeout(300)
         ok('choosing saves the skill', await pg.evaluate(f"()=>{K}.skill()") == 'pilot')
         await pg.reload(); await pg.wait_for_function('()=>window.__kgeu'); await pg.wait_for_timeout(400)
@@ -34,9 +34,9 @@ async def main():
         await pg.evaluate(f"()=>{{while({K}.camMode()!==1){K}.cycleCam()}}"); await pg.wait_for_timeout(600)
         ok('pilot gets the six pack in the cockpit', await pg.evaluate("()=>document.getElementById('sixpack').classList.contains('on')"))
 
-        # switch to rookie from settings
+        # switch to Easy (internally 'rookie') from settings
         await pg.evaluate(f"()=>{K}.openMenu('sSet')"); await pg.wait_for_timeout(200)
-        await finger(pg, '[data-skill="rookie"]'); await pg.wait_for_timeout(200)
+        await finger(pg, '#sSet [data-skill="rookie"]'); await pg.wait_for_timeout(200)
         ok('settings changes the skill', await pg.evaluate(f"()=>{K}.skill()") == 'rookie')
         await pg.evaluate(f"()=>{{{K}.start('runway')}}"); await pg.wait_for_timeout(2500)
         lab = await pg.evaluate("()=>['lIas','lAlt','lVs','lHdg'].map(i=>document.getElementById(i).textContent)")

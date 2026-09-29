@@ -19,10 +19,10 @@ the old name; renaming the GitHub repo would change the link).
 | 11 | Rebrand | New name, manifest, home screen name, icons (180, 192, 512, 1024, favicon) from `refs/haboob-icon.png`, share card, and the icon's palette. |
 | 6 | Main menu rebuilt | Home, FLY flow, Missions, Settings, Controls help (the keyboard chart is hidden on touch). 44 px targets, safe areas, no scrolling. |
 | — | Rename to Pocket Flight Sim | Title, manifest name, menu, splash and watermark use "Pocket Flight Sim"; short_name and home screen name are "Pocket Sim". Same icon, colours and file names. |
-| 4 | Funnel and skill level | First launch asks New to flying or I'm a pilot. That choice replaces Easy flight. Rookie: plain labels (Speed, Height, Climbing, Direction), auto level, stall protection, auto throttle on takeoff, glowing hoops to the runway, auto gear and flaps, plain English radio subtitles. Pilot: KIAS, ALT, VS, HDG, no assists, full ATC, six pack. |
+| 4 | Funnel and skill level | First launch asks EASY or HARD. That choice replaces Easy flight. Easy: plain labels (Speed, Height, Climbing, Direction), auto level, stall protection, auto throttle on takeoff, glowing hoops to the runway, auto gear and flaps, plain English radio subtitles. Hard: KIAS, ALT, VS, HDG, no assists, full ATC, six pack. |
 | 6b | Menu revisions | One FLY screen (carousel, chips, GO). A looping carousel. Compact Missions and Arcade cards with icons, stars and best score. A Change flight panel in the pause menu with Apply. |
-| 5 + 6c | Flight school, lesson 1 | Home: big FLY plus FLIGHT SCHOOL, MISSIONS, ARCADE. Lesson 1 is the one minute first flight with arrows and a big Skip, launched automatically for rookies. Start here badge. Next lesson on every result. Replay from Settings. |
-| 7 | New map | Heading-up mini map. Tap it for a full north-up map with every airport and landmark; pinch, drag, and tap a runway end to set a destination. Distance, bearing and time on the HUD, a big arrow for rookies, glowing hoops near the runway. |
+| 5 + 6c | Flight school, lesson 1 | Home: big FLY plus FLIGHT SCHOOL, MISSIONS, ARCADE. Lesson 1 is the one minute first flight with arrows and a big Skip, launched automatically for Easy players. Start here badge. Next lesson on every result. Replay from Settings. |
+| 7 | New map | Heading-up mini map. Tap it for a full north-up map with every airport and landmark; pinch, drag, and tap a runway end to set a destination. Distance, bearing and time on the HUD, a big arrow for Easy players, glowing hoops near the runway. |
 | 8 | Arcade hub | Featured Red Flag Dogfight (coming soon), landing challenge against the clock, daily challenge, airdrop and strike range, each with stars and best score. |
 | 9 | Photo mode | Camera in the pause menu. It freezes the frame, hides the HUD, and orbits and zooms by finger. SAVE shares a watermarked PNG through the iOS share sheet. |
 | 10 | Splash | Icon on sand, title, thin loading bar, fade into home. |
@@ -41,7 +41,7 @@ headless Chromium at iPhone landscape sizes (667x375, 844x390, 932x430).
 | Thumb stick and throttle fly the aircraft, no motion permission or listeners anywhere (`touch_check`) | pass |
 | Zero control overlaps at 667x375, 844x390, 932x430, including stick down, flap picker, badge, destination, strike and airdrop (`ui_check`) | pass (51 overlaps before) |
 | Every menu screen fits with no scrolling and 44 px targets; FLY then GO is two taps; the carousel loops; Change flight in pause (`menu_check`) | pass |
-| Funnel and Rookie/Pilot (`skill_check`); Flight school, lesson 1 flown end to end with the real stick and throttle (`school_check`) | pass |
+| Funnel and Easy/Hard (`skill_check`); Flight school, lesson 1 flown end to end with the real stick and throttle (`school_check`) | pass |
 | Map opens, pinch, drag, sets a destination, HUD readout, guide path, clears (`map_check`) | pass |
 | Arcade, photo mode, splash, credit (`arcade_check`, `photo_check`, `splash_check`, `credit_check`) | pass |
 | Older suites: physics `test`, `t3` (0 / 36 fails), `t6`, `dubins_test`; base, desktop, score, six pack, strike, mission, radio, Add to Home Screen | pass |
@@ -86,10 +86,10 @@ uses the manifest and the new icon).
 
 **Map**
 16. Tap the mini map (top left, heading up). The full map should open over the paused game. Pinch to zoom, drag to pan. Glendale, Luke, Sky Harbor, the White Tanks, State Farm Stadium and Camelback should all be there.
-17. Tap a runway end, for example Luke 21R, then close. The HUD should show distance, bearing and time; as a Rookie you should see a big arrow. Near the runway, glowing hoops should appear. Tap the readout to clear it.
+17. Tap a runway end, for example Luke 21R, then close. The HUD should show distance, bearing and time; in Easy you should see a big arrow. Near the runway, glowing hoops should appear. Tap the readout to clear it.
 
 **Skill levels**
-18. Settings, Skill: switch to Pilot. The readouts should say KIAS, ALT, VS, HDG, and the radio should show no plain-English line. In the Cessna, the cockpit camera should show the six pack. Switch back to Rookie: you should see "Tower says: …" subtitles and plain labels.
+18. Settings, Mode: switch to Hard. The readouts should say KIAS, ALT, VS, HDG, and the radio should show no plain-English line. In the Cessna, the cockpit camera should show the six pack. Switch back to Easy: you should see "Tower says: …" subtitles and plain labels.
 
 **Arcade, missions, photo**
 19. Arcade: play the landing challenge (starts 5 miles out, clock at top). The results screen should show stars and points, and the card should then show your best. Try the daily challenge.
@@ -105,7 +105,7 @@ uses the manifest and the new icon).
 - **Pitch direction is the one thing to feel on a real phone.** Pulling the stick toward you raises the nose, the same as the old stick. If it feels wrong, Settings has Invert pitch.
 - **The share sheet can only be confirmed on the iPhone.** Photo SAVE calls the Web Share API synchronously inside the tap, which Safari requires. The test stubs `navigator.share`. On a browser without it, the PNG downloads instead.
 - **Lesson 1 took about 70 simulated seconds** in the test, which flies it with coarse inputs. A real player may be a little quicker or slower than the one minute target.
-- **Trim** is no longer on a touch button (the old More drawer is gone). Rookie doesn't need it, and on a Mac Y and H still work.
+- **Trim** is no longer on a touch button (the old More drawer is gone). Easy doesn't need it, and on a Mac Y and H still work.
 - **The old first flight coach** (the prompts that pointed at Auto T/O) is gone. Lesson 1 replaces it, as one learning path.
 - **Records reset** still takes two taps and erases the new landing history and arcade bests too.
 - **Red Flag Dogfight** is a placeholder card that only says it is coming soon.

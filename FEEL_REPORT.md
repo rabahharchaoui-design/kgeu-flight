@@ -11,7 +11,7 @@ Items 3.0 to 3.5 were finished in the overnight run of 27 to 28 September. Items
 ## What changed, in plain English
 
 ### 3.0 Controls: real multi touch, no hidden menu
-Every on screen button owns only the finger that started on it. You can hold the stick and tap gear, flaps, brake and camera at the same time. The More button is gone. Rookie sees stick, throttle, camera, map and pause. Pilot adds GEAR, FLAPS UP and DOWN with a flap readout, and BRAKE. Fixed gear aircraft have no GEAR button, the F-16 has no flaps buttons, drones get SENSOR, the C-130 gets DROP on airdrop missions.
+Every on screen button owns only the finger that started on it. You can hold the stick and tap gear, flaps, brake and camera at the same time. The More button is gone. Easy sees stick, throttle, camera, map and pause. Hard adds GEAR, FLAPS UP and DOWN with a flap readout, and BRAKE. Fixed gear aircraft have no GEAR button, the F-16 has no flaps buttons, drones get SENSOR, the C-130 gets DROP on airdrop missions.
 
 ### 3.1 Smooth rolls
 Attitude and the chase camera are quaternions; the camera's up follows the aircraft's up. Rolls, barrel rolls and inverted flight no longer jerk. A late fix in this session: since 3.1 a frame slower than a quarter second dropped its time entirely, so a long stutter froze the flight. Time is now capped, not dropped.
@@ -23,7 +23,7 @@ Runway, taxiway, threshold, end, approach and beacon lights are small sharp poin
 Tower and crowd views are gone. MQ-9A and MQ-9B have a sensor ball: DAY TV, IR white hot and black hot, drag to slew, pinch or buttons to zoom, LOCK, and an autopilot that orbits the point you are looking at until you move the stick. The C-130 gets a free look pad, a LOOK BACK ramp view and a camera that follows the pallet down.
 
 ### 3.4 Strike mission
-Targets are bigger and marked with diamonds, edge arrows and distances, NEXT TARGET slews the ball (Rookie auto locks). Explosions are a pooled system: fireball, rolling mushroom smoke that drifts with the wind, shockwave, debris, secondaries, night ground glow, white hot in IR.
+Targets are bigger and marked with diamonds, edge arrows and distances, NEXT TARGET slews the ball (Easy auto locks). Explosions are a pooled system: fireball, rolling mushroom smoke that drifts with the wind, shockwave, debris, secondaries, night ground glow, white hot in IR.
 
 ### 3.5 Propellers
 Painted twisted blades at idle that fade into a translucent blur disc at speed. Four blades on each C-130 engine, MQ-9 yellow stripes form a faint ring.
@@ -32,7 +32,7 @@ Painted twisted blades at idle that fade into a translucent blur disc at speed. 
 Above 82 percent throttle the nozzle petals open (a morph target on the real petal mesh) and a layered flame appears: orange outer plume, blue white core, shock diamonds embedded in the core, a glow inside the nozzle. Military power shows only a faint heat haze. At night the flame is a third bigger, the nozzle warms slightly, and an orange pool lights the runway behind the jet on the takeoff roll. The engine sound gains a deep rumble and crackle. A partial attempt stashed the night before was reused and polished.
 
 ### 3.7 Haboob
-A fourth weather chip beside Day, Sunset and Night on the fly screen and in the pause menu's Change flight panel. A 24 km wall of rolling orange brown dust starts 4.5 km south east of your start and moves north west at about 35 kt. As it reaches you: visibility drops to a few hundred metres, the sky goes orange, the sun becomes a dim disc, the wind swings to 150 at 35 with gusts, and you get vertical gusts and buffet. The tower calls "visibility one half mile in blowing dust" and you get a toast at 6 km (Rookie gets a second plain one at 3 km). Switching weather in the pause menu spawns or removes the storm.
+A fourth weather chip beside Day, Sunset and Night on the fly screen and in the pause menu's Change flight panel. A 24 km wall of rolling orange brown dust starts 4.5 km south east of your start and moves north west at about 35 kt. As it reaches you: visibility drops to a few hundred metres, the sky goes orange, the sun becomes a dim disc, the wind swings to 150 at 35 with gusts, and you get vertical gusts and buffet. The tower calls "visibility one half mile in blowing dust" and you get a toast at 6 km (Easy gets a second plain one at 3 km). Switching weather in the pause menu spawns or removes the storm.
 
 ### 3.8 Callsign check
 A sweep of 72 flights (every aircraft, base, start position and skill) found no wrong callsign. What you heard on the MQ-9 was the ambient "Viper 21 flight" chatter, which after the first flight of a session could play before your own tower call. Now every flight resets the chatter timer, chatter waits until your opening exchange is done, and two transmissions never overlap. Also fixed: the pattern "check wheels down, cleared to land" and "nice landing" calls always said Glendale Tower and runway 1, even at Luke; and the strike range "Rifle" and hit or miss calls had no recorded clips.
@@ -87,9 +87,9 @@ Flat within noise. Headless rendering is CPU bound at about 300 ms a frame regar
 
 Do these on the phone in landscape, iOS Safari. The harness cannot reach a real phone, so these are the things only you can judge.
 
-1. **Multi touch, Pilot mode.** Hold the stick in a turn and tap GEAR, FLAPS UP, FLAPS DOWN, BRAKE and VIEW one after another. Each must work while the turn continues.
-2. **Button layout.** Rookie in the Cessna: stick, throttle, camera, map, pause only. Pilot in the F-16: GEAR and BRAKE, no flaps buttons. Pilot in the Cessna and Alpha: flaps, no GEAR. MQ-9: SENSOR. C-130 on the airdrop mission: DROP. No More button anywhere.
-3. **F-16 rolls, Pilot mode.** Full aileron rolls, a barrel roll, a loop, and a stretch of inverted flight. No jerk, no camera flip.
+1. **Multi touch, Hard mode.** Hold the stick in a turn and tap GEAR, FLAPS UP, FLAPS DOWN, BRAKE and VIEW one after another. Each must work while the turn continues.
+2. **Button layout.** Easy in the Cessna: stick, throttle, camera, map, pause only. Hard in the F-16: GEAR and BRAKE, no flaps buttons. Hard in the Cessna and Alpha: flaps, no GEAR. MQ-9: SENSOR. C-130 on the airdrop mission: DROP. No More button anywhere.
+3. **F-16 rolls, Hard mode.** Full aileron rolls, a barrel roll, a loop, and a stretch of inverted flight. No jerk, no camera flip.
 4. **Night flight.** Night, Cessna, 3 mile final at Glendale: sharp runway edge and threshold lights, no dome glows, the landing light pool on the runway below 1,000 ft.
 5. **Nav lights (3.11).** Same night flight in the chase view: red glow on the left tip, green on the right, a bright white tail light. Repeat in the F-16 and the C-130. Then Sunset: still visible.
 6. **Afterburner at night.** F-16, Night, runway at Luke. Hold full throttle with the brake on: the nozzle opens, the flame grows with shock diamonds, the runway behind lights orange, the engine rumbles and crackles. Release the brake and watch the pool follow on the roll. Back to 80 percent: petals close, flame gone within about 3 s, haze only.
