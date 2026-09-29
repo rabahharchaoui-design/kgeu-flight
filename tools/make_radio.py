@@ -92,6 +92,7 @@ TOWER = {
     'meters':      'meters.',
     'long':        'long.',
     'reset_again': 'reset and try again.',
+    'dz_smoke':    'drop zone is marked. Head for the red smoke.',
 
     'n_0': 'zero',  'n_1': 'one',   'n_2': 'two',    'n_3': 'three',
     'n_4': 'four',  'n_5': 'five',  'n_6': 'six',    'n_7': 'seven',
@@ -108,6 +109,10 @@ PILOT = {
     'rb_traffic':      'Looking for the traffic,',
     'load_away':       'load away, one bundle.',
     'rifle':           'Rifle,',
+    # C-130 jump calls on the intercom
+    'j_1min':          'One minute.',
+    'j_10s':           'Ten seconds.',
+    'j_green':         'Green light, green light.',
 }
 
 # ---- background chatter, recorded whole because these lines never change ----
