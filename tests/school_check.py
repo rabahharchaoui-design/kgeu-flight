@@ -63,7 +63,7 @@ async def main():
         # home and the school screen
         await pg.evaluate(f"()=>{K}.openMenu()"); await pg.wait_for_timeout(300)
         home = await pg.evaluate("()=>[...document.querySelectorAll('#sHome button')].map(b=>b.id)")
-        ok('home: big FLY, then FLIGHT SCHOOL, MISSIONS, ARCADE, and the two corner icons', sorted(home) == sorted(['hRec','hSet','hFly','hSch','hMis','hArc']), home)
+        ok('home: big FLY, then FLIGHT SCHOOL, MISSIONS, ARCADE, LEADERBOARDS, and the two corner icons', sorted(home) == sorted(['hRec','hSet','hFly','hSch','hMis','hArc','hLb']), home)
         sz = await pg.evaluate("()=>['hFly','hSch'].map(i=>{const r=document.getElementById(i).getBoundingClientRect();return r.width*r.height})")
         ok('FLY is the big primary button', sz[0] > sz[1] * 1.6, sz)
         ok('Start here is gone once lesson 1 is finished', not await pg.evaluate("()=>document.getElementById('startHere').classList.contains('on')"))
