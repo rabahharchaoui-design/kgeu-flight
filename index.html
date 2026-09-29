@@ -6954,7 +6954,7 @@ function radioUI(){
 // and a missing or broken file is skipped quietly: no errors, one try per session.
 // MUSIC.forced (the Red Flag Dogfight, when that mode exists) loops one file instead.
 const MUSIC={on:true,vol:0.6,free:false,forced:null,list:null,titles:Object.create(null),urls:Object.create(null),bad:Object.create(null),queue:[],last:null,
-  allowed:false,gest:false,played:0,errors:0,hist:[],cache:Object.create(null),cacheOrder:[],slots:[null,null],cur:-1,busy:false,tok:0,offAt:-1,tgt:-1,want:null,duckE:0,loading:false};
+  allowed:false,gest:false,lab:null,played:0,errors:0,hist:[],cache:Object.create(null),cacheOrder:[],slots:[null,null],cur:-1,busy:false,tok:0,offAt:-1,tgt:-1,want:null,duckE:0,loading:false};
 const MUSIC_CACHE_CAP=10;
 function musicTitle(name){return (name&&MUSIC.titles[name])||name||'';}
 function musicTitleUI(name){const t=document.getElementById('pMusTitle');if(t)t.textContent=name?musicTitle(name):'—';}
@@ -6979,6 +6979,8 @@ function musicBuild(){
   if(!actx||musicGain)return;
   try{musicDuckG=actx.createGain();musicDuckG.connect(actx.destination);
     musicGain=actx.createGain();musicGain.gain.value=0;musicGain.connect(musicDuckG);
+    // iOS: an interruption while the app is in front leaves it 'interrupted'; arm the wake
+    actx.addEventListener&&actx.addEventListener('statechange',()=>{if(actx.state!=='running'&&actx.state!=='closed'&&!document.hidden)musicWake();});
     setInterval(musicTick,200);}catch(e){musicGain=null;}
 }
 // freeze a param where it is right now, then schedule from there
@@ -6999,12 +7001,28 @@ function musicGate(){
   try{if(LB&&LB.csHold&&LB.csHold())return;}catch(e){}
   MUSIC.allowed=true;musicTick();
 }
-function musicWanted(){
-  if(!MUSIC.allowed||!MUSIC.on||muted||document.hidden)return false;
+// where the game is: home, menus, school, missions, arcade want music; free flight only
+// if the player asked. The game's own pause changes nothing here: the music plays on
+// under the pause sheet, and its Play / Prev / Next act on it there.
+function musicCtx(){
   if(!running||menu.classList.contains('on'))return true;          // home and every menu screen
   if(LES.on||MISS.on||STRIKE.active||ARC.on||MUSIC.forced)return true;
   return MUSIC.free;                                                  // free flight: the player's choice
 }
+function musicWanted(){
+  if(!MUSIC.allowed||!MUSIC.on||muted||document.hidden)return false;
+  return musicCtx();
+}
+// the player's own play state (MUSIC.on, saved as kgeuMusicOn: MUSIC.on false is the
+// user pause). Play from free flight also turns on music in free flight, or Play would
+// be a dead button there.
+function musicPlaying(){return MUSIC.on&&musicCtx();}
+function musicUserPlay(){
+  if(!MUSIC.on){MUSIC.on=true;try{localStorage.setItem('kgeuMusicOn','1');}catch(e){}}
+  if(!musicCtx()){MUSIC.free=true;try{localStorage.setItem('kgeuMusicFree','1');}catch(e){}}
+  musicUI();musicTick();
+}
+function musicPlayPause(){if(musicPlaying())setMusicOn(false);else musicUserPlay();}
 function musicManifest(){
   if(MUSIC.loading)return;MUSIC.loading=true;
   fetch(MUSIC_DIR+'playlist.json',{cache:'no-cache'}).then(r=>r.ok?r.json():[]).then(l=>{
@@ -7073,6 +7091,9 @@ function musicTick(){
       const tc=want===MUSIC.want?0.03:muted?0.05:MUSIC_XF/4;      // a slider drag follows at once, a context change fades
       aHold(musicGain.gain,now);musicGain.gain.setTargetAtTime(tgt,now,tc);MUSIC.tgt=tgt;}
     MUSIC.want=want;
+    if(MUSIC.lab!==musicPlaying())musicUI();
+    // backgrounded: fade, but keep the track, so it carries on where it was on return
+    if(!want&&document.hidden&&MUSIC.allowed&&MUSIC.on&&musicCtx()){MUSIC.offAt=-1;return;}
     if(!want){if(MUSIC.offAt<0)MUSIC.offAt=now;else if(now-MUSIC.offAt>MUSIC_XF+0.1&&(MUSIC.cur>=0||MUSIC.busy))musicStop();return;}
     MUSIC.offAt=-1;
     if(MUSIC.list===null){musicManifest();return;}
@@ -7087,18 +7108,22 @@ function musicTick(){
     }
   }catch(e){}
 }
+// Next / Prev while the music is paused (or free flight has it off) start it too, so
+// they are never dead buttons
 function musicNext(){
-  if(!actx||!musicGain||MUSIC.busy||MUSIC.cur<0||!MUSIC.slots[MUSIC.cur]||!musicWanted())return;
+  if(!actx||!musicGain||MUSIC.busy)return;
+  if(!musicPlaying()){musicUserPlay();return;}
+  if(MUSIC.cur<0||!MUSIC.slots[MUSIC.cur]||!musicWanted())return;
   musicAdvance(actx.currentTime+0.03);                 // the forced loop just starts again
 }
 // back up to whatever played before this, if the shuffle history has one
 function musicPrev(){
-  if(!actx||!musicGain||MUSIC.busy||MUSIC.cur<0||!MUSIC.slots[MUSIC.cur]||!musicWanted()||musicForcedName())return;
-  const cur=MUSIC.slots[MUSIC.cur].name,h=MUSIC.hist;let prev=null;
-  for(let i=h.length-2;i>=0;i--){if(h[i]!==cur){prev=h[i];break;}}
-  if(!prev||MUSIC.bad[prev])return;
-  const k=MUSIC.queue.indexOf(prev);if(k>=0)MUSIC.queue.splice(k,1);
-  MUSIC.queue.unshift(prev);
+  if(!actx||!musicGain||MUSIC.busy||musicForcedName())return;
+  const s=MUSIC.cur>=0?MUSIC.slots[MUSIC.cur]:null,cur=s?s.name:null,h=MUSIC.hist;let prev=null;
+  for(let i=h.length-(cur?2:1);i>=0;i--){if(h[i]!==cur){prev=h[i];break;}}
+  if(prev&&!MUSIC.bad[prev]){const k=MUSIC.queue.indexOf(prev);if(k>=0)MUSIC.queue.splice(k,1);MUSIC.queue.unshift(prev);}
+  if(!musicPlaying()){musicUserPlay();return;}
+  if(!s||!prev||MUSIC.bad[prev]||!musicWanted())return;
   musicAdvance(actx.currentTime+0.03);
 }
 // the tower's voice: down to 35% over a quarter second, back up over 0.8 s after
@@ -7115,7 +7140,8 @@ function setMusicVol(v){MUSIC.vol=Math.max(0,Math.min(1,v));try{localStorage.set
 function setMusicFree(v){MUSIC.free=!!v;try{localStorage.setItem('kgeuMusicFree',MUSIC.free?'1':'0');}catch(e){}musicUI();musicTick();}
 function musicUI(){
   document.querySelectorAll('.oMusic').forEach(b=>{b.textContent='Music: '+(MUSIC.on?'On':'Off');b.classList.toggle('on',MUSIC.on);});
-  document.querySelectorAll('.playPause').forEach(b=>{b.textContent=MUSIC.on?'Pause':'Play';b.classList.toggle('on',MUSIC.on);});
+  const pl=MUSIC.lab=musicPlaying();
+  document.querySelectorAll('.playPause').forEach(b=>{b.textContent=pl?'Pause':'Play';b.classList.toggle('on',pl);b.setAttribute('aria-label',pl?'Pause music':'Play music');});
   document.querySelectorAll('.oMvol').forEach(r=>r.value=String(Math.round(MUSIC.vol*10)));
   document.querySelectorAll('.oMvolV').forEach(v=>v.textContent=Math.round(MUSIC.vol*100)+'%');
   const f=document.getElementById('oMfree');if(f){f.textContent='In free flight: '+(MUSIC.free?'On':'Off');f.classList.toggle('on',MUSIC.free);}
@@ -7123,7 +7149,7 @@ function musicUI(){
 }
 function musicState(){
   const s=MUSIC.cur>=0?MUSIC.slots[MUSIC.cur]:null,m=musicGain?musicGain.gain.value:0,d=musicDuckG?musicDuckG.gain.value:1;
-  return {on:MUSIC.on,vol:MUSIC.vol,free:MUSIC.free,playing:s?s.name:null,title:s?musicTitle(s.name):null,queueLen:MUSIC.queue.length,played:MUSIC.played,forced:MUSIC.forced,
+  return {on:MUSIC.on,userPaused:!MUSIC.on,vol:MUSIC.vol,free:MUSIC.free,playing:s?s.name:null,title:s?musicTitle(s.name):null,queueLen:MUSIC.queue.length,played:MUSIC.played,forced:MUSIC.forced,
     allowed:MUSIC.allowed,ctx:actx?actx.state:null,gain:m*d,master:m,duck:d,ducked:!!(actx&&MUSIC.duckE>actx.currentTime),errors:MUSIC.errors,want:musicWanted(),hist:MUSIC.hist.slice(),
     xf:MUSIC.slots.map(x=>x?{name:x.name,g:x.g.gain.value}:null),list:MUSIC.list&&MUSIC.list.slice()};
 }
@@ -7133,6 +7159,25 @@ function musicState(){
 (function(){const ev=['pointerup','click','keydown'],f=()=>{initAudio();MUSIC.gest=true;musicGate();
   if(actx&&actx.state==='running'&&MUSIC.allowed)ev.forEach(e=>window.removeEventListener(e,f,true));};
   ev.forEach(e=>window.addEventListener(e,f,{capture:true,passive:true}));})();
+// Back from the background (visibilitychange, pageshow from the back/forward cache) or
+// after an iOS audio interruption (a call, Siri, another app's audio: state 'interrupted'
+// or 'suspended'): try to resume the AudioContext at once, and if iOS wants a gesture for
+// it, the next touch anywhere resumes it (one shot, passive, capture: blocks nothing).
+// The player's own play state (MUSIC.on) is untouched, so paused music stays paused.
+let musicWakeArmed=false;
+function musicWake(){
+  if(!actx||document.hidden)return;
+  if(actx.state!=='running'){
+    try{const q=actx.resume();if(q&&q.catch)q.catch(()=>{});}catch(e){}
+    if(!musicWakeArmed){musicWakeArmed=true;
+      const ev=['touchend','pointerup','click','keydown'],f=()=>{
+        try{const q=actx.resume();if(q&&q.then)q.then(()=>{if(actx.state==='running'){ev.forEach(e=>window.removeEventListener(e,f,true));musicWakeArmed=false;musicTick();}},()=>{});}catch(e){}};
+      ev.forEach(e=>window.addEventListener(e,f,{capture:true,passive:true}));}
+  }
+  musicTick();
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)musicWake();});
+window.addEventListener('pageshow',()=>musicWake());
 // tests: swap the manifest for a given list of {name,url} (or plain names)
 function musicLoadList(list){
   musicStop();MUSIC.urls=Object.create(null);MUSIC.bad=Object.create(null);MUSIC.cache=Object.create(null);MUSIC.cacheOrder=[];MUSIC.queue=[];MUSIC.last=null;MUSIC.errors=0;MUSIC.loading=true;
@@ -7555,7 +7600,7 @@ function start(mode,base){
 const pauseOv=$('pauseOv');
 function openMenu(scr){if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.forced=null;pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
 // the pause button, P and a backgrounded app all land here; the sheet shows while paused
-function togglePause(){paused=!paused;pauseOv.classList.toggle('on',paused);if(paused){radioFade(120);CARP.sync();if(window.stickReset)stickReset();}}
+function togglePause(){paused=!paused;pauseOv.classList.toggle('on',paused);if(paused){radioFade(120);CARP.sync();if(window.stickReset)stickReset();musicUI();}}
 $('pResume').onclick=()=>{paused=false;pauseOv.classList.remove('on');initAudio();radioVolApply();};
 $('pRestart').onclick=()=>{pauseOv.classList.remove('on');start(st.mode==='final'||st.mode==='ramp'?(st.spawn||st.mode):(MISS.on?MISS.kind:STRIKE.active?'range':'runway'));};
 $('pMenu').onclick=()=>openMenu();
@@ -7606,7 +7651,7 @@ $('oSound').onclick=()=>{initAudio();setMuted(!muted);};
 $('oMusic').onclick=()=>{initAudio();setMusicOn(!MUSIC.on);};
 $('oMfree').onclick=()=>{initAudio();setMusicFree(!MUSIC.free);};
 $('oMnext').onclick=()=>{initAudio();musicNext();};
-tapBtn($('pMusic'),()=>{initAudio();setMusicOn(!MUSIC.on);});
+tapBtn($('pMusic'),()=>{initAudio();musicPlayPause();});
 tapBtn($('pMnext'),()=>{initAudio();musicNext();});
 tapBtn($('pPrev'),()=>{initAudio();musicPrev();});
 document.querySelectorAll('.oMvol').forEach(r=>r.addEventListener('input',e=>{initAudio();setMusicVol(+e.target.value/10);}));
@@ -10468,7 +10513,7 @@ window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runM
     wallVisible:!!(HB.g&&HB.g.visible),C:[HB.C.x,HB.C.z],T:[HB.T.x,HB.T.z],sunDisc:!!(HB.sun&&HB.sun.visible),dustDir:st.dustDir,windDir:st.windDir}),
   haboobJump:(m)=>{if(HB.on){hbPlace(m);hbUpdate(0);}},drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
-  RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,musicTick:musicTick,MUSIC:MUSIC,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
+  RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,musicTick:musicTick,MUSIC:MUSIC,actx:()=>actx,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
   stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
