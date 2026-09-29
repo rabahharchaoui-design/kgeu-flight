@@ -67,7 +67,7 @@ Orchestrated run: builder subagent implements, tester subagent verifies at iPhon
 ### P0 STABILITY
 - [x] 1. Controls and HUD vanish at event start. When an event or mission begins, no controls or overlays render and input is dead; sometimes it recovers in a split second, sometimes the app must be killed. Find the root cause (overlay mount order, state reset, a blocking asset load, or a resize/orientation race on iOS). Controls must render on the first frame of every event, every time. Add a Playwright test that starts every event 10 times in a row and asserts the controls are visible and responding within 500 ms.
 - [x] 2. General lag. Profile a full event on a throttled mobile CPU. Kill per frame allocations, redundant DOM writes, and unneeded shadow and particle cost. Report the frame time before and after.
-- [ ] 3. The map opens with lag and flicker. Prebuild or cache the map so opening it is instant and never flickers.
+- [x] 3. The map opens with lag and flicker. Prebuild or cache the map so opening it is instant and never flickers.
 - [ ] 4. The crash scorch circle flickers on the ground. This is z fighting; fix it with polygonOffset or a small lift above terrain.
 
 ### P1 AUDIO

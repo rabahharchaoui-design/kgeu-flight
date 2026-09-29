@@ -8182,7 +8182,9 @@ function mapIndex(){
     for(let cx=Math.floor(b[0]/C);cx<=Math.floor(b[2]/C);cx++)for(let cz=Math.floor(b[1]/C);cz<=Math.floor(b[3]/C);cz++){
       const k=cx*1000+cz;let a=idx.get(k);if(!a){a=[];idx.set(k,a);}a.push(layer,i);}};
   const layers=MAPD.layers=[];
-  const reg=(name,arr)=>{if(!arr)return;const L=layers.length;layers.push({name:name,f:arr});arr.forEach((f,i)=>add(L,i,f.b));};
+  const E=MAPD.ext=[1e9,1e9,-1e9,-1e9];   // the data's extent: map tiles wholly outside it are plain ground colour
+  const reg=(name,arr)=>{if(!arr)return;const L=layers.length;layers.push({name:name,f:arr});arr.forEach((f,i)=>{add(L,i,f.b);
+    E[0]=Math.min(E[0],f.b[0]);E[1]=Math.min(E[1],f.b[1]);E[2]=Math.max(E[2],f.b[2]);E[3]=Math.max(E[3],f.b[3]);});};
   MAPD.roads.forEach((a,c)=>reg('r'+c,a));MAPD.polys.forEach((a,k)=>reg('p'+k,a));MAPD.wlines.forEach((a,k)=>reg('w'+k,a));
   reg('taxi',MAPD.taxi);reg('apron',MAPD.apron);
   MAPD.idx=idx;MAPD.seen=layers.map(L=>new Uint32Array(L.f.length));MAPD.stamp=0;
@@ -8228,7 +8230,7 @@ function drawMap(hdgT){
   mx.fillStyle=MPAL.out;mx.fillRect(0,0,W,W);
   mx.translate(C,C);mx.rotate(-h);
   const P=(x,z)=>[(x-ox)*k,(z-oz)*k],r=range*1.45;
-  if(MBASE.c){MT.d=Math.min(window.devicePixelRatio||1,2);mtDraw(mx,k,ox-r,oz-r,ox+r,oz+r,P,k/MT.d);mtPump(4);}
+  if(MBASE.c){MT.d=Math.min(window.devicePixelRatio||1,2);mtDraw(mx,k,ox-r,oz-r,ox+r,oz+r,P,k/MT.d);mtPump(4);fmPrep();}
   // haboob dust
   if(HB.on)hbMapPoly(mx,P,1);
   // runways
@@ -8300,8 +8302,9 @@ function mbaseBuild(){
     d[o+3]=255;}
   x.putImageData(im,0,0);MBASE.c=c;
 }
-// 32 tiles is 32 MB at 2x; closing the full map trims to the 10 the mini map is using, and at most 6 spare canvases are pooled
-const MT={cache:new Map(),max:32,keep:10,queue:[],base:256/64000,d:1,pool:[],poolMax:6};
+// 32 tiles is 32 MB at 2x; closing the full map trims to the 10 the mini map is using, and at most 6 spare canvases are pooled.
+// pin: the tiles the full map opens on (fmPins), kept through every trim so an open never waits on a tile.
+const MT={cache:new Map(),max:32,keep:10,queue:[],base:256/64000,d:1,pool:[],poolMax:6,pin:new Set()};
 const mtLevel=sc=>clamp(Math.ceil(Math.log2(sc/MT.base)-1e-6),0,9);
 function mtTile(L,i,j){const k=L+':'+i+':'+j,t=MT.cache.get(k);if(t){MT.cache.delete(k);MT.cache.set(k,t);}return t;}
 function mtRender(L,i,j){
@@ -8341,12 +8344,21 @@ function mtRender(L,i,j){
   mtTrim(MT.max);
   return c;
 }
-function mtTrim(n){while(MT.cache.size>n){const k=MT.cache.keys().next().value,c=MT.cache.get(k);MT.cache.delete(k);
-  if(MT.pool.length<MT.poolMax)MT.pool.push(c);else c.width=c.height=0;}}   // a zero sized canvas hands its memory back at once on iOS
+// n counts the unpinned tiles; the pinned ones stay (MT.max still bounds the total, with room for 12 unpinned)
+function mtTrim(n){let pin=0;for(const k of MT.pin)if(MT.cache.has(k))pin++;if(n>=MT.max)n=Math.max(12,MT.max-pin);if(MT.cache.size-pin<=n)return;
+  for(const [k,c] of MT.cache){if(MT.cache.size-pin<=n)break;if(MT.pin.has(k))continue;MT.cache.delete(k);
+    if(MT.pool.length<MT.poolMax)MT.pool.push(c);else c.width=c.height=0;}}   // a zero sized canvas hands its memory back at once on iOS
+// a tile wholly outside the base raster and the map data is plain ground colour: never rendered, never cached
+function mtEmpty(L,i,j){if(!MBASE.c)return false;const sc=MT.base*Math.pow(2,L),sp=256/sc,x0=i*sp,z0=j*sp,x1=x0+sp,z1=z0+sp,R=MBASE.res*2,E=MAPD.ext,m=200+8/(sc*0.72);
+  return !(x1>MBASE.x0-R&&x0<MBASE.x1+R&&z1>MBASE.z0-R&&z0<MBASE.z1+R)&&!(E&&x1>E[0]-m&&x0<E[2]+m&&z1>E[1]-m&&z0<E[3]+m);}
+// the keys of the tiles under a view, as mtDraw picks them
+function mtKeys(sc,wx0,wz0,wx1,wz1,out){const L=mtLevel(sc),span=256/(MT.base*Math.pow(2,L));
+  for(let i=Math.floor(wx0/span);i<=Math.floor(wx1/span);i++)for(let j=Math.floor(wz0/span);j<=Math.floor(wz1/span);j++)if(!mtEmpty(L,i,j))out.add(L+':'+i+':'+j);return out;}
 // draw the tiles under a view. P maps world to screen px; returns true when every tile was cached
 function mtDraw(ctx,sc,wx0,wz0,wx1,wz1,P,lsc){
   const L=mtLevel(lsc||sc),span=256/(MT.base*Math.pow(2,L));let full=true;
   for(let i=Math.floor(wx0/span);i<=Math.floor(wx1/span);i++)for(let j=Math.floor(wz0/span);j<=Math.floor(wz1/span);j++){
+    if(mtEmpty(L,i,j))continue;   // the caller has already filled the ground colour
     const a=P(i*span,j*span),w=span*sc;let t=mtTile(L,i,j);
     if(t){ctx.drawImage(t,a[0],a[1],w+0.5,w+0.5);continue;}
     full=false;const k=L+':'+i+':'+j;if(!MT.queue.includes(k))MT.queue.push(k);
@@ -8364,21 +8376,49 @@ function mtPump(ms,need){
     if(need&&!need(k))continue;const [L,i,j]=k.split(':').map(Number);mtRender(L,i,j);n++;}
   return n>0;
 }
-function mapDataReady(){mbaseBuild();MT.cache.clear();if(FM.on)fmDraw();}
+function mapDataReady(){mbaseBuild();MT.cache.clear();FM.prepT=0;if(FM.on)fmDraw();}
 // ---- the full map: north up, pinch to zoom, drag to pan, tap a runway end to fly there ----
 const FM={on:false,cx:0,cz:0,scale:0.02,ptrs:new Map(),moved:false,wasPaused:false,pinch:null},fmc=$('fmap'),fx=fmc.getContext('2d');
+// Opening is one synchronous paint of tiles that are already there: the canvas keeps its size
+// (a resize clears it and reallocates it), the legend and its icons are built ahead, and the
+// tiles of the opening view are rendered and pinned between opens (fmPrep), so the first frame
+// the overlay shows is the finished map, with nothing to pop in afterwards.
 function fmOpen(){
   if(!running||st.crashed||menu.classList.contains('on'))return;
   FM.on=true;FM.wasPaused=paused;paused=true;if(window.stickReset)stickReset();
-  $('mapOv').classList.add('on');document.body.classList.add('mapOn');legBuild();FM.hl=null;FM.anim=null;for(const b of $('mapLegL').children)b.classList.remove('on');
-  // open on every airport at once, with the aircraft somewhere on screen, in the part the legend leaves free
-  let x0=Math.min(st.pos.x,...AIRPORTS.map(a=>a[2])),x1=Math.max(st.pos.x,...AIRPORTS.map(a=>a[2])),z0=Math.min(st.pos.z,...AIRPORTS.map(a=>a[3])),z1=Math.max(st.pos.z,...AIRPORTS.map(a=>a[3]));
-  FM.scale=Math.min((innerWidth-150-legW())/(x1-x0+4000),(innerHeight-170)/(z1-z0+4000));
-  FM.cx=(x0+x1)/2+legW()/2/FM.scale;FM.cz=(z0+z1)/2;
-  FM.infoK=null;fmSize();lblUI();fmDraw();
+  legBuild();fmSize();
+  $('mapOv').classList.add('on');document.body.classList.add('mapOn');FM.hl=null;FM.anim=null;for(const b of $('mapLegL').children)b.classList.remove('on');
+  const v=fmView(innerWidth,innerHeight);FM.scale=v.s;FM.cx=v.cx;FM.cz=v.cz;
+  // a tile the prep has not reached yet (the map data only just loaded, a new window size) is made now, not shown coarse
+  {const W=innerWidth/2/v.s,H=innerHeight/2/v.s;MT.d=FM.d;fmWarm(40,mtKeys(v.s,v.cx-W,v.cz-H,v.cx+W,v.cz+H,new Set()));}
+  FM.infoK=null;lblUI();fmDraw();
 }
 function fmClose(){FM.on=false;MT.queue.length=0;mtTrim(MT.keep);$('mapOv').classList.remove('on');document.body.classList.remove('mapOn');paused=FM.wasPaused;}
-function fmSize(){const d=Math.min(window.devicePixelRatio||1,2);fmc.width=innerWidth*d;fmc.height=innerHeight*d;fmc.style.width=innerWidth+'px';fmc.style.height=innerHeight+'px';FM.d=d;}
+// only when the size really changed: setting a canvas's width clears it, even to the same value
+function fmSize(){const d=Math.min(window.devicePixelRatio||1,2),W=Math.round(innerWidth*d),H=Math.round(innerHeight*d);FM.d=d;
+  if(fmc.width!==W||fmc.height!==H){fmc.width=W;fmc.height=H;}
+  const sw=innerWidth+'px',sh=innerHeight+'px';if(fmc.style.width!==sw)fmc.style.width=sw;if(fmc.style.height!==sh)fmc.style.height=sh;}
+// the opening view for a w x h screen: every airport at once, the aircraft somewhere on screen, in the part the legend leaves free
+function fmView(w,h){const lw=legW();
+  let x0=st.pos.x,x1=x0,z0=st.pos.z,z1=z0;for(const a of AIRPORTS){x0=Math.min(x0,a[2]);x1=Math.max(x1,a[2]);z0=Math.min(z0,a[3]);z1=Math.max(z1,a[3]);}
+  const s=Math.min((w-150-lw)/(x1-x0+4000),(h-170)/(z1-z0+4000));return {s:s,cx:(x0+x1)/2+lw/2/s,cz:(z0+z1)/2};}
+// pin the tiles of the opening view, in this orientation and the other one (a 24 px margin covers the safe area shifting)
+function fmPins(){const W=innerWidth,H=innerHeight,out=new Set();
+  for(const [w,h] of [[W,H],[H,W]]){const v=fmView(w,h);if(!(v.s>0))continue;const hw=(w/2+24)/v.s,hh=(h/2+24)/v.s;mtKeys(v.s,v.cx-hw,v.cz-hh,v.cx+hw,v.cz+hh,out);}
+  MT.pin=out;}
+// render the keys still missing for up to ms (at least one); true when none are left
+function fmWarm(ms,keys){if(!MAPD.ready||!MBASE.c)return true;const t0=performance.now();let n=0;
+  for(const k of keys||MT.pin){if(MT.cache.has(k))continue;if(n&&performance.now()-t0>=ms)return false;const [L,i,j]=k.split(':').map(Number);mtRender(L,i,j);n++;}
+  return true;}
+// between opens, from the mini map's 10 Hz tick: keep the opening view ready. With the menu or the
+// pause sheet up it works 8 ms a tick; flying, one tile at most every 0.3 s, and only once the mini map has all of its own
+function fmPrep(){
+  if(FM.on||!MAPD.ready||!MBASE.c)return;const now=performance.now(),idle=!running||paused||menu.classList.contains('on');
+  if(FM.lw===undefined){const o=$('mapOv');o.style.visibility='hidden';o.classList.add('on');legW();o.classList.remove('on');o.style.visibility='';if(FM.lw===undefined)FM.lw=null;}
+  if(now-(FM.prepT||0)>1000){FM.prepT=now;legBuild();fmPins();}
+  MT.d=Math.min(window.devicePixelRatio||1,2);
+  if(idle)fmWarm(8);else if(!MT.queue.length&&now-(FM.warmT||0)>300){FM.warmT=now;fmWarm(0);}
+}
 const fmP=(x,z)=>[innerWidth/2+(x-FM.cx)*FM.scale,innerHeight/2+(z-FM.cz)*FM.scale];
 const fmW=(X,Y)=>[FM.cx+(X-innerWidth/2)/FM.scale,FM.cz+(Y-innerHeight/2)/FM.scale];
 // ---- the map's own icon set: a bold round badge in the game palette with a simple white glyph ----
@@ -8581,7 +8621,8 @@ function legPick(kind){
   // centre it in the part of the screen the legend leaves free, close enough in for its name
   const s1=Math.max(FM.scale,0.012),off=legW()/2/s1;fmFly(best.x+off,best.z,s1);
 }
-const legW=()=>{const r=$('mapLeg').getBoundingClientRect();return r.width?r.width+12:0;};
+// measured while the overlay shows; the last measure stands in while it is hidden (fmPrep takes the first)
+const legW=()=>{const r=$('mapLeg').getBoundingClientRect();if(r.width)FM.lw=r.width+12;return FM.lw||0;};
 function fmFly(x,z,s){FM.anim={x0:FM.cx,z0:FM.cz,s0:FM.scale,x1:x,z1:z,s1:s,t0:performance.now(),dur:650};}
 // called every frame the map is open: fly animations, highlight pulses, tiles still to render
 function fmFrame(){
@@ -9718,7 +9759,7 @@ function sensorAP(){
   toast('AUTOPILOT ENGAGED',2);
 }
 // ---------- main loop ----------
-function resize(){const w=window.innerWidth,h=window.innerHeight;renderer.setSize(w,h,false);glcH=glc.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();sizeMap();if(FM.on){fmSize();lblUI();fmDraw();}}
+function resize(){const w=window.innerWidth,h=window.innerHeight;renderer.setSize(w,h,false);glcH=glc.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();sizeMap();fmSize();FM.prepT=0;if(FM.on){lblUI();fmDraw();}}
 window.addEventListener('resize',resize);resize();
 const hudSens=$('sensorHud');let sensOn=false;const hIas=$('hIas'),hAlt=$('hAlt'),hWindT=$('hWindT'),hWindA=$('hWindA'),hAp=$('hAp'),bAuto=$('bAuto'),bAutoT=$('bAutoT'),warnEl=$('warn'),hVs=$('hVs'),hHdg=$('hHdg');
 const APN={to:'AUTO T/O',hold:'ALT HOLD',land:'AUTOLAND',orbit:'ORBIT'},APP={climb:'CLIMB',nav:'NAV',loc:'FINAL',orb:'DESCEND'};
