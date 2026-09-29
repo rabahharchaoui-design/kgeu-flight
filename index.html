@@ -5440,13 +5440,13 @@ function useModel(id){plane.g.visible=false;plane=getModel(id);plane.g.visible=t
 // uploaded one piece at a time while the menu (or the pause sheet) is showing. Left to
 // start(), the first event with a new aircraft built it on the tap and compiled its programs
 // on the first flying frame: the phone froze with the menu gone and nothing else painted yet.
-const WARM={i:0,done:false},WARM_TEX=['map','normalMap','roughnessMap','metalnessMap','emissiveMap','alphaMap','aoMap','bumpMap','lightMap','specularMap'];
+const WARM={i:0,done:false,seen:new WeakSet()},WARM_TEX=['map','normalMap','roughnessMap','metalnessMap','emissiveMap','alphaMap','aoMap','bumpMap','lightMap','specularMap'];
 function warmObj(root){
   root.traverse(o=>{const ms=o.material?(Array.isArray(o.material)?o.material:[o.material]):[];
     for(const mt of ms)for(const k of WARM_TEX){const t=mt[k];
-      if(!t||!t.isTexture||t.isCubeTexture||t.userData.warm||!t.image)continue;
+      if(!t||!t.isTexture||t.isCubeTexture||WARM.seen.has(t)||!t.image)continue;
       if(!(t.isDataTexture||t.image.nodeName||(typeof ImageBitmap!=='undefined'&&t.image instanceof ImageBitmap)))continue;
-      t.userData.warm=1;try{renderer.initTexture(t);}catch(e){}}});
+      WARM.seen.add(t);try{renderer.initTexture(t);}catch(e){}}});
   try{renderer.compile(scene,camera);}catch(e){}
   // one draw into a 4 px target, framed on it, uploads its vertex buffers too (same programs:
   // no tone mapping and linear output either way)
