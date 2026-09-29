@@ -50,6 +50,12 @@ async def run(b, url):
     await pg.evaluate(f"()=>{K}.haboobJump(-2500)"); out['haboob_inside'] = await fps(pg)
     await pg.evaluate(f"()=>{{{K}.setTOD('day');{K}.pick('c130');{K}.start('final')}}"); await pg.wait_for_timeout(4000)
     await pg.evaluate(f"()=>{K}.crashNow('fps test')"); out['c130_crash'] = await fps(pg, seconds=6.0, warm=0.3)
+    # the C-130 airdrop, with the drop zone in view: day, night, inside a haboob (Easy shows everything)
+    await pg.evaluate("()=>localStorage.setItem('kgeuOnboard','rookie')")
+    for tod in ('day', 'night', 'haboob'):
+        await pg.evaluate(f"()=>{{{K}.setSkill&&{K}.setSkill('rookie');{K}.setTOD('{tod}');{K}.mission('drop')}}"); await pg.wait_for_timeout(3000)
+        if tod == 'haboob': await pg.evaluate(f"()=>{K}.haboobJump(-1500)")
+        out['drop_' + tod] = await fps(pg)
     out['errors'] = errs[:3]
     await ctx.close()
     return out
