@@ -77,7 +77,7 @@ Orchestrated run: builder subagent implements, tester subagent verifies at iPhon
 - [x] 8. Flight school instructions get talked over by radio chatter. Build an audio priority queue: instruction voice first, then tower and radio chatter. Chatter waits or ducks while an instruction plays. Voices never overlap each other.
 
 ### P1 FLIGHT FEEL
-- [ ] 9. Nose wheel steering must work any time the wheels are on the ground and groundspeed is above about 1 kt, including at idle throttle.
+- [x] 9. Nose wheel steering must work any time the wheels are on the ground and groundspeed is above about 1 kt, including at idle throttle.
 - [ ] 10. Show all speeds in knots everywhere (HUD, menus, mission text, leaderboard). No mph anywhere.
 - [ ] 11. The Hard mode C130 climbs about 400 ft on its own on any final. Retune the trim and pitch so it holds altitude with the stick neutral.
 - [ ] 12. In Easy mode, the hands off landing must land every aircraft cleanly. Test each aircraft on each runway.

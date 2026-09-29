@@ -1348,7 +1348,12 @@ function step(st,dt,ev){
     _e.x=p; q.setFromEuler(_e); st.w.z=0;
     _hf.set(_f.x,0,_f.z); if(_hf.lengthSq()<1e-6)_hf.set(0,0,-1); _hf.normalize();
     const along=st.vel.x*_hf.x+st.vel.z*_hf.z;
-    const target=-st.steer*0.65*clamp(spd/4,0,1)/(1+spd/18)+(st.noPF||!AC.pf?0:st.power*0.003*clamp(spd/8,0,1));
+    // nose wheel steering, ground speed based (never throttle): at low speed the turn rate is the
+    // rolling geometry, speed over the tightest nose wheel radius (a bigger aircraft turns wider), so
+    // it answers from a walking pace and fades smoothly to nothing at a standstill (no pivot in place);
+    // at speed it tapers off the way a real nose wheel's authority does
+    const nwR=clamp(0.3*AC.len,3,6.5),nw=Math.min(spd/nwR,0.65/(1+spd/18));
+    const target=-st.steer*nw+(st.noPF||!AC.pf?0:st.power*0.003*clamp(spd/8,0,1));
     st.w.y+=(target-st.w.y)*Math.min(1,dt*8);
     const latx=st.vel.x-_hf.x*along, latz=st.vel.z-_hf.z*along, k=1-Math.exp(-12*dt);
     st.vel.x-=latx*k; st.vel.z-=latz*k;
@@ -1401,7 +1406,13 @@ function easyFly(st,dt,ev){
     if(st.throttle<0.25&&st.vel.length()>6){
       const hc=onRwy?RH-clamp(v*0.08,-0.15,0.15):st.ezH;
       if(!st.apW)st.apW=new V3();
-      st.apW.set(clamp((0-_eB.x)*2,-0.12,0.05),-clamp(wrapPi(hc-hdg)*1.5,-0.25,0.25),0);
+      // the stick still steers the nose wheel here: as it goes over, the heading hold lets go of yaw
+      // (st.w.y carries on, and the ground roll steers it from st.steer). Below about 20 kt any real
+      // deflection lets go; by about 30 kt only a firm one does, so a small wing-level aileron input
+      // on a fast rollout never yanks the nose off the centreline
+      const dz=0.05+0.35*smooth(10.3,15,st.vel.length()),rel=smooth(dz,dz+0.25,Math.abs(st.ail));
+      const hold=-clamp(wrapPi(hc-hdg)*1.5,-0.25,0.25);
+      st.apW.set(clamp((0-_eB.x)*2,-0.12,0.05),hold+(st.w.y-hold)*rel,0);
       if(st.ezIdle&&_eB.x<0.06)st.brake=true;          // brakes on once the nose is down
     }
     if(st.vel.length()<3)st.ezIdle=0;
