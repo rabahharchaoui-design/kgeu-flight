@@ -166,10 +166,10 @@ async def main():
             await shot(A, '08_pull_to_refresh'); await A.mouse.up(); await A.wait_for_timeout(1200)
             n1 = await A.evaluate(f"()=>performance.getEntriesByType('resource').filter(e=>e.name.includes('/board?')).length")
             ok('pull to refresh fetches the board again', n1 > n0, (n0, n1))
-            await A.click('[data-lbp=today]'); await A.wait_for_timeout(800)
-            await A.click('[data-lbm=easy]'); await A.wait_for_timeout(1200)
-            ok('Easy has its own, empty board', 'No scores yet' in await A.evaluate("()=>document.getElementById('lbRowsIn').innerText"))
-            await A.click('[data-lbm=hard]'); await A.wait_for_timeout(800)
+            await A.click('[data-lbp=today]'); await A.wait_for_timeout(1200)
+            ok('one list per board: no Easy/Hard chips in the header', await A.evaluate("()=>!document.querySelector('#sLb [data-lbm]')&&!document.querySelector('#sLb .mh .modeSeg')"))
+            chips = await A.evaluate("()=>[...document.querySelectorAll('#lbRowsIn .lbRow, #lbMe .lbRow')].map(r=>{const t=r.querySelector('.modeTag');return t?t.textContent:''})")
+            ok('every row carries its EASY or HARD chip (this run was Hard)', chips and all(c == 'HARD' for c in chips), chips)
             # ---------------- race the leader
             await A.click('#lbRace'); await A.wait_for_timeout(2500)
             g = await A.evaluate(f"()=>{{const G={K}.LB.E.ghost;return G?{{cs:G.cs,n:G.path.n,vis:G.m.g.visible,lab:G.m.label.sp.visible,run:!!{K}.ARC.on}}:null}}")
@@ -190,7 +190,9 @@ async def main():
             # ---------------- offline: the run still flies, the score waits in the queue, then sends
             await A.evaluate(f"()=>{K}.LB.ghostOff()")
             await A.context.set_offline(True)
+            await A.evaluate(f"()=>{K}.setSkill('rookie')")   # this one in Easy: the board then holds HABOOB in both modes
             r = await fly_arcade(A, 'landing1', wait_start=2)
+            await A.evaluate(f"()=>{K}.setSkill('pilot')")
             bt = await badge(A)
             q = await A.evaluate(f"()=>{K}.LB.E.Q.length")
             ok('offline: the run is saved in the queue', q == 1 and 'SAVED' in bt, (q, bt))
@@ -206,6 +208,16 @@ async def main():
             await A.wait_for_function(f"()=>{K}.LB.E.Q.length===0", timeout=20000)
             n = sql("SELECT COUNT(*) n FROM scores WHERE callsign='HABOOB' AND board='arc:landing1'")
             ok('back online: the queued run is sent and accepted', n[0]['n'] == 2, n)
+            # ---------------- one list: a player with runs in both modes shows once, with the better run's chip
+            modes = sql("SELECT mode, score FROM scores WHERE callsign='HABOOB' AND board='arc:landing1' ORDER BY score DESC, id ASC")
+            ok('HABOOB has an Easy and a Hard run on the 1 mile board', sorted(x['mode'] for x in modes) == ['easy', 'hard'], modes)
+            await A.evaluate(f"()=>{{{K}.openMenu();{K}.LB.lbOpen('arc:landing1')}}"); await A.wait_for_timeout(300)
+            await A.click('[data-lbp=all]'); await A.wait_for_timeout(1800)   # All time: last fetched before the Easy run was sent (cache is 30 s)
+            mr = await A.evaluate("()=>({rows:[...document.querySelectorAll('#lbRowsIn .lbRow')].map(r=>({t:r.innerText.replace(/\\s+/g,' '),m:(r.querySelector('.modeTag')||{}).textContent||''})),tot:document.getElementById('lbTotal').textContent,me:(document.querySelector('#lbMe .modeTag')||{}).textContent||''})")
+            best = modes[0]['mode'].upper() if modes else ''
+            ok('merged board: HABOOB appears once, with the chip of the better run', len([x for x in mr['rows'] if 'HABOOB' in x['t']]) == 1 and mr['rows'][0]['m'] == best and mr['me'] == best, (best, mr))
+            ok('merged board: the total counts the player once', mr['tot'] == '1 pilot', mr['tot'])
+            await shot(A, '11b_merged_board')
             # ---------------- the daily challenge: identical spec, one official attempt, then practice
             d1 = await A.evaluate(f"()=>{K}.dailySpec()")
             await A.evaluate(f"()=>{{{K}.openMenu();{K}.nav('sMis')}}"); await A.wait_for_timeout(400)

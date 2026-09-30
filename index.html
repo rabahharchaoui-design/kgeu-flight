@@ -743,8 +743,6 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
 #hLb{ display:flex; align-items:center; justify-content:center; gap:8px; }
 #hLb svg{ width:20px; height:20px; }
 /* the leaderboard screen */
-#sLb .mh .modeSeg{ flex:none; }
-#menu #sLb .mh .chip{ min-height:44px; padding:0 14px; }
 .lbBody{ flex:1; min-height:0; display:flex; gap:10px; }
 .lbList{ flex:0 0 clamp(170px,30vw,270px); overflow-y:auto; touch-action:pan-y; display:flex; flex-direction:column; gap:4px; padding-bottom:8px; -webkit-overflow-scrolling:touch; }
 .lbList h3{ margin:6px 4px 0; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--brown); }
@@ -763,10 +761,21 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
 .lbRow .c{ flex:1; min-width:0; display:flex; align-items:center; gap:8px; white-space:nowrap; overflow:hidden; }
 .lbRow .c span{ overflow:hidden; text-overflow:ellipsis; }
 .lbRow .s{ flex:none; font-weight:900; font-variant-numeric:tabular-nums; }
+.lbRow .modeTag{ flex:none; margin:0 -4px 0 0; white-space:nowrap; padding:1px 5px; border-radius:5px; font-size:10px; line-height:1.3; letter-spacing:.06em; vertical-align:0; }
 .lbRow .a{ flex:none; width:4.2em; font-size:13px; color:#d9b98c; text-align:right; }
 .lbRow.me{ background:var(--sand); color:var(--night); border-radius:10px; border:none; }
 .lbRow.me .n,.lbRow.me.top1 .n{ color:var(--rust); } .lbRow.me .a{ color:var(--brown); }
 .lbRow.top1 .n{ color:#ffd257; }
+/* narrow boards (SE landscape, any portrait): tighter rows so the callsign keeps room beside the EASY/HARD chip */
+@media (max-width:700px){ .lbRow{ gap:6px; padding:0 6px; font-size:16px; } .lbRow .n{ width:auto; min-width:1.4em; } .lbRow .a{ width:3.4em; font-size:12px; } }
+/* portrait: the board list becomes one scrolling line above the board, which gets the full width */
+@media (orientation:portrait){
+  .lbBody{ flex-direction:column; gap:8px; }
+  .lbList{ flex:none; flex-direction:row; overflow-x:auto; overflow-y:hidden; touch-action:pan-x; padding-bottom:2px; }
+  .lbList h3{ display:none; }
+  #menu .lbList button{ white-space:nowrap; }
+  .lbHead{ flex-wrap:wrap; row-gap:6px; }
+}
 .lbMe{ flex:none; }
 .lbMsg{ padding:18px 10px; text-align:center; font-size:17px; font-weight:700; color:#f0d6ad; line-height:1.35; }
 .lbMsg b{ display:block; font-size:22px; color:var(--sand); margin-bottom:4px; }
@@ -993,8 +1002,7 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
   </div>
  </div>
  <div class="scr" id="sLb">
-  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Leaderboards</h2><span class="csTag" id="lbCs"></span>
-   <div class="chips modeSeg" role="radiogroup" aria-label="Board mode"><button class="pick chip" data-lbm="easy" role="radio"><b>Easy</b></button><button class="pick chip" data-lbm="hard" role="radio"><b>Hard</b></button></div></header>
+  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Leaderboards</h2><span class="csTag" id="lbCs"></span></header>
   <div class="lbBody">
    <div class="lbList" id="lbList"></div>
    <div class="lbMain">
@@ -10899,11 +10907,11 @@ const APP_VER='2026-09-30-phone';          // keep version.json in step when shi
     const run=E.runs[b];if(run&&run.st===st)E.ghost.t0=run.t0;
     return true;
   }
-  // Race the leader: fetch the #1 path of this board and mode, start the run, fly beside it
-  function race(b,mode){
+  // Race the leader: fetch the #1 path of this board (Easy or Hard), start the run, fly beside it
+  function race(b){
     const B=BOARDS[b];if(!B||!B.ghost||!B.go)return;
     toast('Fetching the leader...');
-    api('/ghost?b='+encodeURIComponent(b)+'&m='+(mode||'hard')).then(j=>{
+    api('/ghost?b='+encodeURIComponent(b)).then(j=>{
       if(!j.ghost){toast('No leader to race on this board yet');return;}
       return decodePath(j.ghost.path).then(path=>{
         if(!ghostStart(b,j.ghost.cs,j.ghost.ac,j.ghost.creator,path)){toast('Could not build the ghost');return;}
@@ -11061,9 +11069,11 @@ const APP_VER='2026-09-30-phone';          // keep version.json in step when shi
   function welcome(isNew){paintAll();ui();topUpPool();flush();fameFetch();toast((isNew?'Welcome, ':'Welcome back, ')+E.P.cs,3);}
 
   // ---- the leaderboard screen
-  const V={b:'daily',m:SKILL==='rookie'?'easy':'hard',p:'today',seq:0,cache:{}};
+  // one list per board: every player's best run across Easy and Hard, each row carries an EASY or HARD chip
+  const V={b:'daily',p:'today',seq:0,cache:{}};
   function lbOpen(b,m){['arcOv','missOv','gradeOv','landOv'].forEach(id=>{const e=$(id);if(e)e.classList.remove('on');});
-    if(b&&BOARDS[b])V.b=b;V.m=m||(SKILL==='rookie'?'easy':'hard');if(curScr!=='sLb')nav('sLb');else lbRender();}
+    if(b&&BOARDS[b])V.b=b;if(curScr!=='sLb')nav('sLb');else lbRender();}
+  const lbMode=m=>m==='easy'?'<span class="modeTag easy">EASY</span>':m==='hard'?'<span class="modeTag hard">HARD</span>':'';
   function lbList(){const el=$('lbList');let html='',grp='';
     ORDER.forEach(id=>{const B=BOARDS[id];if(B.group!==grp){grp=B.group;html+='<h3>'+esc(grp)+'</h3>';}
       html+='<button data-lbb="'+esc(id)+'" class="'+(id===V.b?'sel':'')+'">'+esc(B.name)+'</button>';});
@@ -11071,7 +11081,6 @@ const APP_VER='2026-09-30-phone';          // keep version.json in step when shi
     const s=el.querySelector('.sel');if(s&&s.scrollIntoView)try{s.scrollIntoView({block:'nearest'});}catch(e){}}
   function lbRender(){
     lbList();const B=BOARDS[V.b];
-    document.querySelectorAll('[data-lbm]').forEach(b=>{b.classList.toggle('sel',b.dataset.lbm===V.m);b.setAttribute('aria-checked',b.dataset.lbm===V.m);});
     document.querySelectorAll('[data-lbp]').forEach(b=>{b.classList.toggle('sel',b.dataset.lbp===V.p);b.setAttribute('aria-selected',b.dataset.lbp===V.p);});
     $('lbTitle').textContent=B.name;$('lbHow').textContent=B.how||'';$('lbRace').hidden=true;
     $('lbCs').innerHTML=E.P?csTag(E.P.cs,rankIdx(E.P.xp||0),E.P.creator):'';
@@ -11081,25 +11090,24 @@ const APP_VER='2026-09-30-phone';          // keep version.json in step when shi
     const inn=$('lbRowsIn'),me=$('lbMe'),B=BOARDS[V.b];
     if(!j){inn.innerHTML='<div class="lbMsg"><b>Offline</b>Leaderboards need a connection. Runs you fly now are saved and sent when you are back online.</div>';me.innerHTML='';$('lbTotal').textContent='';return;}
     const mine=E.P?E.P.cs:'';
-    inn.innerHTML=j.rows.length?j.rows.map(r=>'<div class="lbRow'+(r.cs===mine?' me':'')+(r.r===1?' top1':'')+'"><span class="n">'+r.r+'</span><span class="c">'+csTag(r.cs,rankByName(r.rank),r.creator)+'</span><span class="s">'+esc(fmtS(V.b,r.score))+'</span><span class="a">'+esc(AC_SHORT[r.ac]||'')+'</span></div>').join('')
+    inn.innerHTML=j.rows.length?j.rows.map(r=>'<div class="lbRow'+(r.cs===mine?' me':'')+(r.r===1?' top1':'')+'"><span class="n">'+r.r+'</span><span class="c">'+csTag(r.cs,rankByName(r.rank),r.creator)+'</span>'+lbMode(r.mode)+'<span class="s">'+esc(fmtS(V.b,r.score))+'</span><span class="a">'+esc(AC_SHORT[r.ac]||'')+'</span></div>').join('')
       :'<div class="lbMsg"><b>No scores yet</b>'+(V.p==='today'?'Nobody has flown this one today. ':'')+'Be the first on the board.</div>';
-    me.innerHTML=j.me?'<div class="lbRow me"><span class="n">#'+num(j.me.r)+'</span><span class="c">'+csTag(j.me.cs,rankByName(j.me.rank),j.me.creator,'of '+num(j.total))+'</span><span class="s">'+esc(fmtS(V.b,j.me.score))+'</span><span class="a">YOU</span></div>'
+    me.innerHTML=j.me?'<div class="lbRow me"><span class="n">#'+num(j.me.r)+'</span><span class="c">'+csTag(j.me.cs,rankByName(j.me.rank),j.me.creator,'of '+num(j.total))+'</span>'+lbMode(j.me.mode)+'<span class="s">'+esc(fmtS(V.b,j.me.score))+'</span><span class="a">YOU</span></div>'
       :E.P?'<div class="lbRow me"><span class="n">&ndash;</span><span class="c">'+csTag(E.P.cs,rankIdx(E.P.xp||0),E.P.creator,'no score '+(V.p==='today'?'today':V.p==='week'?'this week':'yet'))+'</span><span class="s"></span><span class="a">YOU</span></div>'
       :'<div class="lbRow me"><span class="c"><span>Pick a callsign in Settings to get on the boards</span></span></div>';
     $('lbTotal').textContent=num(j.total)+' pilot'+(j.total===1?'':'s');
     const rb=$('lbRace');rb.hidden=!(B.ghost&&j.ghost);if(j.ghost){rb.textContent='Race the leader: '+j.ghost.cs;}
   }
   function lbFetch(force){
-    const key=V.b+'|'+V.m+'|'+V.p,seq=++V.seq,c=V.cache[key];
+    const key=V.b+'|'+V.p,seq=++V.seq,c=V.cache[key];
     if(c)lbRows(c);else $('lbRowsIn').innerHTML='<div class="lbMsg">Loading...</div>';
     if(!E.enabled){lbRows(null);return Promise.resolve();}
     if(c&&!force&&Date.now()-c._at<30e3)return Promise.resolve();
-    return api('/board?b='+encodeURIComponent(V.b)+'&m='+V.m+'&p='+V.p+(E.P?'&cs='+E.P.cs:'')).then(j=>{j._at=Date.now();V.cache[key]=j;if(seq===V.seq&&curScr==='sLb')lbRows(j);},
+    return api('/board?b='+encodeURIComponent(V.b)+'&p='+V.p+(E.P?'&cs='+E.P.cs:'')).then(j=>{j._at=Date.now();V.cache[key]=j;if(seq===V.seq&&curScr==='sLb')lbRows(j);},
       ()=>{if(seq===V.seq)lbRows(null);});
   }
-  document.querySelectorAll('[data-lbm]').forEach(b=>b.onclick=()=>{V.m=b.dataset.lbm;lbRender();});
   document.querySelectorAll('[data-lbp]').forEach(b=>b.onclick=()=>{V.p=b.dataset.lbp;lbRender();});
-  $('lbRace').onclick=()=>race(V.b,V.m);
+  $('lbRace').onclick=()=>race(V.b);
   // pull to refresh: drag the rows down from the top
   {const rows=$('lbRows'),pull=$('lbPull');let y0=null,dy=0;
     const down=y=>{y0=rows.scrollTop<=0?y:null;dy=0;},move=y=>{if(y0===null)return;dy=Math.max(0,y-y0);const h=Math.min(44,dy*0.5);pull.style.height=h+'px';pull.textContent=h>=34?'RELEASE TO REFRESH':'PULL TO REFRESH';},
