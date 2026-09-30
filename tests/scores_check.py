@@ -89,7 +89,11 @@ async def fly_arcade(pg, kind, wait_start=9):
         await pg.evaluate(f"()=>{K}.ff(2)"); await pg.wait_for_timeout(60)
         s = await pg.evaluate(f"()=>{{const s={K}.state();return s.onGround||s.crashed}}")
         if s: break
-    await pg.wait_for_timeout(3200)
+    # the results card comes once the aircraft has stopped: run the rollout through
+    for _ in range(40):
+        await pg.evaluate(f"()=>{K}.ff(2)"); await pg.wait_for_timeout(80)
+        if await pg.evaluate("()=>document.getElementById('arcOv').classList.contains('on')"): break
+    await pg.wait_for_timeout(600)
     return await pg.evaluate("()=>({arc:document.getElementById('arcOv').classList.contains('on'),title:document.getElementById('aTitle').textContent})")
 
 async def badge(pg, timeout=20000):

@@ -109,6 +109,32 @@ at Glendale, lower is better. The score is the run time itself.
 **Lessons**: the lesson's own 0 to 100 score (A 90+, B 80+, C 70+, D 60+). A failed lesson is not
 submitted.
 
+## The results card and its grades
+
+Every run ends on one card (index.html, *the results card*): the letter grade, the score, the key
+stats, the board line (rank, PERSONAL BEST or TOP 10 once the Worker answers; Sending, Saved,
+Practice or Unranked otherwise), then CONTINUE and MAIN MENU. It slides in once the aircraft has
+stopped, or 20 s into the rollout, or when the run ends in the air. Free flight landings and the
+dash use a brief card that never pauses the game and goes on its own after 9 s; the grade badge
+opens the same card as the details. Challenges, lessons, missions and the strike pause under it.
+
+The letter on the card is meant to be fair in the same way on every board: A is a run a good pilot
+is proud of, F is a run that did not count.
+
+| Run | A | B | C | D | F |
+|---|---|---|---|---|---|
+| Landing (free flight, and the landing inside a challenge) | 90+ pts | 80+ | 70+ | 60+ | below, or off the paved runway |
+| Landing challenges, daily | 1,000+ pts | 850+ | 700+ | 500+ | below, the wrong runway, or an F landing |
+| Short field landing | touchdown in 500 ft and stopped in 1,500 ft | in 500 ft, stopped in 2,000 | stopped in 2,000 | stopped in 2,600 | longer |
+| Airdrop | under 25 m | under 50 | under 100 | under 150 | outside the circle |
+| Luke to Glendale dash | 2:30 or faster | 3:00 | 3:30 | 4:00 | slower |
+| Strike range | 90+ pts | 80+ | 70+ | 60+ | below |
+| Lessons | 90+ | 80+ | 70+ | 60+ | failed |
+
+The challenge letter comes from the points, so a clean landing on par (1,000) is an A and a fast
+run with a C landing (say 1.3 x par x 0.8 = 1,040) is one too; a D landing at par is a C. The
+dash bands follow the 3 minute target on its card (the `dash` achievement).
+
 Adding a board for a future mode is one line in the game and one in the server:
 
     LB.board('apt:KPHX', {name: 'Phoenix Sky Harbor landing', group: 'World airports'})    // index.html

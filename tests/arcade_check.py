@@ -26,13 +26,23 @@ async def main():
         for _ in range(120):
             await pg.evaluate(f"()=>{K}.ff(3)"); await pg.wait_for_timeout(100)
             if await pg.evaluate(f"()=>{K}.state().onGround||{K}.state().crashed"): break
-        await pg.wait_for_timeout(3500)
-        res = await pg.evaluate("()=>({on:document.getElementById('arcOv').classList.contains('on'),stars:document.getElementById('aStars').textContent.length,title:document.getElementById('aTitle').textContent,lines:document.getElementById('aLines').innerText})")
-        ok('touchdown on the target ends it with a full results screen', res['on'] and res['stars'] == 3 and 'Time' in res['lines'], res)
-        ok('it scores points', 'points' in res['title'], res['title'])
+        # the results card waits for the aircraft to stop: run the rollout through
+        await pg.wait_for_timeout(600)
+        mid = await pg.evaluate("()=>document.getElementById('arcOv').classList.contains('on')")
+        ok('the results card is not up while the aircraft is still rolling', not mid)
+        for _ in range(30):
+            await pg.evaluate(f"()=>{K}.ff(2)"); await pg.wait_for_timeout(120)
+            if await pg.evaluate("()=>document.getElementById('arcOv').classList.contains('on')"): break
+        await pg.wait_for_timeout(500)
+        res = await pg.evaluate("()=>({on:document.getElementById('arcOv').classList.contains('on'),stars:document.getElementById('aStars').textContent.length,title:document.getElementById('aTitle').textContent,lines:document.getElementById('aLines').innerText,letter:document.getElementById('aLetter').textContent,score:document.getElementById('aScore').textContent,btns:[...document.querySelectorAll('#arcOv .rBtns button')].map(b=>b.textContent),paused:window.__kgeu.paused()})")
+        ok('the aircraft has stopped and the results card is up with the stats', res['on'] and res['stars'] == 3 and 'Time' in res['lines'] and 'Touchdown' in res['lines'], res)
+        ok('it scores points, with a letter grade and a score line', 'points' in res['title'] and res['letter'] in 'ABCDF' and 'pts' in res['score'], (res['title'], res['letter'], res['score']))
+        ok('CONTINUE and MAIN MENU, and the card pauses the challenge', res['btns'] == ['CONTINUE', 'MAIN MENU'] and res['paused'], res['btns'])
         best = await pg.evaluate(f"()=>{K}.SCORE.best['arc:landing']")
         ok('best is saved to the records', best and best['pts'] > 0, best)
         await finger(pg, '#aHub'); await pg.wait_for_timeout(400)
+        ok('MAIN MENU lands on the home screen', await pg.evaluate(f"()=>document.getElementById('menu').classList.contains('on')&&{K}.curScr()==='sHome'"))
+        await pg.evaluate(f"()=>{K}.nav('sArc')"); await pg.wait_for_timeout(300)
         em = await pg.evaluate("()=>document.querySelector('#arcCards [data-m=landing] .sc em').textContent")
         ok('the card shows the best score', 'pts' in em, em)
         await finger(pg, '#arcCards [data-m="daily"]'); await pg.wait_for_timeout(900)

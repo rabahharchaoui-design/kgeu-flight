@@ -110,8 +110,11 @@ async def main():
         for _ in range(80):
             await pg.evaluate(STEP, 150)
             if await pg.evaluate(f"()=>{K}.ARC.done||{K}.state().crashed"): break
-        await pg.wait_for_timeout(3500)
-        await pg.wait_for_timeout(3000)
+        # the results card comes once the aircraft has stopped
+        for _ in range(40):
+            await pg.evaluate(STEP, 60)
+            if await pg.evaluate("()=>document.getElementById('arcOv').classList.contains('on')"): break
+        await pg.wait_for_timeout(800)
         best = await pg.evaluate(f"()=>{{const s=JSON.parse(localStorage.getItem('kgeuScores')||'{{}}').best||{{}};return {{one:s['arc:landing1']||null,five:s['arc:landing']||null,title:document.getElementById('aTitle').textContent}}}}")
         ok('the 1 mile challenge scores under its own best, apart from the 5 mile one', best['one'] is not None and best['five'] is None, best)
         await shot(pg, 'arcade_result')
