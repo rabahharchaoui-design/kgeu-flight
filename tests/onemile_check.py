@@ -57,7 +57,7 @@ async def main():
             ok(f'{W}: pause sheet offers it too, selected', [x['t'] for x in c] == ['Runway', 'Ramp', '1 mi final', '3 mi final'] and c[2]['sel'] and all(x['h'] >= 44 for x in c), c)
             if W == 667: await shot(pg, 'pause_667')
             await pg.evaluate(f"()=>{K}.stepFrame(1/30,false,true)")
-            await finger(pg, '#pRestart'); await pg.wait_for_timeout(800)
+            await finger(pg, '#pApply'); await pg.wait_for_timeout(800)
             g = await pg.evaluate(GEOM)
             ok(f'{W}: Restart comes back to 1 mile final', g['spawn'] == 'final1' and 1700 < g['along'] < 2000, g)
             ok(f'{W}: no page errors', not pg.errs, pg.errs[:3])

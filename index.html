@@ -594,6 +594,20 @@ label.sens b{ color:var(--ink); min-width:74px; }
 #phX{ top:var(--padT); right:var(--padR); font-size:18px; }
 #phSave{ bottom:var(--padB); left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:8px; padding:0 22px; min-height:52px !important; font-size:18px; letter-spacing:.08em; background:var(--rust) !important; color:#fff4e0 !important; }
 .phHint{ position:absolute; top:var(--padT); left:50%; transform:translateX(-50%); margin:0; font:700 13px var(--font); color:var(--sand); background:rgba(26,16,9,.6); padding:6px 12px; border-radius:10px; pointer-events:none; }
+/* the pause sheet is the one hub (item 19): quick settings on the left, where to go next on the right */
+.pzQ{ display:flex; gap:6px; flex:none; }
+.pzQ button{ flex:1 1 0; min-width:0; padding:0 4px; }
+#pauseOv .qs{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; line-height:1.05; }
+#pauseOv .qs i{ font-style:normal; font-size:10px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--orange); }
+#pauseOv .qs b{ font-size:14px; font-weight:800; white-space:nowrap; }
+#pauseOv .qs.on{ background:var(--sand); color:var(--night); border-color:var(--sand); } #pauseOv .qs.on i{ color:var(--brown); }
+.pzNav{ display:flex; gap:6px; flex:none; }
+.pzNav button{ flex:1 1 0; min-width:0; min-height:44px; padding:0 4px; font-size:14px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; background:rgba(26,16,9,.9); color:var(--sand); border:1px solid rgba(246,193,119,.18); border-radius:12px; }
+.pzNav .lg{ display:none; } @media (min-width:760px){ .pzNav .lg{ display:inline; } .pzNav .sm{ display:none; } }
+#pauseOv .frows .go{ font-size:clamp(17px,2.8vw,26px); }
+@media (max-height:360px){ #pauseOv .modeDesc{ display:none; } }
+/* narrow (568 wide): each chip takes the width its name needs, so none is cut short */
+@media (max-width:700px){ #pauseOv .grp{ flex:1 1 auto; gap:4px; } #pauseOv .frow{ gap:6px; } #pauseOv .grp .chip{ flex:1 1 auto; min-width:44px; padding:0 3px; } #pauseOv .frows .chip b{ font-size:12.5px; } #pauseOv .frows{ padding:6px; } #pauseOv .frows .go{ flex:0 0 auto; padding:0 12px; } }
 #pauseOv .ph{ display:flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; padding-left:6px; padding-right:6px; } #pauseOv .ph svg{ flex:none; }
 /* music in the pause sheet: on/off, volume and next song beside the Change flight title */
 .pzR .pzH{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:3px 4px 3px 12px; }
@@ -944,7 +958,7 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
    <div class="setCol">
     <div class="srow"><span>Stick</span><div class="chips"><label class="sens"><input type="range" class="oSens" min="0" max="4" step="1" value="2" aria-label="Stick sensitivity"><b class="oSensV">Medium</b></label></div></div>
     <div class="srow"><span>Pitch</span><div class="chips"><button class="tog oInv">Invert pitch: Off</button></div></div>
-    <div class="srow"><span>Sound</span><div class="chips"><button class="tog" id="oSound">Sound: On</button></div></div>
+    <div class="srow"><span>Sound</span><div class="chips"><button class="tog oSound" id="oSound">Sound: On</button></div></div>
     <div class="srow"><span>Help</span><div class="chips" id="helpRow"><button id="bHelp">Controls help</button><button id="bReplay">Replay first flight</button></div></div>
     <div class="srow"><span></span><div class="chips"><button id="bCredits">Music credits</button></div></div>
    </div>
@@ -1033,11 +1047,13 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
    <p class="pzT">Paused</p>
    <div class="modeSeg" role="radiogroup" aria-label="Mode"><button class="chip sk" data-skill="rookie" role="radio"><b>Easy</b></button><button class="chip sk" data-skill="pilot" role="radio"><b>Hard</b></button></div>
    <p class="modeDesc"></p>
-   <button class="primary" id="pResume">Resume</button><button id="pPhoto" class="ph"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>Action Shot</button><button id="pRestart">Restart</button><button id="pSet">Settings</button><button id="pMenu">Main menu</button>
+   <button class="primary" id="pResume">Resume</button><button id="pPhoto" class="ph"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>Action Shot</button>
+   <div class="pzQ"><button class="qs oSound" id="pSound" aria-label="Sound on or off"><i>Sound</i><b>On</b></button><button class="qs oInv" id="pInv" aria-label="Invert pitch"><i>Invert</i><b>Off</b></button></div>
+   <div class="pzQ"><button class="qs" id="pSens" aria-label="Stick sensitivity, tap for the next step"><i>Stick</i><b class="oSensV">Medium</b></button><button id="pSet">Settings</button></div>
   </div>
   <div class="pzR">
    <div class="pzT pzH"><span class="mbTitle" id="pMusTitle">&mdash;</span><div class="pzMus"><button id="pPrev" aria-label="Previous song">Prev</button><button class="tog playPause" id="pMusic" aria-label="Play or pause music">Pause</button><button class="oMnext" id="pMnext">Next</button></div></div>
-   <div class="pzT pzH"><span>Change flight</span></div>
+   <div class="pzNav" role="group" aria-label="Go to"><button id="pMis">Missions</button><button id="pArc">Arcade</button><button id="pSch" aria-label="Flight school"><span class="lg">Flight school</span><span class="sm">School</span></button><button id="pLb" aria-label="Leaderboards"><span class="lg">Leaderboards</span><span class="sm">Boards</span></button><button id="pMenu" aria-label="Main menu"><span class="lg">Main menu</span><span class="sm">Menu</span></button></div>
    <div class="carx compact" id="carPause"></div>
    <div class="frows">
    <div class="frow"><div class="grp g2"><span class="glbl">Base</span>
@@ -1046,7 +1062,7 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
      <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><button class="pick chip" data-tod="haboob"><b>Haboob</b></button></div></div>
    <div class="frow"><div class="grp g3 g4s"><span class="glbl">Start</span>
      <button class="pick chip" data-pos="runway"><b>Runway</b></button><button class="pick chip" data-pos="ramp"><b>Ramp</b></button><button class="pick chip" data-pos="final1"><b>1 mi final</b></button><button class="pick chip" data-pos="final"><b>3 mi final</b></button></div>
-    <button class="go apply" id="pApply">Apply</button></div>
+    <button class="go apply" id="pApply">Restart</button></div>
   </div>
   </div>
  </div></div>
@@ -6128,7 +6144,7 @@ function setInvPitch(v){TOUCH.inv=!!v;try{localStorage.setItem('kgeuInvPitch',TO
 function stickUI(){
   document.querySelectorAll('.oSens').forEach(e=>e.value=String(TOUCH.sens));
   document.querySelectorAll('.oSensV').forEach(e=>e.textContent=['Very low','Low','Medium','High','Very high'][TOUCH.sens]);
-  document.querySelectorAll('.oInv').forEach(e=>{e.textContent='Invert pitch: '+(TOUCH.inv?'On':'Off');e.classList.toggle('on',TOUCH.inv);});
+  document.querySelectorAll('.oInv').forEach(e=>{const v=TOUCH.inv?'On':'Off';if(e.classList.contains('qs'))e.querySelector('b').textContent=v;else e.textContent='Invert pitch: '+v;e.classList.toggle('on',TOUCH.inv);});
 }
 // ---- mouse or trackpad yoke (Mac): press and drag on the scene ----
 const yoke={on:false,x0:0,y0:0,x:0,y:0,id:null},yokeEl=document.getElementById('yoke'),yokeK=document.getElementById('yokeK');
@@ -8008,9 +8024,15 @@ function start(mode,base){
 const pauseOv=$('pauseOv');
 function openMenu(scr){if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.forced=null;pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
 // the pause button, P and a backgrounded app all land here; the sheet shows while paused
-function togglePause(){paused=!paused;pauseOv.classList.toggle('on',paused);if(paused){radioFade(120);CARP.sync();if(window.stickReset)stickReset();musicUI();}}
+function togglePause(){paused=!paused;pauseOv.classList.toggle('on',paused);if(paused){radioFade(120);CARP.sync();PZ0={t:savedType,b:SPAWN_BASE,p:SPAWN_POS};pzApplyUI();if(window.stickReset)stickReset();musicUI();}}
 $('pResume').onclick=()=>{paused=false;pauseOv.classList.remove('on');initAudio();radioVolApply();};
-$('pRestart').onclick=()=>{pauseOv.classList.remove('on');start(st.mode==='final'||st.mode==='ramp'?(st.spawn||st.mode):(MISS.on?MISS.kind:STRIKE.active?'range':'runway'));};
+// Restart and Apply are one button: it restarts this flight (same start, mission or range) until
+// an aircraft, base or start is changed on the sheet, then it reads Apply and flies the new picks.
+// Time of day needs neither, it changes the sky at once.
+var PZ0=null;
+function pzChanged(){return !!PZ0&&(PZ0.t!==savedType||PZ0.b!==SPAWN_BASE||PZ0.p!==SPAWN_POS);}
+function pzApplyUI(){const b=$('pApply');if(b)b.textContent=pzChanged()?'Apply':'Restart';}
+function pzRestart(){start(st.mode==='final'||st.mode==='ramp'?(st.spawn||st.mode):(MISS.on?MISS.kind:STRIKE.active?'range':'runway'));}
 $('pMenu').onclick=()=>openMenu();
 function freeStart(mode){pickType(savedType);pickPos(mode||SPAWN_POS);start(SPAWN_POS);}
 document.getElementById('mRetry').onclick=()=>{missOv.classList.remove('on');start(MISS.kind==='drop'?'drop':'short');};
@@ -8052,10 +8074,11 @@ document.querySelectorAll('.oInv').forEach(b=>b.onclick=()=>setInvPitch(!TOUCH.i
 document.querySelectorAll('.oSens').forEach(r=>r.addEventListener('input',e=>setStickSens(+e.target.value)));
 document.getElementById('oRadio').onclick=()=>{initAudio();setRadioOn(!RADIO.on);};
 document.getElementById('oRvol').addEventListener('input',e=>{initAudio();setRadioVol(+e.target.value/10);});
-function soundUI(){const b=$('oSound');b.textContent='Sound: '+(muted?'Off':'On');b.classList.toggle('on',!muted);}
+function soundUI(){document.querySelectorAll('.oSound').forEach(b=>{if(b.classList.contains('qs'))b.querySelector('b').textContent=muted?'Off':'On';else b.textContent='Sound: '+(muted?'Off':'On');b.classList.toggle('on',!muted);});}
 try{muted=localStorage.getItem('kgeuMuted')==='1';}catch(e){}
 function setMuted(v){muted=!!v;if(muted&&window.speechSynthesis)speechSynthesis.cancel();try{localStorage.setItem('kgeuMuted',muted?'1':'0');}catch(e){}soundUI();}
-$('oSound').onclick=()=>{initAudio();setMuted(!muted);};
+document.querySelectorAll('.oSound').forEach(b=>b.onclick=()=>{initAudio();setMuted(!muted);});
+$('pSens').onclick=()=>setStickSens((TOUCH.sens+1)%STICK_SENS.length);
 $('oMusic').onclick=()=>{initAudio();TK.paused=false;setMusicOn(!MUSIC.on);};
 $('oMfree').onclick=()=>{initAudio();setMusicFree(!MUSIC.free);};
 $('oMnext').onclick=()=>{initAudio();musicNext();};
@@ -8318,7 +8341,7 @@ function navBack(){
   if(fromPause&&!NAV.length){fromPause=false;menuClose();pauseOv.classList.add('on');CARP.sync();return;}
   showScr(NAV.pop()||'sHome');
 }
-function menuClose(){menu.classList.remove('on','see3d');SHOW.on=false;document.body.classList.remove('menuOn');}
+function menuClose(){fromPause=false;menu.classList.remove('on','see3d');SHOW.on=false;document.body.classList.remove('menuOn');}
 document.querySelectorAll('#menu .back').forEach(b=>b.onclick=navBack);
 $('hFly').onclick=()=>nav('sFly');$('hSch').onclick=()=>nav('sSchool');$('hMis').onclick=()=>nav('sMis');$('hArc').onclick=()=>nav('sArc');
 $('hRec').onclick=()=>recOpen();$('hSet').onclick=()=>nav('sSet');$('bHelp').onclick=()=>nav('sHelp');
@@ -8334,7 +8357,10 @@ function creditsRender(){
   }).catch(()=>{creditsLoaded=true;ul.innerHTML='<li><b>Music credits unavailable offline</b></li>';});
 }
 $('bGo').onclick=()=>freeStart();
-$('pSet').onclick=()=>{pauseOv.classList.remove('on');menu.classList.add('on');nav('sSet',true);fromPause=true;};
+// from the pause sheet straight to a menu screen; its back button comes back to the sheet
+function pauseGo(id){pauseOv.classList.remove('on');menu.classList.add('on');nav(id,true);fromPause=true;}
+$('pSet').onclick=()=>pauseGo('sSet');$('pMis').onclick=()=>pauseGo('sMis');$('pArc').onclick=()=>pauseGo('sArc');$('pSch').onclick=()=>pauseGo('sSchool');
+$('pLb').onclick=()=>{pauseGo('sLb');if(LB)LB.lbOpen();};
 $('storyX').onclick=()=>$('storyOv').classList.remove('on');
 
 // ---- the aircraft, friendliest first ----
@@ -8414,8 +8440,8 @@ function showRender(dt,c){
 // ---- where, when and go ----
 const POS_TXT={runway:'on the runway',ramp:'at the ramp',final1:'on 1 mile final',final:'on 3 mile final'};
 // the pause sheet's change flight panel: same picks, Apply restarts at once
-$('pApply').onclick=()=>{pauseOv.classList.remove('on');freeStart();};
-function sumUI(){const el=$('sumLine');if(!el)return;const I=AC_INFO[savedType]||AC_INFO.cessna;
+$('pApply').onclick=()=>{pauseOv.classList.remove('on');if(pzChanged())freeStart();else pzRestart();};
+function sumUI(){pzApplyUI();const el=$('sumLine');if(!el)return;const I=AC_INFO[savedType]||AC_INFO.cessna;
   el.textContent=I[1]+' at '+(SPAWN_BASE==='luke'?'Luke AFB':'Glendale')+', '+TOD.name.toLowerCase()+', '+POS_TXT[SPAWN_POS];}
 
 // ---- missions: everything that is not an arcade game ----

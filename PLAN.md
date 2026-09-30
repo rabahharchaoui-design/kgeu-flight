@@ -91,7 +91,7 @@ Orchestrated run: builder subagent implements, tester subagent verifies at iPhon
 
 ### P2 UI CLEANUP
 - [x] 18. Rename the photo button to something fun that's clearly for sharing, like "Action Shot". Tapping it captures the frame and opens the iOS share sheet.
-- [ ] 19. Audit every button and menu. Cut redundant screens and nested menus so every main action is at most 2 taps from flight. List what you removed or merged in the report.
+- [x] 19. Audit every button and menu. Cut redundant screens and nested menus so every main action is at most 2 taps from flight. List what you removed or merged in the report.
 
 ### DONE
 - [ ] Write ../chain/report-0929.md with: each item's status, commit hash, what changed, anything skipped and why, and before/after frame times. End it with an iPhone hand test checklist covering every item above.

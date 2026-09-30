@@ -46,7 +46,7 @@ async def main():
         await pg.wait_for_timeout(300)
         await finger(pg, '#bPause')
         await pg.wait_for_function("()=>document.getElementById('pauseOv').classList.contains('on')", timeout=5000)
-        await finger(pg, '#pRestart')
+        await finger(pg, '#pApply')
         await snap(pg, '04_pause_restart.png')
 
         await pg.close()

@@ -36,9 +36,9 @@ EVENTS = {
     'lesson_stall':   ('sSchool', '#school .lrow[data-l=stall]', ''),
     'lesson_engine':  ('sSchool', '#school .lrow[data-l=engine]', ''),
     'lesson_pattern': ('sSchool', '#school .lrow[data-l=pattern]', ''),
-    # the in-flight ways back in: RETRY on the crash card, Restart on the pause sheet, Retry on a lesson grade
+    # the in-flight ways back in: RETRY on the crash card, Restart on the pause sheet (#pApply, it reads Restart until a pick changes), Retry on a lesson grade
     'crash_retry':    (None, '#cRetry', 'crash'),
-    'pause_restart':  (None, '#pRestart', 'pause'),
+    'pause_restart':  (None, '#pApply', 'pause'),
     'grade_retry':    (None, '#gRetry', 'grade'),
 }
 
