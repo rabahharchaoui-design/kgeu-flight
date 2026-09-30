@@ -241,6 +241,9 @@ body.hasDest #stickZone{ top:calc(var(--padT) + max(178px, var(--hudH) + 60px));
 #shTL{ left:calc(var(--padL) + var(--map) + 10px); top:var(--padT); }
 #shTR{ right:calc(var(--padR) + var(--col) + 10px); top:var(--padT); text-align:right; }
 body:not(.touch) #shTR{ top:calc(var(--padT) + var(--icon) + 8px); }
+/* the camera's azimuth: tight on the smallest phones so it clears the pause button; in portrait under the map */
+@media (max-width:620px) and (orientation:landscape){ #shTR{ letter-spacing:0; } }
+@media (orientation:portrait){ #shTR{ left:var(--padL); right:auto; top:calc(var(--padT) + var(--map) + 8px); text-align:left; } }
 #shBL{ left:calc(var(--padL) + 124px); bottom:var(--padB); }
 #shBR{ right:calc(var(--padR) + var(--col) + 146px); bottom:var(--padB); border:1px solid rgba(238,242,236,.6); padding:0 5px; }
 #shBR:empty{ display:none; }
@@ -8754,6 +8757,16 @@ function rwyPoly(ctx,r,P,minW){
   const dx=Math.sin(r.h),dz=-Math.cos(r.h),a=P(r.x-dx*r.len/2,r.z-dz*r.len/2),b=P(r.x+dx*r.len/2,r.z+dz*r.len/2);
   ctx.lineCap='butt';ctx.lineWidth=minW;ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();
 }
+// the sensor ball's look direction on the mini map, whenever the ball view is up (degrees, metres)
+const SCONE={on:false,brgT:0,rel:0,half:0,len:0};
+function sensorCone(){
+  SCONE.on=sensOn;if(!sensOn)return SCONE;
+  const D=180/Math.PI;_eu.setFromQuaternion(st.quat,'YXZ');
+  SCONE.rel=SENSOR.az*D;SCONE.brgT=((-_eu.y*D+SCONE.rel)%360+360)%360;
+  SCONE.half=Math.max(4,SENSOR_FOV[SENSOR.zoom]/2);
+  SCONE.len=SENSOR.valid?clamp(Math.hypot(SENSOR.spot.x-st.pos.x,SENSOR.spot.z-st.pos.z),2000,5500):3000;   // at least 2 km, so a steep look still reads past the aircraft icon
+  return SCONE;
+}
 // the mini map: the same tiles, runways and route as the full map, heading up, aircraft centred
 function drawMap(hdgT){
   if(FM.on)return;
@@ -8775,6 +8788,12 @@ function drawMap(hdgT){
     mx.strokeStyle='#4de1ff';mx.lineWidth=2.5*dpr;mx.stroke();
     if(Math.hypot(q[0],q[1])<C*1.4){mx.fillStyle='#4de1ff';mx.strokeStyle='#06121c';mx.lineWidth=1.5*dpr;mx.beginPath();mx.arc(q[0],q[1],4.5*dpr,0,TAU);mx.fill();mx.stroke();}}
   mx.fillStyle='#7fd4ff';TRAFFIC.forEach(o=>{const a=P(o.m.g.position.x,o.m.g.position.z);mx.beginPath();mx.arc(a[0],a[1],2.2*dpr,0,TAU);mx.fill();});
+  // the sensor ball's cone: amber wedge over a dark halo, so it reads at night and through the dust
+  if(sensorCone().on){const b=SCONE.brgT*Math.PI/180-Math.PI/2,w=SCONE.half*Math.PI/180,L=SCONE.len*k;
+    mx.beginPath();mx.moveTo(0,0);mx.arc(0,0,L,b-w,b+w);mx.closePath();
+    mx.fillStyle='rgba(255,214,107,.25)';mx.fill();mx.lineJoin='round';
+    mx.strokeStyle='rgba(6,10,16,.7)';mx.lineWidth=3*dpr;mx.stroke();
+    mx.strokeStyle='#ffe7a8';mx.lineWidth=1.5*dpr;mx.stroke();}
   mx.setTransform(1,0,0,1,0,0);
   // the drop zone on an airdrop mission: upright, pinned to the rim when it is out of range
   if(MISS.on&&MISS.kind==='drop'&&!MISS.dropped){const X=(DROPZ.x-ox)*k,Z=(DROPZ.z-oz)*k,ch=Math.cos(-h),sh=Math.sin(-h);
@@ -9354,9 +9373,11 @@ function shSet(k,t){if(shEl[k].textContent!==t)shEl[k].textContent=t;}
 function sensorHudUpdate(){
   const r=rookie(),D=180/Math.PI;
   shSet('TL',sensorModeName()+'   x'+(1<<SENSOR.zoom));
-  const az=Math.round(((SENSOR.az*D)%360+360)%360),el=Math.round(SENSOR.el*D);
-  shSet('TR',r?`Camera ${az}°  down ${-el}°`:`AZ ${String(az).padStart(3,'0')}  EL ${el}`);
   _eu.setFromQuaternion(st.quat,'YXZ');const hT=((-_eu.y*D)%360+360)%360,hM=(hT-MAGVAR+360)%360;
+  // where the ball looks: true bearing, and left or right of the nose (SENSOR.az is relative, + is right)
+  const rel=Math.round(SENSOR.az*D),brg=(Math.round(hT+SENSOR.az*D)%360+360)%360,el=Math.round(SENSOR.el*D);
+  shSet('TR',r?`Camera ${brg}°\n${rel?Math.abs(rel)+'° '+(rel>0?'right':'left')+' of the nose':'straight ahead'}\n${-el}° down`
+    :`CAM ${String(brg).padStart(3,'0')}°T  ${rel<0?'L':'R'}${String(Math.abs(rel)).padStart(3,'0')}  EL ${el}`);
   if(r)shSet('BL',`ALT ${Math.max(0,Math.round(st.agl*M2FT/10)*10).toLocaleString('en-US')} ft   HDG ${['N','NE','E','SE','S','SW','W','NW'][Math.round(hT/45)%8]}`);
   else shSet('BL',`ALT ${(Math.round((st.pos.y*M2FT+FIELD_FT-GEAR*M2FT)/10)*10).toLocaleString('en-US')}   HDG ${String(Math.round(hM)%360||360).padStart(3,'0')}`);
   shSet('BR',st.ap?'AUTOPILOT':'');
@@ -11195,7 +11216,7 @@ window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runM
     toCenter:p?Math.hypot(p.pos.x-DROPZ.x,p.pos.z-DROPZ.z):null,pallet:p?p.pos.toArray():null,down:!!(p&&p.down),blend:DCAM.bt};},
   sensor:()=>({mode:SENSOR.mode,zoomIdx:SENSOR.zoom,fov:SENSOR_FOV[SENSOR.zoom],lock:!!(SENSOR.tgt||SENSOR.track),
     az:+(SENSOR.az*180/Math.PI).toFixed(2),el:+(SENSOR.el*180/Math.PI).toFixed(2),ap:!!st.ap}),
-  setSensorMode:setSensorMode,sensorZoom:()=>sensorZoomStep(0),sensorLock:()=>sensorLock(),
+  setSensorMode:setSensorMode,sensorZoom:()=>sensorZoomStep(0),sensorLock:()=>sensorLock(),sensorCone:()=>{const c=sensorCone();return {on:c.on,brgT:+c.brgT.toFixed(2),rel:+c.rel.toFixed(2),half:c.half,len:Math.round(c.len)};},
   fire:()=>fireMissile(),trackHere:()=>sensorTrackHere(),nextTarget:()=>nextTarget(),explode:explode,fxClear:()=>fxClear(),fxReset:()=>{fxClear();fireClear();debrisClear();},warmTimes:()=>({ms:WARM.ms.slice(),total:WARM.total,n:WARM_STEPS.length}),
   // profiling: one pass of the effect updates outside the tick, ms per part
   fxProfile:(dt)=>{const t=[performance.now()];fireUpdate(dt);t.push(performance.now());debrisUpdate(dt);t.push(performance.now());fxUpdate(dt);t.push(performance.now());wreckUpdate(dt);t.push(performance.now());fxPack();t.push(performance.now());
