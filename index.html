@@ -380,6 +380,8 @@ body.touch #sixpack{ width:216px; height:144px; }
 .badge b{ font-size:26px; font-weight:900; line-height:1; min-width:22px; text-align:center; }
 .badge b.gA,.badge b.gB{ color:#4cd97b; } .badge b.gC{ color:var(--caution); } .badge b.gD,.badge b.gF{ color:var(--warn); }
 .badge.rec{ border-color:var(--caution); } .badge.rec b{ font-size:11px; letter-spacing:.14em; color:var(--caution); }
+/* the grade line clamps at two lines so the slot clears the throttle; the card has it in full */
+#gbT{ display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
 @media (prefers-reduced-motion: reduce){ .badge{ transition:opacity .2s; transform:none; } }
 /* Records sits on top of the menu, so it needs its own opaque ground and a
    solid sheet, or the menu behind it reads straight through the text. */
@@ -6421,9 +6423,15 @@ function scRecord(key,rec){
 const bannerEl=document.getElementById('banner'),gBadge=document.getElementById('gBadge');
 // The two badges share one slot at the top right (below it are the throttle and the
 // buttons): a new one takes the slot at once and the one it covered comes back after it.
-function badgeOn(el){const q=el._next||[];
+// The landing grade is the exception: it is what the pilot looks for at touchdown and the way
+// to the details, so the record and leaderboard badges that land with it wait behind it.
+function badgeOn(el){
+  if(el!==gBadge&&gBadge.classList.contains('on')&&!gBadge.classList.contains('fade')){
+    const w=gBadge._next||(gBadge._next=[]);if(!w.includes(el))w.push(el);return;}
+  let q=el._next||[];
   for(const o of document.getElementById('badges').children)
     if(o!==el&&o.classList.contains('on')&&!o.classList.contains('fade')){const w=o._next||[];badgeOff(o);q.push(o,...w);}
+  q=q.filter((o,i)=>o!==el&&q.indexOf(o)===i);
   el._next=q;clearTimeout(el._t1);clearTimeout(el._t2);el.classList.remove('fade');el.classList.add('on');
   el._t1=setTimeout(()=>el.classList.add('fade'),4000);
   el._t2=setTimeout(()=>{el.classList.remove('on','fade');const n=el._next||[];el._next=null;const f=n.shift();if(f){f._next=n;badgeOn(f);}},4600);}
