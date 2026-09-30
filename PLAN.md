@@ -90,7 +90,7 @@ Orchestrated run: builder subagent implements, tester subagent verifies at iPhon
 - [x] (skipped: refs/cessna172 holds only ref_c172.jpg, the N6065M photo; no N8401L photos) 17. Cessna 172. Only if refs/cessna172 contains N8401L photos: rematch the model's livery to N8401L and remove the N6065M match. If there are no N8401L photos, skip this item and note that in the report.
 
 ### P2 UI CLEANUP
-- [ ] 18. Rename the photo button to something fun that's clearly for sharing, like "Action Shot". Tapping it captures the frame and opens the iOS share sheet.
+- [x] 18. Rename the photo button to something fun that's clearly for sharing, like "Action Shot". Tapping it captures the frame and opens the iOS share sheet.
 - [ ] 19. Audit every button and menu. Cut redundant screens and nested menus so every main action is at most 2 taps from flight. List what you removed or merged in the report.
 
 ### DONE
