@@ -1,7 +1,7 @@
 const THREE=require('three');global.THREE=THREE;
 const fs=require('fs');const src=fs.readFileSync(process.env.F||__dirname+'/../index.html','utf8');
 const phys=src.split('// PHYSICS-START')[1].split('// PHYSICS-END')[0];
-const api=new Function('THREE',phys+'\nreturn {createState,step,setType,autopilot,apEngage,toU,toV,wX,wZ,THR01,RWY_LEN,TYPES,M2FT:3.28084,get AC(){return AC}};')(THREE);
+const api=new Function('THREE',phys+'\nreturn {createState,step,setType,autopilot,apEngage,windSeed,toU,toV,wX,wZ,THR01,RWY_LEN,TYPES,M2FT:3.28084,get AC(){return AC}};')(THREE);
 function run(type,mode,apMode,T,opts){
   api.setType(type);const st=api.createState(mode);const ev=[];const DT=1/120;
   if(opts&&opts.pre)opts.pre(st);

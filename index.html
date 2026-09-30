@@ -1164,6 +1164,22 @@ const BASES={
         ramp:[()=>lkX(-300,430),()=>lkZ(-300,430)],rampHdg:312.6,
         fin:d=>[lkX(-1210-d,-152.5),lkZ(-1210-d,-152.5)]}
 };
+// ---------- every runway in the game, and both of its ends ----------
+// hdg is the direction you land in, radians clockwise from north. x,z is the landing threshold.
+const RUNWAYS=(function(){
+  const out=[];
+  function add(apt,code,num,len,wid,cx,cz,h,lo,hi,thrLo,thrHi){
+    const dx=Math.sin(h),dz=-Math.cos(h),r={apt:apt,code:code,num:num,len:len,wid:wid,x:cx,z:cz,h:h,lo:lo,hi:hi,ends:[]};
+    // dx,dz: the landing direction; thr: pavement before the threshold (a displaced threshold)
+    r.ends.push({rwy:r,num:lo,x:cx-dx*(len/2-thrLo),z:cz-dz*(len/2-thrLo),h:h,dx:dx,dz:dz,thr:thrLo});
+    r.ends.push({rwy:r,num:hi,x:cx+dx*(len/2-thrHi),z:cz+dz*(len/2-thrHi),h:h+Math.PI,dx:-dx,dz:-dz,thr:thrHi});
+    out.push(r);}
+  add('Glendale','KGEU','1-19',RWY_LEN,30,wX(RWY_LEN/2,0),wZ(RWY_LEN/2,0),RH,'1','19',THR01,RWY_LEN-THR19);
+  for(const r of LUKE_RWY)add('Luke AFB','KLUF',r.lo+'-'+r.hi,r.len,46,lkX(0,r.v),lkZ(0,r.v),LUKE.h,r.lo,r.hi,0,0);
+  for(const r of SH_RWY)add('Sky Harbor','KPHX',r.lo+'-'+r.hi,r.len,46,shX(0,r.v),shZ(0,r.v),SKY_HARBOR.h,r.lo,r.hi,0,0);
+  add('Assault strip','LZ','9-27',LZ.len,LZ.wid,LZ.x,LZ.z,LZ.h,'9','27',0,0);
+  return out;})();
+const RWY_ENDS=[].concat(...RUNWAYS.map(r=>r.ends));
 const KT=1/MS2KT, GS=3*Math.PI/180, TD_U=THR01+300;
 const FL4=[{deg:0,cl:0,cd:0},{deg:10,cl:0.15,cd:0.006},{deg:20,cl:0.3,cd:0.016},{deg:30,cl:0.45,cd:0.03}];
 const TYPES={
@@ -1247,7 +1263,7 @@ function createState(mode,base,finD){
   const yaw=h=>new THREE.Euler(0,-h*Math.PI/180,0,'YXZ');
   st.base=BASES[base]?base:'kgeu';
   st.flapIdx=1;
-  if(typeof WIND_FIX==='undefined'||!WIND_FIX){st.windBase=10*(1+Math.floor(Math.random()*36));st.windKt=1+Math.floor(Math.random()*10);st.windPh=Math.random()*6.28;}
+  if(typeof WIND_FIX==='undefined'||!WIND_FIX){st.windBase=10*(1+Math.floor(wRnd()*36));st.windKt=1+Math.floor(wRnd()*10);st.windPh=wRnd()*6.28;}
   else{st.windBase=WIND_FIX[0];st.windKt=WIND_FIX[1];st.windPh=0;}
   st.windDir=st.windBase;
   const B=BASES[st.base]||BASES.kgeu, bh=B.hdg*Math.PI/180;
@@ -1286,6 +1302,11 @@ function createState(mode,base,finD){
   else {st.pos.set(B.runway[0](),GEAR,B.runway[1]());st.quat.setFromEuler(yaw(B.hdg));}
   return st;
 }
+// the wind's dice (base wind, gusts, haboob buffet, which wing drops in a stall). Math.random in play;
+// windSeed(n) makes them repeat exactly for a test, windSeed() goes back to Math.random
+let wRnd=Math.random;
+function windSeed(n){if(n===undefined||n===null){wRnd=Math.random;return;}let a=n>>>0;
+  wRnd=()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
 function crash(st,why){st.crashed=true;st.crashReason=why;}
 const _f=new V3(),_u=new V3(),_r=new V3(),_F=new V3(),_vh=new V3(),_ld=new V3(),_vb=new V3(),_iq=new Q4(),_dq=new Q4(),_ax=new V3(),_hf=new V3(),_e=new THREE.Euler(0,0,0,'YXZ'),_w=new V3(),_air=new V3();
 function step(st,dt,ev){
@@ -1293,13 +1314,13 @@ function step(st,dt,ev){
   const q=st.quat, mg=AC.mass*AC.g;
   _f.set(0,0,-1).applyQuaternion(q);_u.set(0,1,0).applyQuaternion(q);_r.set(1,0,0).applyQuaternion(q);
   const gh0=groundHeight(st.pos.x,st.pos.z), agl=Math.max(0,st.pos.y-GEAR-gh0); st.agl=agl;
-  st.gustT-=dt; if(st.gustT<=0){st.gustT=0.7+Math.random()*1.8;st.gustTarget=(Math.random()*2-1)*st.gustAmp;}
+  st.gustT-=dt; if(st.gustT<=0){st.gustT=0.7+wRnd()*1.8;st.gustTarget=(wRnd()*2-1)*st.gustAmp;}
   st.gust+=(st.gustTarget-st.gust)*Math.min(1,dt*1.2);
   const wd=st.windDir*Math.PI/180, ws=Math.max(0,st.windKt*0.5144*(1+st.gust))*clamp(0.55+0.45*agl/30,0.55,1);
   _w.set(-Math.sin(wd)*ws,0,Math.cos(wd)*ws);
   // haboob turbulence: a slow random vertical gust and a roll/pitch buffet, both scaled by
   // how deep in the dust we are (st.dust, set by hbUpdate; 0 everywhere else)
-  if(st.dust>0){st.tvT-=dt;if(st.tvT<=0){st.tvT=0.5+Math.random();st.tvTarget=(Math.random()*2-1)*3;st.bp=Math.random()*2-1;st.br=Math.random()*2-1;}
+  if(st.dust>0){st.tvT-=dt;if(st.tvT<=0){st.tvT=0.5+wRnd();st.tvTarget=(wRnd()*2-1)*3;st.bp=wRnd()*2-1;st.br=wRnd()*2-1;}
     st.tv+=(st.tvTarget-st.tv)*Math.min(1,dt*1.5);_w.y+=st.tv*st.dust;}
   _air.copy(st.vel).sub(_w);
   const Va=_air.length(), rho=1.097*Math.exp(-st.pos.y/9200), rr=rho/1.225, qd=0.5*rho*Va*Va;
@@ -1332,7 +1353,7 @@ function step(st,dt,ev){
   st.vel.addScaledVector(_F,dt/AC.mass);
   st.pos.addScaledVector(st.vel,dt);
   const qn=qd/2400, sq=Math.sqrt(qn), aTrim=AC.trimBase+st.trim*AC.trimK;
-  if(stalled&&!st.stalled) st.dropDir=Math.random()<0.5?-1:1;
+  if(stalled&&!st.stalled) st.dropDir=wRnd()<0.5?-1:1;
   st.stalled=stalled;
   st.aoaWarn=!st.onGround&&Va>5&&alpha>AC.aStall-0.05;
   const am=clamp(alpha-aTrim,-0.6,0.6), bm=clamp(beta,-0.6,0.6);
@@ -1416,16 +1437,37 @@ function apGround(st,hdg,v,pitchCmd,rate){
   const hc=RH-clamp(v*0.08,-0.15,0.15);if(!st.apW)st.apW=new V3();
   st.apW.set(clamp((pitchCmd-_eB.x)*2,-0.12,rate),-clamp(wrapPi(hc-hdg)*1.5,-0.25,0.25),0);
 }
+// Easy: the runway end we are lined up with, any airport runway, either direction (not the assault
+// strip: its short field landing is the C-130 mission's test, and a 300 m aim point would overrun
+// it). a is metres past its threshold, c metres right of its centre line. In the air: tracking
+// within 17 degrees of it, inside 150 m of the centre line, up to 9 km out and under 500 m. On the
+// ground: on its pavement with the nose along it.
+const _ezR={e:null,a:0,c:0};
+function ezRunway(st,dir,ground){
+  let best=null,bc=1e9,ba=0,bs=0;
+  for(const e of RWY_ENDS){
+    if(e.rwy.code==='LZ'||Math.abs(wrapPi(dir-e.h))>(ground?0.35:0.3))continue;
+    const rx=st.pos.x-e.x,rz=st.pos.z-e.z,a=rx*e.dx+rz*e.dz,c=rz*e.dx-rx*e.dz,end=e.rwy.len-e.thr;
+    if(ground?(Math.abs(c)>=20||a<=-e.thr-30||a>=end+30):(Math.abs(c)>=150||a<=-9000||a>=end||st.agl>=500))continue;
+    if(Math.abs(c)<bc){bc=Math.abs(c);best=e;ba=a;bs=c;}}
+  _ezR.e=best;_ezR.a=ba;_ezR.c=bs;return _ezR;
+}
 // Easy Flight: stick commands bank angle and flight path, auto flaps and gear, stall and overbank protection
 function easyFly(st,dt,ev){
-  _eB.setFromQuaternion(st.quat,'YXZ');const hdg=-_eB.y,u=toU(st.pos.x,st.pos.z),v=toV(st.pos.x,st.pos.z),onRwy=Math.abs(v)<20&&u>-30&&u<RWY_LEN+30&&Math.abs(wrapPi(hdg-RH))<0.35;
+  _eB.setFromQuaternion(st.quat,'YXZ');const hdg=-_eB.y;
   if(st.onGround){st.ez=0;st.apW=null;if(!st.ezManFlap&&st.vel.length()<30&&st.flapIdx!==AC.toFlap&&st.throttle>0.5)st.flapIdx=AC.toFlap;
-    if(Math.abs(st.ail)>0.05||st.ezH===undefined)st.ezH=hdg;
-    else if(st.vel.length()>3){const hc=onRwy?RH-clamp(v*0.08,-0.15,0.15):st.ezH;st.steer=clamp(wrapPi(hc-hdg)*4,-1,1);}
+    // power up on the runway (a touch and go, a takeoff) or stopped: the next approach is a new one
+    if(st.throttle>0.5||st.vel.length()<3)st.ezFl=0;
+    // on a runway: steer for its centre line, whichever runway and whichever way along it
+    const G=ezRunway(st,hdg,true),held=Math.abs(st.ail)>0.05||st.ezH===undefined;
+    if(held)st.ezH=hdg;
+    // (closing on it at about half the offset per second: a fixed cut of 5 degrees a metre swung a
+    // 115 kt C-130 across the centre line and off its wheels)
+    const hc=G.e?G.e.h-clamp(Math.atan2(G.c*0.5,Math.max(st.vel.length(),4)),-0.15,0.15):st.ezH;
+    if(!held&&st.vel.length()>3)st.steer=clamp(wrapPi(hc-hdg)*4,-1,1);
     // Rolling out with the power back: hold the nose down, the way the autoland rollout
     // does. Left to trim a jet sits nose high at 170 kt and balloons back off the runway.
     if(st.throttle<0.25&&st.vel.length()>6){
-      const hc=onRwy?RH-clamp(v*0.08,-0.15,0.15):st.ezH;
       if(!st.apW)st.apW=new V3();
       // the stick still steers the nose wheel here: as it goes over, the heading hold lets go of yaw
       // (st.w.y carries on, and the ground roll steers it from st.steer). Below about 20 kt any real
@@ -1435,17 +1477,24 @@ function easyFly(st,dt,ev){
       const hold=-clamp(wrapPi(hc-hdg)*1.5,-0.25,0.25);
       st.apW.set(clamp((0-_eB.x)*2,-0.12,0.05),hold+(st.w.y-hold)*rel,0);
       if(st.ezIdle&&_eB.x<0.06)st.brake=true;          // brakes on once the nose is down
+      // and the landing flap comes off on contact: a C-130 on flaps 100 still flies at 115 kt with the
+      // nose level, so it hopped back off the runway
+      if(st.ezIdle&&!st.ezManFlap&&st.flapIdx>AC.toFlap){st.flapIdx=AC.toFlap;ev&&ev.push({type:'ap',msg:'Flaps '+FLAPS[AC.toFlap].deg});}
     }
     if(st.vel.length()<3)st.ezIdle=0;
     return;}
   const gsp=Math.max(10,Math.hypot(st.vel.x,st.vel.z)),trk=Math.atan2(st.vel.x,-st.vel.z),agl=st.agl,kias=st.ias*MS2KT,gAct=Math.atan2(st.vel.y,gsp);
-  if(!st.ez){st.ez=1;st.ezP=_eB.x;st.ezHeld=0;st.ezFT=0;
+  const R=ezRunway(st,trk,false),E=R.e,c=R.c;
+  if(!st.ez){st.ez=1;st.ezP=_eB.x;st.ezHeld=0;st.ezFT=0;st.ezThr=undefined;st.ezTM=0;st.ezGA=0;
     // just off the ground at climb power: trim for Vy. Otherwise trim for whatever speed we have now.
     const vNow=st.ias>5?st.ias:st.vel.length()*0.93;
     st.ezV=st.airTime<2&&st.throttle>0.5?AC.vy:Math.max(AC.vapp*0.9,vNow);st.ezV0=vNow;st.ezDV=0;st.ezLI=0;
     if(!st.ezCfg&&st.agl<400&&st.vel.y<-0.5&&st.gearDown){st.ezCfg='approach';st.ezV=AC.vapp;}}
+  // the throttle moved since Easy last set it: the pilot has it (the approach assist lets go of it)
+  if(!E)st.ezTM=0;
+  else if(st.ezThr!==undefined&&Math.abs(st.throttle-st.ezThr)>0.02)st.ezTM=1;
   // Closes the throttle ONCE on short final. If the pilot adds power after that, it is theirs: go around works.
-  if(!st.ezIdle&&!st.ezIdleDone&&agl<15.24&&st.vel.y<-0.2&&Math.abs(v)<25&&u>-120&&u<RWY_LEN&&Math.abs(wrapPi(hdg-RH))<0.35){
+  if(!st.ezIdle&&!st.ezIdleDone&&agl<15.24&&st.vel.y<-0.2&&E&&Math.abs(c)<25&&R.a>-E.thr-120&&Math.abs(wrapPi(hdg-E.h))<0.35){
     st.ezIdle=1;st.ezIdleDone=1;st.throttle=0;ev&&ev.push({type:'ap',msg:'Auto idle'});}
   if(st.ezIdle&&st.throttle>0.08){st.ezIdle=0;ev&&ev.push({type:'ap',msg:'Power up, go around'});}
   // Configuration by phase, with hysteresis so nothing flip flops: climb, clean, approach.
@@ -1461,7 +1510,9 @@ function easyFly(st,dt,ev){
     else if(!wantDown&&st.gearDown&&agl>45&&st.vel.y>1){st.gearDown=false;ev&&ev.push({type:'ap',msg:'Gear up'});}
   }
   let fl=cfg==='approach'?AC.landFlap:cfg==='climb'?AC.toFlap:0;
-  if(kias>AC.vfe*0.93)fl=0;else if(fl>st.flapIdx&&kias>AC.vfe*0.85)fl=Math.min(fl,Math.max(1,st.flapIdx));
+  // flaps come in early climbing away, but on an approach only for a real overspeed: the C-130 flies
+  // final at 130 kt against a 145 kt flap limit, and a gust used to take its flaps 100 away at 135
+  if(kias>AC.vfe*(cfg==='approach'?1:0.93))fl=0;else if(fl>st.flapIdx&&kias>AC.vfe*0.85)fl=Math.min(fl,Math.max(1,st.flapIdx));
   if(st.ezManFlap)fl=st.flapIdx;                        // pilot touched the flaps: they are manual for this flight
   if(fl!==st.flapIdx){st.ezFT+=dt;if(st.ezFT>1.2){st.flapIdx=fl;st.ezFT=0;ev&&ev.push({type:'ap',msg:'Flaps '+FLAPS[fl].deg});}}else st.ezFT=0;
   // Behaves like a trimmed airplane. The stick moves the nose; let go and it re-trims for the speed you have.
@@ -1470,7 +1521,37 @@ function easyFly(st,dt,ev){
   const x=st.ail,y=st.elev,pitch=_eB.x;
   const acc=(st.ias-st.ezV0)/Math.max(dt,1e-3);st.ezV0=st.ias;st.ezDV+=(acc-st.ezDV)*Math.min(1,dt*2);   // smoothed speed trend
   const vMin=AC.vapp*(st.noProt?0.75:0.9);
-  if(AC.ezAoA&&cfg==='approach'){
+  // Approach assist. Lined up on final with the stick and the throttle left alone, Easy flies the
+  // 3 degree path to the aim point 300 m past the threshold at the approach speed, whatever the
+  // wind, then flares, idles and lands. Trim and power alone never did: the path drifted with
+  // the configuration and the headwind, and the long wings floated a mile down the runway.
+  // Pull or push the stick and it lets go while you hold it; touch the throttle and it lets go
+  // for the rest of the approach (that is how a go around starts).
+  const hT=E?Math.max(0,300-R.a)*Math.tan(GS):0;
+  // it picks the approach up short of the aim point near the path, never climbing away off the runway
+  let ga=!!E&&cfg==='approach'&&!st.ezTM&&Math.abs(y)<=0.05&&!st.noProt&&(st.ezGA||st.ezFl||
+    (R.a<300&&Math.abs(agl-hT)<30+0.3*hT&&!(st.airTime<5&&st.throttle>0.5)));
+  if(ga&&!st.ezGA){st.ezGA=1;st.apPI=pitch;st.apTI=st.throttle;}
+  if(!ga)st.ezGA=0;
+  if(ga){
+    const sink=-st.vel.y;
+    if(!st.ezFl&&agl<Math.max(AC.flareH,(sink-AC.tdSink)/AC.flareK*1.3+2)){st.ezFl=1;st.ezFP=pitch;}
+    let vs;
+    if(st.ezFl){vs=-(AC.tdSink+agl*AC.flareK);if(!st.ezIdle){st.ezIdle=1;st.ezIdleDone=1;ev&&ev.push({type:'ap',msg:'Auto idle'});}}
+    else vs=-gsp*Math.tan(GS)+clamp((hT-agl)*0.25,-3,3);
+    if(st.ezIdle||st.ezFl)st.throttle=0;else apSpeed(st,AC.vapp,dt);
+    let pc=apPitch(st,vs,dt,st.ezFl?4:1);
+    // never below the touchdown attitude, or for an aircraft that comes down final nose low, never
+    // below 3.4 degrees nose down (the nose wheel touches first at 5.7). A C-130 on flaps 100 flies
+    // final 6 degrees nose down: snapping it to the touchdown attitude at 50 ft ballooned it 30 ft,
+    // and a floor that rose to it on the way down floated it half a mile.
+    // In the last metre and a half it comes up to at least level: the wheels set the attitude to
+    // level on contact, and a nose low arrival hopped back into the air when they did.
+    let fp=-1;if(st.ezFl){fp=Math.min(AC.tdPitch,Math.max(-0.06,st.ezFP));fp+=Math.max(0,-fp)*smooth(1.5,0.3,agl);}
+    if(st.ezFl&&pc<fp){pc=fp;st.apPI=Math.max(st.apPI,fp);}
+    st.ezP=pc;st.ezV=Math.max(vMin,st.ias);st.ezHeld=0;
+  }
+  else if(AC.ezAoA&&cfg==='approach'){
     // F-16 flight control law with the gear down: it trims to 13 degrees angle of attack, so the throttle
     // flies the glidepath and the stick fine tunes the AoA.
     if(st.ezAT===undefined||prev!=='approach')st.ezAT=AC.ezAoA;
@@ -1484,25 +1565,40 @@ function easyFly(st,dt,ev){
     if(agl>12&&st.vel.y>vL*1.6){const e=(st.ias-st.ezV)/st.ezV;st.ezP=clamp(st.ezP+(0.12*e+2*st.ezDV/st.ezV)*dt,-0.35,0.45);}
     else st.ezV=Math.max(vMin,Math.min(st.ezV,st.ias));}      // in the flare: hold the attitude and let the speed bleed
   const lim=AC.aStall-0.08;                                          // stall protection
-  if(!st.noProt&&st.alpha>lim){st.ezP=Math.min(st.ezP,pitch-(st.alpha-lim)*2.5);st.ezV=Math.max(st.ezV,st.ias+2);}
+  if(!st.noProt&&!ga&&st.alpha>lim){st.ezP=Math.min(st.ezP,pitch-(st.alpha-lim)*2.5);st.ezV=Math.max(st.ezV,st.ias+2);}
   if(st.noProt&&st.stalled&&st.elev>-0.2)st.ezP-=0.25*dt;       // training: a real stall breaks, the nose falls
   // alpha floor: slow, wing at its limit and sinking hard near the ground. Easy flight firewalls the power.
   if(st.ezAF>0){st.ezAF-=dt;st.throttle=1;}
   else if(!st.noProt&&!st.ezIdle&&agl<200&&st.alpha>lim-0.02&&st.vel.y<-3&&st.throttle<0.95){st.ezAF=4;st.throttle=1;ev&&ev.push({type:'ap',msg:'Alpha floor, max power'});}
   const vLim=-(AC.tdSink+agl*AC.flareK);                             // ground cushion: an automatic flare
-  if(st.vel.y<vLim){st.ezP=Math.min(0.45,st.ezP+(vLim-st.vel.y)/gsp*4*dt);
+  if(st.vel.y<vLim&&!ga){st.ezP=Math.min(0.45,st.ezP+(vLim-st.vel.y)/gsp*4*dt);
     if(AC.ezAoA&&cfg==='approach')st.ezAT=Math.min(AC.aStall-0.1,st.ezAT+(vLim-st.vel.y)/gsp*4*dt);}
   const p=st.ezP;
   let bank=x*(st.bankMax||AC.ezBank)*clamp(agl/40,0.12,1);
   if(st.noProt&&st.stalled)bank+=(st.dropDir||1)*0.35;          // and one wing drops
-  if(Math.abs(x)<0.05&&Math.abs(wrapPi(trk-RH))<0.3&&Math.abs(v)<150&&u>THR01-9000&&u<RWY_LEN&&agl<500){
-    if(Math.abs(v)<25)st.ezLI=clamp((st.ezLI||0)+v*dt*0.00004,-0.06,0.06);
-    bank=apBank(trk,RH-clamp(v*0.066/gsp,-0.8,0.8)-(st.ezLI||0),0.3*clamp(agl/40,0.2,1),gsp);}
-  apAtt(st,p,bank,trk);
+  let yawC=trk;
+  if(Math.abs(x)<0.05&&E){
+    if(Math.abs(c)<25)st.ezLI=clamp((st.ezLI||0)+c*dt*0.0003,-0.06,0.06);
+    // Crab into the wind on final (the nose into the relative wind, the same wind step() blows, so
+    // no sideslip to fight with bank), then kick it straight in the last couple of metres and hold
+    // the drift off with a little wing down (the bank that cancels the sideslip's side force),
+    // never more than half of what the wingtips allow. The old lineup flew the nose down the track
+    // in every wind: the sideslip left it standing 5 m downwind of the centre line.
+    const wd=st.windDir*Math.PI/180,ws=Math.max(0,st.windKt*0.5144*(1+st.gust))*clamp(0.55+0.45*agl/30,0.55,1);
+    // the crab eases in over 3 s from lining up (a spawn on final starts with the nose down the runway)
+    st.ezCK=Math.min(1,(st.ezCK||0)+dt/3);
+    const yC=trk+wrapPi(Math.atan2(st.vel.x+Math.sin(wd)*ws,-(st.vel.z-Math.cos(wd)*ws))-trk)*st.ezCK,k=smooth(2.5,0.5,agl);
+    yawC=yC+wrapPi(E.h-yC)*k;
+    const q=0.6125*st.ias*st.ias*AC.S,ff=Math.atan(q*0.8*st.beta/(AC.mass*AC.g));
+    const mb=Math.max(0.3*clamp(agl/40,0.2,1),k*0.5*AC.tipRoll);
+    bank=clamp(apBank(trk,E.h-clamp(c*0.066/gsp,-0.8,0.8)-(st.ezLI||0),mb,gsp)+ff,-mb,mb);}
+  else st.ezCK=0;
+  apAtt(st,p,bank,yawC);
   // switched into Easy mid flight: blend the assists in over 1.5 s from what the aircraft is
   // already doing, so a bank or a pitch the pilot was holding is eased out, never snapped
   if(st.ezBlend!==undefined&&st.ezBlend<1&&st.apW){st.ezBlend=Math.min(1,st.ezBlend+dt/1.5);const k=st.ezBlend*st.ezBlend*(3-2*st.ezBlend);
     st.apW.set(st.w.x+(st.apW.x-st.w.x)*k,st.w.y+(st.apW.y-st.w.y)*k,st.w.z+(st.apW.z-st.w.z)*k);}
+  st.ezThr=st.throttle;
 }
 // ---------- Dubins shortest path: LSL, RSR, LSR, RSL ----------
 // Planner frame: X = world x, Y = -world z, theta = PI/2 - heading. Left turns are CCW in that frame.
@@ -5822,21 +5918,6 @@ function updatePeople(dt,t){
   if(near)iTorso.instanceMatrix.needsUpdate=iHead.instanceMatrix.needsUpdate=iLeg.instanceMatrix.needsUpdate=iArm.instanceMatrix.needsUpdate=true;
 }
 
-// ---------- every runway in the game, and both of its ends ----------
-// hdg is the direction you land in, radians clockwise from north. x,z is the landing threshold.
-const RUNWAYS=(function(){
-  const out=[];
-  function add(apt,code,num,len,wid,cx,cz,h,lo,hi,thrLo,thrHi){
-    const dx=Math.sin(h),dz=-Math.cos(h),r={apt:apt,code:code,num:num,len:len,wid:wid,x:cx,z:cz,h:h,lo:lo,hi:hi,ends:[]};
-    r.ends.push({rwy:r,num:lo,x:cx-dx*(len/2-thrLo),z:cz-dz*(len/2-thrLo),h:h});
-    r.ends.push({rwy:r,num:hi,x:cx+dx*(len/2-thrHi),z:cz+dz*(len/2-thrHi),h:h+Math.PI});
-    out.push(r);}
-  add('Glendale','KGEU','1-19',RWY_LEN,30,wX(RWY_LEN/2,0),wZ(RWY_LEN/2,0),RH,'1','19',THR01,RWY_LEN-THR19);
-  for(const r of LUKE_RWY)add('Luke AFB','KLUF',r.lo+'-'+r.hi,r.len,46,lkX(0,r.v),lkZ(0,r.v),LUKE.h,r.lo,r.hi,0,0);
-  for(const r of SH_RWY)add('Sky Harbor','KPHX',r.lo+'-'+r.hi,r.len,46,shX(0,r.v),shZ(0,r.v),SKY_HARBOR.h,r.lo,r.hi,0,0);
-  add('Assault strip','LZ','9-27',LZ.len,LZ.wid,LZ.x,LZ.z,LZ.h,'9','27',0,0);
-  return out;})();
-const RWY_ENDS=[].concat(...RUNWAYS.map(r=>r.ends));
 // ---------- airport lights, laid out from the runway table ----------
 const AL={};
 (function(){
@@ -10704,7 +10785,7 @@ const APP_VER='2026-09-29-scores';          // keep version.json in step when sh
     get P(){return E.P;}};
 })();
 
-window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
+window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
   lights:()=>({KGEU:AL.KGEU.count(),KLUF:AL.KLUF.count(),uLights:AL_MAT.uniforms.uLights.value,
     layers:AL_LAYERS.map(L=>({name:L.pts&&L.pts.name,visible:!!(L.pts&&L.pts.visible),inScene:!!(L.pts&&L.pts.parent)})),
