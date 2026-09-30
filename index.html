@@ -1056,7 +1056,10 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
 'use strict';
 // PHYSICS-START
 const V3=THREE.Vector3,Q4=THREE.Quaternion;
-const MS2KT=1.943844,M2FT=3.28084,FIELD_FT=1071,GEAR=1.5,MAGVAR=12;
+const MS2KT=1.943844,M2FT=3.28084,FIELD_FT=1071,MAGVAR=12;
+// GEAR: height of the aircraft origin over the ground with the tyres just touching, per type
+// (TYPES[].gear, the models are built to it); setType sets it
+let GEAR=1.5;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const smooth=(e0,e1,x)=>{const t=clamp((x-e0)/(e1-e0),0,1);return t*t*(3-2*t);};
@@ -1183,21 +1186,21 @@ const RWY_ENDS=[].concat(...RUNWAYS.map(r=>r.ends));
 const KT=1/MS2KT, GS=3*Math.PI/180, TD_U=THR01+300;
 const FL4=[{deg:0,cl:0,cd:0},{deg:10,cl:0.15,cd:0.006},{deg:20,cl:0.3,cd:0.016},{deg:30,cl:0.45,cd:0.03}];
 const TYPES={
-  reaper:{id:'reaper',name:'MQ-9A Reaper',title:'02-4002',mass:4200,S:24,Tstatic:9500,Pmax:670000,eta:0.78,CL0:0.35,CLa:5.8,aStall:0.2,CD0:0.027,k:0.022,span:20.1,len:13,
-    spool:1.3,pf:1,retract:1,wave:0,tipRoll:0.16,tipMsg:'Wingtip strike. That 66 ft wing has 9 degrees of clearance, level it before touchdown.',gndPitch:0.1,trimBase:0.03,trimK:0.1,
+  reaper:{id:'reaper',name:'MQ-9A Reaper',title:'02-4002',mass:4200,S:24,Tstatic:9500,Pmax:670000,eta:0.78,CL0:0.35,CLa:5.8,aStall:0.2,CD0:0.027,k:0.022,span:20.1,len:13,gear:1.68,
+    spool:1.3,pf:1,retract:1,wave:0,tipRoll:0.16,tipMsg:'Wingtip strike. That 66 ft wing has 9 degrees of clearance, level it before touchdown.',gndPitch:0.08,trimBase:0.03,trimK:0.1,
     flaps:[{deg:0,cl:0,cd:0},{deg:10,cl:0.15,cd:0.008},{deg:20,cl:0.3,cd:0.024},{deg:30,cl:0.45,cd:0.055}],toFlap:1,landFlap:3,finalFlap:2,finalThr:0.12,finalPitch:0.04,finalTrim:0.6,vr:95*KT,vy:110*KT,vcruise:125*KT,vapp:100*KT,patAlt:305,climbVS:4,descMax:4,
-    maxBank:0.44,ipD:5200,fafD:3000,slowD:2000,decel:0.5,ezG:0.2,ezGR:0.12,ezBank:0.7,thrC:0.8,flareH:6,flareK:0.3,tdSink:0.45,tdPitch:0,rotP:0.09,rotRate:0.06,apRate:[0.3,0.3,0.5],vne:230,vfe:140,snd:'turbo',cam1:[0,0.12,-5.02],cam1Name:'Nose camera',chase:[5,27],
+    maxBank:0.44,ipD:5200,fafD:3000,slowD:2000,decel:0.5,ezG:0.2,ezGR:0.12,ezBank:0.7,thrC:0.8,flareH:6,flareK:0.3,tdSink:0.45,tdPitch:0,rotP:0.07,rotRate:0.06,apRate:[0.3,0.3,0.5],vne:230,vfe:140,snd:'turbo',cam1:[0,0.12,-5.02],cam1Name:'Nose camera',chase:[5,27],
     cs:'Reaper 8401L',csS:'Reaper 01L',say:'Reaper eight four zero one lima',sayS:'Reaper zero one lima',
     sub:'MQ-9A Reaper 02-4002 at Glendale, KGEU: the first Reaper into Afghanistan, now in the Air Force Museum. 66 ft wing, 900 shp turboprop pusher. Runway 1 is 7,150 ft, field elevation 1,071. Wind changes every flight.',
     tips:'Manual: flaps 10, full power, rotate at 95 kt, gear up once climbing. Land at 100 kt, flaps 30, under 300 fpm.'},
-  mq9b:{id:'mq9b',name:'MQ-9B SkyGuardian',title:'N190TC',mass:4600,S:27.5,Tstatic:9500,Pmax:670000,eta:0.78,CL0:0.35,CLa:5.8,aStall:0.2,CD0:0.026,k:0.016,span:24,len:11.7,
-    spool:1.3,pf:1,retract:1,wave:0,tipRoll:0.14,tipMsg:'Wingtip strike. That 79 ft wing has 8 degrees of clearance, level it before touchdown.',gndPitch:0.1,trimBase:0.03,trimK:0.1,
+  mq9b:{id:'mq9b',name:'MQ-9B SkyGuardian',title:'N190TC',mass:4600,S:27.5,Tstatic:9500,Pmax:670000,eta:0.78,CL0:0.35,CLa:5.8,aStall:0.2,CD0:0.026,k:0.016,span:24,len:11.7,gear:1.70,
+    spool:1.3,pf:1,retract:1,wave:0,tipRoll:0.14,tipMsg:'Wingtip strike. That 79 ft wing has 8 degrees of clearance, level it before touchdown.',gndPitch:0.08,trimBase:0.03,trimK:0.1,
     flaps:[{deg:0,cl:0,cd:0},{deg:10,cl:0.15,cd:0.008},{deg:20,cl:0.3,cd:0.024},{deg:30,cl:0.45,cd:0.055}],toFlap:1,landFlap:3,finalFlap:2,finalThr:0.10,finalPitch:0.04,finalTrim:0.6,vr:95*KT,vy:110*KT,vcruise:125*KT,vapp:100*KT,patAlt:305,climbVS:4,descMax:4,
-    maxBank:0.44,ipD:5600,fafD:3300,slowD:2400,decel:0.42,ezG:0.2,ezGR:0.12,ezBank:0.7,thrC:0.8,flareH:6,flareK:0.3,tdSink:0.45,tdPitch:0,rotP:0.09,rotRate:0.06,apRate:[0.3,0.3,0.5],vne:230,vfe:140,snd:'turbo',cam1:[0,0.14,-5.3],cam1Name:'Nose camera',chase:[5.5,30],
+    maxBank:0.44,ipD:5600,fafD:3300,slowD:2400,decel:0.42,ezG:0.2,ezGR:0.12,ezBank:0.7,thrC:0.8,flareH:6,flareK:0.3,tdSink:0.45,tdPitch:0,rotP:0.07,rotRate:0.06,apRate:[0.3,0.3,0.5],vne:230,vfe:140,snd:'turbo',cam1:[0,0.14,-5.3],cam1Name:'Nose camera',chase:[5.5,30],
     cs:'SkyGuardian 190TC',csS:'SkyGuardian 0TC',say:'Sky Guardian one niner zero tango charlie',sayS:'Sky Guardian zero tango charlie',
     sub:'MQ-9B SkyGuardian, N190TC, at Glendale KGEU. 79 ft wing with winglets, 40 hours of endurance, and it glides like a sailplane. Runway 1 is 7,150 ft, field elevation 1,071. Wind changes every flight.',
     tips:'Manual: flaps 10, full power, rotate at 95 kt, gear up once climbing. Land at 100 kt, flaps 30. It floats, so pull the power early and let it settle.'},
-  cessna:{id:'cessna',name:'Cessna 172',title:'N8401L',mass:1050,S:16.2,Tstatic:2800,Pmax:134000,eta:0.75,CL0:0.3,CLa:5.0,aStall:0.24,CD0:0.03,k:0.05,span:11,len:8.3,
+  cessna:{id:'cessna',name:'Cessna 172',title:'N8401L',mass:1050,S:16.2,Tstatic:2800,Pmax:134000,eta:0.75,CL0:0.3,CLa:5.0,aStall:0.24,CD0:0.03,k:0.05,span:11,len:8.3,gear:1.63,
     spool:0.35,pf:1,retract:0,wave:0,tipRoll:0.35,tipMsg:'Wingtip strike. Level the wings before touchdown.',gndPitch:0.15,trimBase:0.03,trimK:0.1,
     flaps:FL4,toFlap:1,landFlap:3,finalFlap:2,finalThr:0.4,finalPitch:0.0,finalTrim:0.5,vr:55*KT,vy:74*KT,vcruise:100*KT,vapp:65*KT,patAlt:305,climbVS:3,descMax:3.5,
     maxBank:0.44,ipD:4200,fafD:2000,slowD:1500,decel:0.8,ezG:0.2,ezGR:0.12,ezBank:0.7,thrC:0.8,flareH:4,flareK:0.3,tdSink:0.35,tdPitch:0,rotP:0.12,rotRate:0.08,apRate:[0.3,0.4,0.6],vne:163,vfe:85,snd:'piston',cam1:[-0.27,0.07,0.0],cam1Name:'Cockpit',chase:[3.5,17],
@@ -1218,16 +1221,16 @@ const TYPES={
     cs:'Herky 71',csS:'Herky 71',say:'Herky seven one',sayS:'Herky seven one',
     sub:'C-130H Hercules 91-1231, Man o\' War, the 2,000th Hercules built, at Glendale KGEU. 155,000 lb, 132 ft wing, four Allison T56 turboprops. It is heavy and slow and it does not hurry, but it will get into a field the others cannot. Runway 1 is 7,150 ft, field elevation 1,071.',
     tips:'Manual: flaps 50, all four up, rotate at 115 kt, gear up. Plan everything early, it takes a long time to slow down. Land at 130 kt with flaps 100. Firm is correct on a Herc.'},
-  f16:{id:'f16',name:'F-16C Viper',title:'89-2032',mass:11000,S:27.87,Tstatic:95000,Pmax:1e9,eta:1,CL0:0.05,CLa:3.5,aStall:0.42,CD0:0.022,k:0.12,span:9.96,len:15,
+  f16:{id:'f16',name:'F-16C Viper',title:'89-2032',mass:11000,S:27.87,Tstatic:95000,Pmax:1e9,eta:1,CL0:0.05,CLa:3.5,aStall:0.42,CD0:0.022,k:0.12,span:9.96,len:15,gear:1.72,
     spool:2.2,pf:0,retract:1,wave:0.06,tipRoll:0.35,tipMsg:'Wingtip strike. Level the wings before touchdown.',gndPitch:0.2,trimBase:0.08,trimK:0.18,
-    flaps:[{deg:0,cl:0,cd:0},{deg:20,cl:0.1,cd:0.02}],toFlap:1,landFlap:1,finalFlap:1,finalThr:0.18,finalPitch:0.19,finalTrim:0.9,vr:145*KT,vy:300*KT,vcruise:300*KT,vapp:155*KT,patAlt:457,climbVS:22,descMax:12,
+    flaps:[{deg:0,cl:0,cd:0},{deg:20,cl:0.55,cd:0.04}],toFlap:1,landFlap:1,finalFlap:1,finalThr:0.18,finalPitch:0.19,finalTrim:0.9,vr:145*KT,vy:300*KT,vcruise:300*KT,vapp:155*KT,patAlt:457,climbVS:22,descMax:12,
     maxBank:0.62,ezAoA:0.227,ipD:8000,fafD:4500,slowD:3000,decel:1.15,ezG:0.5,ezGR:0.3,ezBank:1.05,thrC:0.6,flareH:6,flareK:0.3,tdSink:0.6,tdPitch:0.1,rotP:0.2,rotRate:0.08,apRate:[0.35,0.4,1.2],vne:800,vfe:300,snd:'jet',cam1:[0,0.86,-3.95],cam1Name:'Cockpit',chase:[6,32],
     cs:'Viper 1',csS:'Viper 1',say:'Viper one',sayS:'Viper one',
     sub:'F-16C 89-2032, Basher 52, the Triple Nickel jet Scott O\'Grady flew over Bosnia, at Luke Air Force Base, 4.4 nm west of Glendale. 29,000 lb of thrust, fly-by-wire feel. Luke runway 03L is 9,910 ft. Switch to Glendale above if you would rather start there.',
     tips:'Manual: full power, rotate at 145 kt, gear up fast, it climbs like a rocket. Land at 155 kt with the nose high, under 300 fpm.'}
 };
 let AC=TYPES.reaper,FLAPS=AC.flaps;AC.g=9.81;
-function setType(id){AC=TYPES[id]||TYPES.reaper;AC.g=9.81;FLAPS=AC.flaps;}
+function setType(id){AC=TYPES[id]||TYPES.reaper;AC.g=9.81;FLAPS=AC.flaps;GEAR=AC.gear||1.5;}
 function liftCoef(a,fl){
   const s=AC.aStall,peak=AC.CL0+AC.CLa*s;let cl;
   if(a>s) cl=Math.max(peak*(1-(a-s)*2.0),0.95*Math.sin(2*a));
@@ -1387,6 +1390,9 @@ function step(st,dt,ev){
     _e.z=0; let p=_e.x;
     if(p<0){p=0;if(st.w.x<0)st.w.x=0;}
     if(p>AC.gndPitch){p=AC.gndPitch;if(st.w.x>0)st.w.x=0;}
+    // the nose wheel carries weight: under 40% of rotation speed it stays on the runway (trim
+    // and the wind used to float it a few cm up at a standstill, the aircraft off its stance)
+    if(p>0&&st.ias<0.4*AC.vr){p=Math.max(0,p-0.5*dt);if(st.w.x>0)st.w.x=0;}
     _e.x=p; q.setFromEuler(_e); st.w.z=0;
     _hf.set(_f.x,0,_f.z); if(_hf.lengthSq()<1e-6)_hf.set(0,0,-1); _hf.normalize();
     const along=st.vel.x*_hf.x+st.vel.z*_hf.z;
@@ -2646,8 +2652,9 @@ function buildF16HD(opt){
   const L=15.06, SPAN_STRUCT=9.45, SPAN_TIP=9.96, HEIGHT=4.88;
   const CG=8.80;                       // origin station, ~35% MAC
   const Z=s=>s-CG;
-  const GND=-1.5;                      // wheels touch here
+  const GND=-1.5;                      // model datum: the airframe is built on it
   const FINTOP=GND+HEIGHT;             // 3.38
+  const DROP=(opt.gear||1.5)+GND;      // the gear legs reach this much lower: wheels touch at -opt.gear
   const P=MAT.P;
   const g=new THREE.Group(); g.name='F-16C';
   const gear=new THREE.Group(); gear.name='gear'; g.add(gear);
@@ -2807,8 +2814,9 @@ function buildF16HD(opt){
   // ---- ventral fins, canted outward ------------------------------------
   for(const sgn of [1,-1]){
     const sh=new THREE.Shape();
-    sh.moveTo(Z(11.85),0); sh.lineTo(Z(13.60),0);
-    sh.lineTo(Z(13.60),-0.40); sh.lineTo(Z(12.65),-0.46);
+    // just aft of the main wheels, about a third of the way to the nozzle (refs/ref_f16.jpg)
+    sh.moveTo(Z(10.95),0); sh.lineTo(Z(12.70),0);
+    sh.lineTo(Z(12.70),-0.40); sh.lineTo(Z(11.75),-0.46);
     const vg=new THREE.ExtrudeGeometry(sh,{depth:0.05,bevelEnabled:true,bevelSize:0.012,
       bevelThickness:0.012,bevelSegments:1,curveSegments:1,steps:1});
     vg.translate(0,0,-0.025);
@@ -2937,18 +2945,19 @@ function buildF16HD(opt){
   {
     const NR=0.26, MR=0.32;
     // nose gear, short and raked forward, just behind the inlet
-    strut(new V3(0,-0.74,Z(6.20)),new V3(0,-1.24,Z(5.62)),0.055,MAT.gearLeg,gear);
-    strut(new V3(0,-0.80,Z(6.02)),new V3(0,-1.14,Z(5.72)),0.028,MAT.gearLeg,gear);
-    wheelAt(0,-1.24,Z(5.62),NR,0.115,gear);
+    strut(new V3(0,-0.74,Z(6.20)),new V3(0,-1.24-DROP,Z(5.62)),0.055,MAT.gearLeg,gear);
+    strut(new V3(0,-0.80,Z(6.02)),new V3(0,-1.14-DROP,Z(5.72)),0.028,MAT.gearLeg,gear);
+    wheelAt(0,-1.24-DROP,Z(5.62),NR,0.115,gear);
     const nd=mesh(new THREE.BoxGeometry(0.02,0.30,0.78),MAT.gearBay,gear);
     nd.position.set(0.10,-0.92,Z(5.95));
-    // main gear, from the wing root down and outboard
+    // main gear, from the wing root down, outboard and aft: the jet's 4 m wheelbase, which with
+    // the leg length is what lets the nose come up 11.5 deg on the mains with the nozzle clear
     for(const sgn of [1,-1]){
-      strut(new V3(sgn*0.70,-0.60,Z(8.60)),new V3(sgn*1.13,-1.18,Z(9.00)),0.062,MAT.gearLeg,gear);
-      strut(new V3(sgn*0.68,-0.62,Z(9.28)),new V3(sgn*1.05,-1.04,Z(9.06)),0.030,MAT.gearLeg,gear);
-      wheelAt(sgn*1.13,-1.18,Z(9.00),MR,0.155,gear);
+      strut(new V3(sgn*0.70,-0.60,Z(8.90)),new V3(sgn*1.13,-1.18-DROP,Z(9.60)),0.062,MAT.gearLeg,gear);
+      strut(new V3(sgn*0.68,-0.62,Z(9.58)),new V3(sgn*1.05,-1.04-DROP,Z(9.66)),0.030,MAT.gearLeg,gear);
+      wheelAt(sgn*1.13,-1.18-DROP,Z(9.60),MR,0.155,gear);
       const md=mesh(new THREE.BoxGeometry(0.02,0.40,0.95),MAT.gearBay,gear);
-      md.position.set(sgn*0.76,-0.80,Z(8.85)); md.rotation.z=sgn*0.16;
+      md.position.set(sgn*0.76,-0.80,Z(9.15)); md.rotation.z=sgn*0.16;
     }
   }
 
@@ -3054,6 +3063,7 @@ function buildMQ9HD(opt){
   const CG=4.90;                      // origin station, near the wing
   const Z=s=>s-CG;
   const GND=-1.5, TOP=GND+HEIGHT;     // 2.31
+  const DROP=(opt.gear||1.5)+GND;     // the gear legs reach this much lower: wheels touch at -opt.gear
   const P=MAT.P;
   const g=new THREE.Group(); g.name='MQ-9A';
   const gear=new THREE.Group(); gear.name='gear'; g.add(gear);
@@ -3213,12 +3223,14 @@ function buildMQ9HD(opt){
   }
   {
     const NR=0.22, MR=0.28;
-    strut(new V3(0,-0.34,Z(2.05)),new V3(0,-1.28,Z(1.98)),0.050,MAT.gearLeg,gear);
-    wheelAt(0,-1.28,Z(1.98),NR,0.10,gear);
+    strut(new V3(0,-0.34,Z(2.05)),new V3(0,-1.28-DROP,Z(1.98)),0.050,MAT.gearLeg,gear);
+    wheelAt(0,-1.28-DROP,Z(1.98),NR,0.10,gear);
+    // mains raked aft to just behind the trailing edge: the pusher prop's lever over them is
+    // what sets how far the nose can come up before the tips reach the runway
     for(const sgn of [1,-1]){
-      strut(new V3(sgn*0.30,-0.32,Z(4.55)),new V3(sgn*1.12,-1.22,Z(4.66)),0.055,MAT.gearLeg,gear);
-      strut(new V3(sgn*0.26,-0.30,Z(5.10)),new V3(sgn*1.05,-1.08,Z(4.72)),0.030,MAT.gearLeg,gear);
-      wheelAt(sgn*1.12,-1.22,Z(4.66),MR,0.125,gear);
+      strut(new V3(sgn*0.30,-0.32,Z(4.55)),new V3(sgn*1.12,-1.22-DROP,Z(5.16)),0.055,MAT.gearLeg,gear);
+      strut(new V3(sgn*0.26,-0.30,Z(5.10)),new V3(sgn*1.05,-1.08-DROP,Z(5.22)),0.030,MAT.gearLeg,gear);
+      wheelAt(sgn*1.12,-1.22-DROP,Z(5.16),MR,0.125,gear);
     }
   }
 
@@ -3621,6 +3633,7 @@ function buildMQ9BHD(opt){
   const CG=5.20;
   const Z=s=>s-CG;
   const GND=-1.5;
+  const DROP=(opt.gear||1.5)+GND;     // the gear legs reach this much lower: wheels touch at -opt.gear
   const P=MAT.P;
   const g=new THREE.Group(); g.name='MQ-9B';
   const gear=new THREE.Group(); gear.name='gear'; g.add(gear);
@@ -3799,12 +3812,13 @@ function buildMQ9BHD(opt){
   }
   {
     const NR=0.22, MR=0.28;
-    strut(new V3(0,-0.36,Z(2.20)),new V3(0,-1.28,Z(2.12)),0.050,MAT.gearLeg,gear);
-    wheelAt(0,-1.28,Z(2.12),NR,0.10,gear);
+    strut(new V3(0,-0.36,Z(2.20)),new V3(0,-1.28-DROP,Z(2.12)),0.050,MAT.gearLeg,gear);
+    wheelAt(0,-1.28-DROP,Z(2.12),NR,0.10,gear);
+    // mains raked aft to just behind the trailing edge, as on the MQ-9A
     for(const sgn of [1,-1]){
-      strut(new V3(sgn*0.32,-0.34,Z(4.85)),new V3(sgn*0.95,-1.22,Z(4.92)),0.055,MAT.gearLeg,gear);
-      strut(new V3(sgn*0.28,-0.32,Z(5.35)),new V3(sgn*0.88,-1.08,Z(4.98)),0.030,MAT.gearLeg,gear);
-      wheelAt(sgn*0.95,-1.22,Z(4.92),MR,0.125,gear);
+      strut(new V3(sgn*0.32,-0.34,Z(4.85)),new V3(sgn*0.95,-1.22-DROP,Z(5.42)),0.055,MAT.gearLeg,gear);
+      strut(new V3(sgn*0.28,-0.32,Z(5.35)),new V3(sgn*0.88,-1.08-DROP,Z(5.48)),0.030,MAT.gearLeg,gear);
+      wheelAt(sgn*0.95,-1.22-DROP,Z(5.42),MR,0.125,gear);
     }
   }
 
@@ -3855,7 +3869,7 @@ function buildMQ9BHD(opt){
 // =========================================================================
 function buildC172HD(opt){
   opt=opt||{};
-  const L=8.28,SPAN=11.00,CG=2.55,Z=s=>s-CG,GND=-1.5,P=MAT.P;
+  const L=8.28,SPAN=11.00,CG=2.55,Z=s=>s-CG,GND=-(opt.gear||1.5),P=MAT.P;
   const g=new THREE.Group();g.name='C172';
   const gear=new THREE.Group();gear.name='gear';g.add(gear);
   const PLUM='#4a1a44',MAUVE='#86559a',WH='#f4f4f1';
@@ -5264,7 +5278,8 @@ const HD=(function(){try{return makeHD();}catch(e){console.warn('HD airframes un
 // wrap an HD airframe in the interface the game expects: g, gear, prop + disc, ab, pylons, canopy
 function hdModel(which){
   if(!HD)return null;
-  let m;try{m=which==='f16'?HD.buildF16HD({gold:true}):which==='c130'?HD.buildC130HD():which==='mq9b'?HD.buildMQ9BHD():which==='cessna'?HD.buildC172HD():which==='alpha'?HD.buildAlphaHD():HD.buildMQ9HD();}catch(e){console.warn(e);return null;}
+  const gr=(TYPES[which]||TYPES.reaper).gear||1.5;
+  let m;try{m=which==='f16'?HD.buildF16HD({gold:true,gear:gr}):which==='c130'?HD.buildC130HD({gear:gr}):which==='mq9b'?HD.buildMQ9BHD({gear:gr}):which==='cessna'?HD.buildC172HD({gear:gr}):which==='alpha'?HD.buildAlphaHD({gear:gr}):HD.buildMQ9HD({gear:gr});}catch(e){console.warn(e);return null;}
   const out={g:m.g,gear:m.gear,canopy:m.canopy||null,pylons:m.pylons||null,hd:true};
   // the world is lit by a hemisphere and a sun already: keep the sky reflection to a sheen
   m.g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false;
@@ -5631,7 +5646,7 @@ function getModel(id){
   else if(id==='c130')m=hdModel('c130')||buildC130();
   else if(id==='mq9b')m=hdModel('mq9b')||buildReaper('N190TC','mq9b');
   else m=hdModel('reaper')||buildReaper();
-  rigProps(m,id);
+  rigProps(m,id);tyrePts(m);
   m.lights=AC_LIGHTS[id]?makeAircraftLights(m.g,AC_LIGHTS[id]):null;
   m.g.userData.heat=0.7;if(m.ab)m.ab.traverse(o=>o.userData.heat=1.0);   // IR: warm airframe, white hot burner (every flame layer)
   m.g.visible=false;MODELS[id]=m;
@@ -5640,6 +5655,33 @@ function getModel(id){
 }
 let plane=getModel('reaper');plane.g.visible=true;
 function useModel(id){plane.g.visible=false;plane=getModel(id);plane.g.visible=true;}
+// ---- stance: the aircraft rests on its tyres ----
+// The physics holds the origin GEAR over the ground and pitches about it; a real aircraft
+// rotates on its main wheels. Every tyre vertex is kept in the model frame (deduplicated to a
+// centimetre), and the display lifts the model by however far the lowest one would sink below
+// its level-attitude height at this attitude: on the runway the mains stay on the surface as
+// the nose comes up and the tail drops about them, the way it does on the real aircraft. The
+// lift fades out over the first 4 m off the ground (it is only for the ground) and with the
+// gear. SURF_Y: the runway, taxiway and apron paint lie 4.5 to 7.5 cm over the ground the
+// physics rolls on; the tyres sit on the paint, not in it.
+const SURF_Y=0.06,_slU=new THREE.Vector3(),_slQ=new Q4();
+function tyrePts(m){
+  const tm=HD&&HD.MAT.tyre;if(!tm)return;
+  const out=[],seen=new Set(),v=new THREE.Vector3(),inv=new THREE.Matrix4(),mw=new THREE.Matrix4();
+  m.g.updateMatrixWorld(true);inv.copy(m.g.matrixWorld).invert();
+  m.g.traverse(o=>{if(!o.isMesh||o.material!==tm||!o.geometry.attributes.position)return;
+    mw.multiplyMatrices(inv,o.matrixWorld);const P=o.geometry.attributes.position;
+    for(let i=0;i<P.count;i++){v.fromBufferAttribute(P,i).applyMatrix4(mw);
+      const k=Math.round(v.x*100)+','+Math.round(v.y*100)+','+Math.round(v.z*100);if(seen.has(k))continue;seen.add(k);out.push(v.x,v.y,v.z);}});
+  if(!out.length)return;
+  m.tyres=new Float32Array(out);let lo=1e9;for(let i=1;i<out.length;i+=3)lo=Math.min(lo,out[i]);m.tyreLo=lo;
+}
+function stanceLift(m,q,gearPos,agl){
+  const P=m.tyres,w=gearPos*clamp(1-agl/4,0,1);if(!P||w<=0)return 0;
+  _slU.set(0,1,0).applyQuaternion(_slQ.copy(q).invert());   // world up, in the model frame
+  let lo=1e9;for(let i=0;i<P.length;i+=3){const h=P[i]*_slU.x+P[i+1]*_slU.y+P[i+2]*_slU.z;if(h<lo)lo=h;}
+  return Math.max(0,m.tyreLo-lo)*w;
+}
 // ---- warm up while the menu is up ----
 // Every aircraft and the drop zone are built, their shaders compiled and their textures
 // uploaded one piece at a time while the menu (or the pause sheet) is showing. Left to
@@ -5684,7 +5726,7 @@ function sizeShadow(){shadow.scale.set(AC.span*1.1,1,AC.len*1.1);}
 const liveries=[[0xc8102e,0x222222,'N738GE'],[0x2a6f97,0xf2a900,'N52614'],[0x3c6e47,0xe0e0e0,'N172SP'],[0x6d2e46,0xd4a017,'N9433K'],[0x222222,0xc8102e,'N65GL'],[0xe07a1f,0x1d3557,'N4412R'],[0x1d3557,0xc8102e,'N20484'],[0x7a7a7a,0x2a6f97,'N6155Q']];
 let pk=0;const PARKED=[];
 for(let u=705;u<=1500;u+=66){const L=liveries[pk%liveries.length];const p=buildPlane({stripe:L[0],accent:L[1],reg:L[2],regColor:'#222',full:false});PARKED.push(p.g);
-  p.g.position.set(wX(u,-340),1.35,wZ(u,-340));p.g.rotation.y=-116*Math.PI/180;OBST.push({kind:'circ',x:wX(u,-340),z:wZ(u,-340),r:6,h:3,name:'a parked airplane'});pk++;}
+  p.g.position.set(wX(u,-340),1.39,wZ(u,-340));p.g.rotation.y=-116*Math.PI/180;OBST.push({kind:'circ',x:wX(u,-340),z:wZ(u,-340),r:6,h:3,name:'a parked airplane'});pk++;}   // 1.39: tyres on the apron paint, 4.5 cm up
 // ---------- traffic: KGEU Cessna, Luke F-16 pair, a C-17, another Reaper ----------
 const ai=buildPlane({stripe:0xc8102e,accent:0x222222,reg:'N5231G',regColor:'#222',full:false});
 const TRAFFIC=[];const _ap=new V3(),_at=new V3(),_at1=new V3(),_at2=new V3(),_ae=new THREE.Euler(0,0,0,'YXZ');
@@ -10221,6 +10263,7 @@ function tick(t,skipRender){
   if(_ipS!==st||snapCamera){_ipS=st;_ipPos.copy(st.pos);_ipQ.copy(st.quat);}
   {const al=clamp(acc/DT,0,1);_dPos.lerpVectors(_ipPos,st.pos,al);_dQ.slerpQuaternions(_ipQ,st.quat,al);}
   const q=_dQ,dp=_dPos;
+  if(!st.crashed)dp.y+=SURF_Y+stanceLift(plane,q,st.gearPos,st.agl);   // on its tyres, on the paint
   // crowd flyby cheers and sound level
   cheerLevel=0;clusters.forEach(c=>{c.cool-=dt;if(c.cheer>0)c.cheer-=dt;
     const d=Math.hypot(c.x-s.pos.x,c.z-s.pos.z);if(running&&!s.crashed&&!s.onGround&&d<280&&s.agl<160&&s.ias>25&&c.cool<=0){c.cheer=4;c.cool=12;}
@@ -10837,7 +10880,7 @@ window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runM
     if(o&&o.on){let n=0,mx=0,mz=0,top=0;for(const m of o.sm){if(!m.sp.visible)continue;n++;mx+=m.sp.position.x-o.x;mz+=m.sp.position.z-o.z;top=Math.max(top,m.y-o.y);}
       out.smokeN=n;out.smokeTop=top;out.mean=n?[mx/n,mz/n]:[0,0];}
     return out;},
-  fxScorch:()=>FX.filter(o=>o.on&&o.scorch.visible).map(o=>o.scorch),terrainMeshH:terrainMeshH,gdLift:gdLift,fxSlots:()=>FX.filter(o=>o.on).map(o=>{let n=0,mx=0,mz=0;for(const m of o.sm){if(!m.sp.visible)continue;n++;mx+=m.sp.position.x-o.x;mz+=m.sp.position.z-o.z;}
+  fxScorch:()=>FX.filter(o=>o.on&&o.scorch.visible).map(o=>o.scorch),terrainMeshH:terrainMeshH,gdLift:gdLift,PARKED:()=>PARKED,apToggle:apToggle,fxSlots:()=>FX.filter(o=>o.on).map(o=>{let n=0,mx=0,mz=0;for(const m of o.sm){if(!m.sp.visible)continue;n++;mx+=m.sp.position.x-o.x;mz+=m.sp.position.z-o.z;}
     return {t:o.t,scale:o.s,smokeN:n,mean:n?[mx/n,mz/n]:[0,0],wind:windVec(new V3()).toArray()};}),
   // crash FX (3.9): force a crash here and now, and read back what it threw
   crashNow:why=>{if(!running||st.crashed)return false;crash(st,why||'Crashed.');onCrash();return true;},
