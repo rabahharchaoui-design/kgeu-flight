@@ -561,12 +561,22 @@ label.sens b{ color:var(--ink); min-width:74px; }
 .carx.compact .desc,.carx.compact .story,.carx.compact .cdots{ display:none; }
 .carx.compact .nm{ font-size:16px; }
 .carx.compact .cwin{ border-radius:12px; overflow:hidden; }
+.carx.compact .arrow{ top:50%; transform:translateY(-50%); height:44px; }   /* stays inside a short carousel, never over the row above */
 /* chips under the carousel: two rows */
 .frows{ display:flex; flex-direction:column; gap:6px; flex:none; }
 .frow{ display:flex; gap:10px; align-items:stretch; }
 .grp{ display:flex; gap:6px; align-items:center; flex:1; min-width:0; }
 .grp.g4{ flex:1.9; } .grp.g2{ flex:1.1; } .grp.g3{ flex:1.8; } .grp.g3.g4s{ flex:2.3; }
 .glbl{ writing-mode:vertical-rl; transform:rotate(180deg); font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--brown); flex:none; }
+/* the start row: two named groups, FREE FLIGHT (do anything, a brief grade card on any landing) and
+   SEGMENTS (short scored starts, each ending in the results card); the caption sits over the chips */
+.grp.cap{ flex-direction:column; align-items:stretch; gap:2px; }
+.gcap{ font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--brown); line-height:1.1; padding-left:2px; }
+.gchips{ display:flex; gap:6px; align-items:center; min-width:0; }
+.gchips .chip{ flex:1; }
+.frow.starts{ align-items:flex-end; }
+.frow.starts .grp.g2{ flex:1.6; }
+#pauseOv .gcap{ color:var(--orange); }
 .frows .chip{ flex:1; min-width:0; min-height:44px; height:44px; border-radius:12px; padding:0 4px; line-height:1; white-space:nowrap; }
 .frows .chip b{ display:block; font-size:clamp(13px,2.2vw,17px); font-weight:800; overflow:hidden; text-overflow:ellipsis; }
 .frows .go{ flex:1; min-height:44px; border-radius:14px; font-size:26px; font-weight:900; letter-spacing:.08em; background:var(--rust) !important; color:#fff4e0 !important; box-shadow:0 5px 0 var(--brown); border:none; }
@@ -949,8 +959,10 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
      <button class="pick chip" data-b="kgeu"><b>Glendale</b></button><button class="pick chip" data-b="luke"><b>Luke AFB</b></button></div>
     <div class="grp g4"><span class="glbl">Time</span>
      <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><button class="pick chip" data-tod="haboob"><b>Haboob</b></button></div></div>
-   <div class="frow"><div class="grp g3 g4s"><span class="glbl">Start</span>
-     <button class="pick chip" data-pos="runway"><b>Runway</b></button><button class="pick chip" data-pos="ramp"><b>Ramp</b></button><button class="pick chip" data-pos="final1"><b>1 mi final</b></button><button class="pick chip" data-pos="final"><b>3 mi final</b></button></div>
+   <div class="frow starts"><div class="grp g2 cap" title="Do anything. A brief grade card on any landing."><span class="gcap">Free flight</span><div class="gchips">
+     <button class="pick chip" data-pos="runway"><b>Runway</b></button><button class="pick chip" data-pos="ramp"><b>Ramp</b></button></div></div>
+    <div class="grp g2 cap" title="Short scored starts. Each one ends in the results card."><span class="gcap">Segments</span><div class="gchips">
+     <button class="pick chip" data-pos="final"><b>3 mi final</b></button><button class="pick chip" data-pos="final1"><b>1 mi final</b></button></div></div>
     <button class="go" id="bGo">GO</button></div>
   </div>
  </div>
@@ -1083,8 +1095,10 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
      <button class="pick chip" data-b="kgeu"><b>Glendale</b></button><button class="pick chip" data-b="luke"><b>Luke AFB</b></button></div>
     <div class="grp g4"><span class="glbl">Time</span>
      <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><button class="pick chip" data-tod="haboob"><b>Haboob</b></button></div></div>
-   <div class="frow"><div class="grp g3 g4s"><span class="glbl">Start</span>
-     <button class="pick chip" data-pos="runway"><b>Runway</b></button><button class="pick chip" data-pos="ramp"><b>Ramp</b></button><button class="pick chip" data-pos="final1"><b>1 mi final</b></button><button class="pick chip" data-pos="final"><b>3 mi final</b></button></div>
+   <div class="frow starts"><div class="grp g2 cap"><span class="gcap">Free flight</span><div class="gchips">
+     <button class="pick chip" data-pos="runway"><b>Runway</b></button><button class="pick chip" data-pos="ramp"><b>Ramp</b></button></div></div>
+    <div class="grp g2 cap"><span class="gcap">Segments</span><div class="gchips">
+     <button class="pick chip" data-pos="final"><b>3 mi final</b></button><button class="pick chip" data-pos="final1"><b>1 mi final</b></button></div></div>
     <button class="go apply" id="pApply">Restart</button></div>
   </div>
   </div>
@@ -6526,6 +6540,7 @@ function onLanding(e){
   if(AC.id==='cessna'||AC.id==='alpha'||AC.id==='mq9b')better=scRecord(AC.id,g);
   if(dash&&dash.better)better=true;
   const free=!ARC.on&&!LES.on&&!MISS.on&&!STRIKE.active,flightT=st.time-RES.freeT0;RES.freeT0=st.time;
+  const seg=free&&!dash&&st.mode==='final'&&!RES.segDone;if(seg)RES.segDone=true;   // the segment's own landing; later ones are free flight
   const rows=g.parts.map(p=>'<div class="gl"><span>'+p[0]+'</span><b>'+p[1]+
     '<i class="pt'+(p[2]>=80?' good':p[2]<55?' bad':'')+'">'+p[2]+'</i></b></div>');
   rows.push('<div class="gl"><span>Flight time</span><b>'+fmtT(flightT)+'</b></div>');
@@ -6533,10 +6548,10 @@ function onLanding(e){
     ',  '+dash.g.toFixed(1)+' G peak</b></div>');
   // the card is filled now (the grade badge opens it as the details) and slides in on its own once the aircraft stops
   const dashL=dash?(dash.secs<=150?'A':dash.secs<=180?'B':dash.secs<=210?'C':dash.secs<=240?'D':'F'):null;
-  resFill(landOv,{letter:dash?dashL:g.letter,title:(dash?'Luke to Glendale dash, ':free?'Free flight landing, ':'Landing, ')+g.where+
+  resFill(landOv,{letter:dash?dashL:g.letter,title:(dash?'Luke to Glendale dash, ':seg?(st.spawn==='final1'?'1 mile final segment, ':'3 mile final segment, '):free?'Free flight landing, ':'Landing, ')+g.where+
     (g.xw>=10?'  ('+Math.round(g.xw)+' kt crosswind)':''),score:dash?fmtT(dash.secs):g.pts+' pts',sub:dash?g.letter+' landing, '+g.pts+' pts':g.line,
     lines:rows.join(''),board:dash?'mission:dash':free?'free:landing':''});
-  if(free||dash)resArm(()=>{if(!landOv.classList.contains('on')&&!menu.classList.contains('on')&&!pauseOv.classList.contains('on'))resShow(landOv,true);},20,true);
+  if(free||dash)resArm(()=>{if(!landOv.classList.contains('on')&&!menu.classList.contains('on')&&!pauseOv.classList.contains('on'))resShow(landOv,!seg);},20,true);
   // the full breakdown also goes to Records; the flight carries on through the rollout
   SCORE.recent=(SCORE.recent||[]);SCORE.recent.unshift({ac:AC.name,letter:g.letter,pts:g.pts,where:g.where,line:g.line,mode:runMode(),
     parts:g.parts.map(p=>[p[0],p[1],p[2]]),when:Date.now()});runLog('landing',{letter:g.letter,pts:g.pts,where:g.where});SCORE.recent.length=Math.min(SCORE.recent.length,10);scSave();
@@ -8122,7 +8137,7 @@ function start(mode,base){
   if(camMode>1)camMode=0;   // the ball view is entered in flight, where its autopilot can take over
   STRIKE.active=false;lesEnd();gradeOv.classList.remove('on');arcStop();$('arcOv').classList.remove('on');
   MUSIC.forced=null;   // a mode with its own song (the Red Flag Dogfight: MUSIC.forced='dogfight.m4a') sets it after start()
-  missReset();resCloseAll();RES.kind='';RES.freeT0=0;
+  missReset();resCloseAll();RES.kind='';RES.freeT0=0;RES.segDone=false;
   document.getElementById('recOv').classList.remove('on');DASH.on=false;badgeHide();
   if(mode==='range')strikeStart();
   if(mode==='drop'||mode==='short')missStart(mode==='drop'?'drop':'short');
@@ -8541,7 +8556,7 @@ function showRender(dt,c){
 }
 
 // ---- where, when and go ----
-const POS_TXT={runway:'on the runway',ramp:'at the ramp',final1:'on 1 mile final',final:'on 3 mile final'};
+const POS_TXT={runway:'free flight on the runway',ramp:'free flight at the ramp',final1:'segment on 1 mile final',final:'segment on 3 mile final'};
 // the pause sheet's change flight panel: same picks, Apply restarts at once
 $('pApply').onclick=()=>{pauseOv.classList.remove('on');if(pzChanged())freeStart();else pzRestart();};
 function sumUI(){pzApplyUI();const el=$('sumLine');if(!el)return;const I=AC_INFO[savedType]||AC_INFO.cessna;

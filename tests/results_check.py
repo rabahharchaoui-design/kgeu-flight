@@ -25,8 +25,9 @@ FIT = """(sel)=>{const s=document.querySelector(sel);const W=innerWidth,H=innerH
   return bad;}"""
 S = "()=>{const s=window.__kgeu.state();return {g:s.onGround,v:Math.hypot(s.vel.x,s.vel.z),crash:s.crashed}}"
 
-async def land(pg, typ='cessna', pos='final'):
-    await pg.evaluate(f"()=>{{const K={K};K.pick('{typ}');K.pickBase('kgeu');K.start('{pos}');}}")
+async def land(pg, typ='cessna', pos='final', seg=False):
+    # a 3 mile final is a SEGMENT (its first landing gets the full card); segDone makes it a free flight landing
+    await pg.evaluate(f"()=>{{const K={K};K.pick('{typ}');K.pickBase('kgeu');K.start('{pos}');K.RES.segDone={'false' if seg else 'true'};}}")
     await pg.wait_for_timeout(300)
     await pg.evaluate(f"()=>{K}.auto()")
     for _ in range(90):

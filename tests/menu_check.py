@@ -75,7 +75,7 @@ async def main():
                 await pg.evaluate("()=>window.__kgeu.pick('f16')")
                 await finger(pg, '#sFly .pick[data-b="luke"]'); await finger(pg, '#sFly .pick[data-tod="sunset"]'); await finger(pg, '#sFly .pick[data-pos="final"]')
                 line = await pg.evaluate("()=>document.getElementById('sumLine').textContent")
-                ok('the header summarises the picks', line == 'F-16 at Luke AFB, sunset, on 3 mile final', line)
+                ok('the header summarises the picks', line == 'F-16 at Luke AFB, sunset, segment on 3 mile final', line)
                 await finger(pg, '#bGo'); await pg.wait_for_timeout(1500)
                 s = await pg.evaluate("()=>{const s=window.__kgeu.state();return {type:s.type,base:s.base,mode:s.mode,menu:document.getElementById('menu').classList.contains('on'),agl:Math.round(s.agl)}}")
                 ok('GO flies exactly what was picked', s['type'] == 'f16' and s['base'] == 'luke' and s['mode'] == 'final' and not s['menu'] and s['agl'] > 100, s)
