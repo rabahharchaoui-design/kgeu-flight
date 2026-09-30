@@ -594,7 +594,7 @@ label.sens b{ color:var(--ink); min-width:74px; }
 #phX{ top:var(--padT); right:var(--padR); font-size:18px; }
 #phSave{ bottom:var(--padB); left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:8px; padding:0 22px; min-height:52px !important; font-size:18px; letter-spacing:.08em; background:var(--rust) !important; color:#fff4e0 !important; }
 .phHint{ position:absolute; top:var(--padT); left:50%; transform:translateX(-50%); margin:0; font:700 13px var(--font); color:var(--sand); background:rgba(26,16,9,.6); padding:6px 12px; border-radius:10px; pointer-events:none; }
-#pauseOv .ph{ display:flex; align-items:center; justify-content:center; gap:8px; }
+#pauseOv .ph{ display:flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; padding-left:6px; padding-right:6px; } #pauseOv .ph svg{ flex:none; }
 /* music in the pause sheet: on/off, volume and next song beside the Change flight title */
 .pzR .pzH{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:3px 4px 3px 12px; }
 .pzH > span{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
@@ -1033,7 +1033,7 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
    <p class="pzT">Paused</p>
    <div class="modeSeg" role="radiogroup" aria-label="Mode"><button class="chip sk" data-skill="rookie" role="radio"><b>Easy</b></button><button class="chip sk" data-skill="pilot" role="radio"><b>Hard</b></button></div>
    <p class="modeDesc"></p>
-   <button class="primary" id="pResume">Resume</button><button id="pPhoto" class="ph"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>Photo</button><button id="pRestart">Restart</button><button id="pSet">Settings</button><button id="pMenu">Main menu</button>
+   <button class="primary" id="pResume">Resume</button><button id="pPhoto" class="ph"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>Action Shot</button><button id="pRestart">Restart</button><button id="pSet">Settings</button><button id="pMenu">Main menu</button>
   </div>
   <div class="pzR">
    <div class="pzT pzH"><span class="mbTitle" id="pMusTitle">&mdash;</span><div class="pzMus"><button id="pPrev" aria-label="Previous song">Prev</button><button class="tog playPause" id="pMusic" aria-label="Play or pause music">Pause</button><button class="oMnext" id="pMnext">Next</button></div></div>
@@ -1059,8 +1059,8 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
 </div>
 <div class="overlay" id="photoOv"><div id="photoPad"></div>
   <p class="phHint">Drag to orbit, pinch to zoom</p>
-  <button id="phX" aria-label="Close photo mode">&#x2715;</button>
-  <button id="phSave"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>SAVE</button>
+  <button id="phX" aria-label="Close Action Shot">&#x2715;</button>
+  <button id="phSave" aria-label="Share this Action Shot"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3M7.5 7.5 12 3l4.5 4.5"/><path d="M8.5 10H5v11h14V10h-3.5"/></svg><span id="phSaveT">SHARE</span></button>
 </div>
 <div class="overlay" id="arcOv"><div class="sheet">
   <p class="aStars" id="aStars"></p>
@@ -7912,9 +7912,11 @@ function arcScore(id){
   if(id==='daily'){const r=SCORE.best['arc:daily:'+todayKey()];return r?[r.stars,r.pts+' pts today']:[0,''];}
   return [0,''];
 }
-// ================= photo mode =================
+// ================= photo mode (the Action Shot) =================
 // Freeze the frame, hide the HUD, orbit and zoom around the aircraft by finger, and
-// save a clean image with a small watermark through the iOS share sheet.
+// share a clean image with a small watermark through the iOS share sheet.
+// Two taps: Action Shot in the pause sheet frames the shot, SHARE takes it. The capture and
+// navigator.share run synchronously inside the SHARE tap, so Safari still sees the gesture.
 const PHOTO={on:false,yaw:0,pitch:0.18,dist:0,ptrs:new Map(),pinch:null};
 const wmIcon=new Image();wmIcon.src='icons/icon-192.png';
 function photoOpen(){
@@ -7922,7 +7924,13 @@ function photoOpen(){
   pauseOv.classList.remove('on');paused=true;PHOTO.on=true;
   _eu.setFromQuaternion(st.quat,'YXZ');PHOTO.yaw=_eu.y+Math.PI+0.6;PHOTO.pitch=0.16;PHOTO.dist=Math.max(14,AC.span*1.6);
   document.body.classList.add('photoOn');$('photoOv').classList.add('on');
+  $('phSaveT').textContent=photoCanShare()?'SHARE':'SAVE';
 }
+// Web Share with files (iOS Safari, Android); a desktop browser without it downloads the PNG instead
+const PHOTO_URL='https://rabahharchaoui-design.github.io/kgeu-flight/';
+function photoCanShare(f){try{return !!(navigator.share&&navigator.canShare&&navigator.canShare({files:[f||new File([''],'a.png',{type:'image/png'})]}));}catch(e){return false;}}
+function photoText(){const cs=LB&&LB.E&&LB.E.P&&LB.E.P.cs;
+  return (cs?'Action shot by '+cs+' in Pocket Flight Sim':'Action shot from Pocket Flight Sim')+'. Fly it: '+PHOTO_URL;}
 function photoClose(){PHOTO.on=false;document.body.classList.remove('photoOn');$('photoOv').classList.remove('on');pauseOv.classList.add('on');CARP.sync();snapCamera=true;}
 function photoCam(){
   const d=PHOTO.dist,cp=Math.cos(PHOTO.pitch);
@@ -7954,14 +7962,18 @@ function photoImage(){
   x.fillStyle='#F6C177';x.textAlign='right';x.textBaseline='bottom';x.fillText(txt,W-pad,H-pad-(ic-fs)*0.35);
   return c;
 }
+function photoDownload(url,name){const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();toast('Action shot saved');}
 function photoSave(){
+  // no await anywhere before navigator.share: toBlob would push it out of the tap's activation
   const c=photoImage(),url=c.toDataURL('image/png'),bin=atob(url.split(',')[1]),u8=new Uint8Array(bin.length);
   for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
   const name='pocket-flight-sim-'+Date.now()+'.png',file=new File([u8],name,{type:'image/png'});
   window.__lastPhoto=file;
-  if(navigator.canShare&&navigator.canShare({files:[file]})){
-    navigator.share({files:[file],title:'Pocket Flight Sim'}).then(()=>toast('Shared'),e=>{if(e&&e.name!=='AbortError')toast('Could not share: '+e.name);});return;}
-  const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();toast('Photo saved');
+  if(photoCanShare(file)){
+    navigator.share({files:[file],title:'Pocket Flight Sim',text:photoText()}).then(()=>toast('Shared'),e=>{
+      if(e&&e.name==='AbortError')return;
+      if(e&&e.name==='NotAllowedError')photoDownload(url,name);else toast('Could not share: '+(e&&e.name));});return;}
+  photoDownload(url,name);
 }
 $('pPhoto').onclick=photoOpen;$('phX').onclick=photoClose;$('phSave').onclick=photoSave;
 // ---------- menus ----------
