@@ -7,8 +7,9 @@
 #  - rendered from a slowly moving camera close (chase, ~25 m) and far (1.2 km, 2.5 km), the
 #    scorch darkens the ground by the same amount every frame (spread < 0.03) and no sample
 #    inside it shows the bare terrain (speckle 0)
-# Everything standing over 30 cm (wreck, buildings, trees), fire and smoke is hidden for the
-# pixel reads, so only the ground layers and the scorch are compared.
+# Everything standing over 30 cm (wreck, buildings, trees), fire and smoke (the instanced quad
+# layer and the instanced debris since item 15) is hidden for the pixel reads, so only the
+# ground layers and the scorch are compared.
 # Run: .venv/bin/python tests/scorch_check.py
 import asyncio, sys
 from playwright.async_api import async_playwright
@@ -42,7 +43,8 @@ MEASURE = """(a)=>{const K=window.__kgeu,{scene,renderer,camera}=K.R3();
   const sc=K.fxScorch().find(m=>Math.hypot(m.position.x-a.x,m.position.z-a.z)<0.5);if(!sc)return null;
   const R=sc.userData.r,base=sc.userData.base,x=sc.position.x,z=sc.position.z,hid=[],bx=new THREE.Box3();
   scene.traverse(o=>{if(!o.visible||o===scene||o===sc)return;
-    if(o.isSprite||o.isPoints||o.isLine){o.visible=false;hid.push(o);return;}
+    // fire, smoke, sparks and debris are one instanced quad layer and one instanced box mesh (item 15)
+    if(o.isSprite||o.isPoints||o.isLine||o.isInstancedMesh||(o.geometry&&o.geometry.isInstancedBufferGeometry)){o.visible=false;hid.push(o);return;}
     if(!o.isMesh||(o.geometry.parameters&&o.geometry.parameters.width>=60000))return;
     bx.setFromObject(o);if(bx.max.y>base+0.3){o.visible=false;hid.push(o);}});
   const gl=renderer.getContext(),W=gl.drawingBufferWidth,H=gl.drawingBufferHeight,v=new THREE.Vector3(),fov0=camera.fov,out=[];
