@@ -23,6 +23,7 @@ every write goes through the Worker, which checks it, and every refusal lands in
 | `index.html`, section *leaderboards* | the `LB` module: boards, card, queue, ghosts, fame, paint |
 | `version.json` | the build id the page checks on launch (keep equal to `APP_VER` in index.html) |
 | `tests/scores_check.py` | end to end in the game against `wrangler dev` |
+| `tests/lb_merge_check.py` | the one list board screen with a stubbed Worker: EASY/HARD chip per row fits at 568x320 to portrait |
 | `tests/upgrade_check.py` | in place upgrade from the `prescores` build |
 | `tests/scores_fps.py` | same-session frame rate A/B with a callsign, fame boards and a ghost |
 
@@ -45,10 +46,15 @@ Secrets on the Worker (set with `npx wrangler secret put NAME`, never in the rep
 
 ## Boards and score formulas
 
-Easy and Hard are separate boards for everything. A run counts as Easy if Easy was on at any
-moment of it (the game's `runMode()`), including the first flight lesson's assists. Every board
-has Today (since 00:00 UTC), This week (since Monday 00:00 UTC) and All time; each player's best
-run counts once.
+Each board is one ranked list for Easy and Hard together. A player's single best run on the
+board, in either mode, counts once, and every row carries a small EASY (green) or HARD (red) chip
+next to the score saying which mode that run was flown in. Rank and the pilot total (the board,
+the "#n of m" end of run badge, personal best and top 10) are computed across both modes. Only the
+display merges: runs are still submitted, token checked and stored per mode (`scores.mode`), a run
+started in Easy is still refused as Hard, and ghosts are still kept per mode (Race the leader flies
+the best ghost of either mode). A run counts as Easy if Easy was on at any moment of it (the
+game's `runMode()`), including the first flight lesson's assists. Every board has Today (since
+00:00 UTC), This week (since Monday 00:00 UTC) and All time.
 
 | Board id | Name | Score | Better | Min run | Legal range | Ghost |
 |---|---|---|---|---|---|---|
@@ -228,7 +234,7 @@ Format: `{v:1, hz:5, o:[x,y,z], n, z, d}`: `o` is the first point in metres, `d`
 little endian frames of 6 int16 (dx, dy, dz in 0.5 m steps, then yaw, pitch, roll as angle/pi x
 32767), deflate-raw compressed when `z` is 1: a few KB for a 3 minute run. The server
 keeps the top 10 per board and mode. Race the leader (on the board screen) flies a translucent
-copy of the leader's aircraft with their callsign over it.
+copy of the leader's aircraft (the best ghost of either mode) with their callsign over it.
 
 ## Fame in the world
 
@@ -260,8 +266,8 @@ npx wrangler d1 execute pfs-scores --remote --file=schema.sql
 npm test
 npm run test:live
 
-# view scores: a board's top 20 in Hard, all time, best per player
-npx wrangler d1 execute pfs-scores --remote --command "SELECT p.callsign, MAX(s.score) best, COUNT(*) runs FROM scores s JOIN players p ON p.id=s.player_id WHERE s.board='arc:landing' AND s.mode='hard' GROUP BY s.player_id ORDER BY best DESC LIMIT 20"
+# view scores: a board's top 20 as the game shows it (all time, best per player across both modes)
+npx wrangler d1 execute pfs-scores --remote --command "SELECT p.callsign, MAX(s.score) best, s.mode, COUNT(*) runs FROM scores s JOIN players p ON p.id=s.player_id WHERE s.board='arc:landing' GROUP BY s.player_id ORDER BY best DESC LIMIT 20"
 #   (for lower-is-better boards, arc:drop and mission:dash, use MIN(s.score) and ORDER BY best ASC)
 
 # the latest 50 scores anywhere
@@ -302,8 +308,11 @@ npx wrangler secret put OHRABAH_SECRET
 npx wrangler tail pfs-scores
 ```
 
-The HTTP API, for reference: `GET /health`, `GET /name?cs=`, `GET /board?b=&m=easy|hard&p=today|week|all&cs=`,
-`GET /ghost?b=&m=`, `GET /fame`, `GET /ranks`, `POST /signup {cs,key[,secret]}`,
+The HTTP API, for reference: `GET /health`, `GET /name?cs=`, `GET /board?b=&p=today|week|all&cs=`
+(answers `{board, mode:'all', period, dir, total, rows:[{r, cs, score, secs, ac, mode, xp, rank, creator, when}],
+me:{r, cs, score, mode, ...}, ghost, now, day}`: one row per player, their best across Easy and Hard, `mode` is
+`easy` or `hard`; `total` counts each player once; an `m` parameter is ignored),
+`GET /ghost?b=` (the best ghost of either mode; `m` ignored), `GET /fame`, `GET /ranks`, `POST /signup {cs,key[,secret]}`,
 `POST /restore {cs,key,code}`, `POST /me {cs,key}`, `POST /rename {cs,key,to}`,
 `POST /token {cs,key,board,mode}`, `POST /pool {cs,key,n}`,
 `POST /submit {cs,key,token,board,mode,score,secs,ac,wx,when[,path]}`. CORS and POSTs are
