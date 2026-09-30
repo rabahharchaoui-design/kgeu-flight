@@ -40,11 +40,14 @@
   --font:"Saira Condensed","Arial Narrow","Roboto Condensed",system-ui,sans-serif;
   /* visual viewport rect, kept up to date from JS */
   --vvl:0px; --vvt:0px; --vvw:100vw; --vvh:100vh;
-  /* safe area, never less than a small pad */
-  --padT:max(env(safe-area-inset-top,0px),8px);
-  --padL:max(env(safe-area-inset-left,0px),10px);
-  --padR:max(env(safe-area-inset-right,0px),10px);
-  --padB:max(env(safe-area-inset-bottom,0px),10px);
+  /* safe area, never less than a small pad. --saT..--saB are the raw insets, one place
+     that reads env(), so tests/ui_check.py can stand in a notch or a Dynamic Island */
+  --saT:env(safe-area-inset-top,0px); --saL:env(safe-area-inset-left,0px);
+  --saR:env(safe-area-inset-right,0px); --saB:env(safe-area-inset-bottom,0px);
+  --padT:max(var(--saT),8px);
+  --padL:max(var(--saL),10px);
+  --padR:max(var(--saR),10px);
+  --padB:max(var(--saB),10px);
   --tap:48px;
   box-sizing:border-box;
 }
@@ -73,14 +76,23 @@ button.on{ background:var(--caution); color:#15110a; border-color:transparent; }
    badges. right edge: the throttle, and just left of it a column of flight buttons
    (auto, view, gear, flaps, brake at the bottom). left 36%: the stick.
    left of the button column: weapon buttons, only when there are any. */
-:root{ --map:92px; --col:66px; --icon:44px; }
-#hud{ position:absolute; top:var(--padT); left:calc(var(--padL) + var(--map) + 8px); display:flex; flex-direction:column; gap:4px; align-items:flex-start; pointer-events:none; }
+:root{ --map:92px; --col:66px; --icon:44px;
+  /* the readouts' size, measured by a ResizeObserver (hudMeasure); these are only first guesses */
+  --hudW:150px; --hudH:106px;
+  /* the centre column under pause (#topCol: mission card, jump light, warning, tower subtitle).
+     Centred, so it is as wide as the narrowest of: clear of the readouts on the left, clear of
+     the stick zone (36% wide) once it runs below it, clear of the badges on the right. */
+  --topW:max(120px, min(440px, calc(var(--vvw) - 2 * (var(--padL) + var(--map) + var(--hudW) + 16px)), calc(.28 * var(--vvw) - 8px), calc(var(--vvw) - 2 * (var(--padR) + min(280px, 36vw) + 8px)))); }
+#hud{ position:absolute; top:var(--padT); left:calc(var(--padL) + var(--map) + 8px); display:grid; gap:4px; justify-items:start; pointer-events:none; }
 #hGrid{ display:grid; grid-template-columns:repeat(2,auto); gap:4px; }
 #hud .card{ padding:3px 8px 4px; min-width:62px; border-radius:8px; }
 .big{ font-size:20px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .big small{ font-size:11px; font-weight:600; color:var(--soft); margin-left:3px; }
 .lbl{ font-size:10px; color:var(--soft); letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
-#hLine{ display:flex; gap:8px; align-items:center; font-size:10px; font-weight:700; letter-spacing:.05em; padding:2px 8px !important; color:var(--soft); }
+/* the flaps/gear/wind line and the autopilot strip wrap inside the width of the four cards
+   (width 0 + min-width 100%: they never widen the readouts toward the centre column) */
+#hud #hLine,#hud #hAp{ width:0; min-width:100%; }
+#hLine{ display:flex; flex-wrap:wrap; gap:0 8px; align-items:center; font-size:10px; font-weight:700; letter-spacing:.05em; padding:2px 8px !important; color:var(--soft); }
 #hLine span{ white-space:nowrap; }
 #hLine .lit{ color:var(--caution); }
 #hWind{ display:flex; align-items:center; gap:4px; color:#bfe3ff; }
@@ -124,47 +136,57 @@ button.on{ background:var(--caution); color:#15110a; border-color:transparent; }
 /* C-130 airdrop: the free look pad owns the corner; desktop: Full screen does */
 /* C-130 airdrop (touch): the look pad owns the corner and the badges take the top row left
    of it, so the ticker and its strip step down one row, still left of the pad, above the
-   button column, and short of the mission card (30vw wide, centred) and of the tower's
-   subtitle (its max-width, #atc). The badges stay one
+   button column, and short of the centre column under pause (#topCol, --topW wide) that
+   holds the mission card and the tower's subtitle. The badges stay one
    line there so they never grow down into it. */
 body.lookOn.touch #tk, body.lookOn.touch #tkCtl{ top:calc(var(--padT) + var(--icon) + 8px); right:calc(var(--padR) + 72px); }
-body.lookOn.touch #tk{ max-width:min(210px, calc(35% - 80px - var(--padR)), calc(50% - 80px - var(--padR) - min(220px, max(75px, 50% - var(--padL) - var(--map) - 162px)))); }
+body.lookOn.touch #tk{ max-width:min(210px, calc(35% - 80px - var(--padR)), calc(50% - 88px - var(--padR) - var(--topW) / 2)); }
 body.lookOn.touch .badge span{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 body.lookOn.touch .badge{ max-height:48px; }
 body:not(.touch) #tk, body:not(.touch) #tkCtl{ right:calc(var(--padR) + 118px); }
-/* portrait: the readout cards reach past the middle, so keep clear of them instead */
-@media (orientation:portrait){ #tk{ max-width:max(88px, calc(100% - var(--padL) - var(--map) - 176px - var(--padR))); } }
 body.sensorOn #tk, body.sensorOn #tkCtl, body.crashOn #tk, body.crashOn #tkCtl{ display:none !important; }
 
 /* ---------- full screen, top right, desktop only ---------- */
 #bFull{ position:absolute; top:var(--padT); right:var(--padR); min-height:var(--icon); }
 body.touch #bFull{ display:none; }
 
-/* ---------- messages ---------- */
-#warn{ position:absolute; left:50%; top:24%; transform:translateX(-50%); font-size:24px; font-weight:800; letter-spacing:.06em; color:#fff; background:var(--warn); border-radius:6px; padding:2px 16px; display:none; white-space:nowrap; }
+/* ---------- messages: the centre column under pause ----------
+   The mission card, the C-130 jump light, the warning, a toast and the tower's subtitle share one
+   flex column, so whichever are up stack in that order and a taller one pushes the rest
+   down instead of sliding under them. Its width is --topW (clear of the readouts, the stick
+   and the badges); long lines wrap and then clamp, so nothing grows into the controls. */
+#topCol{ position:absolute; left:50%; top:calc(var(--padT) + var(--icon) + 8px); transform:translateX(-50%); width:var(--topW);
+  display:flex; flex-direction:column; align-items:center; gap:6px; pointer-events:none; z-index:5; }
+#topCol > *{ max-width:100%; flex:none; }
+#warn{ font-size:24px; text-align:center; font-weight:800; letter-spacing:.06em; color:#fff; background:var(--warn); border-radius:6px; padding:2px 16px; display:none; line-height:1.15; }
+body.touch #warn{ font-size:20px; padding:2px 12px; }
 #warn.on{ display:block; animation:blink .5s steps(2) infinite; }
 @keyframes blink{ 50%{ opacity:.35; } }
 @media (prefers-reduced-motion: reduce){ #warn.on{ animation:none; } }
-#atc{ position:absolute; left:50%; top:calc(var(--padT) + var(--icon) + 8px); transform:translateX(-50%); width:max-content; max-width:clamp(150px, calc(100vw - 2 * (var(--padL) + var(--map) + 162px)), 440px); font-size:12px; font-weight:500; line-height:1.3; opacity:0; transition:opacity .35s; padding:5px 10px; }
-body.missOn #atc{ top:calc(var(--padT) + var(--icon) + 64px); }
+#atc{ font-size:12px; font-weight:500; line-height:1.3; opacity:0; transition:opacity .35s; padding:5px 10px; }
+/* a long transmission keeps its first three lines, the plain English line its first two */
+#atc .tx,#atc .plain{ display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden; }
+#atc .tx{ -webkit-line-clamp:3; } #atc .plain{ -webkit-line-clamp:2; }
 #atc.on{ opacity:1; }
 #atc b{ color:var(--radio); font-weight:600; margin-right:6px; }
-#atc .plain{ display:block; color:var(--sand); font-weight:700; font-size:14px; margin-top:3px; }
+#atc .plain{ color:var(--sand); font-weight:700; font-size:14px; margin-top:3px; }
 #atc.hasPlain{ font-size:11px; color:var(--soft); }
-#toast{ position:absolute; left:50%; top:37%; transform:translateX(-50%); font-size:17px; font-weight:600; opacity:0; transition:opacity .3s; text-align:center; text-shadow:0 1px 3px rgba(0,0,0,.7); white-space:nowrap; }
+#toast{ font-size:17px; font-weight:600; line-height:1.2; opacity:0; transition:opacity .3s; text-align:center; text-shadow:0 1px 3px rgba(0,0,0,.7); }
+#toast:not(.on){ position:absolute; visibility:hidden; }   /* in the column only while it shows */
+body.touch #toast{ font-size:15px; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
 #toast.on{ opacity:1; }
 #bigcfg{ position:absolute; left:50%; top:57%; transform:translate(-50%,-50%); font-size:32px; font-weight:800; letter-spacing:.06em; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,.8); opacity:0; transition:opacity .45s; white-space:nowrap; }
 #bigcfg.on{ opacity:1; transition:opacity .08s; }
 
 /* ---------- mini map, top left ---------- */
 #map{ position:absolute; left:var(--padL); top:var(--padT); border-radius:12px; cursor:pointer; box-shadow:0 0 0 1px rgba(255,255,255,.2),0 2px 10px rgba(0,0,0,.35); touch-action:none; }
-#hDest{ position:absolute; left:var(--padL); top:calc(var(--padT) + 126px); display:flex; align-items:center; gap:8px; min-height:44px; max-width:calc(36vw - var(--padL));
+#hDest{ position:absolute; left:var(--padL); top:calc(var(--padT) + max(126px, var(--hudH) + 8px)); display:flex; align-items:center; gap:8px; min-height:44px; max-width:calc(36vw - var(--padL));
   padding:4px 10px 4px 6px; border-radius:10px; background:rgba(26,16,9,.78); border:1.5px solid var(--orange); color:var(--sand); font:700 13px var(--font); pointer-events:auto; cursor:pointer; touch-action:none; }
 #hDest[hidden]{ display:none; }
 #dArrow{ width:26px; height:26px; flex:none; transition:transform .2s linear; }
 body.easy #dArrow{ width:38px; height:38px; }
 #dTxt{ display:flex; flex-direction:column; min-width:0; line-height:1.15; } #dTxt b,#dTxt span{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } #dTxt span{ font-size:12px; color:#f0d6ad; }
-body.hasDest #stickZone{ top:calc(var(--padT) + 178px); }
+body.hasDest #stickZone{ top:calc(var(--padT) + max(178px, var(--hudH) + 60px)); }
 #mapOv{ background:transparent; padding:0; z-index:12; touch-action:none; }
 #fmap{ position:absolute; inset:0; touch-action:none; }
 #mapOv .mbar{ position:absolute; display:flex; gap:8px; }
@@ -236,7 +258,7 @@ body.sensorOn #hud{ display:none; }
 #touch{ display:none; position:absolute; inset:0; pointer-events:none; }
 body.touch #touch{ display:block; }
 /* left thumb: a stick appears wherever the thumb lands, and springs back on release */
-#stickZone{ position:absolute; left:0; top:calc(var(--padT) + 124px); width:36%; bottom:0; pointer-events:auto; touch-action:none; }
+#stickZone{ position:absolute; left:0; top:calc(var(--padT) + max(124px, var(--hudH) + 6px)); width:36%; bottom:0; pointer-events:auto; touch-action:none; }
 #stick{ position:absolute; width:140px; height:140px; margin:-70px 0 0 -70px; border-radius:50%;
   background:rgba(20,24,30,.36); border:2px solid rgba(255,255,255,.55); box-shadow:0 0 0 1px rgba(0,0,0,.25); display:none; pointer-events:none; }
 #stick::after{ content:''; position:absolute; left:50%; top:50%; width:10px; height:10px; margin:-5px 0 0 -5px; border-radius:50%; background:rgba(255,255,255,.35); }
@@ -336,25 +358,24 @@ body.lookOn:not(.touch) #badges{ top:calc(var(--padT) + var(--icon) + 80px); }
 .gLetter.gA,.gLetter.gB{ color:#4cd97b; } .gLetter.gC{ color:var(--caution); } .gLetter.gD,.gLetter.gF{ color:var(--warn); }
 #gLines{ margin:0 0 16px; font-size:16px; line-height:1.55; }
 #gLines .ok::before{ content:'\2713  '; color:#4cd97b; font-weight:800; } #gLines .no::before{ content:'\2717  '; color:var(--warn); font-weight:800; }
-#sixpack{ position:fixed; left:calc(50% + 20px); bottom:calc(env(safe-area-inset-bottom,0px) + 4px);
+#sixpack{ position:fixed; left:calc(50% + 20px); bottom:calc(var(--saB) + 4px);
   transform:translateX(-50%); width:300px; height:200px; display:none; z-index:3;
   pointer-events:none; filter:drop-shadow(0 2px 6px rgba(0,0,0,.55)); }
 #sixpack.on{ display:block; }
 body.touch #sixpack{ width:216px; height:144px; }
-#banner{ position:fixed; left:50%; top:calc(env(safe-area-inset-top,0px) + 6px); transform:translateX(-50%) scale(.92); opacity:0;
-  display:flex; flex-direction:column; align-items:center; gap:2px; z-index:9; pointer-events:none;
-  padding:10px 26px; border-radius:14px; background:rgba(12,16,22,.86); border:2px solid var(--caution);
-  transition:opacity .18s ease, transform .18s ease; }
-#banner.on{ opacity:1; transform:translateX(-50%) scale(1); }
-#banner b{ font-size:15px; letter-spacing:.18em; color:var(--caution); }
-#banner span{ font-size:20px; font-weight:800; }
-body.touch #banner{ padding:5px 16px; } body.touch #banner b{ font-size:10px; } body.touch #banner span{ font-size:14px; }
+/* NEW RECORD and ACHIEVEMENT: the second badge in the right column (#badges), label over
+   the line. It used to sit fixed over the pause button; now it takes turns with the grade. */
+#banner{ flex-direction:column; align-items:flex-start; justify-content:center; gap:1px; }
+#banner span{ font-weight:800; }
+#banner > *{ max-width:100%; }
 /* ---------- landing grade and record badges: never pause, never take input unless tapped ---------- */
 #badges{ position:fixed; right:var(--padR); top:calc(var(--padT) + var(--icon) + 8px); display:flex; flex-direction:column; align-items:flex-end; gap:6px; z-index:6; pointer-events:none; }
 .badge{ display:flex; align-items:center; gap:10px; max-width:min(240px,32vw); padding:6px 12px 6px 10px; border-radius:12px;
   background:rgba(12,16,22,.84); border:1.5px solid rgba(255,255,255,.16); color:var(--ink); font:600 14px var(--font); line-height:1.15;
   transform:translateX(24px); opacity:0; transition:transform .28s cubic-bezier(.2,.8,.2,1), opacity .28s; pointer-events:none; cursor:pointer; min-height:44px; }
 .badge.on{ transform:none; opacity:1; pointer-events:auto; }
+/* one badge at a time (badgeOn): the hidden ones leave the column so the shown one sits at its top */
+.badge:not(.on){ position:absolute; top:0; right:0; }
 .badge.fade{ opacity:0; transition:opacity .6s; pointer-events:none; }
 .badge b{ font-size:26px; font-weight:900; line-height:1; min-width:22px; text-align:center; }
 .badge b.gA,.badge b.gB{ color:#4cd97b; } .badge b.gC{ color:var(--caution); } .badge b.gD,.badge b.gF{ color:var(--warn); }
@@ -383,9 +404,9 @@ button.danger{ color:var(--warn); } button.danger.arm{ background:var(--warn); c
 #mLines,#sLines{ margin:0 0 16px; font-size:16px; line-height:1.55; }
 .gl{ display:flex; justify-content:space-between; gap:18px; border-bottom:1px solid rgba(255,255,255,.09); padding:4px 0; }
 .gl span{ color:var(--soft); } .gl b{ font-variant-numeric:tabular-nums; white-space:nowrap; }
-#miss{ position:fixed; left:50%; top:calc(var(--padT) + var(--icon) + 8px); transform:translateX(-50%);
-  display:none; flex-direction:column; gap:1px; text-align:center; z-index:5; pointer-events:none;
-  border:2px solid #7fd4ff; max-width:min(560px,86vw); }
+/* the mission card heads the centre column (#topCol); title and line clamp at two lines each */
+#miss{ display:none; flex-direction:column; gap:1px; text-align:center; pointer-events:none; border:2px solid #7fd4ff; }
+#miss b,#miss span{ display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
 #miss.on{ display:flex; }
 /* drop zone guidance */
 #dzHint{ position:fixed; left:50%; bottom:calc(var(--padB) + 70px); transform:translateX(-50%); z-index:5; pointer-events:none; display:none; white-space:nowrap;
@@ -399,8 +420,7 @@ button.danger{ color:var(--warn); } button.danger.arm{ background:var(--warn); c
 #dzMark b{ top:-9px; left:16px; transform:none; font:800 13px var(--font); letter-spacing:.08em; } #dzMark span{ top:14px; font:700 12px var(--font); }
 #dzArrow svg{ position:absolute; left:-15px; top:-15px; filter:drop-shadow(0 1px 3px rgba(0,0,0,.7)); }
 #dzArrow span{ position:absolute; left:0; top:17px; transform:translateX(-50%); white-space:nowrap; font:700 12px var(--font); color:#fff; text-shadow:0 0 3px #000; }
-#jumpLt{ position:fixed; left:50%; top:calc(var(--padT) + var(--icon) + 80px); transform:translateX(-50%); z-index:5; pointer-events:none; display:none;
-  align-items:center; gap:8px; padding:5px 12px; }
+#jumpLt{ pointer-events:none; display:none; align-items:center; gap:8px; padding:5px 12px; }
 #jumpLt.on{ display:flex; }
 #jumpLt i{ width:18px; height:18px; border-radius:50%; background:#3a1a16; box-shadow:inset 0 0 0 2px rgba(255,255,255,.15); }
 #jumpLt i.g{ background:#16301f; }
@@ -408,22 +428,24 @@ button.danger{ color:var(--warn); } button.danger.arm{ background:var(--warn); c
 #jumpLt.green i.g{ background:#2bff6a; box-shadow:0 0 14px 4px rgba(40,255,100,.8); }
 #jumpLt b{ font:800 14px var(--font); letter-spacing:.08em; min-width:92px; }
 #jumpLt.red b{ color:#ff6a5a; } #jumpLt.green b{ color:#6bff9a; }
+body.touch #jumpLt{ padding:4px 9px; gap:6px; } body.touch #jumpLt i{ width:14px; height:14px; } body.touch #jumpLt b{ font-size:13px; min-width:0; white-space:nowrap; }
 #bDrop.jgreen{ animation:dropPulse .6s ease-in-out infinite alternate; border-color:#2bff6a !important; }
 #bDrop.jgreen i{ color:#6bff9a !important; }
 @keyframes dropPulse{ from{ box-shadow:0 0 0 0 rgba(43,255,106,.0); } to{ box-shadow:0 0 0 6px rgba(43,255,106,.55),0 0 18px rgba(43,255,106,.7); background:rgba(20,70,35,.9); } }
 #miss.warn{ border-color:var(--caution); }
 #miss b{ font-size:17px; letter-spacing:.02em; }
 #miss span{ font-size:14px; color:var(--soft); }
-body.touch #miss{ font-size:13px; padding:5px 10px; max-width:30vw; }
+body.touch #miss{ font-size:13px; padding:5px 10px; }
 body.touch #miss b{ font-size:14px; } body.touch #miss span{ font-size:12px; }
-#lesson{ position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom,0px) + 22px); transform:translateX(-50%); display:none; flex-direction:column; gap:3px; max-width:min(560px,90vw); z-index:5; border:2px solid #7fd4ff; font-size:16px; }
+#lesson{ position:fixed; left:50%; bottom:calc(var(--saB) + 22px); transform:translateX(-50%); display:none; flex-direction:column; gap:3px; max-width:min(560px,90vw); z-index:5; border:2px solid #7fd4ff; font-size:16px; }
 #lesson.on{ display:flex; }
 #lesson{ pointer-events:none; } #lesQuit{ pointer-events:auto; }
 #lesson .lesTop{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
 #lesson .lesTop b{ color:#7fd4ff; font-size:13px; letter-spacing:.08em; text-transform:uppercase; }
 #lesson .lesTop button{ padding:3px 10px; font-size:13px; }
 #lesI{ font-weight:700; } #lesM{ font-variant-numeric:tabular-nums; color:var(--soft); font-size:14px; }
-body.touch #lesson{ max-width:30vw; font-size:13px; padding:6px 10px; bottom:calc(env(safe-area-inset-bottom,0px) + 10px); }
+body.touch #lesson{ max-width:calc(28vw - 8px); font-size:13px; padding:6px 10px; bottom:calc(var(--saB) + 10px); }   /* clear of the stick zone (36%) */
+body.touch #lesQuit{ min-height:44px; min-width:52px; }
 body.touch #lesM{ font-size:12px; }
 /* crash: a one line reason at the top, then a compact card at the bottom (3.9) */
 #crashTop{ position:absolute; left:50%; top:calc(var(--padT) + 4px); transform:translateX(-50%); width:max-content; max-width:min(440px, calc(100% - 2 * (var(--padL) + var(--map) + 14px)));
@@ -744,6 +766,28 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
 .badge.lb span{ display:flex; flex-direction:column; font-size:13px; line-height:1.2; }
 .badge.lb span em{ font-style:normal; font-size:11px; font-weight:800; letter-spacing:.12em; color:var(--caution); }
 .lbLine{ color:#7fd4ff; }
+/* ---------- portrait ("Play in portrait anyway") ----------
+   Top left: the map and a compact 2x2 of readouts. Top right, one per row: pause, the
+   ticker, then the badges (in the C-130 airdrop the look pad, then the badges). The centre
+   column starts under the readouts and fills the width left of that strip. The stick, the
+   throttle and the buttons start at --ctlTop, below all of it. */
+@media (orientation:portrait){
+  :root{ --ctlTop:max(calc(var(--padT) + var(--icon) * 2 + 16px), calc(var(--vvh) * .58)); }
+  #hud .card{ padding:2px 6px 3px; min-width:54px; }
+  #hud .big{ font-size:17px; } #hud .big small{ font-size:10px; margin-left:2px; } #hud .lbl{ font-size:9px; }
+  #bPause{ left:auto; right:var(--padR); transform:none; }
+  #tk, #tkCtl, body.lookOn.touch #tk, body.lookOn.touch #tkCtl{ top:calc(var(--padT) + var(--icon) + 8px); right:var(--padR); }
+  #tk, body.lookOn.touch #tk{ max-width:max(88px, calc(var(--vvw) - var(--padL) - var(--map) - var(--hudW) - 16px - var(--padR))); }
+  #badges{ top:calc(var(--padT) + var(--icon) * 2 + 16px); }
+  body.lookOn.touch #lookPad{ top:calc(var(--padT) + var(--icon) * 2 + 16px); }
+  body.lookOn.touch #badges{ top:calc(var(--padT) + var(--icon) * 2 + 88px); right:var(--padR); }
+  #topCol{ left:var(--padL); right:calc(var(--padR) + min(280px, 36vw) + 8px); width:auto; transform:none;
+    top:calc(var(--padT) + max(var(--map), var(--hudH)) + 8px); }
+  #thrCol, #uiroot > #dock, #stickZone, #hDest{ top:var(--ctlTop); }
+  body.hasDest #stickZone{ top:calc(var(--ctlTop) + 54px); }
+  /* the lesson panel sits on the top edge of the controls, full width, growing up */
+  body.touch #lesson{ bottom:calc(var(--vvh) - var(--ctlTop) + 8px); max-width:calc(100% - var(--padL) - var(--padR)); }
+}
 </style>
 </head>
 <body class="menuOn">
@@ -800,9 +844,8 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
     <div id="ctlB" class="ccol" hidden></div>
   </div>
   <div id="lookPad" role="slider" aria-label="Free look, drag to swing the camera"><svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13c2-3.2 4.3-4.8 7-4.8s5 1.6 7 4.8c-2 3.2-4.3 4.8-7 4.8S8 16.2 6 13z"/><circle cx="13" cy="13" r="2" fill="currentColor"/><path d="M13 1.5v3M11.5 3l1.5-1.5L14.5 3M13 24.5v-3M11.5 23l1.5 1.5 1.5-1.5M1.5 13h3M3 11.5L1.5 13 3 14.5M24.5 13h-3M23 11.5l1.5 1.5-1.5 1.5"/></svg><i>LOOK</i></div>
-  <div id="warn"></div>
-  <div id="atc" class="card"></div>
-  <div id="toast"></div>
+  <!-- the centre column under pause: mission card, jump light, warning, toast, tower subtitle -->
+  <div id="topCol"><div id="miss" class="card"><b id="missT"></b><span id="missS"></span></div><div id="jumpLt" class="card"><i class="r"></i><i class="g"></i><b></b></div><div id="warn"></div><div id="toast"></div><div id="atc" class="card"></div></div>
   <!-- crash: the reason as one line at the top, then after 3 s a small card at the bottom
        that leaves the fireball in view -->
   <div id="crashTop" aria-live="assertive"></div>
@@ -827,11 +870,9 @@ body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArro
   <div id="bigFlash" style="position:fixed;inset:0;background:#fff3d6;opacity:0;pointer-events:none;z-index:4"></div>
 <div id="lesson" class="card"><div class="lesTop"><b id="lesT"></b><button id="lesQuit">End</button></div><div id="lesI"></div><div id="lesM"></div></div>
 </div>
-<div id="miss" class="card"><b id="missT"></b><span id="missS"></span></div>
 <div id="dzHint">Head for the red smoke</div>
 <div id="dzMark"><i></i><b>DZ</b><span></span></div>
 <div id="dzArrow"><svg viewBox="0 0 24 24" width="30" height="30"><path d="M7 3l10 9-10 9" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 3l10 9-10 9" fill="none" stroke="#ff4a3a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span></span></div>
-<div id="jumpLt" class="card"><i class="r"></i><i class="g"></i><b></b></div>
 <div id="badges"><div class="badge" id="gBadge" role="button" aria-label="Landing grade, tap for details"><b id="gbL"></b><span id="gbT"></span></div><div class="badge rec" id="banner" role="button" aria-label="New record, tap for records"></div></div>
 <canvas id="sixpack" width="300" height="200"></canvas>
 <div id="tutArrow"><svg viewBox="0 0 64 40"><path d="M2 14 H40 V3 L62 20 L40 37 V26 H2 Z" fill="#F6C177" stroke="#2A1608" stroke-width="2.5" stroke-linejoin="round"/></svg></div>
@@ -6231,6 +6272,12 @@ if(window.visualViewport){
 }
 window.addEventListener('orientationchange',()=>setTimeout(layoutViewport,120));
 layoutViewport();
+// The centre column under pause (#topCol) is sized from where the readouts end. They only
+// change size when a value gains a digit or the skill changes the labels, so a
+// ResizeObserver costs nothing per frame; --hudW/--hudH feed --topW in the CSS.
+if(window.ResizeObserver){const hudEl=document.getElementById('hud'),r=document.documentElement.style;
+  new ResizeObserver(es=>{const c=es[es.length-1].contentRect;if(c.width<1)return;   // hidden (sensor ball): keep the last size
+    r.setProperty('--hudW',Math.ceil(c.width)+'px');r.setProperty('--hudH',Math.ceil(c.height)+'px');}).observe(hudEl);}
 
 // ================= scores, records, the pilot log and achievements =================
 // One localStorage blob, kgeuScores, holds everything: per aircraft records, the
@@ -6354,9 +6401,15 @@ function scRecord(key,rec){
 // and take no input except a deliberate tap, which opens the details and only then pauses.
 // Wall clock, not the frame clock, so four seconds is four seconds at any frame rate.
 const bannerEl=document.getElementById('banner'),gBadge=document.getElementById('gBadge');
-function badgeOn(el){clearTimeout(el._t1);clearTimeout(el._t2);el.classList.remove('fade');el.classList.add('on');
-  el._t1=setTimeout(()=>el.classList.add('fade'),4000);el._t2=setTimeout(()=>el.classList.remove('on','fade'),4600);}
-function badgeOff(el){clearTimeout(el._t1);clearTimeout(el._t2);el.classList.remove('on','fade');}
+// The two badges share one slot at the top right (below it are the throttle and the
+// buttons): a new one takes the slot at once and the one it covered comes back after it.
+function badgeOn(el){const q=el._next||[];
+  for(const o of document.getElementById('badges').children)
+    if(o!==el&&o.classList.contains('on')&&!o.classList.contains('fade')){const w=o._next||[];badgeOff(o);q.push(o,...w);}
+  el._next=q;clearTimeout(el._t1);clearTimeout(el._t2);el.classList.remove('fade');el.classList.add('on');
+  el._t1=setTimeout(()=>el.classList.add('fade'),4000);
+  el._t2=setTimeout(()=>{el.classList.remove('on','fade');const n=el._next||[];el._next=null;const f=n.shift();if(f){f._next=n;badgeOn(f);}},4600);}
+function badgeOff(el){clearTimeout(el._t1);clearTimeout(el._t2);el._next=null;el.classList.remove('on','fade');}
 function bannerShow(kind,text){
   bannerEl.innerHTML='<b>'+kind+'</b><span>'+text+'</span>';badgeOn(bannerEl);
 }
@@ -7571,8 +7624,8 @@ function playLine(l){
   RADIO.log.push({who:l.who,kind:l.kind,text:l.text,clips:Array.isArray(l.clips)?l.clips.slice():l.clips,t:st?+st.time.toFixed(2):0,amb:CHAT.some(p=>p.indexOf(l)>=0),type:AC.id});
   if(RADIO.log.length>200)RADIO.log.shift();
   if(live){                                                        // the grade card speaks without a subtitle
-    atcEl.innerHTML='';const b=document.createElement('b');b.textContent=l.who;atcEl.appendChild(b);
-    atcEl.appendChild(document.createTextNode(l.text));
+    atcEl.innerHTML='';const tx=document.createElement('span');tx.className='tx';atcEl.appendChild(tx);   // .tx clamps at three lines
+    const b=document.createElement('b');b.textContent=l.who;tx.appendChild(b);tx.appendChild(document.createTextNode(l.text));
     const pl=rookie()?plainOf(l):'';atcEl.classList.toggle('hasPlain',!!pl);
     if(pl){const e=document.createElement('span');e.className='plain';e.textContent=pl;atcEl.appendChild(e);}
     atcEl.classList.add('on');}
@@ -10850,8 +10903,8 @@ window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runM
     wallVisible:!!(HB.g&&HB.g.visible),C:[HB.C.x,HB.C.z],T:[HB.T.x,HB.T.z],sunDisc:!!(HB.sun&&HB.sun.visible),dustDir:st.dustDir,windDir:st.windDir}),
   haboobJump:(m)=>{if(HB.on){hbPlace(m);hbUpdate(0);}},drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
-  RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,ticker:()=>{const e=document.getElementById('tk'),c=document.getElementById('tkCtl');return {on:e.classList.contains('on'),paused:e.classList.contains('paused'),anim:getComputedStyle(document.getElementById('tkT')).animationName,scroll:e.classList.contains('scroll'),open:c.classList.contains('on'),text:e.querySelector('#tkT i').textContent,vis:e.offsetParent!==null&&getComputedStyle(e).display!=='none',ctlVis:c.offsetParent!==null};},tickerForce:n=>{TK.force=n||null;tkUI();},tickerOpen:()=>tkOpen(),musicTick:musicTick,MUSIC:MUSIC,actx:()=>actx,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,VQ:VQ,vqLog:clear=>{const r=VQ.log.map(e=>Object.assign({},e));if(clear)VQ.log.length=0;return r;},vqAdd:(who,kind,text,clips,o)=>vqAdd(L(who,kind,text,clips),o),coach2:coach2,chatNow:()=>chatNow(),atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
-  ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
+  RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,ticker:()=>{const e=document.getElementById('tk'),c=document.getElementById('tkCtl');return {on:e.classList.contains('on'),paused:e.classList.contains('paused'),anim:getComputedStyle(document.getElementById('tkT')).animationName,scroll:e.classList.contains('scroll'),open:c.classList.contains('on'),text:e.querySelector('#tkT i').textContent,vis:e.offsetParent!==null&&getComputedStyle(e).display!=='none',ctlVis:c.offsetParent!==null};},tickerForce:n=>{TK.force=n||null;tkUI();},tickerOpen:()=>tkOpen(),tickerClose:()=>{TK.open=false;tkUI();},musicTick:musicTick,MUSIC:MUSIC,actx:()=>actx,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,VQ:VQ,vqLog:clear=>{const r=VQ.log.map(e=>Object.assign({},e));if(clear)VQ.log.length=0;return r;},vqAdd:(who,kind,text,clips,o)=>vqAdd(L(who,kind,text,clips),o),coach2:coach2,chatNow:()=>chatNow(),atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
+  ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),bannerShow:(k,t)=>bannerShow(k,t),badgeHide:()=>badgeHide(),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
   stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   // @OhRabah easter eggs (3.10): where each one is, whether its lights are on, and the tow banner

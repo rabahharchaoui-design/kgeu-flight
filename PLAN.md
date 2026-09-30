@@ -86,7 +86,7 @@ Orchestrated run: builder subagent implements, tester subagent verifies at iPhon
 - [x] 13. Ground clearance. The F-16 and the props look like they hit the runway, and the MQ-9 prop must never touch the ground. Fix the gear height, the model origin, and the pitch at rest for every aircraft. Add a test that asserts the lowest prop and fuselage point stays above ground level while the aircraft sits on the runway.
 - [ ] 14. MQ-9B wingtips. The previous overnight build had them right, and now they flare out wrong. Diff the wingtip geometry against the prior tag and restore it. The MQ-9B tips are smooth upswept curves, like a small quarter pipe turning up at the end of a long straight wing. Check them against the reference photos in refs. Do not change aircraft colors in this run.
 - [ ] 15. Explosions. Make the Hellfire impacts and aircraft crashes big and cinematic, Michael Bay style: a bright flash, an expanding fireball, a rolling black smoke column, flying debris and sparks, a ground scorch mark, camera shake, and a deep boom. Stay within budget: 60 fps on iPhone, pooled particles, no frame drop over 5 ms.
-- [ ] 16. The mission card overlaps the tower subtitle at the top. Stack them cleanly in portrait and landscape and respect the safe area around the notch and Dynamic Island.
+- [x] 16. The mission card overlaps the tower subtitle at the top. Stack them cleanly in portrait and landscape and respect the safe area around the notch and Dynamic Island.
 - [ ] 17. Cessna 172. Only if refs/cessna172 contains N8401L photos: rematch the model's livery to N8401L and remove the N6065M match. If there are no N8401L photos, skip this item and note that in the report.
 
 ### P2 UI CLEANUP
