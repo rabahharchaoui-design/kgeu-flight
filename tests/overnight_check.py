@@ -117,6 +117,8 @@ async def main():
         print('wrote', BASE_F)
     if warns:
         print(f'({len(warns)} warnings, not fatal)')
+        for w in warns:
+            print('  WARN', w)
     print(f'FAILS {len(fails)}' + (': ' + '; '.join(fails) if fails else ''))
     sys.exit(1 if fails else 0)
 

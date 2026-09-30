@@ -24,7 +24,7 @@ the old name; renaming the GitHub repo would change the link).
 | 5 + 6c | Flight school, lesson 1 | Home: big FLY plus FLIGHT SCHOOL, MISSIONS, ARCADE. Lesson 1 is the one minute first flight with arrows and a big Skip, launched automatically for Easy players. Start here badge. Next lesson on every result. Replay from Settings. |
 | 7 | New map | Heading-up mini map. Tap it for a full north-up map with every airport and landmark; pinch, drag, and tap a runway end to set a destination. Distance, bearing and time on the HUD, a big arrow for Easy players, glowing hoops near the runway. |
 | 8 | Arcade hub | Featured Red Flag Dogfight (coming soon), landing challenge against the clock, daily challenge, airdrop and strike range, each with stars and best score. |
-| 9 | Photo mode | Camera in the pause menu. It freezes the frame, hides the HUD, and orbits and zooms by finger. SAVE shares a watermarked PNG through the iOS share sheet. |
+| 9 | Action Shot (photo mode) | Action Shot in the pause menu. It freezes the frame, hides the HUD, and orbits and zooms by finger. SHARE sends a watermarked PNG, the game link and your callsign through the iOS share sheet. |
 | 10 | Splash | Icon on sand, title, thin loading bar, fade into home. |
 | 12 | Creator credit | "Made by @OhRabah" with the YouTube play button on the splash and at the bottom of Settings; opens the channel in a new tab. |
 
@@ -94,7 +94,7 @@ uses the manifest and the new icon).
 **Arcade, missions, photo**
 19. Arcade: play the landing challenge (starts 5 miles out, clock at top). The results screen should show stars and points, and the card should then show your best. Try the daily challenge.
 20. Missions: short field landing and the Luke to Glendale dash each start directly.
-21. Pause, **Photo**: drag to orbit, pinch to zoom, tap **SAVE**. The iOS share sheet should open. Save to Photos and check the small "Pocket Flight Sim" watermark in the corner.
+21. Pause, **Action Shot**: drag to orbit, pinch to zoom, tap **SHARE**. The iOS share sheet should open with the game link (and your callsign) in the text. Save to Photos and check the small "Pocket Flight Sim" watermark in the corner.
 22. Settings: tap "Made by @OhRabah". The channel should open in a new tab.
 
 **Layout**
@@ -103,7 +103,7 @@ uses the manifest and the new icon).
 ## Known limits and notes
 
 - **Pitch direction is the one thing to feel on a real phone.** Pulling the stick toward you raises the nose, the same as the old stick. If it feels wrong, Settings has Invert pitch.
-- **The share sheet can only be confirmed on the iPhone.** Photo SAVE calls the Web Share API synchronously inside the tap, which Safari requires. The test stubs `navigator.share`. On a browser without it, the PNG downloads instead.
+- **The share sheet can only be confirmed on the iPhone.** Action Shot SHARE calls the Web Share API synchronously inside the tap, which Safari requires. The test stubs `navigator.share` and checks the call happens inside the click handler. On a browser without it, the button reads SAVE and the PNG downloads instead.
 - **Lesson 1 took about 70 simulated seconds** in the test, which flies it with coarse inputs. A real player may be a little quicker or slower than the one minute target.
 - **Trim** is no longer on a touch button (the old More drawer is gone). Easy doesn't need it, and on a Mac Y and H still work.
 - **The old first flight coach** (the prompts that pointed at Auto T/O) is gone. Lesson 1 replaces it, as one learning path.

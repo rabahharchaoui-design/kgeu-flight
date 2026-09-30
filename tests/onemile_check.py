@@ -57,7 +57,7 @@ async def main():
             ok(f'{W}: pause sheet offers it too, selected', [x['t'] for x in c] == ['Runway', 'Ramp', '1 mi final', '3 mi final'] and c[2]['sel'] and all(x['h'] >= 44 for x in c), c)
             if W == 667: await shot(pg, 'pause_667')
             await pg.evaluate(f"()=>{K}.stepFrame(1/30,false,true)")
-            await finger(pg, '#pRestart'); await pg.wait_for_timeout(800)
+            await finger(pg, '#pApply'); await pg.wait_for_timeout(800)
             g = await pg.evaluate(GEOM)
             ok(f'{W}: Restart comes back to 1 mile final', g['spawn'] == 'final1' and 1700 < g['along'] < 2000, g)
             ok(f'{W}: no page errors', not pg.errs, pg.errs[:3])
@@ -81,7 +81,9 @@ async def main():
                     # the first 10 s hands off are no worse than the same aircraft's 3 mile final: glide path
                     # deviation and distance off the centre line, compared against a 3 mile start flown the same way
                     DEV = GEOM.replace('return {', 'return {dev:Math.round(s.agl*3.28084-along*Math.tan(3*Math.PI/180)*3.28084),')
-                    CALM = "()=>{const s=window.__kgeu.state();s.windKt=0;s.gustAmp=0;s.gust=0;s.gustTarget=0;}"   # the same still air for both, so the comparison is like for like
+                    # the same still air for both, so the comparison is like for like; the spawn trims for the wind
+                    # it was given, so trim again for the still air
+                    CALM = "()=>{const K=window.__kgeu,s=K.state();s.windKt=0;s.gustAmp=0;s.gust=0;s.gustTarget=0;K.trimSpawn(-3*Math.PI/180);}"
                     await pg.evaluate(f"()=>{K}.start('final1')"); await pg.evaluate(CALM)
                     await pg.evaluate(STEP, 300); a1 = await pg.evaluate(DEV); c1 = await pg.evaluate(f"()=>{K}.state().crashed")
                     await pg.evaluate(f"()=>{K}.start('final')"); await pg.evaluate(CALM); await pg.evaluate(STEP, 300); a3 = await pg.evaluate(DEV)

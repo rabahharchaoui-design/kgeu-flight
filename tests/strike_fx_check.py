@@ -109,6 +109,8 @@ async def main():
 
         # ---------- explosion on the bunker ----------
         await pg.evaluate("()=>{const s=window.__kgeu.state();s.windBase=270;s.windKt=12;s.gustAmp=0;}")
+        await step(pg, 0.1, render=True)
+        pre = await pg.evaluate(f"()=>{K}.fx()")   # draw calls with nothing going off
         await pg.evaluate(FIRE_AT, 'bunker')
         chk('missile reaches the bunker', await fly_missile(pg))
         f0 = await pg.evaluate(f"()=>{K}.fx()")
@@ -119,7 +121,12 @@ async def main():
         await step(pg, max(0.02, 0.5-f0['t']), render=True)
         await shot(pg, 'explosion_0_5s.png')
         f1 = await pg.evaluate(f"()=>{K}.fx()")
-        chk('sprite budget holds (<= 120)', f1['sprites'] <= 120, f1['sprites'])
+        cap = await pg.evaluate(f"()=>{K}.fxCaps.FXQ_N")
+        # item 15: every fire, smoke, spark and flame quad is an instance of one layer (one draw
+        # call), plus the debris mesh and the four ground decals
+        chk(f'quad budget holds (<= {cap} in the pool)', f1['sprites'] <= cap and f1['quads'] <= cap, (f1['sprites'], f1['quads']))
+        # (the count can fall: the missile and the bunker's live mesh are gone by now)
+        chk('the explosion adds at most 8 draw calls', f1['drawCalls'] - pre['drawCalls'] <= 8, f"{pre['drawCalls']} -> {f1['drawCalls']}")
         await pg.evaluate(f"()=>{{{K}.SENSOR.zoom=0;}}")
         await step(pg, 2.5, render=True)
         await shot(pg, 'explosion_3s.png')
@@ -147,7 +154,7 @@ async def main():
         along = (bk['mean'][0]*w[0] + bk['mean'][1]*w[2]) / wl
         chk('after 40 s the column still has smoke', bk['smokeN'] >= 3, bk['smokeN'])
         chk('the smoke has drifted downwind', along > 30, f'{along:.0f} m along the wind')
-        chk('sprite budget holds later on', fl['sprites'] <= 120, fl['sprites'])
+        chk('quad budget holds later on', fl['sprites'] <= cap, fl['sprites'])
 
         # ---------- night, and the chase view ----------
         await pg.evaluate(f"()=>{K}.setTOD('night')")

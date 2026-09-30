@@ -60,3 +60,38 @@ Tag: pre-dogfight. Branch: dogfight. Report: DOGFIGHT_REPORT.md. Replace the "Re
 - [ ] 5.4 VOICES AND SOUND. Prerecord with the macOS say pipeline. Cockpit warning voice female and calm (Samantha). Wingman and the AWACS controller (callsign "Sentry") on other voices through the radio filter. Calls: "Fox two", "Guns guns guns", "Splash one", "Missile launch", "Pull up", "Bandit, bandit", "Winchester", "Bingo", and AWACS picture calls like "Sentry, two bandits, west, twenty miles, angels fifteen". Start screen: "Sound on for the full experience". On iOS set navigator.audioSession.type = "playback" when supported so audio plays with the silent switch on; otherwise show "Turn off silent mode".
 - [ ] 5.5 CONTROLS, MODES, SCORING. Keep the left thumb stick and right edge throttle. Weapon buttons in the lower right area reserved for them: big FOX 2, GUN (hold), FLARES, 60pt or larger, never overlapping each other or the throttle. Easy: bigger seeker circle, faster lock, slower bandits, auto flares twice per round, plain English subtitles ("Enemy missile! Tap FLARES and turn hard!"). Hard: real energy fight, speed bleeds in turns, 9G limit with a gray vision effect near it, no assists, real brevity only. Scoring: points for kills (gun kills double), time bonus, penalty for hits, 1 to 3 stars, hooked into records and the arcade card. Achievements: "Ace" (5 kills in a round), "Guns Kill", "Flare Save", "Untouchable" (no hits). Add one or two surprise touches, like the wingman calling "Tally one!" or a bandit doing a victory roll. Fun, not brutally hard.
 - [ ] 5.END Full pass and fps comparison. Required: all aircraft spawn, the dogfight loads and runs a full round in Playwright, no console errors, no fps regression. If it passes: merge dogfight into master, push, live check. Write DOGFIGHT_REPORT.md with an iPhone hand test list: sound, lock tone feel, weapon button reach, and whether the difficulty is fun.
+
+## PHONE NOTES 0929 (tag pre-phone-0929, branch fix/phone-notes-0929, report ../chain/report-0929.md)
+Orchestrated run: builder subagent implements, tester subagent verifies at iPhone landscape after each fix. One fix per commit.
+
+### P0 STABILITY
+- [x] 1. Controls and HUD vanish at event start. When an event or mission begins, no controls or overlays render and input is dead; sometimes it recovers in a split second, sometimes the app must be killed. Find the root cause (overlay mount order, state reset, a blocking asset load, or a resize/orientation race on iOS). Controls must render on the first frame of every event, every time. Add a Playwright test that starts every event 10 times in a row and asserts the controls are visible and responding within 500 ms.
+- [x] 2. General lag. Profile a full event on a throttled mobile CPU. Kill per frame allocations, redundant DOM writes, and unneeded shadow and particle cost. Report the frame time before and after.
+- [x] 3. The map opens with lag and flicker. Prebuild or cache the map so opening it is instant and never flickers.
+- [x] 4. The crash scorch circle flickers on the ground. This is z fighting; fix it with polygonOffset or a small lift above terrain.
+
+### P1 AUDIO
+- [x] 5. Music must not start at app open. Start it only after the callsign screen is done (or on the first launch after a callsign already exists).
+- [x] 6. The pause menu Prev/Play/Next buttons do nothing, and pausing kills the music with no way back. Make them work, and make play state survive pause, resume, and backgrounding the app.
+- [x] 7. Add a small now playing ticker at the top of the screen that scrolls the track name. Keep it compact, it must not overlap the mission card or the tower subtitle, and tapping it opens the music controls.
+- [x] 8. Flight school instructions get talked over by radio chatter. Build an audio priority queue: instruction voice first, then tower and radio chatter. Chatter waits or ducks while an instruction plays. Voices never overlap each other.
+
+### P1 FLIGHT FEEL
+- [x] 9. Nose wheel steering must work any time the wheels are on the ground and groundspeed is above about 1 kt, including at idle throttle.
+- [x] 10. Show all speeds in knots everywhere (HUD, menus, mission text, leaderboard). No mph anywhere.
+- [x] 11. The Hard mode C130 climbs about 400 ft on its own on any final. Retune the trim and pitch so it holds altitude with the stick neutral.
+- [x] 12. In Easy mode, the hands off landing must land every aircraft cleanly. Test each aircraft on each runway.
+
+### P1 VISUALS
+- [x] 13. Ground clearance. The F-16 and the props look like they hit the runway, and the MQ-9 prop must never touch the ground. Fix the gear height, the model origin, and the pitch at rest for every aircraft. Add a test that asserts the lowest prop and fuselage point stays above ground level while the aircraft sits on the runway.
+- [x] 14. MQ-9B wingtips. The previous overnight build had them right, and now they flare out wrong. Diff the wingtip geometry against the prior tag and restore it. The MQ-9B tips are smooth upswept curves, like a small quarter pipe turning up at the end of a long straight wing. Check them against the reference photos in refs. Do not change aircraft colors in this run.
+- [x] 15. Explosions. Make the Hellfire impacts and aircraft crashes big and cinematic, Michael Bay style: a bright flash, an expanding fireball, a rolling black smoke column, flying debris and sparks, a ground scorch mark, camera shake, and a deep boom. Stay within budget: 60 fps on iPhone, pooled particles, no frame drop over 5 ms.
+- [x] 16. The mission card overlaps the tower subtitle at the top. Stack them cleanly in portrait and landscape and respect the safe area around the notch and Dynamic Island.
+- [x] (skipped: refs/cessna172 holds only ref_c172.jpg, the N6065M photo; no N8401L photos) 17. Cessna 172. Only if refs/cessna172 contains N8401L photos: rematch the model's livery to N8401L and remove the N6065M match. If there are no N8401L photos, skip this item and note that in the report.
+
+### P2 UI CLEANUP
+- [x] 18. Rename the photo button to something fun that's clearly for sharing, like "Action Shot". Tapping it captures the frame and opens the iOS share sheet.
+- [x] 19. Audit every button and menu. Cut redundant screens and nested menus so every main action is at most 2 taps from flight. List what you removed or merged in the report.
+
+### DONE
+- [x] Write ../chain/report-0929.md with: each item's status, commit hash, what changed, anything skipped and why, and before/after frame times. End it with an iPhone hand test checklist covering every item above.
