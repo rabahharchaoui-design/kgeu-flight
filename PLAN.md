@@ -79,7 +79,7 @@ Orchestrated run: builder subagent implements, tester subagent verifies at iPhon
 ### P1 FLIGHT FEEL
 - [x] 9. Nose wheel steering must work any time the wheels are on the ground and groundspeed is above about 1 kt, including at idle throttle.
 - [x] 10. Show all speeds in knots everywhere (HUD, menus, mission text, leaderboard). No mph anywhere.
-- [ ] 11. The Hard mode C130 climbs about 400 ft on its own on any final. Retune the trim and pitch so it holds altitude with the stick neutral.
+- [x] 11. The Hard mode C130 climbs about 400 ft on its own on any final. Retune the trim and pitch so it holds altitude with the stick neutral.
 - [ ] 12. In Easy mode, the hands off landing must land every aircraft cleanly. Test each aircraft on each runway.
 
 ### P1 VISUALS
