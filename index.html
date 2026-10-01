@@ -698,7 +698,8 @@ body.menuOn #tutArrow, body.pauseOn #tutArrow{ display:none !important; }
 .creditsList span{ font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--rust); flex:none; }
 #menu .keys{ font-size:14px; gap:2px 14px; margin:0; } #menu .keys dt{ color:var(--rust); }
 #menu .touchnote{ color:var(--night); font-size:clamp(14px,4.2vh,17px); line-height:1.4; margin:0; max-width:760px; }
-body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArrow, body.pauseOn #uiroot, body.pauseOn #badges, body.pauseOn #sixpack, body.menuOn #uiroot, body.menuOn #badges, body.menuOn #sixpack, body.menuOn #miss, body.menuOn #lesson{ display:none !important; }
+body.mapOn #uiroot, body.mapOn #badges, body.mapOn #sixpack, body.mapOn #tutArrow, body.pauseOn #uiroot, body.pauseOn #badges, body.pauseOn #sixpack, body.menuOn #uiroot, body.menuOn #badges, body.menuOn #sixpack, body.menuOn #miss, body.menuOn #lesson,
+body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHint, body.pauseOn #dzMark, body.pauseOn #dzArrow, body.menuOn #dzHint, body.menuOn #dzMark, body.menuOn #dzArrow{ display:none !important; }
 #menu .pick.sel{ box-shadow:none; } .acard.pick.sel{ border:none; }
 #funnel{ background:var(--sand); color:var(--night); z-index:30; padding:var(--padT) var(--padR) var(--padB) var(--padL); }
 .fun{ display:flex; flex-direction:column; align-items:center; gap:clamp(10px,4vh,22px); width:100%; }
@@ -8134,22 +8135,19 @@ function start(mode,base){
   if(FM.on)fmClose();
   initAudio();
   if(ARC.prevTod){const p=ARC.prevTod;ARC.prevTod=null;setTOD(p);}
-  setType(acType);useModel(acType);sizeShadow();vqReset();radioHush();radioFadeTok++;radioVolApply();chatT=9;atcT=0;atcEl.classList.remove('on');TK.paused=false;TK.open=false;
+  setType(acType);useModel(acType);sizeShadow();vqReset();radioHush();radioFadeTok++;radioVolApply();chatT=9;atcT=0;TK.paused=false;
   const spawn=mode;if(mode==='final1')mode='final';
   st=createState(mode,base||SPAWN_BASE,spawn==='final1'?1852:0);st.type=acType;st.spawn=spawn;
   // 1 mile final: Easy is already configured to land (gear down, landing flaps); Hard is set up the way the
   // 3 mile final is, gear down and approach flaps, and the last stage of flap is the pilot's
-  if(spawn==='final1'&&easy){st.flapIdx=AC.landFlap;st.gearDown=true;st.gearPos=1;trimSpawn(st,-GS);}ROOK.to=false;guideShow(null);st.easy=easy;st.noPF=isTouch||easy;document.body.classList.toggle('easy',easy);A={};running=true;paused=false;RUN.easyEver=easy;RUN.t0=Date.now();events.length=0;cfgReset();camBump=0;
-  menuClose();crashClear();pauseOv.classList.remove('on');$('storyOv').classList.remove('on');snapCamera=true;
+  if(spawn==='final1'&&easy){st.flapIdx=AC.landFlap;st.gearDown=true;st.gearPos=1;trimSpawn(st,-GS);}ROOK.to=false;st.easy=easy;st.noPF=isTouch||easy;document.body.classList.toggle('easy',easy);A={};running=true;paused=false;RUN.easyEver=easy;RUN.t0=Date.now();events.length=0;camBump=0;
+  menuClose();hudClear();pauseOv.classList.remove('on');snapCamera=true;
   // the flight UI shows from this frame on: every class that hides it goes now (pauseOn is otherwise only
   // cleared by the next rendered frame), and no finger from the tap that started this is still held
   if(PHOTO.on){PHOTO.on=false;$('photoOv').classList.remove('on');}
   document.body.classList.remove('menuOn','pauseOn','crashOn','photoOn','mapOn');if(window.stickReset)stickReset();
-  if(camMode>1)camMode=0;   // the ball view is entered in flight, where its autopilot can take over
-  STRIKE.active=false;lesEnd();gradeOv.classList.remove('on');arcStop();$('arcOv').classList.remove('on');
   MUSIC.forced=null;   // a mode with its own song (the Red Flag Dogfight: MUSIC.forced='dogfight.m4a') sets it after start()
-  missReset();resCloseAll();RES.kind='';RES.freeT0=0;RES.segDone=false;
-  document.getElementById('recOv').classList.remove('on');DASH.on=false;badgeHide();
+  RES.kind='';RES.freeT0=0;RES.segDone=false;
   if(mode==='range')strikeStart();
   if(mode==='drop'||mode==='short')missStart(mode==='drop'?'drop':'short');
   if(mode==='drop')dzStart();
@@ -8157,8 +8155,31 @@ function start(mode,base){
   if(LB){LB.reset();if(mode==='range'||mode==='drop'||mode==='short')LB.runStart(mode==='range'?'arc:strike':mode==='drop'?'arc:drop':'mission:short');}
   layoutCtl(true);
 }
+// One sweep for everything a flight put on screen: the result sheets, the mission card, the drop
+// zone (hint, chip, chevron, jump lights, smoke, panels, run in line, gates and its route), the
+// pallet, the arcade target, the lesson panel and arrow, the strike sensor view and its target
+// marks, the Easy guide hoops, the crash card and wreck, the badges, toast, warning, tower line,
+// ticker controls, the big flap/gear readout and the ghost. Each part through its own reset.
+// start() runs it, and so does openMenu(): every path to the main menu (the pause sheet's Main
+// menu, a results card, the crash card's MENU, a badge tap) lands on a fresh nav stack with no
+// way back into that flight, so it is over. The menu screens opened from the pause sheet
+// (pauseGo: Missions, Arcade, School, Boards, Settings) keep the flight for Back and Resume: they
+// do not come here, the flight's overlays are only hidden under them (body.menuOn).
+function hudClear(){
+  resCloseAll();for(const id of ['recOv','storyOv'])$(id).classList.remove('on');
+  STRIKE.active=false;tgtMarkHide();
+  if(camMode>1)camMode=0;   // the ball view is entered in flight, where its autopilot can take over
+  if(sensOn){sensOn=false;hudSens.classList.remove('on');document.body.classList.remove('sensorOn');glc.style.filter='';}
+  lesEnd();arcStop();missReset();DASH.on=false;   // missReset: the pallet, the mission card, the drop camera, dzStop
+  guideShow(null);crashClear();cfgReset();badgeHide();
+  for(const b of $('badges').children)badgeOff(b);
+  toastT=0;toastEl.classList.remove('on');warnEl.classList.remove('on');atcEl.classList.remove('on');
+  TK.open=false;tkUI();
+  if(LB)LB.ghostOff();
+  if(window.layoutCtl)layoutCtl();   // the LOOK pad and DROP button go with the mission
+}
 const pauseOv=$('pauseOv');
-function openMenu(scr){if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.forced=null;pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
+function openMenu(scr){if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.forced=null;hudClear();pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
 // the pause button, P and a backgrounded app all land here; the sheet shows while paused
 function togglePause(){if(RES.brief)resClose(RES.brief);paused=!paused;pauseOv.classList.toggle('on',paused);if(paused){radioFade(120);CARP.sync();PZ0={t:savedType,b:SPAWN_BASE,p:SPAWN_POS};pzApplyUI();if(window.stickReset)stickReset();musicUI();}}
 $('pResume').onclick=()=>{paused=false;pauseOv.classList.remove('on');initAudio();radioVolApply();};
