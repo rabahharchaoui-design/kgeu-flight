@@ -164,7 +164,23 @@ async function main() {
   ok('board carries my row and rank', bd.j.me && bd.j.me.cs === B && bd.j.me.r === 2 && bd.j.total === 2, JSON.stringify(bd.j.me));
   ok('board rows carry the rank badge', !!bd.j.rows[0].rank);
   ok('today and week tabs answer', (await call('/board?b=lesson:stall&m=hard&p=today')).j.rows.length === 2 && (await call('/board?b=lesson:stall&m=hard&p=week')).j.rows.length === 2);
-  ok('Easy board is separate', (await call('/board?b=lesson:stall&m=easy&p=all')).j.rows.length === 0);
+  ok('board rows carry their mode', bd.j.rows.every(r => r.mode === 'hard') && bd.j.me.mode === 'hard', JSON.stringify(bd.j.rows.map(r => r.mode)));
+
+  // ---- one list per board: Easy and Hard merge for display, each player's best run once
+  const te1 = await tokenFor(you, 'lesson:stall', 'easy'), te2 = await tokenFor(me, 'lesson:stall', 'easy');
+  await sleep(3200);
+  const eB = await call('/submit', Object.assign({ board: 'lesson:stall', mode: 'easy', score: 95, secs: 4, ac: 'alpha', wx: 'day', when: Date.now(), token: te1.token }, you));
+  ok('Easy run beating my Hard best is a PB, #1 of 2 across both modes', eB.s === 200 && eB.j.pb === true && eB.j.rank === 1 && eB.j.total === 2, JSON.stringify(eB.j));
+  const eA = await call('/submit', Object.assign({ board: 'lesson:stall', mode: 'easy', score: 60, secs: 4, ac: 'cessna', wx: 'day', when: Date.now(), token: te2.token }, me));
+  ok('Easy run under my Hard best is no PB, best stays the Hard one', eA.s === 200 && eA.j.pb === false && eA.j.best === 88 && eA.j.rank === 2 && eA.j.total === 2, JSON.stringify(eA.j));
+  const mb = await call('/board?b=lesson:stall&p=all&cs=' + B);
+  ok('merged board: each player once, total counts them once', mb.j.rows.length === 2 && mb.j.total === 2 && new Set(mb.j.rows.map(r => r.cs)).size === 2, JSON.stringify(mb.j.rows));
+  ok('merged board: best row per player with its mode', mb.j.rows[0].cs === B && mb.j.rows[0].score === 95 && mb.j.rows[0].mode === 'easy'
+    && mb.j.rows[1].cs === A && mb.j.rows[1].score === 88 && mb.j.rows[1].mode === 'hard', JSON.stringify(mb.j.rows));
+  ok('merged board: my row is my best across modes', mb.j.me && mb.j.me.r === 1 && mb.j.me.score === 95 && mb.j.me.mode === 'easy', JSON.stringify(mb.j.me));
+  ok('merged board: the m parameter is ignored', JSON.stringify((await call('/board?b=lesson:stall&m=easy&p=all')).j.rows) === JSON.stringify((await call('/board?b=lesson:stall&m=hard&p=all')).j.rows) && mb.j.mode === 'all');
+  ok('merged board: today tab merges too', (await call('/board?b=lesson:stall&p=today')).j.rows.length === 2);
+  ok('scores stay stored per mode', sql(`SELECT mode FROM scores WHERE callsign IN ('${A}','${B}') AND board='lesson:stall' ORDER BY mode`).map(r => r.mode).join() === 'easy,easy,hard,hard');
   const d1 = await tokenFor(you, 'daily');
   ok('first daily token is official', !!d1.token && !d1.practice);
   const d2 = await tokenFor(you, 'daily');
@@ -202,7 +218,7 @@ async function main() {
   for (const want of ['no valid run token', 'token already used', 'score 101 outside 0 to 100', 'ghost path missing', 'second official daily attempt', 'profanity: F4GG0T', 'reserved callsign without the secret', 'profanity on rename: SH1THEAD'])
     ok('flagged: ' + want, reasons.includes(want));
   ok('scores table has the callsign, mode, run time, aircraft, weather, token',
-    sql(`SELECT * FROM scores WHERE callsign='${A}' AND board='lesson:stall'`).every(r => r.mode === 'hard' && r.secs === 3.5 && r.ac === 'cessna' && r.wx === 'day' && r.token));
+    sql(`SELECT * FROM scores WHERE callsign='${A}' AND board='lesson:stall' AND mode='hard'`).every(r => r.mode === 'hard' && r.secs === 3.5 && r.ac === 'cessna' && r.wx === 'day' && r.token));
   ok('players table stores only hashes', sql(`SELECT key_hash, rec_hash FROM players WHERE callsign='${A}'`).every(r => r.key_hash !== nk && !r.rec_hash.includes(' ')));
 
   if (LIVE) {

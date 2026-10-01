@@ -37,8 +37,9 @@ GROUPS = [
     ('warn',    '#warn.on',                        False),
     ('ticker',  '#tk.on .tkP',                     False),  # the now playing pill (its 44 pt button is in 'button')
     ('jump',    '#jumpLt.on',                      False),
+    ('sidecfg', '#sideToast.on',                   False),  # the flap / gear / trim / autopilot readout beside the throttle
 ]
-COVERS = ('hudcard', 'radio', 'mission', 'sixpack', 'ticker', 'warn', 'jump')
+COVERS = ('hudcard', 'radio', 'mission', 'sixpack', 'ticker', 'warn', 'jump', 'sidecfg')
 
 COLLECT = """(groups)=>{
   const out=[];
@@ -98,14 +99,14 @@ async def audit(pg, label, w, h, only=None):
     if not (bad or small or off or cover):
         print(f'  ok   {tag}  ({len(hits)} controls, {len(els)} boxes)' + (('  ' + ','.join(e['id'] for e in hits)) if '-v' in sys.argv else ''))
 
-TOP = """(m)=>{const K=window.__kgeu;K.tickerForce('A Much Longer Song Title That Will Not Fit In The Pill');
+TOP = """(m)=>{const K=window.__kgeu;K.tickerForce('A Much Longer Song Title That Will Not Fit In The Pill');K.sideCfg('AUTOLAND COMPLETE','your airplane');
   const a=document.getElementById('atc');a.innerHTML='<span class="tx"><b>Glendale Tower</b>Cessna 3 Kilo Echo, Glendale Tower, wind 050 at 5, runway 1, cleared to land, traffic a Cherokee on the go</span><span class="plain">Tower says: you can land on runway 1, a Cherokee is going around</span>';
   a.classList.add('on','hasPlain');
   const e0=document.getElementById('miss');if(!window.__tkWas)window.__tkWas=[e0.classList.contains('on'),document.body.classList.contains('missOn'),document.getElementById('missT').textContent,document.getElementById('missS').textContent];
   if(m&&!K.MISS.on){const e=document.getElementById('miss');document.getElementById('missT').textContent='AIRDROP  4.2 nm to the DZ, turn left to 040 and hold 1,500 ft';
     document.getElementById('missS').textContent='DROP is live. Put the bundle on the orange bullseye.';e.classList.add('on');}}"""
 TK = ('ticker:', ':tk')   # failures that involve the ticker or its music controls
-UNTOP = """()=>{window.__kgeu.tickerForce(null);document.getElementById('atc').classList.remove('on');
+UNTOP = """()=>{window.__kgeu.tickerForce(null);document.getElementById('atc').classList.remove('on');document.getElementById('sideToast').classList.remove('on');
   const w=window.__tkWas,e=document.getElementById('miss');window.__tkWas=null;e.classList.toggle('on',w[0]);document.body.classList.toggle('missOn',w[1]);document.getElementById('missT').textContent=w[2];document.getElementById('missS').textContent=w[3];}"""
 
 # ---- the top area (item 16) ----
@@ -130,7 +131,7 @@ TOPSET = """([g,o])=>{const K=window.__kgeu,$=id=>document.getElementById(id);K.
   const ts=$('toast');keep(ts);ts.textContent='Now playing: Pocket Sim Original \u2014 Main Theme';ts.classList.add('on');
   const j=$('jumpLt');if(o.jump&&!j.classList.contains('on')){keep(j.lastChild);j.lastChild.textContent='ONE MINUTE';u.push([j,j.className,null]);j.classList.add('on');}
   if(o.lesson){const l=$('lesson');u.push([l,l.className,null]);for(const [id,t] of [['lesT','Lesson 4'],['lesI','Hold 70 kt down final, nose on the numbers'],['lesM','Speed 72 kt, on the glide path']]){keep($(id));$(id).textContent=t;}
-    l.classList.add('on');}
+    l.classList.add('on');K.sideCfg('AUTOLAND COMPLETE','your airplane');}   // the readout places itself when it fires, so with the panel up
   const out=[];
   for(const [kind,sel,top] of g){
     document.querySelectorAll(sel).forEach(el=>{

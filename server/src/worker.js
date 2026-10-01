@@ -332,7 +332,8 @@ async function submit(c) {
   }
 
   const cmp = bd.dir > 0 ? '>' : '<', agg = bd.dir > 0 ? 'MAX' : 'MIN';
-  const prev = await c.env.DB.prepare(`SELECT ${agg}(score) s FROM scores WHERE board=? AND mode=? AND player_id=?`).bind(b, mode, p.id).first();
+  // the boards merge Easy and Hard for display, so a personal best is against both modes
+  const prev = await c.env.DB.prepare(`SELECT ${agg}(score) s FROM scores WHERE board=? AND player_id=?`).bind(b, p.id).first();
   const pb = prev.s === null || (bd.dir > 0 ? score > prev.s : score < prev.s);
 
   const ins = await c.env.DB.batch([
@@ -343,7 +344,7 @@ async function submit(c) {
   if (!ins[0].meta.changes) return reject(c, 'token already used');
   const sid = ins[1].meta.last_row_id;
 
-  const rk = await rankFor(c, b, bd, mode, 0, pb ? score : prev.s);
+  const rk = await rankFor(c, b, 0, pb ? score : prev.s);
   const top10 = pb && rk.rank <= 10;
   const gain = xpFor(bd, score, mode, pb, top10);
   await c.env.DB.prepare('UPDATE players SET xp=xp+? WHERE id=?').bind(gain, p.id).run();
@@ -357,57 +358,63 @@ async function submit(c) {
     await c.env.DB.prepare(`DELETE FROM ghosts WHERE board=? AND mode=? AND score_id NOT IN (SELECT score_id FROM ghosts WHERE board=? AND mode=? ORDER BY score ${bd.dir > 0 ? 'DESC' : 'ASC'}, created ASC LIMIT 10)`)
       .bind(b, mode, b, mode).run();
   }
-  const today = await rankFor(c, b, bd, mode, dayStart(c.now), null, p.id);
+  const today = await rankFor(c, b, dayStart(c.now), null, p.id);
   return json({ ok: true, id: sid, board: b, mode, score, pb, best: pb ? score : prev.s, rank: rk.rank, total: rk.total,
     top10, today: today, xp: p.xp + gain, gain, rankName: rankOf(p.xp + gain).name });
 }
 
-// rank of a best score among every player's best on this board since `since`
-async function rankFor(c, b, bd, mode, since, best, pid) {
-  const agg = bd.dir > 0 ? 'MAX' : 'MIN', cmp = bd.dir > 0 ? '>' : '<';
+// rank of a best score among every player's best on this board since `since`, Easy and Hard
+// together (each player's single best run across both modes counts once)
+async function rankFor(c, b, since, best, pid) {
+  const bd = boardOf(b), agg = bd.dir > 0 ? 'MAX' : 'MIN', cmp = bd.dir > 0 ? '>' : '<';
+  let mode = null;
   if (best === null || best === undefined) {
     if (!pid) return { rank: 0, total: 0 };
-    const r = await c.env.DB.prepare(`SELECT ${agg}(score) s FROM scores WHERE board=? AND mode=? AND created>=? AND player_id=?`).bind(b, mode, since, pid).first();
-    best = r.s;
+    // SQLite returns `mode` from the row that holds the MAX or MIN
+    const r = await c.env.DB.prepare(`SELECT ${agg}(score) s, mode FROM scores WHERE board=? AND created>=? AND player_id=?`).bind(b, since, pid).first();
+    best = r.s; mode = r.mode;
   }
-  const r = await c.env.DB.prepare(`WITH bb AS (SELECT player_id, ${agg}(score) s FROM scores WHERE board=? AND mode=? AND created>=? GROUP BY player_id)
-    SELECT (SELECT COUNT(*) FROM bb WHERE s ${cmp} ?) + 1 AS rank, (SELECT COUNT(*) FROM bb) AS total`).bind(b, mode, since, best === null ? 0 : best).first();
-  return { rank: best === null ? 0 : r.rank, total: r.total, best };
+  const r = await c.env.DB.prepare(`WITH bb AS (SELECT player_id, ${agg}(score) s FROM scores WHERE board=? AND created>=? GROUP BY player_id)
+    SELECT (SELECT COUNT(*) FROM bb WHERE s ${cmp} ?) + 1 AS rank, (SELECT COUNT(*) FROM bb) AS total`).bind(b, since, best === null ? 0 : best).first();
+  return { rank: best === null ? 0 : r.rank, total: r.total, best, mode };
 }
 
 // ---------------------------------------------------------------- reads
+// one list per board: each player's best run across Easy and Hard, the row carries its mode.
+// Submission, tokens and checks stay per mode; only the display merges. `m` is ignored.
 async function board(c) {
-  const q = c.url.searchParams, b = q.get('b') || '', bd = boardOf(b), mode = q.get('m') === 'easy' ? 'easy' : 'hard';
+  const q = c.url.searchParams, b = q.get('b') || '', bd = boardOf(b);
   if (!bd) return json({ error: 'unknown board' }, 404);
   const per = q.get('p') === 'today' ? 'today' : q.get('p') === 'week' ? 'week' : 'all';
   const since = per === 'today' ? dayStart(c.now) : per === 'week' ? weekStart(c.now) : 0;
   const agg = bd.dir > 0 ? 'MAX' : 'MIN', ord = bd.dir > 0 ? 'DESC' : 'ASC';
   // SQLite returns the other columns from the row that holds the MAX or MIN
-  const rows = (await c.env.DB.prepare(`SELECT s.player_id, ${agg}(s.score) score, s.secs, s.ac, s.created, p.callsign cs, p.xp, p.creator
-      FROM scores s JOIN players p ON p.id=s.player_id WHERE s.board=? AND s.mode=? AND s.created>=? AND p.banned=0
-      GROUP BY s.player_id ORDER BY score ${ord}, s.created ASC LIMIT 50`).bind(b, mode, since).all()).results;
+  const rows = (await c.env.DB.prepare(`SELECT s.player_id, ${agg}(s.score) score, s.secs, s.ac, s.mode, s.created, p.callsign cs, p.xp, p.creator
+      FROM scores s JOIN players p ON p.id=s.player_id WHERE s.board=? AND s.created>=? AND p.banned=0
+      GROUP BY s.player_id ORDER BY score ${ord}, s.created ASC LIMIT 50`).bind(b, since).all()).results;
   let r = 0, last = null;
   const out = rows.map((x, i) => { if (x.score !== last) { r = i + 1; last = x.score; }
-    return { r, cs: x.cs, score: x.score, secs: x.secs, ac: x.ac, xp: x.xp, rank: rankOf(x.xp).name, creator: !!x.creator, when: x.created }; });
-  const cnt = await c.env.DB.prepare('SELECT COUNT(DISTINCT player_id) n FROM scores WHERE board=? AND mode=? AND created>=?').bind(b, mode, since).first();
+    return { r, cs: x.cs, score: x.score, secs: x.secs, ac: x.ac, mode: x.mode === 'easy' ? 'easy' : 'hard', xp: x.xp, rank: rankOf(x.xp).name, creator: !!x.creator, when: x.created }; });
+  const cnt = await c.env.DB.prepare('SELECT COUNT(DISTINCT player_id) n FROM scores WHERE board=? AND created>=?').bind(b, since).first();
   let meRow = null;
   const cs = q.get('cs') ? String(q.get('cs')).toUpperCase() : '';
   if (cs) {
     const p = await c.env.DB.prepare('SELECT id,callsign,xp,creator FROM players WHERE callsign=?').bind(cs).first();
     if (p) {
-      const rk = await rankFor(c, b, bd, mode, since, null, p.id);
-      if (rk.best !== null && rk.best !== undefined) meRow = { r: rk.rank, cs: p.callsign, score: rk.best, xp: p.xp, rank: rankOf(p.xp).name, creator: !!p.creator };
+      const rk = await rankFor(c, b, since, null, p.id);
+      if (rk.best !== null && rk.best !== undefined) meRow = { r: rk.rank, cs: p.callsign, score: rk.best, mode: rk.mode === 'easy' ? 'easy' : 'hard', xp: p.xp, rank: rankOf(p.xp).name, creator: !!p.creator };
     }
   }
-  const gh = bd.ghost ? await c.env.DB.prepare(`SELECT g.score, g.ac, p.callsign cs FROM ghosts g JOIN players p ON p.id=g.player_id WHERE g.board=? AND g.mode=? ORDER BY g.score ${ord} LIMIT 1`).bind(b, mode).first() : null;
-  return json({ board: b, mode, period: per, dir: bd.dir, total: cnt.n, rows: out, me: meRow, ghost: gh || null, now: c.now, day: dayOf(c.now) });
+  const gh = bd.ghost ? await c.env.DB.prepare(`SELECT g.score, g.ac, p.callsign cs FROM ghosts g JOIN players p ON p.id=g.player_id WHERE g.board=? ORDER BY g.score ${ord}, g.created ASC LIMIT 1`).bind(b).first() : null;
+  return json({ board: b, mode: 'all', period: per, dir: bd.dir, total: cnt.n, rows: out, me: meRow, ghost: gh || null, now: c.now, day: dayOf(c.now) });
 }
 
+// the best ghost on the board, Easy or Hard (`m` is ignored)
 async function ghost(c) {
-  const q = c.url.searchParams, b = q.get('b') || '', bd = boardOf(b), mode = q.get('m') === 'easy' ? 'easy' : 'hard';
+  const q = c.url.searchParams, b = q.get('b') || '', bd = boardOf(b);
   if (!bd || !bd.ghost) return json({ error: 'no ghosts on this board' }, 404);
   const ord = bd.dir > 0 ? 'DESC' : 'ASC';
-  const g = await c.env.DB.prepare(`SELECT g.score, g.secs, g.ac, g.path, p.callsign cs, p.creator FROM ghosts g JOIN players p ON p.id=g.player_id WHERE g.board=? AND g.mode=? ORDER BY g.score ${ord}, g.created ASC LIMIT 1`).bind(b, mode).first();
+  const g = await c.env.DB.prepare(`SELECT g.score, g.secs, g.ac, g.path, p.callsign cs, p.creator FROM ghosts g JOIN players p ON p.id=g.player_id WHERE g.board=? ORDER BY g.score ${ord}, g.created ASC LIMIT 1`).bind(b).first();
   if (!g) return json({ ghost: null });
   return json({ ghost: { cs: g.cs, creator: !!g.creator, score: g.score, secs: g.secs, ac: g.ac, path: JSON.parse(g.path) } });
 }

@@ -38,7 +38,7 @@ async def main():
         # the overlay
         hud = await pg.evaluate("()=>['shTL','shTR','shBL','shBR'].map(i=>document.getElementById(i).textContent)")
         ok('overlay: mode and zoom top left', hud[0].startswith('DAY TV') and 'x1' in hud[0], hud[0])
-        ok('overlay: AZ and EL top right', hud[1].startswith('AZ ') and ' EL ' in hud[1], hud[1])
+        ok('overlay: camera bearing, side of the nose and EL top right', hud[1].startswith('CAM ') and '°T  ' in hud[1] and ' EL ' in hud[1], hud[1])
         ok('overlay: ALT and HDG bottom left', hud[2].startswith('ALT ') and 'HDG ' in hud[2], hud[2])
         ok('overlay: AUTOPILOT tag bottom right', hud[3] == 'AUTOPILOT', hud[3])
         ok('flight cards step aside in the ball view', not await pg.is_visible('#hud'))
@@ -108,8 +108,8 @@ async def main():
           z.dispatchEvent(new PointerEvent('pointermove',{pointerId:9,clientX:x+40,clientY:y-30,bubbles:true}));}""", box)
         await pg.wait_for_timeout(250)
         ok('moving the stick disconnects the autopilot', not (await sensor(pg))['ap'])
-        tt = await pg.inner_text('#toast')
-        ok('toast says AUTOPILOT OFF', 'AUTOPILOT OFF' in tt, repr(tt))
+        tt = await pg.inner_text('#sideToast')   # phone2 item 6: autopilot changes read beside the throttle, never in the centre
+        ok('the side readout says AUTOPILOT OFF', 'AUTOPILOT OFF' in tt, repr(tt))
         await pg.evaluate("()=>document.getElementById('stickZone').dispatchEvent(new PointerEvent('pointerup',{pointerId:9,bubbles:true}))")
 
         # the MQ-9B gets the same, and the orbit label on AUTO

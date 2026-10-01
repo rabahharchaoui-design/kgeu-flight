@@ -47,7 +47,7 @@ async def main():
             bt = await pg.evaluate("()=>document.getElementById('lbBadge').innerText.replace(/\\s+/g,' ')")
             ok('live run ranked with its run token', bt.startswith('#'), bt)
             await pg.screenshot(path=os.path.join(SHOTS, '28_live_ranked_run.png'))
-            await pg.evaluate(f"()=>{{{K}.openMenu();{K}.LB.lbOpen('arc:landing1','hard')}}"); await pg.wait_for_timeout(500)
+            await pg.evaluate(f"()=>{{{K}.openMenu();{K}.LB.lbOpen('arc:landing1')}}"); await pg.wait_for_timeout(500)
             await pg.click('[data-lbp=today]'); await pg.wait_for_timeout(2500)
             rows = await pg.evaluate("()=>document.getElementById('lbRowsIn').innerText")
             ok('the live board lists the run', CS in rows, rows[:200])

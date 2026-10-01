@@ -58,8 +58,9 @@ async def main():
         pg = await page(b, url, storage=seed)
         await pg.evaluate("(l)=>window.__kgeu.musicLoad(l)", TONES)
         await pg.touchscreen.tap(330, 8)
-        s = await wait_for(pg, lambda s: s['playing'])
-        ok('home: music plays after the first tap', s['playing'] is not None, s['playing'])
+        s = await wait_for(pg, lambda s: s['allowed'])
+        await pg.wait_for_timeout(1200); s = await m(pg)
+        ok('home: the first tap opens the gate, the menu stays silent', s['allowed'] and s['playing'] is None, s['playing'])
 
         # free flight, music in free flight off: it fades out
         await pg.evaluate("()=>{const K=window.__kgeu;K.pick('cessna');K.pickBase('kgeu');K.start('runway')}")
@@ -126,7 +127,7 @@ async def main():
         await background(pg, block_resume=True)
         s = await m(pg)
         ok('iOS-like: still suspended with no gesture', s['ctx'] != 'running', s['ctx'])
-        await pg.touchscreen.tap(330, 8)
+        await finger(pg, '#pMusTitle')   # the music title line on the pause sheet: a gesture that presses nothing (the backdrop would resume)
         s = await wait_for(pg, lambda s: s['ctx'] == 'running' and s['playing'] and s['gain'] > 0.3, 4000)
         ok('iOS-like: one tap resumes the context and the music', s['ctx'] == 'running' and s['playing'] and s['gain'] > 0.3, (s['ctx'], s['playing'], s['gain']))
 

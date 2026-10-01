@@ -37,7 +37,7 @@ async def main():
             pg = await page(b, url, vp=vp, storage={'kgeuOnboard': 'rookie', 'kgeuTut': '1'})
             await pg.evaluate(f"()=>{K}.openFly()"); await pg.wait_for_timeout(400)
             c = await pg.evaluate("""()=>[...document.querySelectorAll('#sFly [data-pos]')].map(b=>{const r=b.getBoundingClientRect();return {p:b.dataset.pos,t:b.textContent.trim(),h:r.height,w:r.width,x:r.x}})""")
-            ok(f'{W}: fly screen offers Runway, Ramp, 1 mi final, 3 mi final', [x['t'] for x in c] == ['Runway', 'Ramp', '1 mi final', '3 mi final'], [x['t'] for x in c])
+            ok(f'{W}: fly screen offers Runway, Ramp (free flight), 3 mi final, 1 mi final (segments)', [x['t'] for x in c] == ['Runway', 'Ramp', '3 mi final', '1 mi final'], [x['t'] for x in c])
             ok(f'{W}: every start chip is a 44 px target that fits', all(x['h'] >= 44 and x['w'] >= 56 for x in c), [(x['t'], round(x['w'])) for x in c])
             fit = await pg.evaluate("()=>{const s=document.getElementById('sFly'),g=document.getElementById('bGo').getBoundingClientRect();return s.scrollHeight<=s.clientHeight+1&&g.right<=innerWidth&&g.bottom<=innerHeight}")
             ok(f'{W}: fly screen still fits, GO on screen', fit)
@@ -54,7 +54,7 @@ async def main():
             ok(f'{W}: GO starts on 1 mile final', g['spawn'] == 'final1' and 1700 < g['along'] < 2000, g)
             await pg.evaluate(f"()=>{K}.togglePause()"); await pg.wait_for_timeout(500)
             c = await pg.evaluate("""()=>[...document.querySelectorAll('#pauseOv [data-pos]')].map(b=>{const r=b.getBoundingClientRect();return {t:b.textContent.trim(),h:r.height,w:r.width,sel:b.classList.contains('sel')}})""")
-            ok(f'{W}: pause sheet offers it too, selected', [x['t'] for x in c] == ['Runway', 'Ramp', '1 mi final', '3 mi final'] and c[2]['sel'] and all(x['h'] >= 44 for x in c), c)
+            ok(f'{W}: pause sheet offers it too, selected', [x['t'] for x in c] == ['Runway', 'Ramp', '3 mi final', '1 mi final'] and c[3]['sel'] and all(x['h'] >= 44 for x in c), c)
             if W == 667: await shot(pg, 'pause_667')
             await pg.evaluate(f"()=>{K}.stepFrame(1/30,false,true)")
             await finger(pg, '#pApply'); await pg.wait_for_timeout(800)
@@ -110,8 +110,11 @@ async def main():
         for _ in range(80):
             await pg.evaluate(STEP, 150)
             if await pg.evaluate(f"()=>{K}.ARC.done||{K}.state().crashed"): break
-        await pg.wait_for_timeout(3500)
-        await pg.wait_for_timeout(3000)
+        # the results card comes once the aircraft has stopped
+        for _ in range(40):
+            await pg.evaluate(STEP, 60)
+            if await pg.evaluate("()=>document.getElementById('arcOv').classList.contains('on')"): break
+        await pg.wait_for_timeout(800)
         best = await pg.evaluate(f"()=>{{const s=JSON.parse(localStorage.getItem('kgeuScores')||'{{}}').best||{{}};return {{one:s['arc:landing1']||null,five:s['arc:landing']||null,title:document.getElementById('aTitle').textContent}}}}")
         ok('the 1 mile challenge scores under its own best, apart from the 5 mile one', best['one'] is not None and best['five'] is None, best)
         await shot(pg, 'arcade_result')
