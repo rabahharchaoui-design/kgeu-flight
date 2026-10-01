@@ -132,7 +132,7 @@ async def main():
 
             # change aircraft, base, start: picked in 2 taps, the button then reads Apply and flies them
             for name, sel, chk, fly_chk in (
-                ('change aircraft', '#carPause .arrow.r', f"()=>{K}.prefs().type==='alpha'", f"()=>{K}.state().type==='alpha'"),
+                ('change aircraft', '#pAc .pick[data-t="alpha"]', f"()=>{K}.prefs().type==='alpha'", f"()=>{K}.state().type==='alpha'"),
                 ('change base', '#pauseOv .pick[data-b="luke"]', f"()=>{K}.prefs().base==='luke'", f"()=>{K}.state().base==='luke'"),
                 ('change start', '#pauseOv .pick[data-pos="ramp"]', f"()=>{K}.prefs().pos==='ramp'", f"()=>{K}.state().mode==='ramp'"),
                 ('change time of day (live)', '#pauseOv .pick[data-tod="night"]', f"()=>{K}.TOD().id==='night'", None),

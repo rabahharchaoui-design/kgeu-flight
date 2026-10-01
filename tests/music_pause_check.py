@@ -127,7 +127,7 @@ async def main():
         await background(pg, block_resume=True)
         s = await m(pg)
         ok('iOS-like: still suspended with no gesture', s['ctx'] != 'running', s['ctx'])
-        await pg.touchscreen.tap(330, 8)
+        await finger(pg, '#pMusTitle')   # the music title line on the pause sheet: a gesture that presses nothing (the backdrop would resume)
         s = await wait_for(pg, lambda s: s['ctx'] == 'running' and s['playing'] and s['gain'] > 0.3, 4000)
         ok('iOS-like: one tap resumes the context and the music', s['ctx'] == 'running' and s['playing'] and s['gain'] > 0.3, (s['ctx'], s['playing'], s['gain']))
 
