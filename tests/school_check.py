@@ -88,7 +88,7 @@ async def main():
         ok('Skip ends it, flight carries on', await pg.evaluate(f"()=>{K}.LES.on===null&&!{K}.paused()"))
         await pg.evaluate(f"()=>{{{K}.openMenu('sSet')}}"); await pg.wait_for_timeout(200)
         await finger(pg, '#bReplay'); await pg.wait_for_timeout(1000)
-        ok('Replay first flight in Settings starts lesson 1', await pg.evaluate(f"()=>{K}.LES.on") == 'first')
+        ok('Replay lesson 1 in Settings starts lesson 1', await pg.evaluate(f"()=>{K}.LES.on") == 'first')
         await pg.context.close()
         await b.close()
     sys.exit(ok.done('school_check'))
