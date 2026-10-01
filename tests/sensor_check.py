@@ -108,8 +108,8 @@ async def main():
           z.dispatchEvent(new PointerEvent('pointermove',{pointerId:9,clientX:x+40,clientY:y-30,bubbles:true}));}""", box)
         await pg.wait_for_timeout(250)
         ok('moving the stick disconnects the autopilot', not (await sensor(pg))['ap'])
-        tt = await pg.inner_text('#toast')
-        ok('toast says AUTOPILOT OFF', 'AUTOPILOT OFF' in tt, repr(tt))
+        tt = await pg.inner_text('#sideToast')   # phone2 item 6: autopilot changes read beside the throttle, never in the centre
+        ok('the side readout says AUTOPILOT OFF', 'AUTOPILOT OFF' in tt, repr(tt))
         await pg.evaluate("()=>document.getElementById('stickZone').dispatchEvent(new PointerEvent('pointerup',{pointerId:9,bubbles:true}))")
 
         # the MQ-9B gets the same, and the orbit label on AUTO
