@@ -180,6 +180,20 @@ body.touch #toast{ font-size:15px; display:-webkit-box; -webkit-box-orient:verti
 #sideToast{ position:absolute; right:0; top:0; z-index:5; pointer-events:none; opacity:0; transition:opacity .45s; white-space:pre-line; text-align:right;
   font:800 14px/1.2 var(--font); letter-spacing:.06em; color:#fff; background:rgba(12,16,22,.84); border:1.5px solid rgba(255,255,255,.16); border-radius:10px; padding:6px 10px; text-shadow:0 1px 3px rgba(0,0,0,.7); max-width:150px; }
 #sideToast.on{ opacity:1; transition:opacity .08s; }
+/* TCAS: the traffic panel left of the flight buttons at the bottom (above the throttle in portrait), the RA
+   bands on the VS card (green: commanded, red: forbidden) and the Easy arrow in the middle */
+#uiroot > #tcas{ position:absolute; right:calc(var(--padR) + var(--col) + 10px + 60px + 10px); bottom:var(--padB); width:110px; height:110px; display:none; pointer-events:none; }
+body.dock2 #uiroot > #tcas{ right:calc(var(--padR) + var(--col) + 10px + 128px + 10px); }
+#uiroot > #tcas.on{ display:block; }
+#hud .card.raClimb{ box-shadow:inset 0 3px 0 #2ee66b, inset 0 -3px 0 #ff3b30; } #hud .card.raDesc{ box-shadow:inset 0 3px 0 #ff3b30, inset 0 -3px 0 #2ee66b; }
+#hVs.raClimb, #hVs.raDesc{ color:#7dffa6; }
+#uiroot > #tcasRA{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:none; flex-direction:column; align-items:center; gap:2px; pointer-events:none; z-index:5; }
+#uiroot > #tcasRA.on{ display:flex; animation:tcasP .8s ease-in-out infinite alternate; }
+#tcasRA svg{ width:80px; height:80px; filter:drop-shadow(0 2px 6px rgba(0,0,0,.6)); }
+#tcasRA.dn svg{ transform:rotate(180deg); }
+#tcasRA b{ font:800 22px var(--font); letter-spacing:.06em; color:#2ee66b; text-shadow:0 0 4px #000, 0 2px 6px rgba(0,0,0,.8); }
+@keyframes tcasP{ from{ opacity:1; } to{ opacity:.45; } }
+@media (prefers-reduced-motion: reduce){ #uiroot > #tcasRA.on{ animation:none; } }
 #sideToast small{ display:block; font-size:11px; font-weight:600; letter-spacing:.03em; color:var(--soft); text-transform:none; }
 
 /* ---------- mini map, top left ---------- */
@@ -910,6 +924,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
     top:calc(var(--padT) + max(var(--map), var(--hudH)) + 8px); }
   #thrCol, #uiroot > #dock, #stickZone, #hDest{ top:var(--ctlTop); }
   body.hasDest #stickZone{ top:calc(var(--ctlTop) + 54px); }
+  #uiroot > #tcas, body.dock2 #uiroot > #tcas{ right:var(--padR); bottom:calc(var(--vvh) - var(--ctlTop) + 8px); }
   /* the lesson panel sits on the top edge of the controls, full width, growing up */
   body.touch #lesson{ bottom:calc(var(--vvh) - var(--ctlTop) + 8px); max-width:calc(100% - var(--padL) - var(--padR)); }
 }
@@ -976,6 +991,8 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   <div id="crashTop" aria-live="assertive"></div>
   <div id="crash" role="dialog" aria-label="Crashed"><div class="ccTxt"><b>CRASHED</b><span id="crashWhy"></span></div><div class="ccBtns"><button class="primary" id="cRetry">RETRY</button><button id="cMenu">MENU</button></div></div>
   <div id="sideToast" role="status" aria-live="polite"></div>
+  <canvas id="tcas" width="220" height="220" aria-hidden="true"></canvas>
+  <div id="tcasRA" aria-live="assertive"><svg viewBox="0 0 80 80" aria-hidden="true"><path d="M40 4 L74 42 H53 V76 H27 V42 H6 Z" fill="#2ee66b" stroke="#06210f" stroke-width="3" stroke-linejoin="round"/></svg><b>CLIMB NOW</b></div>
   <div id="sensorHud"><div class="ch chL"></div><div class="ch chR"></div><div class="ch chT"></div><div class="ch chB"></div>
     <div class="bk a"></div><div class="bk b"></div><div class="bk c"></div><div class="bk d"></div>
     <div class="tx" id="shTL"></div><div class="tx" id="shTR"></div><div class="tx" id="shBL"></div><div class="tx" id="shBR"></div><div class="tx" id="shMid"></div><div id="tgtMarks"></div></div>
@@ -1070,7 +1087,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
    </div>
    <div class="setCol">
     <div class="srow"><span>Stick</span><div class="chips"><label class="sens"><input type="range" class="oSens" min="0" max="4" step="1" value="2" aria-label="Stick sensitivity"><b class="oSensV">Medium</b></label></div></div>
-    <div class="srow"><span>Pitch</span><div class="chips"><button class="tog oInv">Invert pitch: Off</button></div></div>
+    <div class="srow"><span>Flying</span><div class="chips"><button class="tog oInv">Invert pitch: Off</button><button class="tog oTcas" id="oTcas">TCAS: On</button></div></div>
     <div class="srow"><span>Sound</span><div class="chips"><button class="tog oSound" id="oSound">Sound: On</button><button class="tog oHap" id="oHap">Haptics: On</button></div></div>
     <div class="srow"><span>Help</span><div class="chips" id="helpRow"><button id="bHelp">Controls</button><button id="bReplay">Replay lesson 1</button></div></div>
     <div class="srow"><span></span><div class="chips"><button id="bCredits">Music credits</button></div></div>
@@ -6322,7 +6339,12 @@ function tfcStep(o,dt){
     case 'hover':
       vT=0;hT=o.hdg+0.15;altT=Math.max(o.aH,gh+120);o.timer-=dt;if(o.timer<=0){o.state='cruise';tfcHeliTgt(o);}
       break;
+    case 'script':   // tcasConflict: straight and level at its own speed and height
+      vT=o.vS;altT=o.aS;o.timer+=dt;if(o.timer>600)o.state='gone';
+      break;
   }
+  // a TCAS resolution advisory against the player: 1,500 fpm the other way while it lasts (tcasRAStart / tcasRAEnd)
+  if(o.tcasVs!=null&&!o.onGround)vsT=o.tcasVs;
   // heading: a turn rate from the error, bank from the turn rate, capped per type
   if(rate===null){const dh=wrapPi(hT-o.hdg),rm=o.onGround?Math.min(0.5,Math.max(0.15,o.gs/25))
       :TFC_G*Math.tan((o.state==='final'||o.state==='base'?T.bank:T.bn)*TFC_D2R)/Math.max(o.gs,15);
@@ -6367,13 +6389,15 @@ function tfcAdd(plan,M,init){
 function tfcDrop(o){o.m.busy=false;o.m.g.visible=false;tfcFree(o);let i=TRAFFIC.indexOf(o);if(i>=0)TRAFFIC.splice(i,1);i=TFC.list.indexOf(o);if(i>=0)TFC.list.splice(i,1);}
 const tfcTake=type=>{const p=TFC.pool[type];return p?p.filter(M=>!M.busy):[];};
 const tfcRnd=(a,b)=>a+Math.random()*(b-a),TFC_SEP={airliner:4000,cessna:1200,f16:2500,heli:1500};
-// opts (tests): state, end (index into plan.ends), dist (m before the threshold), alt (m above the field),
+// opts (tests): state ('script': x, z, y world, hdg rad, gs m/s for tcasConflict), end (index into plan.ends), dist (m before the threshold), alt (m above the field),
 // wait (s parked); force skips the bubble and 1 km rules. mid: the first population, spread through the cycle.
 function tfcSpawnPlan(plan,opts,mid){
   opts=opts||{};const T=TFC_T[plan.type],forced=!!opts.force,free=tfcTake(plan.type),sep=TFC_SEP[plan.type];
   // airborne spawns also keep clear of every other aircraft (the apron spots are exclusive already)
   const ok=(x,z,gnd)=>forced||(tfcOK(x,z)&&(gnd||TFC.list.every(q=>Math.hypot(q.pos.x-x,q.pos.z-z)>sep)));
   if(!free.length)return null;
+  if(opts.state==='script')   // tcasConflict: anywhere, any height (world y), straight and level
+    return tfcAdd(plan,free[0],{pos:new V3(opts.x,0,opts.z),alt:opts.y,hdg:opts.hdg||0,gs:opts.gs||T.vCruise||50,vS:opts.gs||T.vCruise||50,aS:opts.y,state:'script',forced:true});
   const E=plan.ends.length?(opts.end!=null?plan.ends[opts.end]:tfcWind(plan.ends)):null;
   const fe=E?groundHeight(E.x,E.z)+(plan.surf||0):0,at=(x,z,y)=>({pos:new V3(x,0,z),alt:y});
   if(plan.type==='airliner'){
@@ -6479,6 +6503,193 @@ function updateTraffic(dt){
     if(o.gearLow&&o.m.gear)o.m.gear.visible=_ap.y<160;
     if(o.m.ab)o.m.ab.visible=false;});
 }
+// ================= TCAS =================
+// TCAS II on top of the traffic above. About 4 times a second every airborne aircraft within 20 nm gets
+// a threat level from where it is now and its closest point of approach (CPA), worked out from the
+// relative position and velocity (horizontal CPA, the vertical miss at that time):
+//   0 OTHER       hollow white diamond
+//   1 PROXIMATE   filled white diamond: inside 6 nm and 1,200 ft
+//   2 TRAFFIC     filled amber circle: CPA inside 40 s, missing by under 0.5 nm and 850 ft (or inside that now)
+//   3 RESOLUTION  filled red square: CPA inside 25 s, missing by under 0.3 nm and 600 ft
+// A level holds at least 2 s before it may drop. One RA at a time: a sense (climb or descend, the one with
+// the larger vertical miss, climb if equal), green and red bands on the VS readout and the six pack VSI,
+// the intruder going the other way at 1,500 fpm, until the miss opens up again (and the two are either
+// 600 ft apart or drawing apart) or 40 s pass: "Clear of conflict", and that intruder shows proximate
+// until it moves away. The callouts are dry cockpit clips (c_tcas_*, tools/make_radio.py) through
+// cockpitSay, ahead of the tower, which waits. Off with the traffic (missions, arcade, lessons, the
+// strike) and from Settings; no alerts on the ground, none below 1,000 ft AGL on an approach (within 30
+// degrees of the extended centreline, inside 5 nm), TAs only below 1,000 ft elsewhere. The panel
+// (#tcas) is heading up like the mini map; Easy adds plain English clips and a big arrow (#tcasRA).
+const TC_NM=1852,TC_FT=0.3048,TC_FPM=0.00508,TC_R=20*TC_NM,TC_PROX_D=6*TC_NM,TC_PROX_H=1200*TC_FT;
+const TC_TA={t:40,d:0.5*TC_NM,h:850*TC_FT},TC_RA={t:25,d:0.3*TC_NM,h:600*TC_FT};
+const TC_VS=1500*TC_FPM,TC_HOLD=2,TC_RAMAX=40,TC_REP=8,TC_STEP=0.25,TC_LOW=1000*TC_FT;
+const TC_NAMES=['OTHER','PROXIMATE','TA','RA'],TC_COL=['#ffffff','#ffffff','#ffb020','#ff2d20'];
+const TCAS={on:true,t:0,dT:0,list:[],ra:null,sense:0,raT:0,repT:0,clear:false,inhibit:'off',voiceLog:[],busy:0,src:null,shown:false,
+  el:document.getElementById('tcas'),big:document.getElementById('tcasRA'),ctx:null,dpr:1,band:''};
+try{TCAS.on=localStorage.getItem('kgeuTcas')!=='0';}catch(e){}
+const tcasLive=()=>running&&!MISS.on&&!ARC.on&&!STRIKE.active&&!LES.on;
+// the player on an approach: within 30 degrees of the extended centreline of the runway it is heading for
+// (approachEnd, the destination runway, or any end it is lined up with on a short final), inside 5 nm
+function tcasOnApproach(){
+  const trk=Math.atan2(st.vel.x,-st.vel.z),ends=[approachEnd(),DEST&&DEST.rwy?DEST:null];
+  for(const e of RWY_ENDS)if(e.rwy.code!=='LZ'&&Math.abs(wrapPi(trk-e.h))<1.2)ends.push(e);
+  for(const e of ends){if(!e)continue;
+    const dx=Math.sin(e.h),dz=-Math.cos(e.h),rx=st.pos.x-e.x,rz=st.pos.z-e.z,along=-(rx*dx+rz*dz),lat=Math.abs(rx*dz-rz*dx);
+    if(along>5*TC_NM)continue;
+    if(along>0?Math.atan2(lat,along)<30*TFC_D2R:(along>-e.rwy.len&&lat<150))return true;}
+  return false;
+}
+// where an aircraft is and how it moves: the AI traffic carries both, the curve traffic is sampled
+function tcasKin(o,dt){
+  const c=o.tc||(o.tc={lvl:0,raw:0,held:0,said:false,post:false,cpaT:0,cpaD:0,rel:0,vs:0,div:false,y:0,vy:0,p:null,v:null,live:false});
+  if(o.pos&&o.vel){c.x=o.pos.x;c.y=o.pos.y;c.z=o.pos.z;c.vx=o.vel.x;c.vy=o.vel.y;c.vz=o.vel.z;return c;}
+  const g=o.m.g.position;if(!c.p){c.p=g.clone();c.v=new V3();}else if(dt>0){c.v.subVectors(g,c.p).divideScalar(dt);c.p.copy(g);}
+  c.x=g.x;c.y=g.y;c.z=g.z;c.vx=c.v.x;c.vy=c.v.y;c.vz=c.v.z;return c;
+}
+function tcasStep(dt){
+  TCAS.list.length=0;
+  if(!(TCAS.on&&tcasLive()&&!st.crashed)){TCAS.inhibit='off';if(TCAS.ra)tcasRAEnd(false);for(const o of TRAFFIC)if(o.tc){o.tc.lvl=0;o.tc.live=false;}return;}
+  let cap=3,inh='';
+  if(st.onGround){cap=1;inh='ground';}
+  else if(st.agl<TC_LOW){if(tcasOnApproach()){cap=1;inh='approach';}else{cap=2;inh='low';}}
+  TCAS.inhibit=inh;
+  const px=st.pos.x,py=st.pos.y-GEAR,pz=st.pos.z,vx=st.vel.x,vy=st.vel.y,vz=st.vel.z;
+  let cand=null,newTA=false;
+  for(const o of TRAFFIC){
+    const c=tcasKin(o,dt);c.live=false;
+    if(o.onGround||!o.m.g.visible){c.lvl=0;continue;}
+    const dx=c.x-px,dy=c.y-py,dz=c.z-pz,rvx=c.vx-vx,rvy=c.vy-vy,rvz=c.vz-vz,dH=Math.hypot(dx,dz);
+    if(dH>TC_R){c.lvl=0;continue;}
+    const v2=rvx*rvx+rvz*rvz,rr=dx*rvx+dz*rvz;let t=v2>1e-6?-rr/v2:0;if(t<0)t=0;
+    const mD=Math.hypot(dx+rvx*t,dz+rvz*t),mV=Math.abs(dy+rvy*t);
+    let raw=dH<TC_PROX_D&&Math.abs(dy)<TC_PROX_H?1:0;
+    if(t<=TC_TA.t&&mD<TC_TA.d&&mV<TC_TA.h)raw=2;
+    if(t<=TC_RA.t&&mD<TC_RA.d&&mV<TC_RA.h)raw=3;
+    c.div=rr>0;c.cpaT=t;c.cpaD=mD;c.rel=dy;c.vs=c.vy;c.raw=raw;c.live=true;
+    if(c.post){if(c.div||dH>TC_PROX_D)c.post=false;else raw=Math.min(raw,1);}   // after its RA: proximate until it draws away
+    raw=Math.min(raw,cap);if(TCAS.ra&&TCAS.ra!==o)raw=Math.min(raw,2);
+    c.held+=dt;
+    if(TCAS.ra!==o){
+      if(raw>c.lvl){c.lvl=raw;c.held=0;if(raw>=2&&!c.said){c.said=true;newTA=true;}}
+      else if(raw<c.lvl&&c.held>=TC_HOLD){c.lvl=raw;c.held=0;if(raw<2)c.said=false;}
+      if(c.lvl===3&&!TCAS.ra&&(!cand||t<cand.tc.cpaT))cand=o;}
+    TCAS.list.push(o);
+  }
+  if(TCAS.ra){const o=TCAS.ra,c=o.tc;TCAS.raT+=dt;TCAS.repT-=dt;if(TRAFFIC.indexOf(o)<0)c.live=false;
+    const opening=c.live&&c.raw<3&&(Math.abs(c.rel)>=TC_RA.h||c.div);
+    if(!c.live||cap<3||TCAS.raT>=TC_RAMAX||(TCAS.raT>=TC_HOLD&&opening))tcasRAEnd(true);
+    else if(TCAS.repT<=0){TCAS.repT=TC_REP;   // the callout again, stronger when going the wrong way
+      const wrong=st.vel.y*TCAS.sense<-500*TC_FPM,up=TCAS.sense>0;
+      cockpitSay(rookie()?(up?'c_tcas_e_climb':'c_tcas_e_descend'):wrong?(up?'c_tcas_climb_now':'c_tcas_descend_now'):(up?'c_tcas_climb':'c_tcas_descend'));}}
+  else if(cand)tcasRAStart(cand);
+  else if(newTA){TCAS.clear=false;cockpitSay(rookie()?'c_tcas_e_traffic':'c_tcas_traffic');hapPattern('tdHard');}
+}
+function tcasRAStart(o){
+  const c=o.tc,t=Math.max(c.cpaT,1),yO=st.pos.y-GEAR,vO=st.vel.y;
+  const up=Math.max(vO,TC_VS),dn=Math.min(vO,-TC_VS);
+  const mUp=(yO-c.y)+(up-c.vy)*t,mDn=(c.y-yO)+(c.vy-dn)*t;   // own aircraft above / below it at the CPA
+  // climb unless descending gives clearly more (100 ft)
+  TCAS.sense=mUp>=mDn-30?1:-1;TCAS.ra=o;TCAS.raT=0;TCAS.repT=TC_REP;TCAS.clear=false;c.lvl=3;c.held=0;c.said=true;
+  // the intruder goes the other way (never down into the ground), then resumes what it was doing
+  if(o.plan&&!o.onGround&&!(TCAS.sense>0&&o.agl<300))o.tcasVs=-TCAS.sense*TC_VS;
+  tcasBands(TCAS.sense>0?'up':'dn');
+  if(rookie()){const b=TCAS.big;b.classList.toggle('dn',TCAS.sense<0);b.querySelector('b').textContent=TCAS.sense>0?'CLIMB NOW':'DESCEND NOW';b.classList.add('on');}
+  cockpitSay(rookie()?(TCAS.sense>0?'c_tcas_e_climb':'c_tcas_e_descend'):(TCAS.sense>0?'c_tcas_climb':'c_tcas_descend'));
+  hapPattern('gradeA');
+}
+function tcasRAEnd(voice){
+  const o=TCAS.ra;TCAS.ra=null;TCAS.sense=0;tcasBands('');TCAS.big.classList.remove('on');
+  if(o){if(o.tcasVs!=null){o.tcasVs=null;if(o.state==='script')o.aS=o.alt;}
+    if(o.tc){o.tc.lvl=1;o.tc.held=0;o.tc.post=true;}}
+  if(voice){TCAS.clear=true;cockpitSay(rookie()?'c_tcas_e_clear':'c_tcas_clear');}
+}
+// the green band (commanded, at least 1,500 fpm) and the red band (forbidden) on the VS card
+function tcasBands(s){
+  if(s===TCAS.band)return;TCAS.band=s;const e=$('hVs'),c=e.parentNode;
+  for(const el of [e,c]){el.classList.toggle('raBand',!!s);el.classList.toggle('raClimb',s==='up');el.classList.toggle('raDesc',s==='dn');}
+}
+// one cockpit line at a time, dry into the output (no radio filter, no squelch). The tower queue holds
+// while it plays: a tower line on the air is cut and goes back in the queue.
+function cockpitSay(id){
+  TCAS.voiceLog.push(id);if(TCAS.voiceLog.length>200)TCAS.voiceLog.shift();
+  if(TCAS.src){try{TCAS.src.stop();}catch(e){}TCAS.src=null;}
+  if(VQ.cur)vqCut(true);
+  const b=RADIO.buf[id],d=b?b.duration+0.25:1.8;
+  if(actx&&b&&!muted){try{const s=actx.createBufferSource(),g=actx.createGain();g.gain.value=0.9;s.buffer=b;s.connect(g);g.connect(actx.destination);
+    const n=actx.currentTime;s.start(n+0.02);TCAS.src=s;s.onended=()=>{if(TCAS.src===s)TCAS.src=null;};musicDuck(n,n+d);}catch(e){}}
+  TCAS.busy=VQ.clock+d;
+  if(rookie()&&radioLive()){const T={c_tcas_e_traffic:'Plane nearby!',c_tcas_e_climb:'Plane nearby! Climb now!',c_tcas_e_descend:'Plane nearby! Descend now!',c_tcas_e_clear:'All clear.'}[id];
+    if(T){atcEl.innerHTML='';const tx=document.createElement('span');tx.className='tx';const bb=document.createElement('b');bb.textContent='TCAS';tx.appendChild(bb);
+      tx.appendChild(document.createTextNode(T));atcEl.appendChild(tx);atcEl.classList.remove('hasPlain');atcEl.classList.add('on');atcT=Math.max(atcT,d+1.5);}}
+}
+// the symbol for a level, centred on cx,cy, s about its half size, k the line scale
+function tcasSym(x,cx,cy,lvl,s,k){
+  x.beginPath();
+  if(lvl<=1){x.moveTo(cx,cy-s);x.lineTo(cx+s,cy);x.lineTo(cx,cy+s);x.lineTo(cx-s,cy);x.closePath();}
+  else if(lvl===2)x.arc(cx,cy,s*0.8,0,TAU);
+  else x.rect(cx-s*0.72,cy-s*0.72,s*1.44,s*1.44);
+  x.lineJoin='round';
+  if(lvl===0){x.strokeStyle='rgba(0,0,0,.7)';x.lineWidth=3.2*k;x.stroke();x.strokeStyle='#fff';x.lineWidth=1.4*k;x.stroke();}
+  else{x.fillStyle=TC_COL[lvl];x.fill();x.strokeStyle='rgba(0,0,0,.7)';x.lineWidth=1.1*k;x.stroke();}
+}
+const tcasLvl=o=>o.tc&&o.tc.live?o.tc.lvl:0;
+// the panel: 110 px round, heading up, 2 nm (dotted) and 6 nm rings, the own aircraft in the centre
+function tcasDraw(hdgT){
+  const el=TCAS.el;if(!el)return;
+  const d=Math.min(window.devicePixelRatio||1,2),S=110,R=S/2;
+  if(!TCAS.ctx||TCAS.dpr!==d){TCAS.dpr=d;el.width=S*d;el.height=S*d;TCAS.ctx=el.getContext('2d');}
+  const x=TCAS.ctx,k=(R-12)/TC_PROX_D,h=-hdgT*TFC_D2R,ch=Math.cos(h),sh=Math.sin(h);
+  x.setTransform(d,0,0,d,0,0);x.clearRect(0,0,S,S);
+  x.beginPath();x.arc(R,R,R-1,0,TAU);x.fillStyle='rgba(0,0,0,.45)';x.fill();x.strokeStyle='rgba(255,255,255,.8)';x.lineWidth=1;x.stroke();
+  x.save();x.beginPath();x.arc(R,R,R-1.5,0,TAU);x.clip();
+  x.strokeStyle='rgba(255,255,255,.45)';x.lineWidth=1;x.beginPath();x.arc(R,R,6*TC_NM*k,0,TAU);x.stroke();
+  x.fillStyle='rgba(255,255,255,.75)';for(let i=0;i<12;i++){const a=i*Math.PI/6;x.fillRect(R+Math.cos(a)*2*TC_NM*k-0.8,R+Math.sin(a)*2*TC_NM*k-0.8,1.6,1.6);}
+  const px=st.pos.x,py=st.pos.y-GEAR,pz=st.pos.z;
+  const L=TCAS.list.slice().sort((a,b)=>tcasLvl(a)-tcasLvl(b));
+  x.font='700 9px '+F;x.textAlign='center';x.textBaseline='middle';
+  for(const o of L){const c=o.tc,lvl=tcasLvl(o),X=(c.x-px)*k,Z=(c.z-pz)*k;let sx=X*ch-Z*sh,sy=X*sh+Z*ch;const r=Math.hypot(sx,sy),lim=R-7;
+    if(r>lim){if(lvl<2)continue;sx*=lim/r;sy*=lim/r;}
+    const cx=R+sx,cy=R+sy;tcasSym(x,cx,cy,lvl,5,1);
+    const rel=Math.round((c.y-py)/TC_FT/100),t=rel===0?'00':(rel>0?'+':'-')+String(Math.min(99,Math.abs(rel))).padStart(2,'0');
+    const above=c.y>=py,ty=above?cy-10:cy+10;x.lineWidth=2.5;x.strokeStyle='rgba(0,0,0,.75)';x.strokeText(t,cx,ty);x.fillStyle=TC_COL[lvl];x.fillText(t,cx,ty);
+    if(Math.abs(c.vy)>500*TC_FPM){const ax=cx+9,up=c.vy>0;x.strokeStyle=TC_COL[lvl];x.lineWidth=1.4;x.beginPath();x.moveTo(ax,cy-4);x.lineTo(ax,cy+4);
+      x.moveTo(ax-2.5,up?cy-1.5:cy+1.5);x.lineTo(ax,up?cy-4:cy+4);x.lineTo(ax+2.5,up?cy-1.5:cy+1.5);x.stroke();}}
+  x.restore();
+  x.fillStyle='#ffd640';x.strokeStyle='#15110a';x.lineWidth=1.3;x.lineJoin='round';x.beginPath();
+  x.moveTo(R,R-7);x.lineTo(R+5,R+5.5);x.lineTo(R,R+2.8);x.lineTo(R-5,R+5.5);x.closePath();x.stroke();x.fill();
+}
+// every frame: the 4 Hz assessment, the panel's show and hide, and a redraw at 10 Hz while it shows
+function tcasUpdate(dt,hdgT){
+  if(dt>0){TCAS.t+=dt;if(TCAS.t>=TC_STEP){const s=TCAS.t;TCAS.t=0;tcasStep(s);}}
+  const show=TCAS.on&&tcasLive()&&!paused&&!st.crashed&&!st.onGround&&!FM.on&&!PHOTO.on&&!sensOn&&!RES.brief&&!menu.classList.contains('on')&&!spCan.classList.contains('on');
+  if(show!==TCAS.shown){TCAS.shown=show;TCAS.el.classList.toggle('on',show);if(show)TCAS.dT=0;}
+  if(show&&(TCAS.dT-=dt)<=0){TCAS.dT=0.1;tcasDraw(hdgT);}
+  if(TCAS.big.classList.contains('on')&&!(TCAS.ra&&running&&!st.crashed))TCAS.big.classList.remove('on');
+}
+// a new flight, the menu, a mission: no RA, no bands, no arrow, the panel down, every level back to other
+function tcasReset(){
+  if(TCAS.ra)tcasRAEnd(false);
+  for(const o of TRAFFIC)if(o.tc){o.tc.lvl=0;o.tc.held=0;o.tc.said=false;o.tc.post=false;o.tc.live=false;o.tc.p=null;}
+  TCAS.list.length=0;TCAS.t=0;TCAS.clear=false;TCAS.busy=0;
+  if(TCAS.src){try{TCAS.src.stop();}catch(e){}TCAS.src=null;}
+  TCAS.shown=false;TCAS.el.classList.remove('on');TCAS.big.classList.remove('on');tcasBands('');
+}
+function setTcas(v){TCAS.on=!!v;try{localStorage.setItem('kgeuTcas',TCAS.on?'1':'0');}catch(e){}if(!TCAS.on)tcasReset();tcasUI();}
+function tcasUI(){document.querySelectorAll('.oTcas').forEach(b=>{b.textContent='TCAS: '+(TCAS.on?'On':'Off');b.classList.toggle('on',TCAS.on);});}
+// tests: a scripted conflict. 'headon': an airliner 6 nm ahead on the reciprocal at our altitude, 250 kt;
+// 'cross': one from the right that meets us at the same point. It flies straight and level ('script')
+// and obeys the RA override like any other traffic.
+function tcasConflict(kind){
+  if(!running)return null;
+  if(!tfcTake('airliner').length){let far=null,fd=-1;for(const o of TFC.list){if(o.type!=='airliner')continue;const dd=Math.hypot(o.pos.x-st.pos.x,o.pos.z-st.pos.z);if(dd>fd){fd=dd;far=o;}}if(far)tfcDrop(far);}
+  const gs=Math.hypot(st.vel.x,st.vel.z),h=gs>5?Math.atan2(st.vel.x,-st.vel.z):-_euH.setFromQuaternion(st.quat,'YXZ').y;
+  const fx=Math.sin(h),fz=-Math.cos(h),rx=-fz,rz=fx,vI=250*0.514444,D=6*TC_NM;let x,z,hd;
+  if(kind==='cross'){const T=D/Math.hypot(gs,vI);x=st.pos.x+fx*gs*T+rx*vI*T;z=st.pos.z+fz*gs*T+rz*vI*T;hd=h-Math.PI/2;}
+  else{x=st.pos.x+fx*D;z=st.pos.z+fz*D;hd=h+Math.PI;}
+  return tfcSpawn('airliner',{state:'script',x:x,z:z,y:st.pos.y-GEAR,hdg:wrapPi(hd),gs:vI});
+}
+function tcasLevels(){return TCAS.list.map(o=>{const c=o.tc;return {callName:o.callName||o.kind||'',type:o.type||o.grp||'',level:TC_NAMES[tcasLvl(o)],lv:tcasLvl(o),
+  relAlt:Math.round(c.rel/TC_FT),vs:Math.round(c.vy/TC_FPM),range:+(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)/TC_NM).toFixed(2),cpaT:+c.cpaT.toFixed(1),cpaD:+(c.cpaD/TC_NM).toFixed(3),id:o.id||null};});}
 // ---------- people ----------
 const people=[],clusters=[];
 const shirts=['#d8342c','#2f6db5','#f2a900','#4fcf8e','#ffffff','#1f2a44','#e86a92','#7b5cc4','#ff8c42','#2a9d8f','#e9c46a','#264653','#c8102e','#8ecae6'];
@@ -7745,7 +7956,7 @@ function sensorView(){if(!running||st.crashed||!hasBall())return;
     for(let i=vis.length-1;i>=0;i--){const eh=(HT[vis[i].id]||44)+(h?GAP:0);if(h+eh>H){cut=i+1;break;}h+=eh;cut=i;}
     ORDER.forEach(el=>{if(!show[el.id]&&el.parentNode!==A)A.appendChild(el);});
     vis.forEach((el,i)=>(i<cut?B:A).appendChild(el));
-    B.hidden=cut===0;
+    B.hidden=cut===0;document.body.classList.toggle('dock2',!B.hidden);   // the TCAS panel steps left of a second column
   };
   let key='';
   window.iconsUI=()=>{
@@ -8280,6 +8491,7 @@ function vqPump(){
   for(let i=0;i<radioQ.length;i++){const l=radioQ[i];if(l.pri==null)l.pri=2;if(l.exp==null)l.exp=VQ.clock+25;
     if(vqStale(l)){l.dead=true;radioQ.splice(i--,1);}}
   const h=radioQ[0];if(!h)return;
+  if(TCAS.busy>VQ.clock)return;                                    // a TCAS callout has the air (cockpitSay)
   if(VQ.cur){const k=VQ.cur;
     if(!(h.pri<k.pri||(h.cut&&h.pri===k.pri)))return;               // same or lower priority waits its turn
     if(h.pri>0&&!(h.cut&&h.pri===k.pri)&&k.estEnd-VQ.clock<1.5)return;   // nearly done: let it finish
@@ -8694,6 +8906,7 @@ function hudClear(){
   toastT=0;toastEl.classList.remove('on');warnEl.classList.remove('on');atcEl.classList.remove('on');
   TK.open=false;tkUI();
   if(LB)LB.ghostOff();
+  tcasReset();   // the TCAS panel, the RA bands and the Easy arrow
   if(window.layoutCtl)layoutCtl();   // the LOOK pad and DROP button go with the mission
 }
 const pauseOv=$('pauseOv');
@@ -8812,6 +9025,7 @@ function hapCfg(kind){if(kind==='flap'||kind==='gear')hapPattern('detent');else 
 function hapUI(){document.querySelectorAll('.oHap').forEach(b=>{if(b.classList.contains('qs'))b.querySelector('b').textContent=HAP.on?'On':'Off';else b.textContent='Haptics: '+(HAP.on?'On':'Off');b.classList.toggle('on',HAP.on);});}
 function setHaptics(v){HAP.on=!!v;try{localStorage.setItem('kgeuHaptics',HAP.on?'1':'0');}catch(e){}hapUI();if(HAP.on)hapPattern('ap');}
 document.querySelectorAll('.oHap').forEach(b=>b.onclick=()=>setHaptics(!HAP.on));
+document.querySelectorAll('.oTcas').forEach(b=>b.onclick=()=>setTcas(!TCAS.on));tcasUI();
 // menu buttons: a very light tick on the press (the dock buttons tick through what they change)
 document.addEventListener('pointerdown',e=>{const b=e.target&&e.target.closest?e.target.closest('button'):null;
   if(b&&b.closest('#menu,#pauseOv,.overlay,#crash,#funnel,#csOv,#tkCtl'))hapPattern('button');},true);
@@ -9406,6 +9620,10 @@ function drawSixPack(){
    x.fillStyle='#c9d1d9';x.font='700 9px '+F;x.textAlign='center';x.textBaseline='middle';
    for(const v of [-2000,-1000,0,1000,2000]){const a=A(v)+Math.PI;
      x.fillText(String(Math.abs(v/1000)),cx+Math.cos(a)*(R-16),cy+Math.sin(a)*(R-16));}
+   // a TCAS resolution advisory: green arc for the commanded range, red for the forbidden one
+   if(TCAS.ra){const g=TCAS.sense>0,a=v=>A(v)+Math.PI;x.lineWidth=5;x.lineCap='butt';
+     x.beginPath();x.arc(cx,cy,R-5,g?a(1500):a(-2000),g?a(2000):a(-1500));x.strokeStyle='#2ee66b';x.stroke();
+     x.beginPath();x.arc(cx,cy,R-5,g?a(-2000):a(-1500),g?a(1500):a(2000));x.strokeStyle='#ff3b30';x.stroke();}
    spNeedle(x,cx,cy,A(vs)+Math.PI*1.5,R-7,3,'#f2f4f6');
    spLabel(x,cx,cy+30,'FPM x100');}
 }
@@ -9518,7 +9736,6 @@ function drawMap(hdgT){
     mx.strokeStyle='rgba(6,10,16,.75)';mx.lineWidth=5*dpr;mx.beginPath();mx.moveTo(0,0);mx.lineTo(q[0],q[1]);mx.stroke();
     mx.strokeStyle='#4de1ff';mx.lineWidth=2.5*dpr;mx.stroke();
     if(Math.hypot(q[0],q[1])<C*1.4){mx.fillStyle='#4de1ff';mx.strokeStyle='#06121c';mx.lineWidth=1.5*dpr;mx.beginPath();mx.arc(q[0],q[1],4.5*dpr,0,TAU);mx.fill();mx.stroke();}}
-  mx.fillStyle='#7fd4ff';TRAFFIC.forEach(o=>{if(!o.m.g.visible)return;const a=P(o.m.g.position.x,o.m.g.position.z);mx.beginPath();mx.arc(a[0],a[1],2.2*dpr,0,TAU);mx.fill();});
   // the sensor ball's cone: amber wedge over a dark halo, so it reads at night and through the dust
   if(sensorCone().on){const b=SCONE.brgT*Math.PI/180-Math.PI/2,w=SCONE.half*Math.PI/180,L=SCONE.len*k;
     mx.beginPath();mx.moveTo(0,0);mx.arc(0,0,L,b-w,b+w);mx.closePath();
@@ -9530,6 +9747,10 @@ function drawMap(hdgT){
   if(MISS.on&&MISS.kind==='drop'&&!MISS.dropped){const X=(DROPZ.x-ox)*k,Z=(DROPZ.z-oz)*k,ch=Math.cos(-h),sh=Math.sin(-h);
     let sx=X*ch-Z*sh,sy=X*sh+Z*ch;const r=Math.hypot(sx,sy),lim=C-11*dpr;if(r>lim){sx*=lim/r;sy*=lim/r;}
     mx.save();mx.scale(dpr,dpr);mIcon(mx,'drop',(C+sx)/dpr,(C+sy)/dpr,16);mx.restore();}
+  // traffic: the TCAS symbol for its level, upright
+  {const ch=Math.cos(-h),sh=Math.sin(-h),lim=C+4*dpr;
+   for(const o of TRAFFIC){if(!o.m.g.visible)continue;const g=o.m.g.position,X=(g.x-ox)*k,Z=(g.z-oz)*k,sx=X*ch-Z*sh,sy=X*sh+Z*ch;
+     if(Math.abs(sx)>lim||Math.abs(sy)>lim)continue;tcasSym(mx,C+sx,C+sy,tcasLvl(o),3.4*dpr,dpr);}}
   // range ring, 2 nm
   mx.strokeStyle='rgba(244,241,234,.28)';mx.lineWidth=1*dpr;mx.setLineDash([3*dpr,3*dpr]);mx.beginPath();mx.arc(C,C,3704*k,0,TAU);mx.stroke();mx.setLineDash([]);
   // the aircraft, always pointing up, in the full map's yellow
@@ -9826,7 +10047,7 @@ function fmDraw(){
   LBL.W=W;LBL.H=H;LBL.boxes=LBL.ui.slice();LBL.boxes.push([bx-12,by-28,bx+bw+12,by+12]);LBL.placed=[];
   const C=[],inView=(q,m)=>q[0]>-m&&q[1]>-m&&q[0]<W+m&&q[1]<H+m;
   FM.pois=mapPOIs();fmCands(C,sc,inView);
-  lblPlace(C);
+  FM.tfcDrawn=0;lblPlace(C);
   fx.fillStyle='rgba(14,16,20,.82)';rrect(fx,bx-8,by-24,bw+16,32,8);fx.fill();
   fx.strokeStyle='#f4f1ea';fx.lineWidth=2;fx.lineCap='butt';fx.beginPath();fx.moveTo(bx,by-5);fx.lineTo(bx,by);fx.lineTo(bx+bw,by);fx.lineTo(bx+bw,by-5);fx.stroke();
   haloText(fx,n+' '+un,bx+bw/2,by-13,'700 11px '+F,'#f4f1ea');
@@ -9864,6 +10085,12 @@ function fmCands(C,sc,inView){
     if(sc>0.02||on){const font='600 11px '+F,w=lblMeasure(font,P.name)+6,g=sz/2+4;
       C.push({pri:360+(on?400:0),req:ic,x:q[0],y:q[1],w:w,h:15,kind:'name',spots:[[g+w/2,0],[-g-w/2,0],[0,g+8],[0,-g-8]],
         draw:(x,cx,cy)=>haloText(x,P.name,cx,cy,font,'#f4f1ea','rgba(16,17,20,.92)',3)});}}
+  // traffic: the TCAS symbol for its level, below every label (they never hide one); TA and RA pulse
+  for(const o of TRAFFIC){if(!o.m.g.visible)continue;const g=o.m.g.position,q=fmP(g.x,g.z);if(!inView(q,10))continue;const lv=tcasLvl(o);
+    C.push({pri:100+lv*20,x:q[0],y:q[1],w:14,h:14,kind:'tfc',draw:(x,cx,cy)=>{FM.tfcDrawn++;
+      if(lv>=2){const k=(now%900)/900;x.strokeStyle=lv===3?'rgba(255,45,32,'+(1-k).toFixed(2)+')':'rgba(255,176,32,'+(1-k).toFixed(2)+')';x.lineWidth=2.5;
+        x.beginPath();x.arc(cx,cy,7+k*10,0,TAU);x.stroke();}
+      tcasSym(x,cx,cy,lv,6,1);}});}
   // runway numbers: close in only, one at each end, out along the extended centre line
   if(sc>0.028)for(const e of RWY_ENDS){const font='800 11px '+F,tw=lblMeasure(font,e.num),w=Math.max(20,tw+10),h=17,on=DEST===e;
     const q=fmP(e.x,e.z);if(!inView(q,60))continue;const ux=-Math.sin(e.h),uy=Math.cos(e.h),g=w/2+6;
@@ -9912,6 +10139,7 @@ function fmFrame(){
   let redraw=mtPump(10);
   if(FM.anim){const A=FM.anim,t=Math.min(1,(performance.now()-A.t0)/A.dur),e=t*t*(3-2*t);
     FM.cx=A.x0+(A.x1-A.x0)*e;FM.cz=A.z0+(A.z1-A.z0)*e;FM.scale=Math.exp(Math.log(A.s0)+(Math.log(A.s1)-Math.log(A.s0))*e);if(t>=1)FM.anim=null;redraw=true;}
+  if(TCAS.list.some(o=>tcasLvl(o)>=2))redraw=true;   // the TA / RA pulse
   if(FM.hl){if(performance.now()-FM.hl.t0<4500)redraw=true;else{FM.hl=null;for(const b of $('mapLegL').children)b.classList.remove('on');redraw=true;}}
   if(redraw)fmDraw();
 }
@@ -11409,6 +11637,7 @@ function tick(t,skipRender){
   // instruments
   _eu.setFromQuaternion(q,'YXZ');const hdgT=((-_eu.y*180/Math.PI)%360+360)%360,hdgM=(hdgT-MAGVAR+360)%360;
   mapT-=dt;if(mapT<=0){mapT=0.1;drawMap(hdgT);}
+  tcasUpdate(running&&!paused?dt:0,hdgT);
   if(FM.on)fmFrame();
   hudT-=dt;
   if(hudT<=0){hudT=0.08;
@@ -11998,6 +12227,9 @@ window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runM
 })();
 (function(){let t='day';try{const v=localStorage.getItem('kgeuTOD');if(v&&TOD_SET[v])t=v;}catch(e){}setTOD(t);})();
 window.__kgeu.TFC=TFC;window.__kgeu.tfcList=tfcList;window.__kgeu.tfcSpawn=tfcSpawn;window.__kgeu.tfcClear=tfcClear;
+window.__kgeu.TCAS={levels:tcasLevels,state:()=>({ta:TCAS.list.some(o=>tcasLvl(o)>=2),ra:!!TCAS.ra,sense:TCAS.ra?(TCAS.sense>0?'climb':'descend'):null,clear:TCAS.clear,inhibit:TCAS.inhibit,
+  shown:TCAS.shown,on:TCAS.on,raT:TCAS.raT}),tcasConflict:tcasConflict,setTcas:setTcas,T:TCAS,tcasVoiceLog:TCAS.voiceLog};
+window.__kgeu.tcasConflict=tcasConflict;window.__kgeu.tcasVoiceLog=TCAS.voiceLog;
 window.__kgeu.LB=LB;try{LB.boot();}catch(e){console.warn('leaderboards',e);}
 rebuildTerrain(st.pos.x,st.pos.z);
 requestAnimationFrame(frame);

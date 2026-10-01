@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Pre-record every ATC line with the macOS `say` command.
 
+The cockpit voice (TCAS, c_* clips) is Daniel, Enhanced if installed, and is
+played dry in the game.
+
 Two Enhanced voices: Samantha for the controllers, Evan for the pilots. Female
 tower against male pilot is the pairing that stays readable through a band
 limited radio filter, where two male voices blur together.
@@ -20,6 +23,9 @@ OUT = os.path.join(ROOT, 'radio')
 TOWER_VOICE = 'Samantha (Enhanced)'
 PILOT_VOICE = 'Evan (Enhanced)'
 TOWER_RATE, PILOT_RATE = 200, 190          # controllers talk faster than pilots
+# the cockpit voice (TCAS): calm male, played dry in the game, not through the radio
+COCKPIT_VOICES = ('Daniel (Enhanced)', 'Daniel')
+COCKPIT_RATE = 175
 
 # ---- said by both sides: the pilot calls the facility, the tower calls the aircraft ----
 BOTH = {
@@ -145,9 +151,32 @@ CHATTER_PILOT = {
     'ch_p12': 'Cleared to land, viper two one.',
 }
 
+# ---- cockpit voice, c_*: TCAS callouts (Hard) and plain English versions (Easy) ----
+COCKPIT = {
+    'tcas_traffic':     'Traffic, traffic.',
+    'tcas_climb':       'Climb, climb.',
+    'tcas_descend':     'Descend, descend.',
+    'tcas_climb_now':   'Increase climb, increase climb.',
+    'tcas_descend_now': 'Increase descent, increase descent.',
+    'tcas_clear':       'Clear of conflict.',
+    'tcas_e_traffic':   'Plane nearby!',
+    'tcas_e_climb':     'Plane nearby! Climb now!',
+    'tcas_e_descend':   'Plane nearby! Descend now!',
+    'tcas_e_clear':     'All clear.',
+}
+
+
+def cockpit_voice(voices=None):
+    if voices is None:
+        voices = subprocess.run(['say', '-v', '?'], capture_output=True, text=True).stdout
+    for v in COCKPIT_VOICES:
+        if any(line.startswith(v + ' ') or line.startswith(v + '\t') for line in voices.splitlines()):
+            return v
+    return None
+
 
 def manifest():
-    """id -> (voice tag, text). Tower clips are t_*, pilot clips p_*."""
+    """id -> (voice tag, text). Tower clips are t_*, pilot clips p_*, cockpit c_*."""
     m = {}
     for k, v in BOTH.items():
         m['t_' + k] = ('t', v)
@@ -156,6 +185,7 @@ def manifest():
     for k, v in CHATTER_TOWER.items():  m['t_' + k] = ('t', v)
     for k, v in PILOT.items():          m['p_' + k] = ('p', v)
     for k, v in CHATTER_PILOT.items():  m['p_' + k] = ('p', v)
+    for k, v in COCKPIT.items():        m['c_' + k] = ('c', v)
     return m
 
 
@@ -168,7 +198,10 @@ TRIM = ('silenceremove=start_periods=1:start_silence=0.02:start_threshold=-50dB:
 def render(cid, voice, text, tmp):
     aiff = os.path.join(tmp, cid + '.aiff')
     m4a = os.path.join(OUT, cid + '.m4a')
-    v, rate = (TOWER_VOICE, TOWER_RATE) if voice == 't' else (PILOT_VOICE, PILOT_RATE)
+    if voice == 'c':
+        v, rate = cockpit_voice(), COCKPIT_RATE
+    else:
+        v, rate = (TOWER_VOICE, TOWER_RATE) if voice == 't' else (PILOT_VOICE, PILOT_RATE)
     subprocess.run(['say', '-v', v, '-r', str(rate), '-o', aiff, text], check=True)
     subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', aiff, '-af', TRIM,
                     '-ac', '1', '-c:a', 'aac', '-b:a', '64k', m4a], check=True)
@@ -195,6 +228,9 @@ def main():
         if v not in voices:
             print(f'voice not installed: {v}', file=sys.stderr)
             return 2
+    if not cockpit_voice(voices):
+        print(f'voice not installed: {COCKPIT_VOICES[0]} or {COCKPIT_VOICES[1]}', file=sys.stderr)
+        return 2
 
     os.makedirs(OUT, exist_ok=True)
     tmp = os.path.join(OUT, '.tmp')
@@ -215,7 +251,7 @@ def main():
 
     json.dump(sorted(m.keys()), open(os.path.join(OUT, 'clips.json'), 'w'), indent=0)
     print(f'{len(m)} clips, {total/1024:.0f} KB total, average {total/len(m)/1024:.1f} KB')
-    print(f'tower voice {TOWER_VOICE}, pilot voice {PILOT_VOICE}')
+    print(f'tower voice {TOWER_VOICE}, pilot voice {PILOT_VOICE}, cockpit voice {cockpit_voice(voices)}')
     return 0
 
 
