@@ -24,7 +24,7 @@ LEFT = """(fly)=>{const K=window.__kgeu,$=id=>document.getElementById(id),out=[]
     const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&r.right>0&&r.bottom>0&&r.left<innerWidth&&r.top<innerHeight;};
   document.querySelectorAll('.overlay.on').forEach(e=>{if(e.id!=='menu'||fly)out.push('overlay #'+e.id);});
   const ids=['miss','jumpLt','dzHint','dzMark','dzArrow','hDest','lesson','tutArrow','sensorHud','lookPad','crash','crashTop','bDrop'];
-  if(!fly)ids.push('warn','toast','atc','bigcfg','tk','tkCtl','sixpack');
+  if(!fly)ids.push('warn','toast','atc','sideToast','tk','tkCtl','sixpack');
   ids.forEach(id=>{if(vis($(id)))out.push('#'+id+' '+($(id).textContent||'').trim().slice(0,28));});
   document.querySelectorAll('#tgtMarks .on').forEach(()=>out.push('target mark'));
   document.querySelectorAll('#badges .badge').forEach(e=>{if(e.classList.contains('on')||vis(e))out.push('badge #'+e.id);});

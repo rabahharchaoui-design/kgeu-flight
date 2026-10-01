@@ -32,8 +32,8 @@ async def main():
     await pg.mouse.up(); await pg.wait_for_timeout(200)
     # keyboard flap change raises the big readout
     await pg.keyboard.press(']'); await pg.wait_for_timeout(250)
-    big=await pg.inner_text('#bigcfg')
-    chk('flap change shows the big readout', 'FLAPS' in big, repr(big))
+    big=await pg.inner_text('#sideToast')
+    chk('flap change shows the side readout', 'FLAPS' in big, repr(big))
     chk('flaps line under the altitude card updates',
         'FLAPS' in await pg.inner_text('#hFlap'), await pg.inner_text('#hFlap'))
     # strike mode on desktop: click to track, space to fire

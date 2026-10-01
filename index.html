@@ -61,7 +61,7 @@ html,body{ margin:0; height:100%; overflow:hidden; background:var(--page); color
 /* ---------- the UI lives inside the visual viewport ---------- */
 #uiroot{ position:fixed; left:var(--vvl); top:var(--vvt); width:var(--vvw); height:var(--vvh); pointer-events:none; overflow:hidden; }
 #uiroot > *{ pointer-events:auto; }
-#warn,#atc,#toast,#bigcfg,#sensorHud{ pointer-events:none; }
+#warn,#atc,#toast,#sideToast,#sensorHud{ pointer-events:none; }
 
 .card{ background:var(--glass); border:1px solid rgba(255,255,255,.08); border-radius:10px; padding:8px 12px; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
 button{ font:600 15px var(--font); color:var(--ink); background:var(--glass); border:1px solid rgba(255,255,255,.14); border-radius:8px; padding:7px 12px; cursor:pointer; touch-action:manipulation; }
@@ -175,8 +175,12 @@ body.touch #warn{ font-size:20px; padding:2px 12px; }
 #toast:not(.on){ position:absolute; visibility:hidden; }   /* in the column only while it shows */
 body.touch #toast{ font-size:15px; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
 #toast.on{ opacity:1; }
-#bigcfg{ position:absolute; left:50%; top:57%; transform:translate(-50%,-50%); font-size:32px; font-weight:800; letter-spacing:.06em; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,.8); opacity:0; transition:opacity .45s; white-space:nowrap; }
-#bigcfg.on{ opacity:1; transition:opacity .08s; }
+/* flap, gear, trim and autopilot changes: a small readout beside the throttle, 2 s then it fades;
+   the centre of the screen stays clear (sideCfg places it left of the dock, level with the throttle) */
+#sideToast{ position:absolute; right:0; top:0; z-index:5; pointer-events:none; opacity:0; transition:opacity .45s; white-space:pre-line; text-align:right;
+  font:800 14px/1.2 var(--font); letter-spacing:.06em; color:#fff; background:rgba(12,16,22,.84); border:1.5px solid rgba(255,255,255,.16); border-radius:10px; padding:6px 10px; text-shadow:0 1px 3px rgba(0,0,0,.7); max-width:150px; }
+#sideToast.on{ opacity:1; transition:opacity .08s; }
+#sideToast small{ display:block; font-size:11px; font-weight:600; letter-spacing:.03em; color:var(--soft); text-transform:none; }
 
 /* ---------- mini map, top left ---------- */
 #map{ position:absolute; left:var(--padL); top:var(--padT); border-radius:12px; cursor:pointer; box-shadow:0 0 0 1px rgba(255,255,255,.2),0 2px 10px rgba(0,0,0,.35); touch-action:none; }
@@ -489,7 +493,7 @@ body.touch #lesM{ font-size:12px; }
 #crash .ccTxt b{ display:block; color:var(--warn); font-size:16px; font-weight:800; letter-spacing:.04em; }
 #crash .ccBtns{ display:flex; gap:8px; flex:none; }
 #crash button{ min-height:44px; min-width:84px; font-size:17px; font-weight:800; padding:8px 14px; }
-body.crashOn #hud, body.crashOn #dock, body.crashOn #touch, body.crashOn #lookPad, body.crashOn #bPause, body.crashOn #hDest, body.crashOn #warn, body.crashOn #bigcfg, body.crashOn #tutArrow{ display:none !important; }
+body.crashOn #hud, body.crashOn #dock, body.crashOn #touch, body.crashOn #lookPad, body.crashOn #bPause, body.crashOn #hDest, body.crashOn #warn, body.crashOn #sideToast, body.crashOn #tutArrow{ display:none !important; }
 .touchnote{ display:none; color:var(--soft); margin:0 0 16px; font-size:16px; }
 #a2hs{ display:none; margin:0 0 14px; padding:10px 13px; font-size:15px; line-height:1.4;
   color:var(--ink); background:rgba(242,169,0,.13); border:1px solid rgba(242,169,0,.45); border-radius:10px; }
@@ -910,7 +914,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
        that leaves the fireball in view -->
   <div id="crashTop" aria-live="assertive"></div>
   <div id="crash" role="dialog" aria-label="Crashed"><div class="ccTxt"><b>CRASHED</b><span id="crashWhy"></span></div><div class="ccBtns"><button class="primary" id="cRetry">RETRY</button><button id="cMenu">MENU</button></div></div>
-  <div id="bigcfg"></div>
+  <div id="sideToast" role="status" aria-live="polite"></div>
   <div id="sensorHud"><div class="ch chL"></div><div class="ch chR"></div><div class="ch chT"></div><div class="ch chB"></div>
     <div class="bk a"></div><div class="bk b"></div><div class="bk c"></div><div class="bk d"></div>
     <div class="tx" id="shTL"></div><div class="tx" id="shTR"></div><div class="tx" id="shBL"></div><div class="tx" id="shBR"></div><div class="tx" id="shMid"></div><div id="tgtMarks"></div></div>
@@ -6127,22 +6131,39 @@ function setFlaps(i){const n=clamp(i,0,FLAPS.length-1);if(st.easy&&!st.ezManFlap
 // Big centred readout on every flap or gear change, manual or automatic, plus a small
 // persistent line under the altitude card. Driven off the state, not off event text, so
 // autopilot and easy flight changes announce themselves the same way.
-let pFlap=-1,pGear=null,cfgT=0;
-function bigCfg(t){const b=$('bigcfg');b.textContent=t;b.classList.add('on');cfgT=2;}
-function cfgReset(){pFlap=-1;pGear=null;cfgT=0;const b=$('bigcfg');if(b)b.classList.remove('on');}
+let pFlap=-1,pGear=null,cfgT=0,cfgTrim=null;
+const sideEl=$('sideToast');
+// the side readout: a line (and an optional small second line) beside the throttle, level with
+// it and left of the dock, for about 2 s. Flaps, gear, trim and the autopilot all come here;
+// nothing of theirs goes to the centre of the screen. kind: what changed, for the haptics.
+function sideCfg(t,sub,kind){
+  sideEl.textContent=t;if(sub){const s=document.createElement('small');s.textContent=sub;sideEl.appendChild(s);}
+  const thr=$('thr'),dock=$('dock'),ui=$('uiroot').getBoundingClientRect(),tr=thr.getBoundingClientRect(),dr=dock.getBoundingClientRect();
+  const h=sideEl.offsetHeight,w=sideEl.offsetWidth,sz=$('stickZone').getBoundingClientRect();
+  // left of the dock when it shows (else of the throttle), a third of the way down the throttle: level with
+  // CLIMB and above, clear of the lesson panel at the bottom. If that spot is the stick zone it goes above the controls.
+  let edge=(dr.width?dr.left:tr.left)-10,top=tr.top+tr.height*0.33-h/2;
+  if(sz.width&&edge-w<sz.right&&top+h>sz.top&&top<sz.bottom){const le=$('lesson'),lr=le.classList.contains('on')?le.getBoundingClientRect():null;
+    edge=tr.right;top=Math.min(tr.top,dr.width?dr.top:tr.top,lr&&lr.height?lr.top:1e9)-8-h;}
+  sideEl.style.right=Math.round(ui.right-edge)+'px';
+  sideEl.style.top=Math.round(top-ui.top)+'px';
+  sideEl.classList.add('on');cfgT=2;sideEl.dataset.kind=kind||'';
+  if(typeof HAP!=='undefined'&&kind)HAP.cfg(kind);
+}
+function cfgReset(){pFlap=-1;pGear=null;cfgT=0;sideEl.classList.remove('on');}
 function cfgUpdate(dt){
-  if(cfgT>0){cfgT-=dt;if(cfgT<=0)$('bigcfg').classList.remove('on');}
+  if(cfgT>0){cfgT-=dt;if(cfgT<=0)sideEl.classList.remove('on');}
   const fi=st.flapIdx,deg=FLAPS[fi].deg;
-  if(fi!==pFlap){if(pFlap>=0)bigCfg('FLAPS '+deg+FDEG);pFlap=fi;}
+  if(fi!==pFlap){if(pFlap>=0)sideCfg('FLAPS '+deg+FDEG,null,'flap');pFlap=fi;}
   const want=AC.retract?(st.gearDown?'DOWN':'UP'):'';
-  if(want!==pGear){if(pGear!==null&&want)bigCfg('GEAR '+want);pGear=want;}
+  if(want!==pGear){if(pGear!==null&&want)sideCfg('GEAR '+want,null,'gear');pGear=want;}
   const fl=$('hFlap');setTxt(fl,'FLAPS '+deg+FDEG);fl.classList.toggle('lit',fi>0);
   const g=$('hGear');
   if(!AC.retract){setTxt(g,'');g.classList.remove('lit');}
   else{const pos=st.gearPos>0.99?'DOWN':st.gearPos<0.01?'UP':'TRANSIT';
     setTxt(g,'GEAR '+pos);g.classList.toggle('lit',pos!=='DOWN');}
 }
-function apOff(msg){if(!st.ap)return;st.ap=null;st.apW=null;st.trim=clamp((st.alpha-AC.trimBase)/AC.trimK,-1,1);if(msg)toast(msg);}
+function apOff(msg){if(!st.ap)return;st.ap=null;st.apW=null;st.trim=clamp((st.alpha-AC.trimBase)/AC.trimK,-1,1);if(msg)sideCfg('AUTOPILOT OFF',/your airplane/i.test(msg)?'your airplane':null,'ap');}
 // the sensor view autopilot rides through throttle changes; everything else lets go on a throttle move
 function apOffThr(){if(st.ap&&!st.ap.sensor)apOff('Autopilot off, your airplane');}
 // two falling tones, a quarter second, when the sensor autopilot lets go
@@ -6157,8 +6178,8 @@ function apToggle(mode){
   if(mode==='to'){const u=toU(st.pos.x,st.pos.z),v=toV(st.pos.x,st.pos.z),h=-new THREE.Euler().setFromQuaternion(st.quat,'YXZ').y;
     if(!st.onGround){toast('Already flying. Tap Auto Land to bring it home');return;}
     if(Math.abs(v)>14||u<-30||u>900||Math.abs(Math.atan2(Math.sin(h-RH),Math.cos(h-RH)))>0.35||Math.hypot(st.vel.x,st.vel.z)>15){toast('Line up on runway 1 first');return;}
-    apEngage(st,'to');toast('Auto takeoff. Hands off');}
-  else{if(st.onGround){toast('Auto Land works once you are airborne');return;}apEngage(st,'land');toast('Autoland engaged. Heading for runway 1');}
+    apEngage(st,'to');sideCfg('AUTO TAKEOFF','hands off','ap');}
+  else{if(st.onGround){toast('Auto Land works once you are airborne');return;}apEngage(st,'land');sideCfg('AUTOLAND','to runway 1','ap');}
 }
 const touchIn={elev:0,ail:0,active:false,brake:false};
 // Skill level, chosen on first launch and changeable in Settings. Rookie is easy
@@ -6320,8 +6341,7 @@ function updateControls(dt){
   st.rud=ap(st.rud,kR,kR?3:5);st.steer=clamp(st.rud+st.ail,-1,1);
   if(tUp)st.throttle=clamp(st.throttle+0.55*dt,0,1);
   if(tDn)st.throttle=clamp(st.throttle-0.55*dt,0,1);
-  if(keys['y'])st.trim=clamp(st.trim+0.35*dt,-1,1);
-  if(keys['h'])st.trim=clamp(st.trim-0.35*dt,-1,1);
+  if(keys['y']||keys['h']){st.trim=clamp(st.trim+(keys['y']?0.35:-0.35)*dt,-1,1);const tv=Math.round(st.trim*10);if(tv!==cfgTrim){cfgTrim=tv;sideCfg('TRIM '+(tv>0?'+':'')+tv,tv>0?'nose up':tv<0?'nose down':'neutral','trim');}}
   st.brake=!!keys[' ']||touchIn.brake||!!touchIn.padBrake;
 }
 // ---------- visual viewport: keep the whole UI inside what is actually visible ----------
@@ -7246,7 +7266,7 @@ function sensorView(){if(!running||st.crashed||!hasBall())return;
 })();
 // ---------- audio ----------
 let actx=null,eng,eng2,eng2G,engF,engG,noiseG,noiseF,hornG,cheerG,whine,whineG,abG=null,crackG,crackEnv,crackT=0;
-function toggleGear(){if(!running||st.crashed)return;if(!AC.retract){toast('Fixed gear on the '+(AC.id==='alpha'?'Alpha':'172'));return;}if(st.onGround){toast('Gear stays down on the ground');return;}st.gearDown=!st.gearDown;toast(st.gearDown?'Gear down':'Gear up');}
+function toggleGear(){if(!running||st.crashed)return;if(!AC.retract){sideCfg('GEAR FIXED','on the '+(AC.id==='alpha'?'Alpha':'172'),'note');return;}if(st.onGround){sideCfg('GEAR DOWN','stays down on the ground','note');return;}st.gearDown=!st.gearDown;}
 function initAudio(){
   if(actx){actx.resume&&actx.resume();return;}
   try{
@@ -10740,7 +10760,8 @@ function tick(t,skipRender){
       if(ev.paved&&(best===null||f<best)){best=f;try{localStorage.setItem(bestKey(),String(f));}catch(e){}showBest();}
       atcTouchdown(ev);clusters.forEach(c=>{if(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)<1800){c.cheer=4.5;}});}
     // flap and gear changes announce themselves through the big readout, not a toast
-    if(ev.type==='ap'&&!/^(Flaps |Gear up|Gear down)/.test(ev.msg)) toast(ev.msg);
+    if(ev.type==='ap'&&ev.done)sideCfg('AUTOLAND COMPLETE','your airplane','ap');
+    else if(ev.type==='ap'&&!/^(Flaps |Gear up|Gear down)/.test(ev.msg)) toast(ev.msg);
     if(ev.type==='liftoff') clusters.forEach(c=>{if(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)<1500){c.cheer=4;}});
   }
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.classList.remove('on');}
@@ -11344,7 +11365,7 @@ window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runM
   RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,ticker:()=>{const e=document.getElementById('tk'),c=document.getElementById('tkCtl');return {on:e.classList.contains('on'),paused:e.classList.contains('paused'),anim:getComputedStyle(document.getElementById('tkT')).animationName,scroll:e.classList.contains('scroll'),open:c.classList.contains('on'),text:e.querySelector('#tkT i').textContent,vis:e.offsetParent!==null&&getComputedStyle(e).display!=='none',ctlVis:c.offsetParent!==null};},tickerForce:n=>{TK.force=n||null;tkUI();},tickerOpen:()=>tkOpen(),tickerClose:()=>{TK.open=false;tkUI();},musicTick:musicTick,MUSIC:MUSIC,actx:()=>actx,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,VQ:VQ,vqLog:clear=>{const r=VQ.log.map(e=>Object.assign({},e));if(clear)VQ.log.length=0;return r;},vqAdd:(who,kind,text,clips,o)=>vqAdd(L(who,kind,text,clips),o),coach2:coach2,chatNow:()=>chatNow(),atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),bannerShow:(k,t)=>bannerShow(k,t),badgeHide:()=>badgeHide(),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
-  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   // @OhRabah easter eggs (3.10): where each one is, whether its lights are on, and the tow banner
   eggs:()=>EGG.list.map(o=>{const p=o.getWorldPosition(new V3()),r={name:o.name,x:p.x,y:p.y,z:p.z,ry:o.rotation.y,lit:(o.name==='egg_billboard'||o.name==='egg_rooftop')&&EGG.lit,visible:o.visible};
     if(o.name==='egg_tow'){const b=EGG.tow.ban.getWorldPosition(new V3()),f=new V3(0,0,-1).applyQuaternion(o.quaternion);r.banner={x:b.x,y:b.y,z:b.z};r.fwd=[f.x,f.y,f.z];}return r;}),
