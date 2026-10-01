@@ -20,7 +20,7 @@ AUDIT = """()=>{const ov=document.getElementById('pauseOv'),pz=ov.querySelector(
     b.querySelectorAll('b,i,span').forEach(e=>{if(e.offsetParent&&e.scrollWidth>e.clientWidth+1)bad.push('truncated '+e.textContent.trim().slice(0,12));});});
   // neighbours: 12 px between any two buttons, 8 px between the chips of one segmented group (aircraft,
   // base, time, starts, Easy/Hard) on the 568 wide screen; overlaps never
-  let minGap=1e9,minIn=1e9;const grp=b=>b.closest('.gchips,.acRow,.modeSeg,.grp');
+  let minGap=1e9,minIn=1e9;const grp=b=>b.closest('.acRow,.modeSeg,.pzQ,.frow');   // one row of chips or tiles is one group
   for(let i=0;i<bs.length;i++)for(let j=i+1;j<bs.length;j++){const a=R(bs[i]),b=R(bs[j]);if(bs[i].contains(bs[j])||bs[j].contains(bs[i]))continue;
     const gx=Math.max(a.left,b.left)-Math.min(a.right,b.right),gy=Math.max(a.top,b.top)-Math.min(a.bottom,b.bottom);
     const ox=-gx>0.5,oy=-gy>0.5;if(ox&&oy)bad.push('overlap '+(bs[i].id||bs[i].textContent.trim().slice(0,8))+'/'+(bs[j].id||bs[j].textContent.trim().slice(0,8)));
@@ -48,7 +48,7 @@ async def main():
             tag = f'{W}x{H}'
             ok(f'{tag}: 44 px targets, nothing cut off, no overlaps', not a['bad'], a['bad'][:6])
             ok(f'{tag}: at least 12 px between neighbouring buttons', a['minGap'] >= 11.5, a['minGap'])
-            ok(f'{tag}: chips inside one group at least {8 if W < 620 else 12} px apart', a['minIn'] >= (7.5 if W < 620 else 11.5), a['minIn'])
+            ok(f'{tag}: chips or tiles inside one row at least {8 if W < 620 else 12} px apart', a['minIn'] >= (7.5 if W < 620 else 11.5), a['minIn'])
             ok(f'{tag}: no scrolling', not a['scroll'])
             ok(f'{tag}: RESUME is the big one at the top', a['resumeTop'] and a['resumeBig'])
             ok(f'{tag}: MAIN MENU sits on its own at the far right, secondary style, clear of everything', a['menuRight'] and a['menuApart'] >= 11.5 and a['menuSecondary'], (a['menuRight'], a['menuApart'], a['menuSecondary']))
