@@ -82,6 +82,9 @@ TOWER = {
     'tfc_c17':    'a C-seventeen.',
     'tfc_reaper': 'an M Q nine.',
     'tfc_banner': 'a banner tow plane.',
+    'tfc_airliner': 'an airliner.',
+    'tfc_f16':      'an F-sixteen.',
+    'tfc_heli':     'a helicopter.',
 
     'gila_range':  'Gila Range Control,',
     'cleared_hot': 'you are cleared hot. Range is clear, four targets.',

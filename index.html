@@ -4884,7 +4884,12 @@ const AC_LIGHTS={
     {x:0,y:3.7,z:-5.5,color:ACL_C.white,kind:'nav'},acBeacon(0,4.16,-1.0),
     acStrobe(0,10.24,12.2),acStrobe(0,-0.61,-7.5,{on:'air'}),
     acLand(-6.3,3.08,-2.0),acLand(6.3,3.08,-2.0),acTaxi(-2.6,-0.2,-2.32,{on:'gear'}),acTaxi(2.6,-0.2,-2.32,{on:'gear'}),
-    acForm(-12,3.7,-1.85),acForm(-15,3.52,-2.0),acForm(-18,3.35,-2.2),acForm(12,3.7,-1.85),acForm(15,3.52,-2.0),acForm(18,3.35,-2.2)]
+    acForm(-12,3.7,-1.85),acForm(-15,3.52,-2.0),acForm(-18,3.35,-2.2),acForm(12,3.7,-1.85),acForm(15,3.52,-2.0),acForm(18,3.35,-2.2)],
+  // AI traffic. Airliner: nav and strobes at the wingtips, white on the tail cone, red beacons top and belly
+  airliner:[acNav(-16.95,0.05,3.3),acNav(16.95,0.05,3.3),acStrobe(-16.95,0.05,4.3),acStrobe(16.95,0.05,4.3),
+    acAft(0,1.2,18.95),acBeacon(0,2.02,-1.5),acBeacon(0,-2.04,2.0)],
+  // helicopter: nav on the stabiliser tips, white at the fin, red beacons on the fin top and the belly
+  heli:[acNav(-1.22,0.47,5.6),acNav(1.22,0.47,5.6),acAft(0,0.5,6.88),acBeacon(0,1.68,6.4),acBeacon(0,-1.13,0.2)]
 };
 // wingtip glow: one per red / green nav light, same spot, no cone
 for(const k in AC_LIGHTS)AC_LIGHTS[k].push(...AC_LIGHTS[k].filter(l=>l.kind==='nav'&&l.color!==ACL_C.white).map(l=>({x:l.x,y:l.y,z:l.z,color:l.color,kind:'glow'})));
@@ -5697,6 +5702,80 @@ function buildHeavy(){
   add(new THREE.BoxGeometry(0.6,9,6),m,0,7,28);add(new THREE.BoxGeometry(17,0.5,4.5),m,0,11.4,29.5);
   scene.add(g);return {g:g};
 }
+// ---- AI traffic models: every part merged into one vertex coloured mesh, one draw call a model ----
+// parts: [[geometry already placed, hex colour], ...]
+const TFC_MAT=new THREE.MeshLambertMaterial({vertexColors:true});
+function tfcMerge(parts){
+  let n=0;const gs=parts.map(p=>{const g=p[0].index?p[0].toNonIndexed():p[0];if(!g.attributes.normal)g.computeVertexNormals();n+=g.attributes.position.count;return g;});
+  const P=new Float32Array(n*3),N=new Float32Array(n*3),C=new Float32Array(n*3),c=new THREE.Color();let o=0;
+  gs.forEach((g,i)=>{const k=g.attributes.position.count;P.set(g.attributes.position.array,o*3);N.set(g.attributes.normal.array,o*3);c.setHex(parts[i][1]);
+    for(let j=o*3;j<(o+k)*3;j+=3){C[j]=c.r;C[j+1]=c.g;C[j+2]=c.b;}o+=k;});
+  const m=new THREE.BufferGeometry();m.setAttribute('position',new THREE.BufferAttribute(P,3));m.setAttribute('normal',new THREE.BufferAttribute(N,3));
+  m.setAttribute('color',new THREE.BufferAttribute(C,3));m.computeBoundingSphere();return m;}
+const tfcAt=(g,x,y,z)=>g.translate(x,y,z);
+// plain generic liveries: a white body, one colour for the cheat line and the tail, no names or logos
+const TFC_PAL=[0x1d3557,0xc8102e,0x2a9d8f,0xe07a1f,0x6d2e46];
+// Generic narrow body, about 37 m long and 34 m span, nose at -Z. Wheels 3.9 m under the origin.
+// Fuselage lathe with the tail swept up, belly, cheat lines and windscreen as partial lathes
+// over it, swept wings and tail as thin extrusions, two pods. About 700 triangles.
+function buildAirliner(pal){
+  const W=0xf2f3f5,G=0x9aa1a8,L=0xd3d7dc,D=0x23272c,col=TFC_PAL[pal%TFC_PAL.length];
+  const prof=[[0.05,-18.6],[0.75,-18.2],[1.3,-17.4],[1.7,-16.2],[1.93,-14.6],[1.98,-12],[1.98,8],[1.86,11],[1.52,14],[1.02,16.6],[0.45,18.5],[0.08,18.9]];
+  const up=g=>{const a=g.attributes.position;for(let i=0;i<a.count;i++){const z=a.getZ(i);if(z>8)a.setY(i,a.getY(i)+(z-8)*0.11);}return g;};
+  // phi 0 is the belly, PI/2 the right side, PI the crown
+  const lathe=(pr,seg,p0,pl,k)=>{const g=new THREE.LatheGeometry(pr.map(q=>new THREE.Vector2(q[0]*(k||1),q[1])),seg,p0||0,pl||Math.PI*2);g.rotateX(Math.PI/2);return up(g);};
+  const cab=prof.slice(4,9);
+  const slab=(pts,d)=>{const sh=new THREE.Shape();sh.moveTo(pts[0][0],pts[0][1]);for(let i=1;i<pts.length;i++)sh.lineTo(pts[i][0],pts[i][1]);
+    return new THREE.ExtrudeGeometry(sh,{depth:d,bevelEnabled:false});};
+  const parts=[[lathe(prof,12),W],[lathe(cab,4,-0.9,1.8,1.006),G],
+    [lathe(cab,1,1.70,0.2,1.01),col],[lathe(cab,1,Math.PI*2-1.9,0.2,1.01),col],
+    [lathe([[1.3,-17.4],[1.7,-16.2]],4,2.0,Math.PI*2-4.0,1.012),D]];
+  for(const sx of [1,-1]){
+    // wing: 27 deg sweep, 5 deg dihedral, low on the fuselage
+    const w=slab([[sx*1.6,-4.5],[sx*17,3.1],[sx*17,4.6],[sx*1.6,2.2]],0.35);w.rotateX(Math.PI/2);w.translate(0,0.175,0);w.rotateZ(sx*0.087);parts.push([tfcAt(w,0,-1.35,0),L]);
+    const pod=new THREE.CylinderGeometry(0.95,0.8,4.0,10);pod.rotateX(Math.PI/2);parts.push([tfcAt(pod,sx*5.6,-2.45,-4.3),W]);
+    const lip=new THREE.CircleGeometry(0.86,10);lip.rotateY(Math.PI);parts.push([tfcAt(lip,sx*5.6,-2.45,-6.31),D]);
+    parts.push([tfcAt(new THREE.BoxGeometry(0.3,0.9,3),sx*5.6,-1.75,-3.0),L]);
+    const tp=slab([[sx*0.5,14.6],[sx*6.3,17.4],[sx*6.3,18.4],[sx*0.5,18.2]],0.22);tp.rotateX(Math.PI/2);parts.push([tfcAt(tp,0,1.0,0),W]);
+  }
+  const fin=slab([[12.4,1.4],[16.6,8.2],[18.6,8.2],[18.9,1.4]],0.3);fin.rotateY(-Math.PI/2);parts.push([tfcAt(fin,0.15,0,0),col]);
+  const g=new THREE.Group(),body=new THREE.Mesh(tfcMerge(parts),TFC_MAT);g.add(body);
+  // gear: two mains and the nose leg, one mesh, shown below 160 m
+  const gp=[];
+  for(const x of [3.6,-3.6]){gp.push([tfcAt(new THREE.BoxGeometry(0.25,1.6,0.25),x,-2.6,1.4),G]);const w=new THREE.CylinderGeometry(0.6,0.6,0.5,8);w.rotateZ(Math.PI/2);gp.push([tfcAt(w,x,-3.3,1.4),D]);}
+  gp.push([tfcAt(new THREE.BoxGeometry(0.2,1.55,0.2),0,-2.72,-13),G]);{const w=new THREE.CylinderGeometry(0.4,0.4,0.35,8);w.rotateZ(Math.PI/2);gp.push([tfcAt(w,0,-3.5,-13),D]);}
+  const gear=new THREE.Mesh(tfcMerge(gp),TFC_MAT);g.add(gear);
+  scene.add(g);return {g:g,gear:gear,body:body};
+}
+// rotor blur: a faint grey disc with two blade traces, so a spinning disc reads as turning
+const TFC_ROTOR_TEX=tex(64,64,(x,w,h)=>{x.clearRect(0,0,w,h);const gr=x.createRadialGradient(32,32,2,32,32,31);gr.addColorStop(0,'rgba(40,44,48,.55)');gr.addColorStop(1,'rgba(40,44,48,.25)');
+  x.fillStyle=gr;x.beginPath();x.arc(32,32,31,0,Math.PI*2);x.fill();x.fillStyle='rgba(20,22,24,.55)';x.save();x.translate(32,32);for(let k=0;k<2;k++){x.rotate(Math.PI/2);x.fillRect(-31,-1.5,62,3);}x.restore();});
+const TFC_ROTOR_MAT=new THREE.MeshBasicMaterial({map:TFC_ROTOR_TEX,transparent:true,opacity:0.6,depthWrite:false,side:THREE.DoubleSide});
+// light helicopter: cabin, glazed nose, tail boom, fin, stabiliser, skids. Skids 1.74 m under the origin.
+// The main rotor and tail rotor are half transparent discs that spin. About 250 triangles.
+function buildHeli(pal){
+  const col=TFC_PAL[(pal+2)%TFC_PAL.length],W=0xf2f3f5,D=0x1e2630,G=0x5d646a;
+  const sph=(sx,sy,sz)=>{const g=new THREE.SphereGeometry(1,8,5);g.scale(sx,sy,sz);return g;};
+  const boom=new THREE.CylinderGeometry(0.12,0.3,5,6,1,true);boom.rotateX(Math.PI/2);
+  const parts=[[sph(1.15,1.1,2.1),col],[tfcAt(sph(0.95,0.8,1.1),0,0.15,-1.25),D],[tfcAt(boom,0,0.35,4.0),col],
+    [tfcAt(new THREE.BoxGeometry(0.12,1.5,0.9),0,0.9,6.4),col],[tfcAt(new THREE.BoxGeometry(2.4,0.08,0.6),0,0.45,5.6),W],
+    [tfcAt(new THREE.BoxGeometry(0.12,0.12,3.6),0.95,-1.68,0.1),G],[tfcAt(new THREE.BoxGeometry(0.12,0.12,3.6),-0.95,-1.68,0.1),G],
+    [tfcAt(new THREE.BoxGeometry(2.0,0.1,0.12),0,-1.3,-0.8),G],[tfcAt(new THREE.BoxGeometry(2.0,0.1,0.12),0,-1.3,0.9),G],
+    [tfcAt(new THREE.CylinderGeometry(0.1,0.1,0.5,6,1,true),0,1.3,0),G]];
+  const g=new THREE.Group();g.add(new THREE.Mesh(tfcMerge(parts),TFC_MAT));
+  const rg=new THREE.CircleGeometry(5.3,16);rg.rotateX(-Math.PI/2);const rotor=new THREE.Mesh(rg,TFC_ROTOR_MAT);rotor.position.y=1.6;rotor.renderOrder=2;g.add(rotor);
+  const tg=new THREE.CircleGeometry(0.75,10);tg.rotateY(Math.PI/2);const trot=new THREE.Mesh(tg,TFC_ROTOR_MAT);trot.position.set(0.2,0.9,6.5);trot.renderOrder=2;g.add(trot);
+  scene.add(g);return {g:g,rotor:rotor,trot:trot};
+}
+// far stand-ins (beyond 6 km): two to four boxes, under 60 triangles, same lights as the full model
+function tfcLod(type,pal){
+  const B=(w,h,d,x,y,z,c)=>[tfcAt(new THREE.BoxGeometry(w,h,d),x,y,z),c],col=TFC_PAL[pal%TFC_PAL.length],W=0xf2f3f5;
+  const P=type==='airliner'?[B(3.9,3.9,37,0,0,0,W),B(34,0.4,5,0,-1.3,1,0xd3d7dc),B(0.4,6,4.5,0,4.6,16.4,col),B(12,0.3,3,0,1.0,16.8,W)]
+    :type==='heli'?[B(2.2,2.1,4,0,0,0,TFC_PAL[(pal+2)%TFC_PAL.length]),B(0.4,0.4,5,0,0.35,4,TFC_PAL[(pal+2)%TFC_PAL.length]),B(10,0.05,0.5,0,1.6,0,0x2a2e33)]
+    :type==='f16'?[B(1.4,1.2,15,0,0,0,0x8d949b),B(9.5,0.12,4,0,-0.05,1.6,0x8d949b),B(0.1,3,2.5,0,1.8,5.5,0x8d949b)]
+    :[B(1.2,1.4,8,0,0,0,W),B(11,0.15,1.5,0,0.9,-0.75,W),B(0.1,1.5,1.1,0,1.0,4.7,W)];
+  const m=new THREE.Mesh(tfcMerge(P),TFC_MAT);m.visible=false;return m;
+}
 const MODELS={};
 function buildAlpha(){
   // high wing, pod and boom, T-tail. Built with the ground at y=0, then dropped so the wheels sit at -GEAR.
@@ -5903,18 +5982,12 @@ const liveries=[[0xc8102e,0x222222,'N738GE'],[0x2a6f97,0xf2a900,'N52614'],[0x3c6
 let pk=0;const PARKED=[];
 for(let u=705;u<=1500;u+=66){const L=liveries[pk%liveries.length];const p=buildPlane({stripe:L[0],accent:L[1],reg:L[2],regColor:'#222',full:false});PARKED.push(p.g);
   p.g.position.set(wX(u,-340),1.39,wZ(u,-340));p.g.rotation.y=-116*Math.PI/180;OBST.push({kind:'circ',x:wX(u,-340),z:wZ(u,-340),r:6,h:3,name:'a parked airplane'});pk++;}   // 1.39: tyres on the apron paint, 4.5 cm up
-// ---------- traffic: KGEU Cessna, Luke F-16 pair, a C-17, another Reaper ----------
-const ai=buildPlane({stripe:0xc8102e,accent:0x222222,reg:'N5231G',regColor:'#222',full:false});
+// ---------- traffic ----------
+// TRAFFIC: every other aircraft in the sky. The AI traffic (TFC, below the far cull) adds and removes
+// its own entries; the banner tow plane of the @OhRabah egg keeps its fixed closed curve.
 const TRAFFIC=[];const _ap=new V3(),_at=new V3(),_at1=new V3(),_at2=new V3(),_ae=new THREE.Euler(0,0,0,'YXZ');
-function wL(a,b,y){const sn=Math.sin(LUKE.h),cs=Math.cos(LUKE.h);return new V3(LUKE.x+a*sn+b*cs,y,LUKE.z-a*cs+b*sn);}
 function addTraffic(o){o.path=new THREE.CatmullRomCurve3(o.pts,true,'catmullrom',0.5);o.len=o.path.getLength();o.bank=0;o.yp=null;TRAFFIC.push(o);return o;}
-addTraffic({m:ai,kind:'a Cessna',grp:'c',v:48,t:0.35,pts:[[-1300,0,200],[600,0,120],[2600,0,200],[3500,500,300],[3300,1400,320],[1100,1500,320],[-1300,1400,320],[-2200,600,280]].map(p=>new V3(wX(p[0],p[1]),p[2],wZ(p[0],p[1])))});
-const vipPts=[[-7000,-160,460],[-2000,-160,460],[0,-160,460],[900,-700,420],[1500,-1400,330],[0,-1550,300],[-1800,-1450,300],[-2900,-900,210],[-2300,-160,90],[-600,-160,45],[1600,-160,110],[3600,700,350],[3200,3200,600],[-2500,4200,700],[-8500,2600,620],[-10000,700,520]].map(p=>wL(p[0],p[1],p[2]));
-const v1=addTraffic({m:hdModel('f16')||buildF16(),kind:'a flight of two F-16s',grp:'v',v:125,t:0.1,pts:vipPts,gearLow:1});
-const v2=addTraffic({m:hdModel('f16')||buildF16(),kind:'',grp:'v',v:125,t:0,pts:vipPts,gearLow:1});v2.t=(v1.t-260/v2.len+1)%1;
 const circ=(cx,cz,r,y,n)=>{const a=[];for(let i=0;i<n;i++){const t=i/n*Math.PI*2;a.push(new V3(cx+Math.cos(t)*r,y,cz+Math.sin(t)*r));}return a;};
-addTraffic({m:buildHeavy(),kind:'a C-17',grp:'h',v:115,t:0.3,pts:circ(-2000,-4000,14000,2130,14)});
-addTraffic({m:hdModel('reaper')||buildReaper('N12TH'),kind:'an MQ-9',grp:'r',v:42,t:0.6,pts:circ(9000,-9000,2600,1500,10)});
 // ---------- @OhRabah easter eggs (3.10) ----------
 // Five civilian spots, nothing at Luke: a hangar banner at Glendale, a lit billboard on the
 // west edge of the State Farm Stadium lot (faces the airport, seen on right downwind and on
@@ -6018,9 +6091,10 @@ function eggUpdate(dt){
       a.needsUpdate=n.needsUpdate=true;}}
 }
 TRAFFIC.forEach(o=>{o.m.g.userData.heat=0.8;if(o.m.gear)o.m.gear.visible=false;if(o.m.prop)trafficProps(o.m,o.grp==='c'||o.grp==='b'?'cessna':'reaper');});
-// traffic lights: nav, strobes and beacon only, one shared material; the C-17 has no light table
-{const TL={c:['cessna',0.15],b:['cessna',0.15],v:['f16',0],r:['reaper',0]};
- TRAFFIC.forEach(o=>{const t=TL[o.grp];if(t)o.m.lights=makeAircraftLights(o.m.g,AC_LIGHTS[t[0]],{mat:ACL_MAT_T,only:['nav','strobe','beacon','glow'],dy:t[1]});});}
+// traffic lights: nav, strobes and beacon only, one shared material. Keyed by the curve traffic's grp
+// and by the AI traffic's type: [AC_LIGHTS table, y offset]
+const TL={c:['cessna',0.15],b:['cessna',0.15],v:['f16',0],r:['reaper',0],cessna:['cessna',0.15],f16:['f16',0],airliner:['airliner',0],heli:['heli',0]};
+TRAFFIC.forEach(o=>{const t=TL[o.grp];if(t)o.m.lights=makeAircraftLights(o.m.g,AC_LIGHTS[t[0]],{mat:ACL_MAT_T,only:['nav','strobe','beacon','glow'],dy:t[1]});});
 // ---------- far cull: aircraft a pixel or two across ----------
 // Every part of a model is a draw call wherever it is: from Luke, 9 km out, the 13 parked
 // Cessnas at Glendale were 364 calls a frame for a few grey pixels, the traffic another 200.
@@ -6042,8 +6116,360 @@ function farUpdate(){
   for(const f of FAR){const px=f.span*k/Math.max(1,f.g.position.distanceTo(cp)),off=px<(f.off?FAR_PX*1.25:FAR_PX);   // no flicker at the edge
     if(off!==f.off){f.off=off;for(const m of f.ms)m.layers.mask=off?0:1;}}
 }
+// ================= AI traffic =================
+// TFC keeps 6 to 10 kinematic aircraft alive around the player, built from a list of airfield
+// plans so a new region can plug its own in later. A plan:
+//   {type:'airliner'|'cessna'|'f16'|'heli', apt:label,
+//    ends:[runway ends (RWY_ENDS entries) landed on; the one most into the wind is picked at each spawn],
+//    depEnds:[optional, the ends departures use, picked the same way; default ends],
+//    pattern:'straightin'|'left'|'overhead'|'roam',
+//    park:{x,z,hdg,spots:[[x,z],...]} apron spots (hdg deg true, the first spot is x,z), or null,
+//    twy / depTwy: metres from the landing / departure runway centreline to its parallel taxiway, apron side,
+//    exitU: metres past the threshold where traffic turns off,
+//    climbOut:{hdg (deg, relative to the runway heading), alt (m above the field)},
+//    count:{min,max}, every:[s,s] optional (a new one scheduled every that many seconds),
+//    fin: final length a straight in arrival starts at (m), surf: height of the runway paint (m),
+//    roam:[[x,z],...] (helicopters) points to wander between}
+// Each aircraft is an entry in TRAFFIC with the old shape {m, kind, grp, v} (map dots, far cull, lights,
+// radio advisories all read it) plus pos, vel (m/s), hdg (rad true), alt (wheels, m), vs, gs, state,
+// onGround, callName and type. Nothing is created or kept beyond TFC_R of the player, an aircraft
+// beyond 10 km steps every 4th frame, and the lot is hidden and frozen in missions, arcade games,
+// lessons and the strike, or while no flight is running.
+// States. airliner: final > rollout > taxi_in > parked > taxi_out > hold > lineup > takeoff > climb > depart.
+// cessna: upwind > crosswind > downwind > base > final > touchgo > upwind. f16: initial > break > downwind >
+// base > final > rollout > taxi_in > parked > ... like the airliner. heli: cruise <> hover. Any final can
+// become goaround, which rejoins a left circuit at crosswind.
+const TFC_R=37040,TFC_SPAWN=34500,TFC_NEAR=1000,TFC_FAR=10000,TFC_MAX=10,TFC_MIN=6,TFC_G=9.81,TFC_D2R=Math.PI/180;
+// per type: bank (max, deg) and bn (normal), speeds and accelerations in m/s and m/s2, vsUp / vsDn / vsA
+// vertical speed limits and change, gam glide path (deg), aim (touchdown aim past the threshold, m),
+// flare (height, m), sink at touchdown (m/s), patAlt / patD / finD / upX: circuit height above the
+// field, downwind offset, base turn distance before the threshold, upwind past the runway end
+const TFC_T={
+  airliner:{bank:30,bn:25,vApp:72,vFin:85,vPat:105,vClimb:125,vCruise:150,vr:76,vTaxi:9,acc:2.0,dec:2.4,aAir:1.0,dAir:0.8,vsUp:11,vsDn:9,vsA:2,gam:3,aim:350,flare:9,sink:1.0,patAlt:900,patD:5000,finD:9000,upX:3000,kind:'an airliner',call:'airliner'},
+  cessna:{bank:45,bn:28,vApp:34,vFin:38,vPat:46,vClimb:38,vCruise:50,vr:28,vTaxi:7,acc:1.6,dec:1.8,aAir:0.8,dAir:0.6,vsUp:3.5,vsDn:3.5,vsA:1.5,gam:4,aim:150,flare:4,sink:0.6,patAlt:305,patD:1300,finD:1400,upX:400,kind:'a Cessna',call:'Cessna'},
+  f16:{bank:70,bn:45,vApp:80,vFin:85,vPat:103,vClimb:180,vCruise:200,vr:82,vTaxi:10,acc:6,dec:3,aAir:4,dAir:4,vsUp:30,vsDn:14,vsA:6,gam:3,aim:300,flare:6,sink:0.9,patAlt:457,patD:2000,finD:2600,upX:1500,kind:'an F-16',call:'F-16'},
+  heli:{bank:30,bn:25,vPat:50,vTaxi:0,acc:2,dec:2,aAir:1.6,dAir:2,vsUp:5,vsDn:4,vsA:1.5,kind:'a helicopter',call:'helicopter'}
+};
+const TFC={plans:[],list:[],pool:{},spawns:[],want:[],next:[],frame:0,chk:0,seq:0,need:true,auto:true,shown:true,ms:0,update:null};
+// the model pool, built once: up to 5 airliners, 2 Cessnas, 2 F-16s and 2 helicopters at a time
+function tfcMake(type,i){
+  const h=new THREE.Group();h.name='tfc_'+type;let full,gear=null,rotor=null,trot=null,gy;
+  if(type==='airliner'){const a=buildAirliner(i);full=a.g;gear=a.gear;gy=3.9;}
+  else if(type==='heli'){const a=buildHeli(i);full=a.g;rotor=a.rotor;trot=a.trot;gy=1.74;}
+  else if(type==='cessna'){const L=liveries[(i+3)%liveries.length],p=buildPlane({stripe:L[0],accent:L[1],reg:L[2],regColor:'#222',full:false});trafficProps(p,'cessna');full=p.g;gy=1.37;}
+  else{const f=hdModel('f16')||buildF16();full=f.g;gear=f.gear||null;if(f.ab)f.ab.visible=false;gy=f.hd?TYPES.f16.gear:1.5;}
+  h.add(full);const lod=tfcLod(type,i);h.add(lod);scene.add(h);h.visible=false;h.userData.heat=0.8;
+  const M={g:h,full:full,lod:lod,gear:gear,rotor:rotor,trot:trot,gy:gy,busy:false,lodOn:false,type:type},t=TL[type];
+  M.lights=makeAircraftLights(h,AC_LIGHTS[t[0]],{mat:ACL_MAT_T,only:['nav','strobe','beacon','glow'],dy:t[1]});
+  return M;
+}
+[['airliner',5],['cessna',2],['f16',2],['heli',2]].forEach(([type,n])=>{TFC.pool[type]=[];
+  for(let i=0;i<n;i++){const M=tfcMake(type,i);TFC.pool[type].push(M);farAdd(M.g);const f=FAR[FAR.length-1];WARM_STEPS.push(()=>farWarm(f));}});
+function tfcEnd(code,num){return RWY_ENDS.find(e=>e.rwy.code===code&&e.num===num);}
+// Arizona: Sky Harbor arrivals on 8/26 and departures off 7L/25R, Glendale left traffic on 1/19,
+// the Luke overhead to 3L/21R with departures off 3R/21L, helicopters over Phoenix
+(function(){
+  const sh=[];for(let k=0;k<5;k++)sh.push([shX(-420+48*k,95),shZ(-420+48*k,95)]);
+  const lk=[];for(let k=0;k<4;k++)lk.push([lkX(60+60*k,300),lkZ(60+60*k,300)]);
+  const roam=lists.sub.concat(lists.near).filter(e=>e[0]>FWY_X+400).map(e=>[e[0],e[1]]);
+  for(const [dx,dz] of [[0,0],[1500,800],[-1200,1200],[900,-1400],[-1500,-700]])roam.push([DT_TOP.x+dx,DT_TOP.z+dz]);
+  TFC.plans.push(
+    {type:'airliner',apt:'KPHX',ends:[tfcEnd('KPHX','08'),tfcEnd('KPHX','26')],depEnds:[tfcEnd('KPHX','07L'),tfcEnd('KPHX','25R')],pattern:'straightin',
+     park:{x:sh[0][0],z:sh[0][1],hdg:2,spots:sh},twy:90,depTwy:150,exitU:2000,climbOut:{hdg:0,alt:2500},count:{min:3,max:5},every:[60,120],fin:18520,surf:0.3},
+    {type:'cessna',apt:'KGEU',ends:[tfcEnd('KGEU','1'),tfcEnd('KGEU','19')],pattern:'left',park:null,twy:120,exitU:0,climbOut:null,count:{min:1,max:2},surf:0.06},
+    {type:'f16',apt:'KLUF',ends:[tfcEnd('KLUF','03L'),tfcEnd('KLUF','21R')],depEnds:[tfcEnd('KLUF','03R'),tfcEnd('KLUF','21L')],pattern:'overhead',
+     park:{x:lk[0][0],z:lk[0][1],hdg:312.6,spots:lk},twy:152,depTwy:100,exitU:1800,climbOut:{hdg:0,alt:1500},count:{min:2,max:2},surf:0.06},
+    {type:'heli',apt:'Phoenix',ends:[],pattern:'roam',park:null,count:{min:1,max:2},roam:roam,surf:0});
+  TFC.plans.forEach(p=>{if(p.park)p.park.taken=p.park.spots.map(()=>null);});
+})();
+// runway end frame: a metres down the landing direction from the threshold, b metres right of the centreline
+const _tfcA={a:0,b:0};
+function tfcAB(E,x,z){const dx=x-E.x,dz=z-E.z;_tfcA.a=dx*E.dx+dz*E.dz;_tfcA.b=-dx*E.dz+dz*E.dx;return _tfcA;}
+function tfcP(E,a,b){return [E.x+E.dx*a-E.dz*b,E.z+E.dz*a+E.dx*b];}
+const tfcLen=E=>E.rwy.len-E.thr;                              // the far end of the pavement
+const tfcLine=(E,b,v)=>E.h-clamp(b/(6*Math.max(v,8)),-0.5,0.5);   // heading that brings it back onto the centreline
+function tfcWind(ends){const w=st.windDir*TFC_D2R;let best=ends[0],bd=9;for(const E of ends){const d=Math.abs(wrapPi(E.h-w));if(d<bd){bd=d;best=E;}}return best;}
+function tfcOK(x,z){const d=Math.hypot(x-st.pos.x,z-st.pos.z);return d>TFC_NEAR&&d<TFC_SPAWN;}
+const tfcPlayerLow=()=>running&&!st.crashed&&(st.onGround||st.agl<100);
+// the player sits on (or just over) this runway: within 100 m of the centreline, between the ends
+function tfcOnRwy(E){if(!tfcPlayerLow())return false;const p=tfcAB(E,st.pos.x,st.pos.z);return Math.abs(p.b)<100&&p.a>-E.thr-30&&p.a<tfcLen(E)+30;}
+// another aircraft rolling on this runway (fin: or on a final to it inside 5 km), not counting o's own flight
+function tfcRwyBusy(o,rw,fin){
+  for(const q of TFC.list){if(q===o||!q.E||q.E.rwy!==rw||q.grp===o.grp)continue;
+    if(q.state==='lineup'||q.state==='takeoff'||q.state==='reject'||q.state==='rollout'||q.state==='touchgo')return true;
+    if(fin&&q.state==='final'&&tfcAB(q.E,q.pos.x,q.pos.z).a>-5000)return true;}
+  return false;}
+// 1: the player on the ground within R metres ahead, 2: another aircraft on the ground ahead (head on, the lower id goes)
+function tfcAhead(o,R,onlyPlayer){
+  const fx=Math.sin(o.hdg),fz=-Math.cos(o.hdg);
+  if(running&&!st.crashed&&(st.onGround||st.agl<15)){const dx=st.pos.x-o.pos.x,dz=st.pos.z-o.pos.z,f=dx*fx+dz*fz;if(f>0&&f<R&&Math.abs(dx*fz-dz*fx)<45)return 1;}
+  if(onlyPlayer)return 0;
+  for(const q of TFC.list){if(q===o||!q.onGround)continue;
+    const dx=q.pos.x-o.pos.x,dz=q.pos.z-o.pos.z,f=dx*fx+dz*fz;
+    if(f>0&&f<Math.min(R,160)&&Math.abs(dx*fz-dz*fx)<35){
+      const qx=Math.sin(q.hdg),qz=-Math.cos(q.hdg),f2=-dx*qx-dz*qz;
+      if(f2>0&&f2<160&&Math.abs(dx*qz-dz*qx)<35&&q.gs>0.2&&o.id<q.id)continue;
+      return 2;}}
+  return 0;}
+function tfcSpot(plan){const P=plan.park;if(!P)return -1;for(let i=0;i<P.spots.length;i++)if(!P.taken[i])return i;return -1;}
+function tfcFree(o){if(o.spotI!=null&&o.plan.park){if(o.plan.park.taken[o.spotI]===o)o.plan.park.taken[o.spotI]=null;}o.spotI=null;}
+function tfcClaim(o,i){if(i<0)return;o.plan.park.taken[i]=o;o.spotI=i;o.spot=o.plan.park.spots[i];}
+// taxi in: off the runway at the exit, out to the parallel taxiway, along it, into the spot
+function tfcRouteIn(o){const E=o.E,P=o.plan,sp=o.spot,s0=tfcAB(E,sp[0],sp[1]),s=s0.b>0?1:-1,apk=s0.a,ax=Math.max(tfcAB(E,o.pos.x,o.pos.z).a,P.exitU);
+  return [tfcP(E,ax+25,s*25),tfcP(E,ax+25,s*P.twy),tfcP(E,apk,s*P.twy),sp.slice()];}
+// taxi out: from the spot to the departure taxiway, along it to the end, to the hold short line
+function tfcRouteOut(o,sp){const E=o.E,P=o.plan,s0=tfcAB(E,sp[0],sp[1]),s=s0.b>0?1:-1,apk=s0.a,t=P.depTwy||P.twy;
+  return [tfcP(E,apk,s*t),tfcP(E,40,s*t),tfcP(E,40,s*55)];}
+function tfcHeliTgt(o){const R=o.plan.roam;let c=R.filter(p=>tfcOK(p[0],p[1])&&Math.hypot(p[0]-o.pos.x,p[1]-o.pos.z)>1500);if(!c.length)c=R;o.tgt=c[Math.floor(Math.random()*c.length)];}
+function tfcStep(o,dt){
+  const T=o.T,E=o.E,P=o.plan,gh=groundHeight(o.pos.x,o.pos.z)+(P.surf||0);
+  let hT=o.hdg,vT=o.gs,altT=null,ff=0,vsT=null,rate=null,dec=0,a=0,b=0;
+  if(E){const p=tfcAB(E,o.pos.x,o.pos.z);a=p.a;b=p.b;}
+  const R=o.gs*o.gs/(TFC_G*Math.tan(T.bn*TFC_D2R))+30,tg=Math.tan((T.gam||3)*TFC_D2R);
+  const ov=o.pat==='overhead';
+  const leg=(pa,pb)=>{const q=tfcP(E,pa,pb);hT=Math.atan2(q[0]-o.pos.x,-(q[1]-o.pos.z));return Math.hypot(q[0]-o.pos.x,q[1]-o.pos.z);};
+  const follow=()=>{   // taxi along o.wp; true when the last point is reached
+    if(o.wi>=o.wp.length){vT=0;return true;}
+    const w=o.wp[o.wi],dx=w[0]-o.pos.x,dz=w[1]-o.pos.z,d=Math.hypot(dx,dz),last=o.wi===o.wp.length-1;
+    hT=Math.atan2(dx,-dz);vT=last?Math.min(T.vTaxi,0.4*d+1):T.vTaxi;if(Math.abs(wrapPi(hT-o.hdg))>0.6)vT=Math.min(vT,4);
+    if(tfcAhead(o,150)){vT=0;dec=3;}
+    if(d<(last?3:15)){o.wi++;if(o.wi>=o.wp.length){vT=0;return true;}}
+    return false;};
+  switch(o.state){
+    case 'final':
+      hT=tfcLine(E,b,o.gs);vT=a<-6000?T.vFin:T.vApp;altT=gh+Math.max(0,T.aim-a)*tg;ff=-o.gs*tg;
+      if(o.alt-gh<T.flare&&a>-800)vsT=-T.sink;
+      if(a>-1852&&a<T.aim+300&&(tfcOnRwy(E)||tfcRwyBusy(o,E.rwy,false))){o.state='goaround';o.ga=(o.ga||0)+1;}
+      break;
+    case 'goaround':
+      hT=tfcLine(E,b,o.gs);vT=T.vPat;altT=gh+T.patAlt;
+      if(a>tfcLen(E)+T.upX*0.5){o.state='crosswind';o.pat='left';o.side=-1;o.cwA=a+R;}
+      break;
+    case 'upwind':
+      hT=tfcLine(E,b,o.gs);vT=T.vClimb;altT=gh+T.patAlt;
+      if(a>tfcLen(E)+T.upX-R){o.state='crosswind';o.cwA=a+R;}
+      break;
+    case 'crosswind':
+      vT=T.vPat;altT=gh+T.patAlt;   // square off the runway from where the turn began
+      if(leg(o.cwA!=null?o.cwA:tfcLen(E)+T.upX,o.side*T.patD)<R)o.state='downwind';
+      break;
+    case 'downwind':
+      if(ov){hT=E.h+Math.PI;vT=88;altT=gh+300;if(a<=-1300){o.state='base';o.R=Math.max(350,Math.abs(b)/2);}break;}
+      vT=T.vPat;{const ba=(T.aim+T.finD)*tg;altT=gh+T.patAlt-clamp(-a/T.finD,0,1)*(T.patAlt-ba)*0.5;}
+      if(leg(-T.finD,o.side*T.patD)<R){o.state='base';o.bsA=a-R;}
+      break;
+    case 'base':
+      if(ov){rate=o.side*TFC_G*Math.tan(Math.min(Math.atan(o.gs*o.gs/(TFC_G*o.R)),T.bank*TFC_D2R))/Math.max(o.gs,20);
+        vT=T.vApp;altT=gh+(T.aim+1300)*tg;if(Math.abs(wrapPi(o.hdg-E.h))<0.2)o.state='final';break;}
+      vT=T.vApp*1.15;altT=gh+(T.aim+T.finD)*tg;leg(o.bsA!=null?o.bsA:-T.finD,0);
+      if(Math.abs(b)<R*0.9)o.state='final';
+      break;
+    case 'initial':   // the overhead: 1,500 ft along the runway at 300 kt, break over the numbers
+      hT=tfcLine(E,b,o.gs);vT=154;altT=gh+T.patAlt;if(a>=0)o.state='break';
+      break;
+    case 'break':
+      rate=o.side*TFC_G*Math.tan(60*TFC_D2R)/Math.max(o.gs,20);vT=103;altT=gh+T.patAlt;
+      if(Math.abs(wrapPi(o.hdg-E.h-Math.PI))<0.14)o.state='downwind';
+      break;
+    case 'touchgo':
+      o.timer+=dt;hT=tfcLine(E,b,Math.max(o.gs,10));vT=o.timer<4?22:T.vr+4;
+      if(tfcAhead(o,150+o.gs*o.gs/(2*T.dec),true)){vT=0;dec=T.dec*1.6;o.timer=Math.min(o.timer,3.9);}
+      if(o.timer>=4&&o.gs>=T.vr){o.onGround=false;o.vs=1.5;o.state='upwind';}
+      break;
+    case 'rollout':
+      hT=tfcLine(E,b,Math.max(o.gs,10));vT=12;dec=clamp((o.gs*o.gs-144)/(2*Math.max(40,P.exitU-a)),0.6,T.dec*1.4);
+      if(tfcAhead(o,150+o.gs*o.gs/(2*T.dec),true)){vT=0;dec=T.dec*1.6;}
+      if(o.gs<=13&&a>=P.exitU-30){if(o.spot){o.wp=tfcRouteIn(o);o.wi=0;o.state='taxi_in';}else o.state='gone';}
+      break;
+    case 'taxi_in':
+      if(follow()){o.state='parked';o.gs=0;o.timer=o.wait!=null?o.wait:60+Math.random()*120;}
+      break;
+    case 'parked':
+      vT=0;hT=P.park.hdg*TFC_D2R;o.timer-=dt;
+      if(o.timer<=0&&Math.abs(wrapPi(o.hdg-hT))<0.1){const sp=o.spot||[o.pos.x,o.pos.z];o.E=tfcWind(P.depEnds||P.ends);o.wp=tfcRouteOut(o,sp);o.wi=0;tfcFree(o);o.spot=null;o.state='taxi_out';}
+      break;
+    case 'taxi_out':
+      if(follow()){o.state='hold';o.gs=0;}
+      break;
+    case 'hold':   // lines up only with the player clear of the runway and nobody else on it
+      vT=0;
+      if(!tfcOnRwy(E)&&!tfcRwyBusy(o,E.rwy,true)){const s=b>0?1:-1;o.wp=[tfcP(E,70,s*20),tfcP(E,110,0)];o.wi=0;o.state='lineup';}
+      break;
+    case 'lineup':
+      if(follow()){hT=E.h;vT=0;if(Math.abs(wrapPi(o.hdg-E.h))<0.05&&o.gs<0.5&&!tfcOnRwy(E))o.state='takeoff';}
+      break;
+    case 'takeoff':
+      hT=tfcLine(E,b,Math.max(o.gs,10));vT=T.vr+6;
+      if(o.gs<0.8*T.vr&&tfcAhead(o,tfcLen(E)-a,true))o.state='reject';
+      else if(o.gs>=T.vr){o.onGround=false;o.vs=T.vsUp*0.4;o.state='climb';}
+      break;
+    case 'reject':
+      hT=tfcLine(E,b,Math.max(o.gs,10));vT=0;dec=T.dec*1.5;if(o.gs<0.5){o.state='lineup';o.wi=o.wp.length;}
+      break;
+    case 'climb':
+      hT=o.alt-gh<150?tfcLine(E,b,o.gs):E.h+P.climbOut.hdg*TFC_D2R;vT=T.vClimb;altT=gh+P.climbOut.alt;
+      if(o.alt-gh>=P.climbOut.alt-40){o.state='depart';o.hOut=hT;o.aOut=o.alt;o.timer=0;}
+      break;
+    case 'depart':
+      hT=o.hOut;vT=T.vCruise;altT=o.aOut;o.timer+=dt;if(o.timer>900)o.state='gone';
+      break;
+    case 'cruise':   // helicopters: point to point over the city, now and then a hover
+      if(!o.tgt)tfcHeliTgt(o);
+      {const dx=o.tgt[0]-o.pos.x,dz=o.tgt[1]-o.pos.z,d=Math.hypot(dx,dz);hT=Math.atan2(dx,-dz);vT=d<400?Math.max(15,o.cv*d/400):o.cv;
+       altT=gh+o.hAgl;if(Math.hypot(o.pos.x-DT_TOP.x,o.pos.z-DT_TOP.z)<2500)altT=Math.max(altT,DT_TOP.h+120);
+       if(d<150){if(Math.random()<0.4){o.state='hover';o.timer=10+Math.random()*20;o.aH=o.alt;}else tfcHeliTgt(o);}}
+      break;
+    case 'hover':
+      vT=0;hT=o.hdg+0.15;altT=Math.max(o.aH,gh+120);o.timer-=dt;if(o.timer<=0){o.state='cruise';tfcHeliTgt(o);}
+      break;
+  }
+  // heading: a turn rate from the error, bank from the turn rate, capped per type
+  if(rate===null){const dh=wrapPi(hT-o.hdg),rm=o.onGround?Math.min(0.5,Math.max(0.15,o.gs/25))
+      :TFC_G*Math.tan((o.state==='final'||o.state==='base'?T.bank:T.bn)*TFC_D2R)/Math.max(o.gs,15);
+    rate=clamp(dh*0.6,-rm,rm);}
+  o.hdg=wrapPi(o.hdg+rate*dt);
+  const bT=o.onGround?0:Math.atan(rate*o.gs/TFC_G);o.bank+=(bT-o.bank)*Math.min(1,dt*3);
+  // speed
+  const ac=vT>o.gs?(o.onGround?T.acc:T.aAir):(dec||(o.onGround?T.dec:T.dAir));
+  o.gs=Math.max(0,o.gs+clamp(vT-o.gs,-ac*dt,ac*dt));
+  // height: wheels on the paint on the ground, otherwise a vertical speed toward the wanted height
+  if(o.onGround){o.alt=gh;o.vs=0;}
+  else{
+    const t=vsT!==null?vsT:altT!==null?clamp(ff+(altT-o.alt)*0.25,-T.vsDn,T.vsUp):0;
+    o.vs+=clamp(t-o.vs,-T.vsA*dt,T.vsA*dt);o.alt+=o.vs*dt;
+    if(o.alt<=gh){o.alt=gh;
+      if(o.state==='final'){o.onGround=true;o.vs=0;o.timer=0;o.tdA=a;o.state=o.type==='cessna'?'touchgo':'rollout';}
+      else o.vs=Math.max(0,o.vs);}
+  }
+  o.pos.x+=Math.sin(o.hdg)*o.gs*dt;o.pos.z-=Math.cos(o.hdg)*o.gs*dt;o.pos.y=o.alt;o.agl=o.alt-gh;
+}
+const _tfcE=new THREE.Euler(0,0,0,'YXZ');
+function tfcPose(o,dt){
+  const M=o.m,g=M.g,T=o.T;
+  g.position.set(o.pos.x,o.alt+M.gy,o.pos.z);
+  const p=o.type==='heli'?-0.12*o.gs/50:o.onGround?(o.state==='takeoff'&&o.gs>T.vr*0.9?0.1:0)
+    :Math.atan2(o.vs,Math.max(o.gs,1))+(o.state==='final'?(o.agl<T.flare?0.1:0.05):0.03);
+  _tfcE.set(p,-o.hdg,-o.bank,'YXZ');g.quaternion.setFromEuler(_tfcE);
+  if(M.gear)M.gear.visible=o.onGround||o.agl<160;
+  const dc=g.position.distanceTo(camera.position),lod=M.lodOn?dc>5800:dc>6200;
+  if(lod!==M.lodOn){M.lodOn=lod;M.full.visible=!lod;M.lod.visible=lod;}
+  if(M.rotor&&dt>0){M.rotor.rotation.y-=dt*28;M.trot.rotation.x+=dt*60;}
+  o.vel.set(Math.sin(o.hdg)*o.gs,o.vs,-Math.cos(o.hdg)*o.gs);o.v=o.gs;
+}
+function tfcAdd(plan,M,init){
+  const T=TFC_T[plan.type],o=Object.assign({m:M,type:plan.type,plan:plan,T:T,kind:T.kind,callName:T.call,id:++TFC.seq,pos:new V3(),vel:new V3(),
+    hdg:0,alt:0,vs:0,gs:0,bank:0,agl:0,acc:0,timer:0,cool:0,onGround:false,state:'',E:null,side:-1,pat:plan.pattern,spot:null,spotI:null,wp:[],wi:0},init);
+  if(!o.grp)o.grp='t'+o.id;
+  o.pos.y=o.alt;o.agl=o.alt-groundHeight(o.pos.x,o.pos.z)-(plan.surf||0);
+  M.busy=true;M.g.visible=TFC.shown;TRAFFIC.push(o);TFC.list.push(o);tfcPose(o,0);
+  TFC.spawns.push({type:o.type,state:o.state,d:Math.round(Math.hypot(o.pos.x-st.pos.x,o.pos.z-st.pos.z)),forced:!!init.forced});if(TFC.spawns.length>60)TFC.spawns.shift();
+  return o;}
+function tfcDrop(o){o.m.busy=false;o.m.g.visible=false;tfcFree(o);let i=TRAFFIC.indexOf(o);if(i>=0)TRAFFIC.splice(i,1);i=TFC.list.indexOf(o);if(i>=0)TFC.list.splice(i,1);}
+const tfcTake=type=>{const p=TFC.pool[type];return p?p.filter(M=>!M.busy):[];};
+const tfcRnd=(a,b)=>a+Math.random()*(b-a),TFC_SEP={airliner:4000,cessna:1200,f16:2500,heli:1500};
+// opts (tests): state, end (index into plan.ends), dist (m before the threshold), alt (m above the field),
+// wait (s parked); force skips the bubble and 1 km rules. mid: the first population, spread through the cycle.
+function tfcSpawnPlan(plan,opts,mid){
+  opts=opts||{};const T=TFC_T[plan.type],forced=!!opts.force,free=tfcTake(plan.type),sep=TFC_SEP[plan.type];
+  // airborne spawns also keep clear of every other aircraft (the apron spots are exclusive already)
+  const ok=(x,z,gnd)=>forced||(tfcOK(x,z)&&(gnd||TFC.list.every(q=>Math.hypot(q.pos.x-x,q.pos.z-z)>sep)));
+  if(!free.length)return null;
+  const E=plan.ends.length?(opts.end!=null?plan.ends[opts.end]:tfcWind(plan.ends)):null;
+  const fe=E?groundHeight(E.x,E.z)+(plan.surf||0):0,at=(x,z,y)=>({pos:new V3(x,0,z),alt:y});
+  if(plan.type==='airliner'){
+    let s0=opts.state||(mid&&Math.random()<0.35?'parked':'final');const si=tfcSpot(plan);
+    if(s0==='final'){
+      let D=opts.dist||(mid?tfcRnd(6000,plan.fin):plan.fin),q=null;const Dmin=Math.min(5000,D);
+      for(;D>=Dmin;D-=1000){const p=tfcP(E,-D,0);if(ok(p[0],p[1])){q=p;break;}}
+      if(q&&(si>=0||forced)){const o=tfcAdd(plan,free[0],Object.assign(at(q[0],q[1],fe+(opts.alt!=null?opts.alt:(T.aim+D)*Math.tan(T.gam*TFC_D2R))),
+          {hdg:E.h,gs:D>6000?T.vFin:T.vApp,state:'final',E:E,wait:opts.wait,forced:forced}));tfcClaim(o,si);return o;}
+      if(opts.state)return null;s0='parked';
+    }
+    if(si<0)return null;const sp=plan.park.spots[si];if(!ok(sp[0],sp[1],1))return null;
+    const o=tfcAdd(plan,free[0],Object.assign(at(sp[0],sp[1],groundHeight(sp[0],sp[1])+plan.surf),{hdg:plan.park.hdg*TFC_D2R,state:'parked',onGround:true,
+      timer:opts.wait!=null?opts.wait:mid?tfcRnd(15,150):tfcRnd(60,180),forced:forced}));tfcClaim(o,si);return o;
+  }
+  if(plan.type==='cessna'){
+    const s=-1,L=tfcLen(E),U=L+T.upX,ba=(T.aim+T.finD)*Math.tan(T.gam*TFC_D2R),H=E.h;
+    const C={upwind:['upwind',L*0.5,0,H,120],crosswind:['crosswind',U,s*T.patD*0.5,H+s*Math.PI/2,250],downwind:['downwind',L*0.6,s*T.patD,H+Math.PI,T.patAlt],
+      down2:['downwind',-200,s*T.patD,H+Math.PI,T.patAlt-30],base:['base',-T.finD,s*T.patD*0.5,H-s*Math.PI/2,ba+40],final:['final',-(opts.dist||T.finD*0.6),0,H,null]};
+    let list=opts.state?[C[opts.state]].filter(Boolean):mid?Object.values(C):[C.downwind,C.crosswind];
+    list=list.map(c=>{const p=tfcP(E,c[1],c[2]);return [c,p];}).filter(x=>ok(x[1][0],x[1][1]));
+    if(!list.length)return null;
+    const [c,p]=list[Math.floor(Math.random()*list.length)];
+    const h=opts.alt!=null?opts.alt:c[4]!=null?c[4]:Math.max(10,(T.aim-c[1])*Math.tan(T.gam*TFC_D2R));
+    return tfcAdd(plan,free[0],Object.assign(at(p[0],p[1],fe+h),{hdg:wrapPi(c[3]),gs:c[0]==='final'?T.vApp:T.vPat,state:c[0],E:E,side:s,pat:'left',forced:forced}));
+  }
+  if(plan.type==='f16'){
+    const n=opts.single?1:2;if(free.length<n)return null;
+    const s0=opts.state||(mid&&Math.random()<0.3?'parked':'initial'),grp='f'+(TFC.seq+1),kind=n>1?'a flight of two F-16s':T.kind;
+    if(s0==='parked'){const sp=[];for(let i=0;i<plan.park.spots.length&&sp.length<n;i++)if(!plan.park.taken[i])sp.push(i);
+      if(sp.length<n||sp.some(i=>!ok(plan.park.spots[i][0],plan.park.spots[i][1],1)))return null;
+      let lead=null;sp.forEach((si,k)=>{const q=plan.park.spots[si];const o=tfcAdd(plan,free[k],Object.assign(at(q[0],q[1],groundHeight(q[0],q[1])+plan.surf),
+        {hdg:plan.park.hdg*TFC_D2R,state:'parked',onGround:true,timer:(opts.wait!=null?opts.wait:mid?tfcRnd(20,120):tfcRnd(60,180))+k*20,grp:grp,kind:k?'':kind,forced:forced}));tfcClaim(o,si);lead=lead||o;});
+      return lead;}
+    const D=opts.dist||(mid?tfcRnd(3000,9260):9260),pts=[];for(let k=0;k<n;k++)pts.push(tfcP(E,-D-k*5*154,0));
+    if(pts.some(p=>!ok(p[0],p[1])))return null;
+    let lead=null;pts.forEach((p,k)=>{const o=tfcAdd(plan,free[k],Object.assign(at(p[0],p[1],fe+(opts.alt!=null?opts.alt:T.patAlt)),
+      {hdg:E.h,gs:154,state:'initial',E:E,side:-1,pat:'overhead',grp:grp,kind:k?'':kind,wait:opts.wait,forced:forced}));tfcClaim(o,tfcSpot(plan));lead=lead||o;});
+    return lead;
+  }
+  if(plan.type==='heli'){
+    const c=plan.roam.filter(p=>ok(p[0],p[1]));if(!c.length)return null;
+    const p=c[Math.floor(Math.random()*c.length)],hA=opts.alt!=null?opts.alt:tfcRnd(150,460);
+    const o=tfcAdd(plan,free[0],Object.assign(at(p[0],p[1],groundHeight(p[0],p[1])+hA),{hdg:Math.random()*Math.PI*2,gs:45,state:'cruise',hAgl:hA,cv:tfcRnd(41,57),forced:forced}));
+    tfcHeliTgt(o);return o;
+  }
+  return null;
+}
+const tfcAlive=type=>TFC.list.reduce((n,o)=>n+(o.type===type?1:0),0);
+// first population: a count per plan inside its range, the total clamped to 6..10, spread through the cycle
+function tfcPopulate(){
+  const P=TFC.plans;TFC.want=P.map(p=>p.count.min+Math.floor(Math.random()*(p.count.max-p.count.min+1)));
+  let tot=TFC.want.reduce((a,b)=>a+b,0),guard=0;
+  while(tot>TFC_MAX&&guard++<50){const i=Math.floor(Math.random()*P.length);if(TFC.want[i]>P[i].count.min){TFC.want[i]--;tot--;}}
+  while(tot<TFC_MIN&&guard++<100){const i=Math.floor(Math.random()*P.length);if(TFC.want[i]<P[i].count.max){TFC.want[i]++;tot++;}}
+  P.forEach((p,i)=>{TFC.next[i]=p.every?tfcRnd(p.every[0],p.every[1]):10;
+    for(let n=0;n<4&&tfcAlive(p.type)<TFC.want[i]&&TFC.list.length<TFC_MAX;n++)tfcSpawnPlan(p,{},true);});
+}
+// once a second: refill each plan (airliners on their own clock), and never fewer than 6 in all
+function tfcSchedule(){
+  TFC.plans.forEach((p,i)=>{TFC.next[i]-=1;const n=tfcAlive(p.type),need=p.type==='f16'?2:1;
+    if(TFC.list.length+need>TFC_MAX)return;
+    if(n<p.count.min||(TFC.next[i]<=0&&n<(p.every?p.count.max:TFC.want[i]))){
+      if(tfcSpawnPlan(p,{},false))TFC.next[i]=p.every?tfcRnd(p.every[0],p.every[1]):20;}});
+  for(let k=0;k<TFC.plans.length&&TFC.list.length<TFC_MIN;k++){const p=TFC.plans[k];if(tfcAlive(p.type)<p.count.max)tfcSpawnPlan(p,{},false);}
+}
+TFC.update=function(dt){
+  const on=running&&!MISS.on&&!ARC.on&&!STRIKE.active&&!LES.on;
+  if(on!==TFC.shown){TFC.shown=on;for(const o of TFC.list)o.m.g.visible=on;}
+  if(!on||!(dt>0))return;
+  const t0=performance.now();
+  if(TFC.need){TFC.need=false;if(TFC.auto)tfcPopulate();}
+  TFC.frame++;
+  if(TFC.auto&&(TFC.chk-=dt)<=0){TFC.chk=1;tfcSchedule();}
+  const px=st.pos.x,pz=st.pos.z;
+  for(let i=TFC.list.length-1;i>=0;i--){const o=TFC.list[i];
+    const d=Math.hypot(o.pos.x-px,o.pos.z-pz);
+    if(d>TFC_R){tfcDrop(o);continue;}
+    o.acc+=dt;if(d>TFC_FAR&&(TFC.frame+o.id)%4)continue;
+    let h=o.acc;o.acc=0;while(h>1e-6&&o.state!=='gone'){const s=Math.min(h,0.25);tfcStep(o,s);h-=s;}
+    if(o.state==='gone'){tfcDrop(o);continue;}
+    tfcPose(o,dt);
+  }
+  TFC.ms=performance.now()-t0;
+};
+// a new flight starts with a fresh sky, populated on its first running frame
+function tfcReset(){for(let i=TFC.list.length-1;i>=0;i--)tfcDrop(TFC.list[i]);TFC.need=true;TFC.chk=0;}
+function tfcClear(){for(let i=TFC.list.length-1;i>=0;i--)tfcDrop(TFC.list[i]);TFC.need=false;}
+function tfcSpawn(type,opts){const p=TFC.plans.find(q=>q.type===type);if(!p)return null;TFC.need=false;
+  const o=tfcSpawnPlan(p,Object.assign({},opts||{},{force:true}),false);return o?o.id:null;}
+function tfcList(){return TFC.list.map(o=>({id:o.id,type:o.type,state:o.state,x:o.pos.x,y:o.alt,z:o.pos.z,hdg:((o.hdg/TFC_D2R)%360+360)%360,gs:o.gs,vs:o.vs,
+  onGround:o.onGround,callName:o.callName,kind:o.kind,agl:o.agl,end:o.E?o.E.rwy.code+' '+o.E.num:null,tdA:o.tdA==null?null:o.tdA,ga:o.ga||0,
+  lights:o.m.lights?o.m.lights.count:0,visible:o.m.g.visible,lod:o.m.lodOn}));}
+// the curve traffic (the banner tow); the AI traffic runs in TFC.update
 function updateTraffic(dt){
-  TRAFFIC.forEach(o=>{o.t=(o.t+o.v*dt/o.len)%1;
+  TRAFFIC.forEach(o=>{if(!o.path)return;o.t=(o.t+o.v*dt/o.len)%1;
     // getPointAt and getTangentAt, without the two Vector3 the tangent allocates each call
     const pt=o.path.getUtoTmapping(o.t);o.path.getPoint(pt,_ap);
     o.path.getPoint(Math.max(0,pt-0.0001),_at1);o.path.getPoint(Math.min(1,pt+0.0001),_at2);_at.copy(_at2).sub(_at1).normalize();
@@ -7923,7 +8349,8 @@ function windTxt(){const w=windNow();return 'wind '+w[0]+' at '+w[1];}
 function ktC(k){return k===10?['t_n_10']:k<10?['t_n_'+k]:String(k).split('').map(d=>'t_n_'+d);}
 function windC(){const w=windNow();return ['t_wind'].concat(w[0].split('').map(d=>'t_n_'+d),['t_at'],ktC(w[1]));}
 const CLK=['','t_n_1','t_n_2','t_n_3','t_n_4','t_n_5','t_n_6','t_n_7','t_n_8','t_n_9','t_c_10','t_c_11','t_c_12'];
-const TFCC={'a Cessna':'t_tfc_cessna','a flight of two F-16s':'t_tfc_vipers','a C-17':'t_tfc_c17','an MQ-9':'t_tfc_reaper','a banner tow plane':'t_tfc_banner'};
+const TFCC={'a Cessna':'t_tfc_cessna','a flight of two F-16s':'t_tfc_vipers','a C-17':'t_tfc_c17','an MQ-9':'t_tfc_reaper','a banner tow plane':'t_tfc_banner',
+  'an airliner':'t_tfc_airliner','an F-16':'t_tfc_f16','a helicopter':'t_tfc_heli'};
 function altC(ft){
   if(ft<100)return [];
   if(ft>=1000)return ['t_n_'+Math.min(9,Math.round(ft/1000)),'t_thousand_feet'];
@@ -7971,9 +8398,10 @@ function radioUpdate(dt){
   chatT-=dt;if(chatT<=0&&opened&&!st.crashed&&!radioQ.length&&!VQ.cur){chatT=16+Math.random()*16;chatNow();}
   advT-=dt;if(advT<=0&&!st.onGround&&!st.crashed){advT=2;
     const hdg=-_euH.setFromQuaternion(st.quat,'YXZ').y;const seen={};
-    for(const o of TRAFFIC){if(seen[o.grp]||(o.cool=(o.cool||0)-2)>0||!o.kind)continue;
+    // airborne traffic inside 5 nm and 1,000 ft, each aircraft (or flight) at most once a minute
+    for(const o of TRAFFIC){if(seen[o.grp]||(o.cool=(o.cool||0)-2)>0||!o.kind||!o.m.g.visible||o.onGround)continue;
       o.m.g.getWorldPosition(_rp);const dx=_rp.x-st.pos.x,dz=_rp.z-st.pos.z,d=Math.hypot(dx,dz),dy=_rp.y-st.pos.y;
-      if(d<5500&&d>500&&Math.abs(dy)<450){seen[o.grp]=1;TRAFFIC.forEach(q=>{if(q.grp===o.grp)q.cool=100;});
+      if(d<9260&&d>500&&Math.abs(dy)<305){seen[o.grp]=1;TRAFFIC.forEach(q=>{if(q.grp===o.grp)q.cool=60;});
         let rel=Math.atan2(dx,-dz)-hdg;rel=((rel%(2*Math.PI))+2*Math.PI)%(2*Math.PI);const clk=Math.round(rel/(Math.PI/6))%12||12;
         const mi=Math.max(1,Math.round(d/1852)),ft=Math.round(Math.abs(dy)*M2FT/100)*100;
         const near=Math.abs(dy)<60;
@@ -8237,7 +8665,7 @@ function start(mode,base){
   if(PHOTO.on){PHOTO.on=false;$('photoOv').classList.remove('on');}
   document.body.classList.remove('menuOn','pauseOn','crashOn','photoOn','mapOn');if(window.stickReset)stickReset();
   MUSIC.forced=null;   // a mode with its own song (the Red Flag Dogfight: MUSIC.forced='dogfight.m4a') sets it after start()
-  RES.kind='';RES.freeT0=0;RES.segDone=false;
+  RES.kind='';RES.freeT0=0;RES.segDone=false;tfcReset();
   if(mode==='range')strikeStart();
   if(mode==='drop'||mode==='short')missStart(mode==='drop'?'drop':'short');
   if(mode==='drop')dzStart();
@@ -9090,7 +9518,7 @@ function drawMap(hdgT){
     mx.strokeStyle='rgba(6,10,16,.75)';mx.lineWidth=5*dpr;mx.beginPath();mx.moveTo(0,0);mx.lineTo(q[0],q[1]);mx.stroke();
     mx.strokeStyle='#4de1ff';mx.lineWidth=2.5*dpr;mx.stroke();
     if(Math.hypot(q[0],q[1])<C*1.4){mx.fillStyle='#4de1ff';mx.strokeStyle='#06121c';mx.lineWidth=1.5*dpr;mx.beginPath();mx.arc(q[0],q[1],4.5*dpr,0,TAU);mx.fill();mx.stroke();}}
-  mx.fillStyle='#7fd4ff';TRAFFIC.forEach(o=>{const a=P(o.m.g.position.x,o.m.g.position.z);mx.beginPath();mx.arc(a[0],a[1],2.2*dpr,0,TAU);mx.fill();});
+  mx.fillStyle='#7fd4ff';TRAFFIC.forEach(o=>{if(!o.m.g.visible)return;const a=P(o.m.g.position.x,o.m.g.position.z);mx.beginPath();mx.arc(a[0],a[1],2.2*dpr,0,TAU);mx.fill();});
   // the sensor ball's cone: amber wedge over a dark halo, so it reads at night and through the dust
   if(sensorCone().on){const b=SCONE.brgT*Math.PI/180-Math.PI/2,w=SCONE.half*Math.PI/180,L=SCONE.len*k;
     mx.beginPath();mx.moveTo(0,0);mx.arc(0,0,L,b-w,b+w);mx.closePath();
@@ -10924,6 +11352,7 @@ function tick(t,skipRender){
   cheerLevel=0;clusters.forEach(c=>{c.cool-=dt;if(c.cheer>0)c.cheer-=dt;
     const d=Math.hypot(c.x-s.pos.x,c.z-s.pos.z);if(running&&!s.crashed&&!s.onGround&&d<280&&s.agl<160&&s.ias>25&&c.cool<=0){c.cheer=4;c.cool=12;}
     if(c.cheer>0){const cd=camera.position.distanceTo(_ct.set(c.x,2,c.z));cheerLevel=Math.max(cheerLevel,clamp(1/(1+cd/180),0,1)*Math.min(1,c.cheer));}});
+  TFC.update(running&&!paused?dt:0);   // frozen while paused, hidden off the air and in missions
   if(running&&!paused){updateTraffic(dt);updateCars(dt);eggUpdate(dt);}
   updatePeople(dt,ts);
   if(running&&!paused&&!st.crashed){
@@ -11568,6 +11997,7 @@ window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runM
   starField.visible=false;starField.renderOrder=-1;scene.add(starField);
 })();
 (function(){let t='day';try{const v=localStorage.getItem('kgeuTOD');if(v&&TOD_SET[v])t=v;}catch(e){}setTOD(t);})();
+window.__kgeu.TFC=TFC;window.__kgeu.tfcList=tfcList;window.__kgeu.tfcSpawn=tfcSpawn;window.__kgeu.tfcClear=tfcClear;
 window.__kgeu.LB=LB;try{LB.boot();}catch(e){console.warn('leaderboards',e);}
 rebuildTerrain(st.pos.x,st.pos.z);
 requestAnimationFrame(frame);
