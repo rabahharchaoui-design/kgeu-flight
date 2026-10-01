@@ -1034,7 +1034,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
       <label class="sens"><input type="range" id="oRvol" min="0" max="10" step="1" value="7" aria-label="Radio volume"><b id="oRvolV">70%</b></label></div></div>
     <div class="srow"><span>Music</span><div class="chips"><button class="tog oMusic" id="oMusic">Music: On</button>
       <label class="sens"><input type="range" class="oMvol" id="oMvol" min="0" max="10" step="1" value="6" aria-label="Music volume"><b class="oMvolV" id="oMvolV">60%</b></label></div></div>
-    <div class="srow"><span></span><div class="chips"><button class="oMnext" id="oMnext">Next song</button><button class="tog" id="oMfree">In free flight: Off</button></div></div>
+    <div class="srow"><span></span><div class="chips"><button class="tog" id="oMfree">In free flight: Off</button></div></div>
     <div class="srow"><span>Callsign</span><div class="chips"><span class="csTag" id="oCs"></span><button id="oCsCh">Change</button><button id="oCsRe">Restore</button></div></div>
    </div>
    <div class="setCol">
@@ -7497,11 +7497,12 @@ function musicGate(){
   try{if(LB&&LB.csHold&&LB.csHold())return;}catch(e){}
   MUSIC.allowed=true;musicTick();
 }
-// where the game is: home, menus, school, missions, arcade want music; free flight only
-// if the player asked. The game's own pause changes nothing here: the music plays on
-// under the pause sheet, and its Play / Prev / Next act on it there.
+// where the game is: music only in flight. Never on the splash, the callsign card, home or any
+// menu screen; school, missions, arcade and the strike want it, free flight only if the player
+// asked. The game's own pause changes nothing here: the music plays on under the pause sheet,
+// and its Play / Prev / Next act on it there.
 function musicCtx(){
-  if(!running||menu.classList.contains('on'))return true;          // home and every menu screen
+  if(!running||menu.classList.contains('on'))return false;         // home and every menu screen: silent
   if(LES.on||MISS.on||STRIKE.active||ARC.on||MUSIC.forced)return true;
   return MUSIC.free;                                                  // free flight: the player's choice
 }
@@ -7584,13 +7585,16 @@ function musicTick(){
   try{
     const now=actx.currentTime,want=musicWanted(),tgt=want?MUSIC.vol:0;
     if(Math.abs(tgt-MUSIC.tgt)>1e-4){
-      const tc=want===MUSIC.want?0.03:muted?0.05:MUSIC_XF/4;      // a slider drag follows at once, a context change fades
+      const tc=want===MUSIC.want?0.03:muted?0.05:(!want&&menu.classList.contains('on'))?0.18:MUSIC_XF/4;   // a slider drag follows at once, a context change fades, a menu within a second
       aHold(musicGain.gain,now);musicGain.gain.setTargetAtTime(tgt,now,tc);MUSIC.tgt=tgt;}
     MUSIC.want=want;
     if(MUSIC.lab!==musicPlaying())musicUI();
     tkUI();
+    if(MUSIC.list===null&&MUSIC.allowed)musicManifest();          // the playlist loads once the gate opens, flight or not
     // backgrounded: fade, but keep the track, so it carries on where it was on return
     if(!want&&document.hidden&&MUSIC.allowed&&MUSIC.on&&musicCtx()){MUSIC.offAt=-1;return;}
+    // a menu screen opened from the pause sheet (Settings, a list): silent, but the track is kept, so Back and Resume carry it on
+    if(!want&&MUSIC.on&&running&&!st.crashed&&fromPause&&menu.classList.contains('on')){MUSIC.offAt=-1;return;}
     if(!want){if(MUSIC.offAt<0)MUSIC.offAt=now;else if(now-MUSIC.offAt>MUSIC_XF+0.1&&(MUSIC.cur>=0||MUSIC.busy))musicStop();return;}
     MUSIC.offAt=-1;
     if(MUSIC.list===null){musicManifest();return;}
@@ -8281,7 +8285,6 @@ document.querySelectorAll('.oSound').forEach(b=>b.onclick=()=>{initAudio();setMu
 $('pSens').onclick=()=>setStickSens((TOUCH.sens+1)%STICK_SENS.length);
 $('oMusic').onclick=()=>{initAudio();TK.paused=false;setMusicOn(!MUSIC.on);};
 $('oMfree').onclick=()=>{initAudio();setMusicFree(!MUSIC.free);};
-$('oMnext').onclick=()=>{initAudio();musicNext();};
 tapBtn($('pMusic'),()=>{initAudio();musicPlayPause();tkPausedBy();});
 tapBtn($('pMnext'),()=>{initAudio();musicNext();});
 tapBtn($('pPrev'),()=>{initAudio();musicPrev();});

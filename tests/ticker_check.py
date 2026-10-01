@@ -39,9 +39,9 @@ async def main():
         pg = await page(b, url, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3', 'kgeuMusicFree': '1'})
         await pg.evaluate("(l)=>window.__kgeu.musicLoad(l)", TONES)
         await pg.touchscreen.tap(330, 8)
-        await wait_for(pg, m, lambda s: s['playing'])
+        await wait_for(pg, m, lambda s: s['allowed'])
         t = await tk(pg)
-        ok('home screen: no ticker (menus hide it)', not t['vis'], t)
+        ok('home screen: no ticker (menus hide it, and are silent)', not t['vis'], t)
 
         await pg.evaluate("()=>{const K=window.__kgeu;K.pick('cessna');K.pickBase('kgeu');K.start('runway')}")
         s = await wait_for(pg, m, lambda s: s['playing'] and s['want'], 8000)

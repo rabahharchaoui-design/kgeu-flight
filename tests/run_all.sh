@@ -14,7 +14,7 @@ for t in prefs_check landing_check touch_check ui_check menu_check skill_check s
          multitouch_check roll_check night_check sensor_check sensor_az_check dropcam_check strike_fx_check prop_check \
          haboob_check callsign_check crash_check egg_check navlight_check quiet_check music_check map2_check modes_check dz_check onemile_check scores_check lb_merge_check upgrade_check \
          warm_console_check map_open_check scorch_check music_start_check music_pause_check ticker_check voice_queue_check \
-         steer_check units_check trim_check easy_land_check clearance_check taps_check results_check segments_check overlay_check sidetoast_check; do
+         steer_check units_check trim_check easy_land_check clearance_check taps_check results_check segments_check overlay_check sidetoast_check music_menu_check; do
   out=$($PY tests/$t.py 2>&1); code=$?
   echo "== $t (exit $code)"; echo "$out" | grep -E "FAIL|passed|clear|FAILS" | tail -4
   [[ $code -ne 0 ]] && fail+=("$t")
