@@ -229,6 +229,8 @@ async def main():
             ok('merged board: the total counts the player once', mr['tot'] == '1 pilot', mr['tot'])
             await shot(A, '11b_merged_board')
             # ---------------- the daily challenge: identical spec, one official attempt, then practice
+            # today's daily may be at a world airport (the rotation): pin it to Arizona, no reload (world_lb_check flies the world ones)
+            await A.evaluate(f"()=>{K}.dailyRegion('az')")
             d1 = await A.evaluate(f"()=>{K}.dailySpec()")
             await A.evaluate(f"()=>{{{K}.openMenu();{K}.nav('sMis')}}"); await A.wait_for_timeout(400)
             first = await A.evaluate("()=>document.querySelector('#misCards .mcard').dataset.m")

@@ -677,6 +677,18 @@ label.sens b{ color:var(--ink); min-width:74px; }
 /* six arcade cards: the featured one takes one cell so they sit three rows by two, like before */
 #menu .mcard.feat{ background:linear-gradient(90deg,var(--rust),var(--brown)); }
 #menu .mcard.feat .ac{ color:var(--sand); } #menu .mcard.feat .d{ color:#ffe9cc; }
+/* short landscape screens: the six Arizona arcade cards fit the first screen without scrolling (World airports
+   below them scroll up): the name on one line, the description on two (one at 320 px, where the icon goes too) */
+@media (orientation:landscape) and (max-height:400px){
+  #arcCards{ gap:6px; }
+  #menu #arcCards .mcard{ min-height:48px; padding-top:5px; padding-bottom:5px; }
+  #arcCards .mcard b{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #arcCards .mcard .d{ display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+}
+@media (orientation:landscape) and (max-height:340px){
+  #arcCards .mcard .ico{ display:none; }
+  #arcCards .mcard .d{ -webkit-line-clamp:1; }
+}
 #photoOv{ background:transparent; padding:0; z-index:12; }
 #photoPad{ position:absolute; inset:0; touch-action:none; cursor:grab; }
 #photoOv button{ position:absolute; min-width:44px; min-height:44px; background:rgba(26,16,9,.8); color:var(--sand); border:1.5px solid rgba(246,193,119,.45); font-weight:800; }
@@ -10015,8 +10027,9 @@ function aptStart(id){if(REGION.id!==id){pickRegion(id,{resume:{arc:'apt',region
 function todayKey(){const d=new Date();return d.getUTCFullYear()*10000+(d.getUTCMonth()+1)*100+d.getUTCDate();}
 function dayRng(k){let s=(k*2654435761)>>>0;return ()=>{s=(s+0x6D2B79F5)>>>0;let t=s;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
 // the same challenge for everyone on a given day: the region (one of four), aircraft, target, start, time of day and wind.
+// ARC.dailyRegion (tests only, __kgeu.dailyRegion): pins the region, the draw is still made so the rest stays today's.
 // The region is the first draw, so the rest keeps Arizona's structure; a world region's target is its home runway end.
-function dailySpec(){const r=dayRng(todayKey()),region=DAILY_REGIONS[Math.floor(r()*DAILY_REGIONS.length)],T=region==='az'?ARC_TARGETS():[aptEnd(region)];
+function dailySpec(){const r=dayRng(todayKey()),d0=DAILY_REGIONS[Math.floor(r()*DAILY_REGIONS.length)],region=ARC.dailyRegion&&REGIONS[ARC.dailyRegion]?ARC.dailyRegion:d0,T=region==='az'?ARC_TARGETS():[aptEnd(region)];
   const o={region:region,type:CAR[Math.floor(r()*CAR.length)],end:T[Math.floor(r()*T.length)],dist:6500+r()*4000,off:(r()*2-1)*1.3,alt:1800+r()*1600};
   o.tod=['day','sunset','night'][Math.floor(r()*3)];o.wdir=10*(1+Math.floor(r()*36));o.wkt=2+Math.floor(r()*11);o.day=todayKey();return o;}
 function placeAir(x,z,aglFt,h,kt){
@@ -13619,7 +13632,7 @@ window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runM
   starField.visible=false;starField.renderOrder=-1;scene.add(starField);
 })();
 (function(){let t='day';try{const v=localStorage.getItem('kgeuTOD');if(v&&TOD_SET[v])t=v;}catch(e){}setTOD(t);})();
-window.__kgeu.TFC=TFC;window.__kgeu.tfcList=tfcList;window.__kgeu.tfcSpawn=tfcSpawn;window.__kgeu.tfcClear=tfcClear;
+window.__kgeu.dailyRegion=id=>{ARC.dailyRegion=id||null;return dailySpec().region;};window.__kgeu.TFC=TFC;window.__kgeu.tfcList=tfcList;window.__kgeu.tfcSpawn=tfcSpawn;window.__kgeu.tfcClear=tfcClear;
 window.__kgeu.TCAS={levels:tcasLevels,state:()=>({ta:TCAS.list.some(o=>tcasLvl(o)>=2),ra:!!TCAS.ra,sense:TCAS.ra?(TCAS.sense>0?'climb':'descend'):null,clear:TCAS.clear,inhibit:TCAS.inhibit,
   shown:TCAS.shown,on:TCAS.on,raT:TCAS.raT}),tcasConflict:tcasConflict,setTcas:setTcas,T:TCAS,tcasVoiceLog:TCAS.voiceLog};
 window.__kgeu.tcasConflict=tcasConflict;window.__kgeu.tcasVoiceLog=TCAS.voiceLog;

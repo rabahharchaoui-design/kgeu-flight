@@ -21,12 +21,16 @@ def tone(freq, secs):
 TONES = [{'name': f'_tp{i}.wav', 'url': tone(f, 30.0), 'title': f'Tap Tone {i}'} for i, f in enumerate((330, 440, 550))]
 
 FIT = """(sel)=>{const s=document.querySelector(sel);const W=innerWidth,H=innerHeight;const bad=[];
-  s.querySelectorAll('button,input,.chip').forEach(e=>{const r=e.getBoundingClientRect();if(!r.width||getComputedStyle(e).visibility==='hidden')return;
+  // the location row scrolls sideways (4.6b): a card counts by the part its row shows, a card scrolled out of sight
+  // not at all, its 44 px by its full size (the rule tests/pause_layout_check.py uses)
+  const R=b=>{const r=b.getBoundingClientRect(),L=b.closest('.locs');if(!L)return r;const q=L.getBoundingClientRect(),x0=Math.max(r.left,q.left),x1=Math.max(x0,Math.min(r.right,q.right));
+    return {left:x0,right:x1,top:r.top,bottom:r.bottom,x:x0,y:r.top,width:x1-x0,height:r.height};};
+  s.querySelectorAll('button,input,.chip').forEach(e=>{const r0=e.getBoundingClientRect(),r=R(e);if(r.width<=0.5||getComputedStyle(e).visibility==='hidden')return;
     if(r.left<-0.5||r.top<-0.5||r.right>W+0.5||r.bottom>H+0.5)bad.push('off screen '+(e.id||e.textContent.trim().slice(0,16)));
-    if(e.matches('button')&&(r.width<43.5||r.height<43.5))bad.push('small '+(e.id||e.textContent.trim().slice(0,16))+' '+Math.round(r.width)+'x'+Math.round(r.height));
+    if(e.matches('button')&&(r0.width<43.5||r0.height<43.5))bad.push('small '+(e.id||e.textContent.trim().slice(0,16))+' '+Math.round(r0.width)+'x'+Math.round(r0.height));
     if(e.matches('button')&&e.scrollWidth>e.clientWidth+1)bad.push('text cut '+(e.id||e.textContent.trim().slice(0,16)));});
   s.querySelectorAll('.chip b,.qs b,.qs i,.pzNav span').forEach(e=>{if(e.offsetParent&&e.scrollWidth>e.clientWidth+1)bad.push('truncated '+e.textContent);});
-  const hits=[...s.querySelectorAll('button')].filter(e=>e.getBoundingClientRect().width).map(e=>[e,e.getBoundingClientRect()]);
+  const hits=[...s.querySelectorAll('button')].filter(e=>R(e).width>0.5).map(e=>[e,R(e)]);
   for(let i=0;i<hits.length;i++)for(let j=i+1;j<hits.length;j++){const a=hits[i][1],b=hits[j][1];
     if(hits[i][0].contains(hits[j][0])||hits[j][0].contains(hits[i][0]))continue;
     if(Math.min(a.right,b.right)-Math.max(a.left,b.left)>1&&Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>1)bad.push('overlap '+hits[i][0].textContent.trim().slice(0,10)+' / '+hits[j][0].textContent.trim().slice(0,10));}

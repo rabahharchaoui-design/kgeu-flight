@@ -9,6 +9,8 @@ async def main():
     async with async_playwright() as p:
         b = await launch(p)
         pg = await page(b, url, storage={'kgeuOnboard': 'rookie', 'kgeuTut': '1', 'kgeuType': 'cessna'})
+        # today's daily may be at a world airport (the rotation): pin it to Arizona so it flies here (world_lb_check flies the world ones)
+        assert await pg.evaluate(f"()=>{K}.dailyRegion('az')") == 'az'
         await pg.evaluate(f"()=>{{{K}.openMenu();{K}.nav('sArc')}}"); await pg.wait_for_timeout(300)
         cards = await pg.evaluate("()=>[...document.querySelectorAll('#arcCards .mcard')].map(c=>({id:c.dataset.m,ico:!!c.querySelector('svg.ico'),stars:!!c.querySelector('.stars'),soon:!!c.querySelector('.soon'),t:c.querySelector('b').textContent}))")
         ok('featured Red Flag Dogfight, coming soon, is first', cards[0]['id'] == 'dogfight' and cards[0]['soon'] and cards[0]['t'] == 'Red Flag Dogfight', cards[:1])

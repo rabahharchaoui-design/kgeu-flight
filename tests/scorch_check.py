@@ -70,7 +70,12 @@ MEASURE = """(a)=>{const K=window.__kgeu,{scene,renderer,camera}=K.R3();
     sc.visible=true;renderer.render(scene,camera);gl.readPixels(x0,y0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,A);
     sc.visible=false;renderer.render(scene,camera);gl.readPixels(x0,y0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,B);sc.visible=true;
     let sum=0,bad=0,n=0;for(const [X,Y] of px){const i=((Y-y0)*w+(X-x0))*4,off=lum(B,i),dk=(off-lum(A,i))/Math.max(off,1);
-      if(dk<0.3){rc.setFromCamera({x:(X+0.5)/W*2-1,y:(Y+0.5)/H*2-1},camera);const h=rc.intersectObjects(scene.children,true).find(h=>h.object.visible);
+      if(dk<0.3){rc.setFromCamera({x:(X+0.5)/W*2-1,y:(Y+0.5)/H*2-1},camera);
+        // seen grazing from far off a pixel is ~7 m of ground deep: a sample near the far or near rim can round
+        // to a pixel whose centre ray passes beyond the disc (the 2 px test above is radial, the rim is not);
+        // that pixel is off the scorch, not speckle
+        if(!rc.intersectObject(sc,false).length)continue;
+        const h=rc.intersectObjects(scene.children,true).find(h=>h.object.visible);
         if(h&&!flat(h.object))continue;bad++;}
       sum+=dk;n++;}
     out.push({dark:sum/Math.max(n,1),speckle:bad/Math.max(n,1),n:n,pxR:(x1-x0)/2});}

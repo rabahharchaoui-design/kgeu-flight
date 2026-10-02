@@ -126,6 +126,8 @@ async def main():
         for skill, tag in (('pilot', 'Hard'), ('rookie', 'Easy')):
             pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': skill, 'kgeuTut': '1', 'kgeuCoach': '3'})
             await pg.evaluate(f"()=>{K}.setSkill('{skill}')")
+            # today's daily may be at a world airport (the rotation): pin it to Arizona so it flies here, no reload
+            await pg.evaluate(f"()=>{K}.dailyRegion('az')")
             await pg.touchscreen.tap(422, 6); await pg.wait_for_timeout(300)
 
             # Easy: the modes whose overlays differ in Easy (DZ chip, route, guide hoops, lesson arrow)
