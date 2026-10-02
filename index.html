@@ -1381,7 +1381,7 @@ function airportZoneDist(x,z){if(!REGION.az)return terrZoneD(x,z);const u=toU(x,
 // 400 m; sea cells at 0 (the water plane) and, by the sea, land never under it. Paris rivers keep their
 // height. groundHeight is bilinear between cell centres; isWater is the nearest cell of the water mask.
 // Until the data is in, the ground is flat at 0 and nothing is water (FLY waits for WORLD.ready).
-const TERR={ready:false,W:0,H:0,c:200,ox:0,oz:0,h:null,wat:null,segs:[],aero:[],pv:null,tw:[],ap:[]};
+const TERR={ready:false,W:0,H:0,c:200,ox:0,oz:0,h:null,wat:null,fw:null,segs:[],aero:[],pv:null,tw:[],ap:[]};
 function pipXZ(P,x,z){let c=false;for(let i=0,j=P.length-1;i<P.length;j=i++){const a=P[i],b=P[j];
   if((a[1]>z)!==(b[1]>z)&&x<(b[0]-a[0])*(z-a[1])/(b[1]-a[1])+a[0])c=!c;}return c;}
 function segD(x,z,ax,az,bx,bz){const ex=bx-ax,ez=bz-az,L=ex*ex+ez*ez,t=L>0?clamp(((x-ax)*ex+(z-az)*ez)/L,0,1):0;return Math.hypot(x-ax-ex*t,z-az-ez*t);}
@@ -1427,7 +1427,10 @@ function terrH(x,z){
 function isWater(x,z){
   const T=TERR;if(REGION.az||!T.ready)return false;
   const i=clamp(Math.floor((x-T.ox)/T.c),0,T.W-1),j=clamp(Math.floor((z-T.oz)/T.c),0,T.H-1);
-  return T.wat[j*T.W+i]===1;
+  if(T.wat[j*T.W+i]===1)return true;
+  // a finer mask where the grid's cells are wider than the river (the Seine through Paris, 25 m cells)
+  const F=T.fw;if(!F)return false;const a=Math.floor((x-F.x0)/F.c),b=Math.floor((z-F.z0)/F.c);
+  return a>=0&&b>=0&&a<F.W&&b<F.H&&F.m[b*F.W+a]===1;
 }
 function terrPaved(x,z){
   for(const r of RUNWAYS){const e=r.ends[0],dx=x-r.x,dz=z-r.z;
@@ -1472,7 +1475,8 @@ function hitObstacle(x,z,y){
     if(o.kind==='rect'){ if(u>o.u0-9&&u<o.u1+9&&v>o.v0-9&&v<o.v1+9&&y-GEAR<o.h) return o.name; }
     // a building's own outline (world region terminals and hangars), 5 m of margin through the box test only
     else if(o.kind==='poly'){ if(x>o.b[0]-5&&x<o.b[2]+5&&z>o.b[1]-5&&z<o.b[3]+5&&y-GEAR<o.h&&(pipXZ(o.P,x,z)||polyEdgeD(o.P,x,z)<5)) return o.name; }
-    else if(Math.hypot(x-o.x,z-o.z)<o.r+5&&y-GEAR<o.h) return o.name;
+    // lo (optional): the circle's underside, open below it (under the Eiffel Tower's first platform)
+    else if(Math.hypot(x-o.x,z-o.z)<o.r+5&&y-GEAR<o.h&&!(o.lo>y+3)) return o.name;
   }
   return null;
 }
@@ -7116,13 +7120,14 @@ function wbSignTex(letter,text){return tex(256,56,(x,w,h)=>{x.fillStyle='#111';x
   x.font='800 40px '+F;x.textAlign='center';x.textBaseline='middle';x.fillText(letter,32,h/2+2);x.fillStyle='#111';x.fillText(text,64+(w-67)/2,h/2+2);});}
 // terminals: the three wall bands of before (so the same triangles), textured: u along the walls in
 // 8 m bays, v up the 14 m; the roof samples the light lip at the top of the texture
-function wbTerminal(G,P,y0){
-  let s=0;
+// H: the height (14 m; de Gaulle's Terminal 1 drum 25 m, the bands stretched)
+function wbTerminal(G,P,y0,H){
+  let s=0;const k=(H||14)/14;
   for(let i=0,j=P.length-1;i<P.length;j=i++){const a=P[j],b=P[i],l=Math.hypot(a[0]-b[0],a[1]-b[1]);if(l<0.5)continue;
     const u0=s/8,u1=(s+l)/8;s+=l;
-    for(const B of [[0,4.5],[4.5,11],[11,14]]){wbQuad(G,[a[0],y0+B[0],a[1]],[b[0],y0+B[0],b[1]],[b[0],y0+B[1],b[1]],[a[0],y0+B[1],a[1]]);
+    for(const B of [[0,4.5],[4.5,11],[11,14]]){wbQuad(G,[a[0],y0+B[0]*k,a[1]],[b[0],y0+B[0]*k,b[1]],[b[0],y0+B[1]*k,b[1]],[a[0],y0+B[1]*k,a[1]]);
       const v0=B[0]/14,v1=B[1]/14;G.uv.push(u0,v0,u1,v0,u1,v1,u0,v0,u1,v1,u0,v1);}}
-  const n0=G.p.length;wbPoly(G,P,()=>y0+14);for(let k=n0;k<G.p.length;k+=3)G.uv.push(0.5,13.6/14);}
+  const n0=G.p.length;wbPoly(G,P,()=>y0+14*k);for(let q=n0;q<G.p.length;q+=3)G.uv.push(0.5,13.6/14);}
 // one 8 m bay, 14 m tall: concrete base, dark glass from 4.5 to 12 m with a light mullion, a wall band and a
 // 1 m light lip (the roof slab's edge). The night map: the glass band glowing warm from inside, the rest dark.
 function wbTermTex(night){
@@ -7189,9 +7194,12 @@ function buildWorld(d){
     poles.forEach((p,i)=>{M.makeTranslation(p[0],gh(p[0],p[1]),p[1]);pm.setMatrixAt(i,M);});pm.name='apronPoles';scene.add(pm);WB.tris.apronPoles=poles.length*10;}
   // ---- terminals (14 m: the window band texture, a light roof, lit inside at night), hangars (16 m, the long side a dark door) ----
   const bG=wbGeo(),tG=wbGeo(),HW=[0.70,0.71,0.70],HD=[0.30,0.32,0.34],HR=[0.62,0.64,0.66];tG.uv=[];
-  for(const P of terms){const c=wbCentroid(P),y0=gh(c[0],c[1]);wbTerminal(tG,P,y0);
+  for(const P of terms){const c=wbCentroid(P),y0=gh(c[0],c[1]);
+    // de Gaulle's round Terminal 1 (the "camembert", 190 m across): a 25 m drum
+    const H=REGION.id==='lfpg'&&P.length>=16&&Math.hypot(c[0]+880+WOFF[0],c[1]+602+WOFF[1])<60?25:14;if(H>14)WB.n.t1=(WB.n.t1||0)+1;
+    wbTerminal(tG,P,y0,H);
     let b=[1e9,1e9,-1e9,-1e9];for(const p of P){b=[Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])];}
-    OBST.push({kind:'poly',P:P,b:b,h:y0+14,name:'the terminal'});}
+    OBST.push({kind:'poly',P:P,b:b,h:y0+H,name:'the terminal'});}
   for(const P of hangs){const c=wbCentroid(P),y0=gh(c[0],c[1]);wbBuilding(bG,P,y0,[[0,16,HW]],HR,HD);
     let b=[1e9,1e9,-1e9,-1e9];for(const p of P){b=[Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])];}
     OBST.push({kind:'poly',P:P,b:b,h:y0+16,name:'a hangar'});}
@@ -7260,8 +7268,10 @@ function buildWorld(d){
     WB.n.holds=holds.length;}
   L.build();L.pts.visible=TOD.lights>0;WB.n.lights=L.count();
   if(REGION.id==='rjtt')WORLD.clear=[[TKY.bb.x,TKY.bb.z,90]];
+  if(REGION.id==='lfpg')parisPrep(d);
   buildWorldCity(d);
   if(REGION.id==='rjtt')buildTokyo(d);
+  if(REGION.id==='lfpg')buildParis(d);
   WB.ms=Math.round(performance.now()-t0);
 }
 // ---- the city: instanced boxes from the urban density grid; motorways, trunk and primary roads; long bridges ----
@@ -7272,7 +7282,17 @@ const W_CITY=[['#c9ccd0','#a9adb3','#8e9399','#e8e9ea','#b5b8bc','#7d8288','#f2f
 // floors of 4 m. The day map only shades the glass a little (the instance colour carries the city); the
 // night map is the emissive one: dark, about half the windows lit warm or cool. One corner
 // (the top left) is plain wall, white by day, black at night: the roofs sample it.
-const W_CITY_WIN={rjtt:1};
+const W_CITY_WIN={rjtt:1,lfpg:1};
+// the windows' uv on a box from its instance scale, so they keep their 4 m size on every box; roofs on the plain corner
+const CITY_WIN_UV=`#include <uv_vertex>
+#ifdef USE_UV
+  #ifdef USE_INSTANCING
+  vec3 wS=vec3(length(instanceMatrix[0].xyz),length(instanceMatrix[1].xyz),length(instanceMatrix[2].xyz));
+  #else
+  vec3 wS=vec3(1.0);
+  #endif
+  vUv=abs(normal.y)>0.5?vec2(0.01,0.99):uv*vec2(abs(normal.x)>0.5?wS.z:wS.x,wS.y)/32.0;
+#endif`;
 function worldWinTex(night){
   return tex(256,256,(x,w,h)=>{x.fillStyle=night?'#000':'#fff';x.fillRect(0,0,w,h);
     for(let j=0;j<8;j++)for(let i=0;i<8;i++){const r=hash(i*31+7,j*17+3),q=hash(i*13+5,j*29+11),X=i*32+4,Yp=j*32+7;
@@ -7289,19 +7309,14 @@ function worldCityMat(){
   if(WORLD.cityMat)return WORLD.cityMat;
   if(!W_CITY_WIN[REGION.id])return WORLD.cityMat=new THREE.MeshLambertMaterial({vertexColors:true});
   const m=new THREE.MeshLambertMaterial({vertexColors:true,map:worldWinTex(false),emissive:0xffffff,emissiveMap:worldWinTex(true),emissiveIntensity:0});
-  // the box's uv from its instance scale, so the windows keep their 4 m size on every box; roofs on the plain corner
-  m.onBeforeCompile=sh=>{sh.vertexShader=sh.vertexShader.replace('#include <uv_vertex>',`#include <uv_vertex>
-#ifdef USE_UV
-  #ifdef USE_INSTANCING
-  vec3 wS=vec3(length(instanceMatrix[0].xyz),length(instanceMatrix[1].xyz),length(instanceMatrix[2].xyz));
-  #else
-  vec3 wS=vec3(1.0);
-  #endif
-  vUv=abs(normal.y)>0.5?vec2(0.01,0.99):uv*vec2(abs(normal.x)>0.5?wS.z:wS.x,wS.y)/32.0;
-#endif`);
+  // Paris (uRoof 0.85): the top 15% of every box is the dark grey zinc of a Haussmann mansard, from the
+  // unit box's own height (no extra triangles); 0 elsewhere
+  const roof={value:REGION.id==='lfpg'?0.85:0};
+  m.onBeforeCompile=sh=>{sh.vertexShader='varying float vH;\n'+sh.vertexShader.replace('#include <uv_vertex>',CITY_WIN_UV).replace('#include <begin_vertex>','#include <begin_vertex>\n  vH=position.y;');
     // at night the fog takes less of the lit city (uWinFog), so the far windows still glow
-    sh.uniforms.uWinFog=WORLD.winFog;
-    sh.fragmentShader='uniform float uWinFog;\n'+sh.fragmentShader.replace('#include <fog_fragment>',THREE.ShaderChunk.fog_fragment.replace('fogColor, fogFactor )','fogColor, fogFactor*uWinFog )'));};
+    sh.uniforms.uWinFog=WORLD.winFog;sh.uniforms.uRoof=roof;
+    sh.fragmentShader='uniform float uWinFog,uRoof;\nvarying float vH;\n'+sh.fragmentShader.replace('#include <color_fragment>','#include <color_fragment>\n  if(uRoof>0.0&&vH>uRoof)diffuseColor.rgb=vec3(0.40,0.42,0.46);')
+      .replace('#include <fog_fragment>',THREE.ShaderChunk.fog_fragment.replace('fogColor, fogFactor )','fogColor, fogFactor*uWinFog )'));};
   m.customProgramCacheKey=()=>'cityWin';
   WORLD.winFog={value:1};
   const f=()=>{m.emissiveIntensity=TOD.night?1:TOD.lights*0.35;WORLD.winFog.value=TOD.night?0.5:1;};TOD_HOOKS.push(f);f();
@@ -7309,18 +7324,23 @@ function worldCityMat(){
 function buildWorldCity(d){
   const U=d.urban,urb=WORLD.urb,pal=REGION.pal||0,clr=WORLD.clear||[];   // clr: [x,z,r] kept free of boxes
   if(urb){
-    const cand=[];
+    // Paris (4.3): the core inside the peripherique (PARIS.coreAt < 1) has its own share of the cap, every
+    // cell, nearest the centre first, Haussmann blocks 18 to 30 m; the rest of the region lower
+    const cand=[],core=[],pc=REGION.id==='lfpg'?PARIS.coreAt:null,CORE=2600;
     for(let j=0;j<U.h;j++)for(let i=0;i<U.w;i++){const v=urb[j*U.w+i];if(v<40)continue;
       const x=U.x0+(i+0.5)*U.cell-WOFF[0],z=U.z0+(j+0.5)*U.cell-WOFF[1],dd=Math.hypot(x-APC.x,z-APC.z);
+      if(pc){const e=pc(x,z);if(e<1){if(!isWater(x,z))core.push([e,x,z,v,i,j,1]);continue;}}
       // thinner with distance (the grey of the ground carries the far city), never on the field or the water
       if(hash(i*7+1,j*13+5)>clamp(Math.pow(9000/dd,2),0.06,1))continue;
       if(isWater(x,z)||terrZoneD(x,z)<250)continue;cand.push([dd,x,z,v,i,j]);}
-    cand.sort((a,b)=>a[0]-b[0]);
-    const B=[];
-    for(const c of cand){const n=c[3]<100?1:c[3]<170?2:3;
-      for(let k=0;k<n&&B.length<6000;k++){const r1=hash(c[4]*3+k,c[5]*5+1),r2=hash(c[4]*5+k,c[5]*3+2),r3=hash(c[4]+k*11,c[5]+7);
-        const x=c[1]+(r1-0.5)*U.cell*0.75,z=c[2]+(r2-0.5)*U.cell*0.75;if(isWater(x,z)||clr.some(q=>Math.hypot(x-q[0],z-q[1])<q[2]))continue;
-        const h=clamp(10+50*Math.pow(c[3]/255,1.3)*(0.45+r3*0.9),10,60);B.push([x,z,25+r3*45,25+r1*45,h,r2*1.57]);}
+    cand.sort((a,b)=>a[0]-b[0]);core.sort((a,b)=>a[0]-b[0]);
+    const B=[],wet=(x,z,r)=>isWater(x,z)||(pc&&(isWater(x+r,z)||isWater(x-r,z)||isWater(x,z+r)||isWater(x,z-r)));
+    for(const c of core.concat(cand)){const n=c[6]?(c[3]<100?1:2):c[3]<100?1:c[3]<170?2:3,cap=c[6]?Math.min(CORE,6000):6000;
+      for(let k=0;k<n&&B.length<cap;k++){const r1=hash(c[4]*3+k,c[5]*5+1),r2=hash(c[4]*5+k,c[5]*3+2),r3=hash(c[4]+k*11,c[5]+7);
+        const x=c[1]+(r1-0.5)*U.cell*0.75,z=c[2]+(r2-0.5)*U.cell*0.75,w=25+r3*45,dp=25+r1*45;
+        if(wet(x,z,Math.max(w,dp)*0.5)||clr.some(q=>Math.hypot(x-q[0],z-q[1])<q[2]))continue;
+        const h=c[6]?18+12*r3:pc?clamp(8+24*Math.pow(c[3]/255,1.3)*(0.45+r3*0.9),8,26):clamp(10+50*Math.pow(c[3]/255,1.3)*(0.45+r3*0.9),10,60);
+        B.push([x,z,w,dp,h,r2*1.57]);}
       if(B.length>=6000)break;}
     if(B.length){
       const g=worldCityGeo(),im=new THREE.InstancedMesh(g,worldCityMat(),B.length),M=new THREE.Matrix4(),Q=new Q4(),S=new V3(),Pp=new V3(),c=new THREE.Color(),P=W_CITY[pal];
@@ -7358,6 +7378,18 @@ function buildWorldCity(d){
   if(piers.length){const im=new THREE.InstancedMesh(new THREE.BoxGeometry(5,1,5).translate(0,0.5,0),lam(0x9a9ca0),piers.length),M=new THREE.Matrix4(),Q=new Q4(),S=new V3(),Pp=new V3();
     piers.forEach((p,i)=>{S.set(1,32,1);Pp.set(p[0],p[2],p[1]);M.compose(Pp,Q,S);im.setMatrixAt(i,M);});im.name='bridgePiers';scene.add(im);WB.tris.piers=piers.length*12;}
 }
+// a region's street lights: points over the urban grid (cells of density 60 and up, density weighted, about
+// n of them), never on the water or the field; col(r) the colour for a random r in [0,1)
+function worldStreetLights(d,name,n,col){
+  const U=d.urban,urb=WORLD.urb,CL=makeLightLayer(name);let tot=0;
+  if(urb){for(let i=0;i<urb.length;i++)if(urb[i]>=60)tot+=urb[i]/255;
+    const k=n/Math.max(1,tot);
+    for(let j=0;j<U.h;j++)for(let i=0;i<U.w;i++){const v=urb[j*U.w+i];if(v<60)continue;
+      const n=v/255*k,c=Math.floor(n)+(hash(i*3+1,j*7+2)<n%1?1:0);
+      for(let q=0;q<c;q++){const x=U.x0+(i+hash(i+q*17,j*5+3))*U.cell-WOFF[0],z=U.z0+(j+hash(i*7+q,j+q*13+9))*U.cell-WOFF[1];
+        if(isWater(x,z)||terrZoneD(x,z)<300)continue;
+        CL.addLight(x,groundHeight(x,z)+6,z,col(hash(i*11+q,j*3+q)),0,0,false);}}}
+  CL.build();CL.pts.visible=TOD.lights>0;return CL;}
 // ---------- Tokyo (4.2): landmarks, skyline, night, billboard ----------
 // Built by buildWorld after the city, only in the rjtt region, from WORLD.data.landmarks (ARP frame,
 // moved by WOFF). Tokyo Tower and the Skytree are lattice silhouettes in one vertex coloured mesh each,
@@ -7482,15 +7514,7 @@ function buildTokyo(d){
     const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({map:glow,vertexColors:true,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
     m.renderOrder=1;m.visible=false;add(m,'tokyo_neon');}
   // ---- the city's street lights: points over the urban grid (density weighted, about 3,000), warm sodium, white, a few cool ----
-  {const U=d.urban,urb=WORLD.urb,CL=makeLightLayer('TKY_CITY');let tot=0;
-    if(urb){for(let i=0;i<urb.length;i++)if(urb[i]>=60)tot+=urb[i]/255;
-      const k=3000/Math.max(1,tot);
-      for(let j=0;j<U.h;j++)for(let i=0;i<U.w;i++){const v=urb[j*U.w+i];if(v<60)continue;
-        const n=v/255*k,c=Math.floor(n)+(hash(i*3+1,j*7+2)<n%1?1:0);
-        for(let q=0;q<c;q++){const x=U.x0+(i+hash(i+q*17,j*5+3))*U.cell-WOFF[0],z=U.z0+(j+hash(i*7+q,j+q*13+9))*U.cell-WOFF[1];
-          if(isWater(x,z)||terrZoneD(x,z)<300)continue;const r=hash(i*11+q,j*3+q);
-          CL.addLight(x,gh(x,z)+6,z,r<0.6?0xffb35c:r<0.9?0xfff2d6:0xcfe0ff,0,0,false);}}}
-    CL.build();CL.pts.visible=TOD.lights>0;TKY.CL=CL;TKY.cityLights=CL.count();}
+  {const CL=worldStreetLights(d,'TKY_CITY',3000,r=>r<0.6?0xffb35c:r<0.9?0xfff2d6:0xcfe0ff);TKY.CL=CL;TKY.cityLights=CL.count();}
   // ---- Mount Fuji: a 3,000 m cone at 42 km, snow on the top 30%, no fog, its colour washed toward the haze ----
   {const f=lm.fuji;if(f){const fx=f[0]+WOFF[0],fz=f[1]+WOFF[1];TKY.fujiReal=((Math.atan2(fx,-fz)*180/Math.PI)+360)%360;}
     const b=TKY.fujiBrg*Math.PI/180,x=APC.x+Math.sin(b)*TKY.fujiDist,z=APC.z-Math.cos(b)*TKY.fujiDist,V=(r,y)=>new THREE.Vector2(r,y);
@@ -7511,6 +7535,213 @@ function tkTOD(){
   if(TKY.parts.tokyo_neon)TKY.parts.tokyo_neon.visible=n;
   const F=TKY.fuji;if(F){_tkH.setHex(TOD.haze);const k=n?0.25:1,w=n?0.25:TOD.id==='day'?0.38:0.45;
     F.mL.color.copy(_tkC.setHex(0x5f6f86).multiplyScalar(k).lerp(_tkH,w));F.mC.color.copy(_tkC.setHex(0xf2f5fa).multiplyScalar(n?0.32:1).lerp(_tkH,w*0.8));}
+}
+// ---------- Paris (4.3): landmarks, the Seine, the Haussmann city, night, billboard ----------
+// Built by buildWorld after the city, only in the lfpg region, from WORLD.data.landmarks (ARP frame, moved
+// by WOFF), every landmark at its true spot. parisPrep runs before the city: the 25 m Seine mask
+// (TERR.fw, from the data's water polygons, the Ile de la Cite and Ile Saint-Louis left as land) and the
+// spots kept free of city boxes. The Eiffel Tower (a lattice of tapered beams: four curved legs, the
+// arches, three platforms, the antenna) is built 1.6 times its real size and the Defense towers 1.3 times
+// their real height, both drawn without fog, washed toward the haze with distance (uWash), so the tower
+// and the cluster read on the horizon 20 to 25 km away from the finals and climb outs at de Gaulle:
+// moved closer than real life. At night: the tower lit gold, and for the first 5 minutes of every hour it
+// sparkles (PARIS.sparkle: a layer of 500 white lights flashing at random phases, the REIL flash of the
+// airport light shader); PARIS.forceSparkle true or false overrides the clock (null: the clock). Its
+// beacon sweeps (two opposed rotating beacon lights). The Arc, the Sacre-Coeur and Notre-Dame lit warm
+// and white; the Defense windows lit. The @OhRabah board 2.5 nm out on the final to 26L, 250 m left.
+const PARIS={bb:{x:wX(THR01-4630,-250),z:wZ(THR01-4630,-250)},c:[-16300,16100],ab:[5000,4100],eiffelK:1.6,defK:1.3,
+  tris:{},parts:{},night:[],wash:[],base:{},lm:{},def:[],bridges:0,built:false,sparkle:false,forceSparkle:null,SP:null,t:0,
+  // < 1 inside the peripherique (an ellipse round the centre, ARP frame c, half axes ab), world coordinates
+  coreAt:(x,z)=>{const dx=(x+WOFF[0]-PARIS.c[0])/PARIS.ab[0],dz=(z+WOFF[1]-PARIS.c[1])/PARIS.ab[1];return dx*dx+dz*dz;}};
+// the islands, ARP frame: centre, bearing of the long axis, half length, half width
+const P_ISLES=[[-15100,17100,120,520,115],[-14312,17555,120,300,90]];
+// the Defense towers in the frame of the historical axis from the Grande Arche (u toward the Arc de
+// Triomphe, v to its left): [u, v, w, d, real height]. The slender one (231 m), the twins, the rest
+const P_DEF=[[330,-40,28,28,231],[520,-210,32,32,167],[520,-145,32,32,167],[260,160,46,40,187],[640,90,42,40,184],
+  [720,-60,38,38,165],[420,-260,44,34,180],[820,190,40,32,135],[900,-150,40,36,195],[980,210,34,30,128],[220,-300,40,40,140],
+  [1060,40,40,36,120],[600,300,36,30,150],[160,330,38,38,145],[760,-300,36,36,160]];
+function parisPrep(d){
+  const lm=PARIS.lm;for(const l of d.landmarks||[])lm[l.id]=[l.x-WOFF[0],l.z-WOFF[1]];
+  // ---- the Seine mask: 25 m cells over central Paris, every water polygon that reaches it, scanline filled ----
+  const c=25,X0=-25000,Z0=12000,W=560,H=380,m=new Uint8Array(W*H);
+  for(const P of d.water||[]){let bx0=1e9,bx1=-1e9,bz0=1e9,bz1=-1e9;for(const p of P){bx0=Math.min(bx0,p[0]);bx1=Math.max(bx1,p[0]);bz0=Math.min(bz0,p[1]);bz1=Math.max(bz1,p[1]);}
+    if(bx1<X0||bx0>X0+W*c||bz1<Z0||bz0>Z0+H*c)continue;
+    for(let j=0;j<H;j++){const z=Z0+(j+0.5)*c;if(z<bz0||z>bz1)continue;const xs=[];
+      for(let i=0,k=P.length-1;i<P.length;k=i++){const a=P[i],b=P[k];if((a[1]>z)!==(b[1]>z))xs.push(a[0]+(z-a[1])/(b[1]-a[1])*(b[0]-a[0]));}
+      xs.sort((a,b)=>a-b);
+      for(let q=0;q+1<xs.length;q+=2){const i0=Math.max(0,Math.ceil((xs[q]-X0)/c-0.5)),i1=Math.min(W-1,Math.floor((xs[q+1]-X0)/c-0.5));for(let i=i0;i<=i1;i++)m[j*W+i]=1;}}}
+  for(let j=0;j<H;j++)for(let i=0;i<W;i++){if(!m[j*W+i])continue;const x=X0+(i+0.5)*c,z=Z0+(j+0.5)*c;
+    for(const s of P_ISLES){const b=s[2]*Math.PI/180,ex=Math.sin(b),ez=-Math.cos(b),dx=x-s[0],dz=z-s[1],u=(dx*ex+dz*ez)/s[3],v=(dz*ex-dx*ez)/s[4];if(u*u+v*v<1)m[j*W+i]=0;}}
+  TERR.fw={x0:X0-WOFF[0],z0:Z0-WOFF[1],c:c,W:W,H:H,m:m};
+  // ---- the Defense towers, and the spots kept free of city boxes ----
+  const cl=[[PARIS.bb.x,PARIS.bb.z,90]];
+  if(lm.grande_arche&&lm.arc){const g=lm.grande_arche,ex=lm.arc[0]-g[0],ez=lm.arc[1]-g[1],l=Math.hypot(ex,ez),ax=ex/l,az=ez/l;PARIS.axis=[ax,az];
+    for(const t of P_DEF){const x=g[0]+ax*t[0]+az*t[1],z=g[1]+az*t[0]-ax*t[1];PARIS.def.push({x:x,z:z,w:t[2],d:t[3],h:t[4]*PARIS.defK});cl.push([x,z,Math.max(t[2],t[3])*0.7+25]);}
+    cl.push([g[0],g[1],130]);}
+  if(lm.arc)cl.push([lm.arc[0],lm.arc[1],125]);
+  if(lm.eiffel)cl.push([lm.eiffel[0],lm.eiffel[1],220]);
+  if(lm.sacre_coeur)cl.push([lm.sacre_coeur[0],lm.sacre_coeur[1],110]);
+  if(lm.notre_dame)cl.push([lm.notre_dame[0],lm.notre_dame[1],110]);
+  WORLD.clear=cl;
+}
+// a material washed toward u.value (rgb, amount) after lighting: the far landmarks drawn without fog
+function pWash(m,key){const u={value:new THREE.Vector4(0,0,0,0)},prev=m.onBeforeCompile;
+  m.onBeforeCompile=sh=>{if(prev)prev(sh);sh.uniforms.uWash=u;
+    sh.fragmentShader='uniform vec4 uWash;\n'+sh.fragmentShader.replace('#include <fog_fragment>','gl_FragColor.rgb=mix(gl_FragColor.rgb,uWash.rgb,uWash.a);\n#include <fog_fragment>');};
+  m.customProgramCacheKey=()=>key;m.userData.wash=u;return m;}
+// a triangular roof along local x from x0 to x1, half width hw, eaves at yb, ridge at yt
+function pRoof(G,x0,x1,hw,yb,yt,z,col){z=z||0;
+  wbQuad(G,[x0,yb,z-hw],[x1,yb,z-hw],[x1,yt,z],[x0,yt,z],col);wbQuad(G,[x1,yb,z+hw],[x0,yb,z+hw],[x0,yt,z],[x1,yt,z],col);
+  G.p.push(x0,yb,z-hw,x0,yt,z,x0,yb,z+hw,x1,yb,z+hw,x1,yt,z,x1,yb,z-hw);for(let i=0;i<6;i++)G.c.push(col[0],col[1],col[2]);}
+// the same roof across local z (a transept)
+function pRoofZ(G,z0,z1,hw,yb,yt,x,col){
+  wbQuad(G,[x-hw,yb,z0],[x-hw,yb,z1],[x,yt,z1],[x,yt,z0],col);wbQuad(G,[x+hw,yb,z1],[x+hw,yb,z0],[x,yt,z0],[x,yt,z1],col);
+  G.p.push(x-hw,yb,z0,x,yt,z0,x+hw,yb,z0,x+hw,yb,z1,x,yt,z1,x-hw,yb,z1);for(let i=0;i<6;i++)G.c.push(col[0],col[1],col[2]);}
+// the Eiffel Tower's profile: [height, half width of the outside, half thickness of a leg or column]
+const P_EIF=[[0,62.5,11],[20,53,9.5],[40,44,8],[57,37,7],[85,27,5.5],[115,20,4.5],[150,15,3.5],[190,11,2.6],[230,8,2],[276,5,1.5]];
+function pEif(y){for(let k=0;k+1<P_EIF.length;k++){const a=P_EIF[k],b=P_EIF[k+1];if(y<=b[0]){const t=(y-a[0])/(b[0]-a[0]);return [a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}}return [5,1.5];}
+function buildParis(d){
+  const lm=PARIS.lm,gh=(x,z)=>groundHeight(x,z),L=makeLightLayer('PARIS'),add=(o,name)=>{o.name=name;scene.add(o);PARIS.parts[name]=o;return o;};
+  const night=(ms,day,nm)=>PARIS.night.push({ms:ms,day:day,night:nm}),wash=(m,p)=>{PARIS.wash.push({m:m,p:p});return m;};
+  const S4=[[1,1],[-1,1],[-1,-1],[1,-1]];
+  // ---- the Eiffel Tower: 330 m, built at 1.6 times (528 m) ----
+  if(lm.eiffel){const [x,z]=lm.eiffel,y0=gh(x,z),K=PARIS.eiffelK,G=wbGeo(),BR=tkRGB(0x6e5a48),DK=tkRGB(0x5a4a3c),LV=P_EIF.map(e=>e[0]);
+    const cp=y=>{const e=pEif(y);return e[0]-e[1];};
+    for(let k=0;k+1<LV.length;k++){const y1=LV[k],y2=LV[k+1],c1=cp(y1),c2=cp(y2),t1=pEif(y1)[1],t2=pEif(y2)[1];
+      for(const s of S4)tkBeam(G,[s[0]*c1,y1,s[1]*c1],[s[0]*c2,y2,s[1]*c2],t1,t2,BR);
+      for(let i=0;i<4;i++){const a=S4[i],b=S4[(i+1)%4];
+        if(y2!==57&&y2!==115&&y2!==276)tkBeam(G,[a[0]*c2,y2,a[1]*c2],[b[0]*c2,y2,b[1]*c2],0.8,0.8,BR);
+        if(y1>=57){tkBeam(G,[a[0]*c1,y1,a[1]*c1],[b[0]*c2,y2,b[1]*c2],0.5,0.5,BR);tkBeam(G,[b[0]*c1,y1,b[1]*c1],[a[0]*c2,y2,a[1]*c2],0.5,0.5,BR);}}}
+    // the four arches under the first platform
+    for(let i=0;i<4;i++){const a=S4[i],b=S4[(i+1)%4],P=[];
+      for(let q=0;q<=8;q++){const th=q/8*Math.PI,y=12+27*Math.sin(th),e=cp(y)-pEif(y)[1]*0.6,t=-Math.cos(th);
+        P.push([(a[0]+b[0])/2*e+(b[0]-a[0])/2*e*t,y,(a[1]+b[1])/2*e+(b[1]-a[1])/2*e*t]);}
+      for(let q=0;q<8;q++)tkBeam(G,P[q],P[q+1],1.1,1.1,BR);}
+    for(const s of S4)tkAdd(G,new THREE.BoxGeometry(26,4,26),DK,s[0]*cp(0),2,s[1]*cp(0));
+    const p1=2*pEif(60)[0]+6,p2=2*pEif(117)[0]+6;
+    tkAdd(G,new THREE.BoxGeometry(p1,7,p1),DK,0,60.5,0);tkAdd(G,new THREE.BoxGeometry(p1-6,2,p1-6),BR,0,65,0);
+    tkAdd(G,new THREE.BoxGeometry(p2,5,p2),DK,0,117.5,0);
+    tkAdd(G,new THREE.BoxGeometry(17,8,17),DK,0,278,0);tkAdd(G,new THREE.BoxGeometry(10,8,10),BR,0,286,0);
+    tkBeam(G,[0,290,0],[0,312,0],1.5,0.9,BR);tkBeam(G,[0,312,0],[0,330,0],0.6,0.25,DK);
+    const day=pWash(tkMat(),'pWash');day.fog=false;const nm=tkMat([0xffa83c,0.95,1]),me=tkMesh(G,day,'eiffel_mesh'),T=new THREE.Group();
+    T.add(me);T.position.set(x,y0,z);T.scale.setScalar(K);add(T,'eiffel_tower');PARIS.base.eiffel_tower=y0;night([me],day,nm);wash(day,lm.eiffel);
+    // night: warm lights on the platforms, the beacon (two opposed rotating lights)
+    for(const s of S4){L.addLight(x+s[0]*p1/2*K,y0+64*K,z+s[1]*p1/2*K,0xffc27a,0,0,false);L.addLight(x+s[0]*p2/2*K,y0+120*K,z+s[1]*p2/2*K,0xffc27a,0,0,false);}
+    L.addLight(x+2,y0+291*K,z,0xfff2c8,3,0,false);L.addLight(x-2,y0+291*K,z,0xfff2c8,3,0.5,false);
+    // the sparkle: 500 white lights over the four faces (the legs only below the first platform) and the top
+    const SP=makeLightLayer('PARIS_SPARKLE');let n=0;
+    for(let q=0;n<500&&q<20000;q++){const r=hash(q,701),y=r<0.06?282+hash(q,702)*46:hash(q,703)*280;
+      if(y<282&&hash(q,704)>pEif(y)[0]/62.5*1.4)continue;
+      let px=0,pz=0;
+      if(y<282){const e=pEif(y),hw=e[0]+0.6,sg=hash(q,705)<0.5?-1:1,f=Math.floor(hash(q,706)*4);
+        const t=y<57?sg*(1-hash(q,707)*2*e[1]/e[0]):hash(q,707)*2-1,a=t*e[0];
+        if(f===0){px=a;pz=hw;}else if(f===1){px=a;pz=-hw;}else if(f===2){px=hw;pz=a;}else{px=-hw;pz=a;}}
+      SP.addLight(x+px*K,y0+y*K,z+pz*K,0xffffff,1,hash(q,708),false);n++;}
+    SP.build();SP.pts.visible=false;PARIS.SP=SP;
+    OBST.push(...S4.map(s=>({kind:'circ',x:x+s[0]*65,z:z+s[1]*65,r:24,h:y0+60*K,name:'the Eiffel Tower'})),
+      {kind:'circ',x:x,z:z,r:pEif(57)[0]*K,lo:y0+40*K,h:y0+67*K,name:'the Eiffel Tower'},{kind:'circ',x:x,z:z,r:20*K,h:y0+120*K,name:'the Eiffel Tower'},
+      {kind:'circ',x:x,z:z,r:8*K,h:y0+290*K,name:'the Eiffel Tower'},{kind:'circ',x:x,z:z,r:2,h:y0+330*K,name:'the Eiffel Tower'});}
+  // ---- the Arc de Triomphe: 50 x 45 x 22 m, the arch along the historical axis, on its round plaza ----
+  if(lm.arc){const [x,z]=lm.arc,y0=gh(x,z),G=wbGeo(),CR=tkRGB(0xe6dcc2),ax=PARIS.axis||[1,0];
+    for(const s of [-1,1]){tkAdd(G,new THREE.BoxGeometry(22,50,15.2),CR,0,25,s*14.9);
+      // the vault: the corners over the 14.6 m opening stepped round a 7.3 m half circle from 21.7 m
+      for(let i=0;i<3;i++){const yb=21.7+i*2.43,ym=yb+1.2,hx=Math.sqrt(Math.max(0,7.3*7.3-(ym-21.7)*(ym-21.7)));tkAdd(G,new THREE.BoxGeometry(22,2.43,7.3-hx+0.01),CR,0,ym,s*(7.3+hx)/2);}}
+    tkAdd(G,new THREE.BoxGeometry(22,21,14.6),CR,0,39.5,0);tkAdd(G,new THREE.BoxGeometry(24,1.5,47),CR,0,44.75,0);
+    tkAdd(G,new THREE.BoxGeometry(22.5,4.5,45.5),CR,0,47.75,0);
+    const day=tkMat(),nm=tkMat([0xffc27a,0.6,1]),me=tkMesh(G,day,'arc_mesh'),A=new THREE.Group();A.add(me);
+    A.position.set(x,y0,z);A.rotation.y=Math.atan2(-ax[1],ax[0]);add(A,'arc_de_triomphe');PARIS.base.arc_de_triomphe=y0;night([me],day,nm);
+    // the Etoile: a flat disc 120 m round on the ground mesh
+    const P=wbGeo(),cache=new Map(),Y=(a,b)=>terrainMeshH(a,b,cache)+0.25,N=28,GR=tkRGB(0x8a877f);
+    for(let i=0;i<N;i++){const a0=i/N*Math.PI*2,a1=(i+1)/N*Math.PI*2,p0=[x+Math.cos(a0)*120,z+Math.sin(a0)*120],p1=[x+Math.cos(a1)*120,z+Math.sin(a1)*120];
+      wbTriUp(P,[x,Y(x,z),z],[p0[0],Y(p0[0],p0[1]),p0[1]],[p1[0],Y(p1[0],p1[1]),p1[1]],GR);}
+    const pm=tkMesh(P,groundDecalMat(new THREE.MeshLambertMaterial({vertexColors:true})),'etoile_plaza');add(pm,'etoile_plaza');
+    for(const s of S4)L.addLight(x+s[0]*26,y0+3,z+s[1]*16,0xffd49a,0,0,false);}
+  // ---- the Sacre-Coeur on Montmartre: the 83 m dome on its drum, two small domes, the bell tower, white ----
+  if(lm.sacre_coeur){const [x,z]=lm.sacre_coeur,y0=gh(x,z),G=wbGeo(),WT=tkRGB(0xf1eee6),SH=tkRGB(0xdcd8cf);
+    tkAdd(G,new THREE.BoxGeometry(70,10,110),SH,0,-5,0);
+    tkAdd(G,new THREE.BoxGeometry(40,28,80),WT,0,14,0);tkAdd(G,new THREE.BoxGeometry(36,20,12),WT,0,10,46);
+    tkAdd(G,new THREE.CylinderGeometry(17,17,26,12,1,false,0,Math.PI),WT,0,13,-40);
+    tkAdd(G,new THREE.CylinderGeometry(12,12,22,16,1,true),WT,0,39,0);
+    tkAdd(G,new THREE.SphereGeometry(13,16,8,0,Math.PI*2,0,Math.PI/2).scale(1,1.45,1),WT,0,50,0);
+    tkAdd(G,new THREE.CylinderGeometry(3,3,8,8),WT,0,73,0);tkAdd(G,new THREE.CylinderGeometry(0,2.6,6,8),WT,0,80,0);
+    for(const s of [-1,1]){tkAdd(G,new THREE.CylinderGeometry(4.5,4.5,8,10,1,true),WT,s*15,32,30);
+      tkAdd(G,new THREE.SphereGeometry(5,10,6,0,Math.PI*2,0,Math.PI/2).scale(1,1.4,1),WT,s*15,36,30);tkAdd(G,new THREE.CylinderGeometry(0,1.4,4,6),WT,s*15,45,30);}
+    tkAdd(G,new THREE.BoxGeometry(12,60,12),WT,0,30,-64);tkAdd(G,new THREE.BoxGeometry(9,6,9),WT,0,63,-64);
+    tkAdd(G,new THREE.SphereGeometry(4.5,10,6,0,Math.PI*2,0,Math.PI/2),WT,0,66,-64);
+    const day=tkMat(),nm=tkMat([0xf4f1ff,0.55,1]),me=tkMesh(G,day,'sacre_coeur_mesh'),C=new THREE.Group();C.add(me);C.position.set(x,y0,z);C.rotation.y=-0.2;
+    add(C,'sacre_coeur');PARIS.base.sacre_coeur=y0;night([me],day,nm);
+    OBST.push({kind:'circ',x:x,z:z,r:45,h:y0+50,name:'the Sacre-Coeur'},{kind:'circ',x:x,z:z,r:14,h:y0+83,name:'the Sacre-Coeur'});}
+  // ---- Notre-Dame on the Ile de la Cite: the west front's two 69 m towers, the nave, the spire to 96 m, grey ----
+  if(lm.notre_dame){const [x,z]=lm.notre_dame,y0=gh(x,z),G=wbGeo(),TG=wbGeo(),ST=tkRGB(0xb8b0a0),RF=tkRGB(0x6f7377);
+    tkAdd(G,new THREE.BoxGeometry(110,22,40),ST,10,11,0);tkAdd(G,new THREE.BoxGeometry(110,11,14),ST,10,27.5,0);pRoof(G,-45,65,8,33,43,0,RF);
+    tkAdd(G,new THREE.BoxGeometry(14,33,48),ST,25,16.5,0);pRoofZ(G,-24,24,8,33,43,25,RF);
+    tkAdd(G,new THREE.CylinderGeometry(20,20,30,10,1,false,0,Math.PI),ST,65,15,0);
+    tkAdd(G,new THREE.BoxGeometry(12,45,40),ST,-51,22.5,0);tkBeam(G,[25,40,0],[25,96,0],2.6,0.2,RF);
+    for(const s of [-1,1])tkAdd(TG,new THREE.BoxGeometry(13,69,13),ST,-51,34.5,s*13.5);
+    const day=tkMat(),nm=tkMat([0xffe2b0,0.5,1]),me=tkMesh(G,day,'notre_dame_mesh'),mt=tkMesh(TG,day,'notre_dame_towers'),N=new THREE.Group();N.add(me,mt);
+    N.position.set(x,y0,z);N.rotation.y=-23*Math.PI/180;add(N,'notre_dame');PARIS.base.notre_dame=y0;night([me,mt],day,nm);
+    for(const s of [-1,1])L.addLight(x+s*12,y0+2,z+18,0xffd49a,0,0,false);}
+  // ---- la Defense: the towers (1.3 times their height) with lit windows, and the Grande Arche on the axis ----
+  if(lm.grande_arche){const [x,z]=lm.grande_arche,y0=gh(x,z),ax=PARIS.axis||[1,0],ang=Math.atan2(-ax[1],ax[0]);
+    const tm=pWash(new THREE.MeshLambertMaterial({vertexColors:true,map:worldCityMat().map,emissive:0xffffff,emissiveMap:worldCityMat().emissiveMap,emissiveIntensity:0,fog:false}),'pTowerWin');
+    const pv=tm.onBeforeCompile;tm.onBeforeCompile=sh=>{sh.vertexShader=sh.vertexShader.replace('#include <uv_vertex>',CITY_WIN_UV);pv(sh);};
+    const g=new THREE.BoxGeometry(1,1,1).translate(0,0.5,0),pc=g.attributes.position,col=new Float32Array(pc.count*3);
+    for(let i=0;i<pc.count;i++)col.set(pc.getY(i)>0.99&&g.attributes.normal.getY(i)>0.5?[0.8,0.82,0.84]:[1,1,1],i*3);g.setAttribute('color',new THREE.BufferAttribute(col,3));
+    const T=PARIS.def.filter(t=>!isWater(t.x,t.z)),im=new THREE.InstancedMesh(g,tm,T.length),M=new THREE.Matrix4(),Q=new Q4().setFromAxisAngle(_yUp,ang),Sc=new V3(),Pp=new V3(),cc=new THREE.Color();
+    const GL=['#9fb3c6','#8ea4b8','#b4c4d2','#7f97ad','#a9bccb','#c2ced8'];
+    T.forEach((t,i)=>{const b=gh(t.x,t.z)-2;Sc.set(t.w,t.h+2,t.d);Pp.set(t.x,b,t.z);M.compose(Pp,Q,Sc);im.setMatrixAt(i,M);im.setColorAt(i,cc.set(GL[Math.floor(hash(i,91)*GL.length)]));
+      if(t.h>=180*PARIS.defK)OBST.push({kind:'circ',x:t.x,z:t.z,r:Math.max(t.w,t.d)/2,h:b+2+t.h,name:'a skyscraper'});});
+    im.userData.heat=0.55;add(im,'la_defense');wash(tm,lm.grande_arche);PARIS.defTop=Math.max(...T.map(t=>t.h));
+    const f=()=>{tm.emissiveIntensity=TOD.night?1:TOD.lights*0.35;};TOD_HOOKS.push(f);f();
+    // the Grande Arche: a hollow 110 m cube, open along the axis: two side walls, the roof and the base
+    const G=wbGeo(),WT=tkRGB(0xf4f4f1);
+    for(const s of [-1,1])tkAdd(G,new THREE.BoxGeometry(110,110,18),WT,0,55,s*46);
+    tkAdd(G,new THREE.BoxGeometry(110,18,74),WT,0,101,0);tkAdd(G,new THREE.BoxGeometry(110,14,74),WT,0,7,0);
+    const day=pWash(tkMat(),'pWash');day.fog=false;const nm=tkMat([0xeef2ff,0.5,1]),me=tkMesh(G,day,'grande_arche_mesh'),A=new THREE.Group();A.add(me);
+    A.position.set(x,y0,z);A.rotation.y=ang;add(A,'grande_arche');PARIS.base.grande_arche=y0;night([me],day,nm);wash(day,lm.grande_arche);
+    OBST.push({kind:'circ',x:x,z:z,r:76,h:y0+110,name:'the Grande Arche'});}
+  // ---- the Seine: the 25 m mask as flat water on the ground mesh, row runs of up to 4 cells ----
+  {const F=TERR.fw,G=wbGeo(),cache=new Map(),Y=(a,b)=>terrainMeshH(a,b,cache)+0.2;
+    if(F)for(let j=0;j<F.H;j++){let i=0;while(i<F.W){if(!F.m[j*F.W+i]){i++;continue;}let e=i;while(e+1<F.W&&F.m[j*F.W+e+1]&&e-i<3)e++;
+      const xa=F.x0+i*F.c,xb=F.x0+(e+1)*F.c,za=F.z0+j*F.c,zb=za+F.c;
+      wbQuad(G,[xa,Y(xa,za),za],[xa,Y(xa,zb),zb],[xb,Y(xb,zb),zb],[xb,Y(xb,za),za]);i=e+1;}}
+    if(G.p.length){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(G.p,3));
+      const nr=new Float32Array(G.p.length);for(let i=1;i<nr.length;i+=3)nr[i]=1;g.setAttribute('normal',new THREE.BufferAttribute(nr,3));g.computeBoundingSphere();
+      const w=new THREE.Mesh(g,groundDecalMat(new THREE.MeshPhongMaterial({color:0x2c5672,specular:0x8fa3b5,shininess:60})));w.userData.heat=0.05;w.userData.irVar=0;add(w,'seine');}
+    // six bridges in the centre: [ARP x, z, bearing of the deck], from Grenelle to the Pont au Change; each spans
+    // the water run through its spot, 15 m wide, 8 m over the water, two low piers, an abutment at each end
+    const BG=wbGeo(),SN=tkRGB(0xcfc6b0);
+    for(const b of [[-19900,17550,132],[-19204,16457,135],[-17400,16110,0],[-16900,16250,0],[-15950,16670,0],[-15150,16910,0]]){
+      const r=b[2]*Math.PI/180,ex=Math.sin(r),ez=-Math.cos(r);let cx=b[0]-WOFF[0],cz=b[1]-WOFF[1];
+      if(!isWater(cx,cz)){let ok=false;for(let s=5;s<300&&!ok;s+=5)for(const sg of [-1,1])if(!ok&&isWater(cx+ex*s*sg,cz+ez*s*sg)){cx+=ex*s*sg;cz+=ez*s*sg;ok=true;}if(!ok)continue;}
+      let a=0,c=0;while(a<600&&isWater(cx-ex*(a+5),cz-ez*(a+5)))a+=5;while(c<600&&isWater(cx+ex*(c+5),cz+ez*(c+5)))c+=5;
+      const L0=a+c+40,mx=cx+ex*(c-a)/2,mz=cz+ez*(c-a)/2,yd=Y(mx,mz)+8,rot=Math.atan2(-ez,ex),B=new THREE.Group();
+      B.position.set(mx,yd,mz);B.rotation.y=rot;B.updateMatrixWorld(true);
+      const bx=(w,h,dd,px,py)=>{const q=new THREE.BoxGeometry(w,h,dd);q.translate(px,py,0);q.applyMatrix4(B.matrixWorld);tkAdd(BG,q,SN);};
+      bx(L0,1.6,15,0,-0.8);for(const s of [-1,1]){bx(4,8,12,s*L0/6,-5);bx(8,14,15,s*(L0/2-4),-8);}PARIS.bridges++;}
+    if(BG.p.length)add(tkMesh(BG,tkMat(),'seine_bridges'),'seine_bridges');}
+  // ---- the city's street lights, warm, and the board facing the approach to 26L ----
+  {const CL=worldStreetLights(d,'PARIS_CITY',3000,r=>r<0.7?0xffc074:r<0.95?0xfff0d2:0xd8e4ff);PARIS.CL=CL;PARIS.cityLights=CL.count();}
+  PARIS.bbo=buildCityBillboard(PARIS.bb.x,PARIS.bb.z,((RH*180/Math.PI+180)%360+360)%360,'Paris',L);
+  L.build();L.pts.visible=TOD.lights>0;PARIS.L=L;
+  for(const k in PARIS.parts)PARIS.tris[k]=tkTris(PARIS.parts[k]);PARIS.tris.city_billboard=tkTris(PARIS.bbo.g);
+  PARIS.built=true;TOD_HOOKS.push(parisTOD);parisTOD();
+}
+function parisTOD(){
+  if(!PARIS.built)return;const n=!!TOD.night;
+  for(const o of PARIS.night)for(const m of o.ms)m.material=n?o.night:o.day;
+  parisTick(true);
+}
+// every frame (the work every 0.4 s, or now when forced): the sparkle on or off, and the far landmarks
+// washed toward the haze by their distance from the camera (the day materials; a little at night)
+const _pH=new THREE.Color();
+function parisTick(force){
+  const t=performance.now();if(!force&&t-PARIS.t<400)return;PARIS.t=t;
+  const f=PARIS.forceSparkle,on=f===true||(f!==false&&!!TOD.night&&new Date().getMinutes()<5);
+  PARIS.sparkle=on;if(PARIS.SP&&PARIS.SP.pts)PARIS.SP.pts.visible=on;
+  _pH.setHex(TOD.haze);const cp=camera.position;
+  for(const o of PARIS.wash){const dd=Math.hypot(cp.x-o.p[0],cp.z-o.p[1]),w=(TOD.night?0.15:TOD.id==='day'?0.35:0.4)*smooth(2500,30000,dd);
+    o.m.userData.wash.value.set(_pH.r,_pH.g,_pH.b,w);}
 }
 // the parks onto the terrain grid (green in terrainColor)
 function worldParks(d){
@@ -12465,6 +12696,7 @@ function tick(t,skipRender){
   TFC.update(running&&!paused?dt:0);   // frozen while paused, hidden off the air and in missions
   if(running&&!paused){updateTraffic(dt);updateCars(dt);eggUpdate(dt);}
   updatePeople(dt,ts);
+  if(PARIS.built)parisTick(false);
   if(running&&!paused&&!st.crashed){
     if(STRIKE.built){rangeMoving(dt);targetsTick(dt);}
     if(STRIKE.active||(camMode===2&&hasBall()))sensorUpdate(dt);
@@ -13114,7 +13346,7 @@ window.__kgeu.TCAS={levels:tcasLevels,state:()=>({ta:TCAS.list.some(o=>tcasLvl(o
 window.__kgeu.tcasConflict=tcasConflict;window.__kgeu.tcasVoiceLog=TCAS.voiceLog;
 window.__kgeu.LB=LB;try{LB.boot();}catch(e){console.warn('leaderboards',e);}
 // world regions (4.6a)
-Object.assign(window.__kgeu,{flySub:flySub,CHAT_R:CHAT_R,APTS:APTS,PLACES:PLACES,TERRAIN:TERRAIN,LANDMARKS:LANDMARKS,locShow:locShow,REGION:REGION,REGIONS:REGIONS,WORLD:WORLD,pickRegion:pickRegion,isWater:isWater,TERR:TERR,RUNWAYS:RUNWAYS,WB:WB,AL:AL,OBST:OBST,TKY:TKY,CITYBB:CITYBB,buildCityBillboard:buildCityBillboard,
+Object.assign(window.__kgeu,{flySub:flySub,CHAT_R:CHAT_R,APTS:APTS,PLACES:PLACES,TERRAIN:TERRAIN,LANDMARKS:LANDMARKS,locShow:locShow,REGION:REGION,REGIONS:REGIONS,WORLD:WORLD,pickRegion:pickRegion,isWater:isWater,TERR:TERR,RUNWAYS:RUNWAYS,WB:WB,AL:AL,OBST:OBST,TKY:TKY,PARIS:PARIS,CITYBB:CITYBB,buildCityBillboard:buildCityBillboard,
   wframe:()=>({rh:RH,len:RWY_LEN,thr01:THR01,thr19:THR19,woff:WOFF.slice(),fieldFt:FIELD_FT,home:HOME_RWY,base0:BASE0}),
   tris:()=>renderer.info.render.triangles,rinfo:()=>({tri:renderer.info.render.triangles,calls:renderer.info.render.calls,geo:renderer.info.memory.geometries,tex:renderer.info.memory.textures})});
 worldLoad();
