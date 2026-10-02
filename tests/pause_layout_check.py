@@ -11,10 +11,12 @@ ok = Checks()
 K = 'window.__kgeu'
 SIZES = [(568, 320), (667, 375), (844, 390), (390, 844)]
 AUDIT = """()=>{const ov=document.getElementById('pauseOv'),pz=ov.querySelector('.pz');const W=innerWidth,H=innerHeight;const bad=[];
-  const bs=[...ov.querySelectorAll('button')].filter(b=>b.getBoundingClientRect().width>0&&getComputedStyle(b).visibility!=='hidden');
-  const R=b=>b.getBoundingClientRect();
-  bs.forEach(b=>{const r=R(b),id=b.id||b.textContent.trim().slice(0,12);
-    if(r.width<43.5||r.height<43.5)bad.push('small '+id+' '+Math.round(r.width)+'x'+Math.round(r.height));
+  // the location row scrolls sideways (4.6b): a card counts by the part its row shows, a card scrolled out of sight not at all
+  const R=b=>{const r=b.getBoundingClientRect(),L=b.closest('.locs');if(!L)return r;const q=L.getBoundingClientRect(),x0=Math.max(r.left,q.left),x1=Math.max(x0,Math.min(r.right,q.right));
+    return {left:x0,right:x1,top:r.top,bottom:r.bottom,x:x0,y:r.top,width:x1-x0,height:r.height};};
+  const bs=[...ov.querySelectorAll('button')].filter(b=>R(b).width>0.5&&getComputedStyle(b).visibility!=='hidden');
+  bs.forEach(b=>{const r0=b.getBoundingClientRect(),r=R(b),id=b.id||b.textContent.trim().slice(0,12);
+    if(r0.width<43.5||r0.height<43.5)bad.push('small '+id+' '+Math.round(r0.width)+'x'+Math.round(r0.height));
     if(r.left<-0.5||r.top<-0.5||r.right>W+0.5||r.bottom>H+0.5)bad.push('off screen '+id);
     if(b.scrollWidth>b.clientWidth+1)bad.push('text cut '+id);
     b.querySelectorAll('b,i,span').forEach(e=>{if(e.offsetParent&&e.scrollWidth>e.clientWidth+1)bad.push('truncated '+e.textContent.trim().slice(0,12));});});

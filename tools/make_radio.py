@@ -34,6 +34,13 @@ BOTH = {
     'luke_tower':       'Luke Tower',
     'luke_ground':      'Luke Ground',
     'phoenix_approach': 'Phoenix Approach',
+    # world regions (4.6b): the tower and ground of each region's airport
+    'tokyo_tower':         'Tokyo Tower',
+    'tokyo_ground':        'Haneda Ground',
+    'degaulle_tower':      'de Gaulle Tower',
+    'degaulle_ground':     'de Gaulle Ground',
+    'santosdumont_tower':  'Santos Dumont Tower',
+    'santosdumont_ground': 'Santos Dumont Ground',
     'cs_skyhawk':       'Skyhawk eight four zero one lima',
     'cs_skyhawk_s':     'Skyhawk zero one lima',
     'cs_viper':         'Viper one',
@@ -51,6 +58,17 @@ TOWER = {
     'rwy_1':   'runway one',              'rwy_19':  'runway one niner',
     'rwy_03l': 'runway zero three left',  'rwy_03r': 'runway zero three right',
     'rwy_21l': 'runway two one left',     'rwy_21r': 'runway two one right',
+    # world regions (4.6b): every runway end at Haneda, de Gaulle and Santos Dumont
+    'rwy_34r': 'runway three four right', 'rwy_34l': 'runway three four left',
+    'rwy_16r': 'runway one six right',    'rwy_16l': 'runway one six left',
+    'rwy_04':  'runway zero four',        'rwy_22':  'runway two two',
+    'rwy_05':  'runway zero five',        'rwy_23':  'runway two three',
+    'rwy_26l': 'runway two six left',     'rwy_26r': 'runway two six right',
+    'rwy_27l': 'runway two seven left',   'rwy_27r': 'runway two seven right',
+    'rwy_08l': 'runway zero eight left',  'rwy_08r': 'runway zero eight right',
+    'rwy_09l': 'runway zero niner left',  'rwy_09r': 'runway zero niner right',
+    'rwy_20l': 'runway two zero left',    'rwy_20r': 'runway two zero right',
+    'rwy_02l': 'runway zero two left',    'rwy_02r': 'runway zero two right',
 
     'cleared_to':     'cleared for takeoff.',
     'cleared_land':   'cleared to land.',
@@ -135,6 +153,16 @@ CHATTER_TOWER = {
     'ch_t7': 'Cessna seven three eight golf echo, runway one, taxi via alpha.',
     'ch_t8': 'Reach four eight two, direct Luke approved, maintain eight thousand.',
     'ch_t9': 'Viper two one flight, check wheels down. Runway three left, cleared to land.',
+    # world regions (4.6b): generic callsigns only, never a real airline
+    'ch_jp_t1': 'Skyline two two, Tokyo Tower, runway three four left, continue approach.',
+    'ch_jp_t2': 'Pacific seven, Haneda Ground, runway zero five, taxi via charlie.',
+    'ch_jp_t3': 'Orient four one, runway zero five, cleared for takeoff.',
+    'ch_fr_t1': 'Atlantic three one zero, de Gaulle Tower, runway two seven right, cleared to land.',
+    'ch_fr_t2': 'Riviera five two, de Gaulle Ground, push and start approved, facing east.',
+    'ch_fr_t3': 'Lumiere nine eight, runway two six left, line up and wait.',
+    'ch_br_t1': 'Carioca one five, Santos Dumont Tower, runway two zero left, cleared to land.',
+    'ch_br_t2': 'Sugarloaf eight, Santos Dumont Ground, runway two zero right, taxi via alpha.',
+    'ch_br_t3': 'Guanabara three, runway two zero right, cleared for takeoff, right turn out over the bay.',
 }
 CHATTER_PILOT = {
     'ch_p1': 'Luke tower, viper two one, flight of two, initial, runway three left.',
@@ -149,6 +177,16 @@ CHATTER_PILOT = {
     'ch_p10': 'Viper two two, bingo.',
     'ch_p11': 'Copy. Viper two one flight, knock it off. Rejoin, R T B.',
     'ch_p12': 'Cleared to land, viper two one.',
+    # world regions (4.6b)
+    'ch_jp_p1': 'Tokyo Tower, Skyline two two, ten miles south, runway three four left.',
+    'ch_jp_p2': 'Haneda Ground, Pacific seven, at the gate, request taxi.',
+    'ch_jp_p3': 'Tokyo Tower, Orient four one, ready runway zero five.',
+    'ch_fr_p1': 'de Gaulle Tower, Atlantic three one zero, established runway two seven right.',
+    'ch_fr_p2': 'de Gaulle Ground, Riviera five two, request push and start.',
+    'ch_fr_p3': 'de Gaulle Tower, Lumiere nine eight, ready runway two six left.',
+    'ch_br_p1': 'Santos Dumont Tower, Carioca one five, over the bridge, runway two zero left.',
+    'ch_br_p2': 'Santos Dumont Ground, Sugarloaf eight, request taxi.',
+    'ch_br_p3': 'Santos Dumont Tower, Guanabara three, ready runway two zero right.',
 }
 
 # ---- cockpit voice, c_*: TCAS callouts (Hard) and plain English versions (Easy) ----

@@ -800,7 +800,8 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 .setFoot{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex:none; flex-wrap:nowrap; }
 .setFoot #a2hs{ flex:1; min-width:0; }
 .setFoot .credit{ flex:none; order:2; }
-#osmCredit{ order:3; flex:none; margin:0; font:600 11px var(--font); color:#8a5a33; max-width:92px; line-height:1.15; }
+#osmCredit{ order:3; flex:none; margin:0; font:600 10px var(--font); color:#8a5a33; line-height:1.2; text-align:right; }
+#osmCredit span{ display:block; white-space:nowrap; }   /* three short lines: map data, runways (4.6b), terrain (4.6b) */
 #rotate{ position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:24px; text-align:center; background:rgba(8,14,22,.92); z-index:20; font-size:22px; font-weight:700; }
 @media (orientation:portrait){ body.touch:not(.portraitok) #rotate{ display:flex; } }
 /* ================= leaderboards: callsign card, boards, ranks, the end of run badge ================= */
@@ -929,6 +930,39 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   /* the lesson panel sits on the top edge of the controls, full width, growing up */
   body.touch #lesson{ bottom:calc(var(--vvh) - var(--ctlTop) + 8px); max-width:calc(100% - var(--padL) - var(--padR)); }
 }
+/* ---------- the location picker (4.6b): the airports grouped by region, one row that scrolls sideways
+   when it does not fit. FLY: the region name over its cards, each card a bold name and a one line
+   description. The pause sheet: names only, the region a small upright label beside its cards. ---------- */
+.frow.locRow{ align-items:flex-end; }
+.grp.locG{ flex:2.2 1 0; min-width:0; }
+.frow.locRow .grp.g4.cap{ flex:1.9 1 0; }
+.locs{ position:relative; flex:1; min-width:0; display:flex; gap:12px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; touch-action:pan-x; overscroll-behavior-x:contain; }
+.locs::-webkit-scrollbar{ display:none; }
+/* more cards past an edge: that edge fades out (locFade) */
+.locs.fr{ -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 48px),transparent); mask-image:linear-gradient(90deg,#000 calc(100% - 48px),transparent); }
+.locs.fl{ -webkit-mask-image:linear-gradient(90deg,transparent,#000 48px); mask-image:linear-gradient(90deg,transparent,#000 48px); }
+.locs.fl.fr{ -webkit-mask-image:linear-gradient(90deg,transparent,#000 48px,#000 calc(100% - 48px),transparent); mask-image:linear-gradient(90deg,transparent,#000 48px,#000 calc(100% - 48px),transparent); }
+.lgrp{ flex:none; display:flex; flex-direction:column; gap:2px; }
+.lgrp .gchips{ gap:6px; }
+.frows .chip.loc{ flex:none; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:2px; padding:0 10px; text-align:left; }
+.frows .chip.loc b{ font-size:14px; line-height:1.05; overflow:visible; }
+.frows .chip.loc span{ display:block; font-size:10.5px; font-weight:600; line-height:1.1; white-space:nowrap; color:rgba(42,22,8,.62); }
+#menu .frows .chip.loc.sel span{ color:rgba(246,193,119,.82); }
+#pauseOv .lgrp{ flex-direction:row; align-items:center; gap:4px; }
+#pauseOv .lgrp .glbl{ font-size:8px; letter-spacing:.06em; }
+#pauseOv .lgrp .gchips{ gap:12px; }
+#pauseOv .frow .chip.loc{ align-items:center; padding:0 10px; }
+#pauseOv .frow .chip.loc span{ display:none; }
+/* the pause sheet's time chips take the width their names need (44 px at least), the airports the rest */
+#pauseOv .frow.locRow .grp.locG{ flex:1 1 0; } #pauseOv .frow.locRow .grp.g4{ flex:0 1 auto; }
+#pauseOv .frow.locRow .grp.g4 .chip{ flex:1 0 auto; min-width:44px; padding:0 8px; }
+@media (max-width:620px) and (orientation:landscape){ #pauseOv .lgrp .gchips{ gap:8px; } #pauseOv .frow .chip.loc{ padding:0 7px; } }
+/* Arizona only cards seen from a world region */
+.azTag{ display:inline-block; margin-left:6px; padding:1px 5px; border-radius:5px; font-style:normal; font-size:9px; font-weight:800; letter-spacing:.08em; line-height:1.3;
+  vertical-align:1px; text-transform:uppercase; background:rgba(246,193,119,.16); color:#e8cfa5; }
+/* a lesson row: the tag in its top right corner, above the trophy, so a long lesson name keeps its one line */
+#menu .lrow .azTag{ position:absolute; top:5px; right:10px; margin:0; font-size:8px; background:rgba(42,22,8,.1); color:var(--brown); }
+#menu .lrow.next .azTag{ background:rgba(246,193,119,.16); color:#e8cfa5; }
 </style>
 </head>
 <body class="menuOn">
@@ -1052,10 +1086,9 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   </div>
   <div class="carx" id="carMain"></div>
   <div class="frows">
-   <div class="frow"><div class="grp g2"><span class="glbl">Base</span>
-     <button class="pick chip" data-b="kgeu"><b>Glendale</b></button><button class="pick chip" data-b="luke"><b>Luke AFB</b></button></div>
-    <div class="grp g4"><span class="glbl">Time</span>
-     <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><button class="pick chip" data-tod="haboob"><b>Haboob</b></button></div></div>
+   <div class="frow locRow"><div class="grp locG"><div class="locs" id="locFly" role="radiogroup" aria-label="Location"></div></div>
+    <div class="grp g4 cap"><span class="gcap">Time</span><div class="gchips">
+     <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><button class="pick chip" data-tod="haboob"><b>Haboob</b></button></div></div></div>
    <div class="frow starts"><div class="grp g2 cap" title="Do anything. A brief grade card on any landing."><span class="gcap">Free flight</span><div class="gchips">
      <button class="pick chip" data-pos="runway"><b>Runway</b></button><button class="pick chip" data-pos="ramp"><b>Ramp</b></button></div></div>
     <div class="grp g2 cap" title="Short scored starts. Each one ends in the results card."><span class="gcap">Segments</span><div class="gchips">
@@ -1096,7 +1129,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
    </div>
   </div>
   <div class="setFoot"><a class="credit" href="https://www.youtube.com/@OhRabah" target="_blank" rel="noopener"><svg class="yt" viewBox="0 0 28 20" aria-hidden="true"><path d="M27.4 3.1A3.5 3.5 0 0 0 24.9.6C22.7 0 14 0 14 0S5.3 0 3.1.6A3.5 3.5 0 0 0 .6 3.1C0 5.3 0 10 0 10s0 4.7.6 6.9a3.5 3.5 0 0 0 2.5 2.5C5.3 20 14 20 14 20s8.7 0 10.9-.6a3.5 3.5 0 0 0 2.5-2.5C28 14.7 28 10 28 10s0-4.7-.6-6.9Z" fill="#FF0000"/><path d="M11.2 14.3 18.4 10l-7.2-4.3v8.6Z" fill="#FFFFFF"/></svg><span>Made by @OhRabah</span></a>
-  <p id="osmCredit">Map data &copy; OpenStreetMap contributors</p>
+  <p id="osmCredit"><span>Map data &copy; OpenStreetMap contributors</span><span>Runways: OurAirports</span><span>Terrain: SRTM, Copernicus DEM via Mapzen</span></p>
   <p id="a2hs"><b>Play it full screen.</b> Tap <span class="shr"></span> <b>Share</b> in Safari, then <b>Add to Home Screen</b>.</p></div>
  </div>
  <div class="scr" id="sHelp">
@@ -1189,8 +1222,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
     <div class="pzRow"><div class="modeSeg" role="radiogroup" aria-label="Mode"><button class="chip sk" data-skill="rookie" role="radio"><b>Easy</b></button><button class="chip sk" data-skill="pilot" role="radio"><b>Hard</b></button></div><button id="pPhoto" class="ph" aria-label="Action Shot"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Action Shot</span></button><button id="pSet">Settings</button></div>
     <div class="pzRow acRow" id="pAc" role="radiogroup" aria-label="Aircraft"></div>
     <div class="frows">
-    <div class="frow"><div class="grp g2">
-      <button class="pick chip" data-b="kgeu"><b>Glendale</b></button><button class="pick chip" data-b="luke"><b>Luke AFB</b></button></div>
+    <div class="frow locRow"><div class="grp locG"><div class="locs" id="locPz" role="radiogroup" aria-label="Location"></div></div>
      <div class="grp g4">
       <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><button class="pick chip" data-tod="haboob"><b>Haboob</b></button></div></div>
     <div class="frow starts"><div class="grp g2 cap"><span class="gcap">Free flight</span><div class="gchips">
@@ -1497,6 +1529,8 @@ const TYPES={
     maxBank:0.44,ipD:5200,fafD:3000,slowD:2000,decel:0.5,ezG:0.2,ezGR:0.12,ezBank:0.7,thrC:0.8,flareH:6,flareK:0.3,tdSink:0.45,tdPitch:0,rotP:0.07,rotRate:0.06,apRate:[0.3,0.3,0.5],vne:230,vfe:140,snd:'turbo',cam1:[0,0.12,-5.02],cam1Name:'Nose camera',chase:[5,27],
     cs:'Reaper 8401L',csS:'Reaper 01L',say:'Reaper eight four zero one lima',sayS:'Reaper zero one lima',
     sub:'MQ-9A Reaper 02-4002 at Glendale, KGEU: the first Reaper into Afghanistan, now in the Air Force Museum. 66 ft wing, 900 shp turboprop pusher. Runway 1 is 7,150 ft, field elevation 1,071. Wind changes every flight.',
+    // outside Arizona (4.6b): the same without the field; flySub adds the region's runway and elevation
+    sub2:'MQ-9A Reaper 02-4002: the first Reaper into Afghanistan, now in the Air Force Museum. 66 ft wing, 900 shp turboprop pusher.',
     tips:'Manual: flaps 10, full power, rotate at 95 kt, gear up once climbing. Land at 100 kt, flaps 30, under 300 fpm.'},
   mq9b:{id:'mq9b',name:'MQ-9B SkyGuardian',title:'N190TC',mass:4600,S:27.5,Tstatic:9500,Pmax:670000,eta:0.78,CL0:0.35,CLa:5.8,aStall:0.2,CD0:0.026,k:0.016,span:24,len:11.7,gear:1.70,
     spool:1.3,pf:1,retract:1,wave:0,tipRoll:0.14,tipMsg:'Wingtip strike. That 79 ft wing has 8 degrees of clearance, level it before touchdown.',gndPitch:0.08,trimBase:0.03,trimK:0.1,
@@ -1504,6 +1538,8 @@ const TYPES={
     maxBank:0.44,ipD:5600,fafD:3300,slowD:2400,decel:0.42,ezG:0.2,ezGR:0.12,ezBank:0.7,thrC:0.8,flareH:6,flareK:0.3,tdSink:0.45,tdPitch:0,rotP:0.07,rotRate:0.06,apRate:[0.3,0.3,0.5],vne:230,vfe:140,snd:'turbo',cam1:[0,0.14,-5.3],cam1Name:'Nose camera',chase:[5.5,30],
     cs:'SkyGuardian 190TC',csS:'SkyGuardian 0TC',say:'Sky Guardian one niner zero tango charlie',sayS:'Sky Guardian zero tango charlie',
     sub:'MQ-9B SkyGuardian, N190TC, at Glendale KGEU. 79 ft wing with winglets, 40 hours of endurance, and it glides like a sailplane. Runway 1 is 7,150 ft, field elevation 1,071. Wind changes every flight.',
+    // outside Arizona (4.6b): the same without the field; flySub adds the region's runway and elevation
+    sub2:'MQ-9B SkyGuardian, N190TC. 79 ft wing with winglets, 40 hours of endurance, and it glides like a sailplane.',
     tips:'Manual: flaps 10, full power, rotate at 95 kt, gear up once climbing. Land at 100 kt, flaps 30. It floats, so pull the power early and let it settle.'},
   cessna:{id:'cessna',name:'Cessna 172',title:'N8401L',mass:1050,S:16.2,Tstatic:2800,Pmax:134000,eta:0.75,CL0:0.3,CLa:5.0,aStall:0.24,CD0:0.03,k:0.05,span:11,len:8.3,gear:1.63,
     spool:0.35,pf:1,retract:0,wave:0,tipRoll:0.35,tipMsg:'Wingtip strike. Level the wings before touchdown.',gndPitch:0.15,trimBase:0.03,trimK:0.1,
@@ -1511,6 +1547,8 @@ const TYPES={
     maxBank:0.44,ipD:4200,fafD:2000,slowD:1500,decel:0.8,ezG:0.2,ezGR:0.12,ezBank:0.7,thrC:0.8,flareH:4,flareK:0.3,tdSink:0.35,tdPitch:0,rotP:0.12,rotRate:0.08,apRate:[0.3,0.4,0.6],vne:163,vfe:85,snd:'piston',cam1:[-0.27,0.07,0.0],cam1Name:'Cockpit',chase:[3.5,17],
     cs:'Skyhawk 8401L',csS:'Skyhawk 01L',say:'Skyhawk eight four zero one lima',sayS:'Skyhawk zero one lima',
     sub:'Black Baron Air Cessna 172, N8401L, at Glendale KGEU. 180 hp, fixed gear. Runway 1 is 7,150 ft, field elevation 1,071. Wind changes every flight.',
+    // outside Arizona (4.6b): the same without the field; flySub adds the region's runway and elevation
+    sub2:'Black Baron Air Cessna 172, N8401L. 180 hp, fixed gear.',
     tips:'Manual: flaps 10, full power, rotate at 55 kt, climb 74 kt. Land at 65 kt, flaps 30, flare low and slow.'},
   alpha:{id:'alpha',name:'Pipistrel Alpha Trainer',title:'N502AT',mass:520,S:9.51,Tstatic:1600,Pmax:59700,eta:0.84,CL0:0.35,CLa:5.2,aStall:0.277,CD0:0.016,k:0.035,span:10.5,len:6.5,
     spool:0.3,pf:1,retract:0,wave:0,tipRoll:0.35,tipMsg:'Wingtip strike. Level the wings before touchdown.',gndPitch:0.15,trimBase:0.03,trimK:0.1,
@@ -1518,6 +1556,8 @@ const TYPES={
     maxBank:0.44,ipD:4000,fafD:2000,slowD:1500,decel:0.6,ezG:0.2,ezGR:0.12,ezBank:0.7,thrC:0.85,flareH:4,flareK:0.3,tdSink:0.35,tdPitch:0,rotP:0.12,rotRate:0.08,apRate:[0.3,0.4,0.6],vne:135,vfe:70,snd:'piston',cam1:[-0.28,0.03,-0.10],cam1Name:'Cockpit',chase:[3,14],
     cs:'Pipistrel 502AT',csS:'Pipistrel 2AT',say:'Pipistrel five zero two alpha tango',sayS:'Pipistrel two alpha tango',
     sub:'Pipistrel Alpha Trainer at Glendale KGEU. High wing, T-tail, 80 hp Rotax, 1,212 lb and glider smooth. Runway 1 is 7,150 ft, field elevation 1,071. Wind changes every flight.',
+    // outside Arizona (4.6b): the same without the field; flySub adds the region's runway and elevation
+    sub2:'Pipistrel Alpha Trainer. High wing, T-tail, 80 hp Rotax, 1,212 lb and glider smooth.',
     tips:'Manual: flaps +15, full power, rotate at 47 kt, climb at 76 kt. Approach at 70 kt, then 55 kt with flaps +25 on final. It floats, so plan a long flat approach.'},
   c130:{id:'c130',name:'C-130H Hercules',title:'91-1231',mass:50000,S:162.1,Tstatic:185000,Pmax:13700000,eta:0.80,CL0:0.40,CLa:5.2,aStall:0.26,CD0:0.030,k:0.042,span:40.4,len:29.8,
     spool:1.6,pf:1,retract:1,wave:0,tipRoll:0.25,tipMsg:'Wingtip strike. That 132 ft wing is a long way from the centreline, fly it level onto the runway.',gndPitch:0.05,trimBase:0.03,trimK:0.1,
@@ -1525,6 +1565,8 @@ const TYPES={
     maxBank:0.35,ipD:6500,fafD:3500,slowD:2500,decel:0.45,ezG:0.2,ezGR:0.10,ezBank:0.5,thrC:0.7,flareH:6,flareK:0.25,tdSink:0.8,tdPitch:0.02,rotP:0.07,rotRate:0.04,apRate:[0.18,0.22,0.35],vne:320,vfe:145,snd:'turboprop4',cam1:[0,2.60,-11.4],cam1Name:'Flight deck',chase:[11,58],
     cs:'Herky 71',csS:'Herky 71',say:'Herky seven one',sayS:'Herky seven one',
     sub:'C-130H Hercules 91-1231, Man o\' War, the 2,000th Hercules built, at Glendale KGEU. 155,000 lb, 132 ft wing, four Allison T56 turboprops. It is heavy and slow and it does not hurry, but it will get into a field the others cannot. Runway 1 is 7,150 ft, field elevation 1,071.',
+    // outside Arizona (4.6b): the same without the field; flySub adds the region's runway and elevation
+    sub2:'C-130H Hercules 91-1231, Man o\' War, the 2,000th Hercules built. 155,000 lb, 132 ft wing, four Allison T56 turboprops. It is heavy and slow and it does not hurry, but it will get into a field the others cannot.',
     tips:'Manual: flaps 50, all four up, rotate at 115 kt, gear up. Plan everything early, it takes a long time to slow down. Land at 130 kt with flaps 100. Firm is correct on a Herc.'},
   f16:{id:'f16',name:'F-16C Viper',title:'89-2032',mass:11000,S:27.87,Tstatic:95000,Pmax:1e9,eta:1,CL0:0.05,CLa:3.5,aStall:0.42,CD0:0.022,k:0.12,span:9.96,len:15,gear:1.72,
     spool:2.2,pf:0,retract:1,wave:0.06,tipRoll:0.35,tipMsg:'Wingtip strike. Level the wings before touchdown.',gndPitch:0.2,trimBase:0.08,trimK:0.18,
@@ -1532,6 +1574,8 @@ const TYPES={
     maxBank:0.62,ezAoA:0.227,ipD:8000,fafD:4500,slowD:3000,decel:1.15,ezG:0.5,ezGR:0.3,ezBank:1.05,thrC:0.6,flareH:6,flareK:0.3,tdSink:0.6,tdPitch:0.1,rotP:0.2,rotRate:0.08,apRate:[0.35,0.4,1.2],vne:800,vfe:300,snd:'jet',cam1:[0,0.86,-3.95],cam1Name:'Cockpit',chase:[6,32],
     cs:'Viper 1',csS:'Viper 1',say:'Viper one',sayS:'Viper one',
     sub:'F-16C 89-2032, Basher 52, the Triple Nickel jet Scott O\'Grady flew over Bosnia, at Luke Air Force Base, 4.4 nm west of Glendale. 29,000 lb of thrust, fly-by-wire feel. Luke runway 03L is 9,910 ft. Switch to Glendale above if you would rather start there.',
+    // outside Arizona (4.6b): the same without the field; flySub adds the region's runway and elevation
+    sub2:'F-16C 89-2032, Basher 52, the Triple Nickel jet Scott O\'Grady flew over Bosnia. 29,000 lb of thrust, fly-by-wire feel.',
     tips:'Manual: full power, rotate at 145 kt, gear up fast, it climbs like a rocket. Land at 155 kt with the nose high, under 300 fpm.'}
 };
 let AC=TYPES.reaper,FLAPS=AC.flaps;AC.g=9.81;
@@ -4601,8 +4645,10 @@ function skyPaint(k){
   c.needsUpdate=true;
 }
 function setTOD(id){
+  // the dust storm is Arizona's: day in a world region, the saved Haboob kept for coming back
+  const fb=id==='haboob'&&!REGION.az;if(fb)id='day';
   TOD=TOD_SET[id]||TOD_SET.day;
-  try{localStorage.setItem('kgeuTOD',TOD.id);}catch(e){}
+  if(!fb)try{localStorage.setItem('kgeuTOD',TOD.id);}catch(e){}
   HAZE.setHex(TOD.haze);
   scene.fog.color.copy(HAZE);scene.fog.near=TOD.fog[0];scene.fog.far=TOD.fog[1];
   scene.background=HAZE;
@@ -7253,15 +7299,17 @@ function worldLoad(){
       terrSet(d,new Int16Array(b[0]),new Uint8Array(b[1]));WORLD.data=d;WORLD.urb=new Uint8Array(b[2]);worldParks(d);
       buildWorld(d);tfcRegion();
       tcx=1e9;rebuildTerrain(st.pos.x,st.pos.z);
-      WORLD.ms=Math.round(performance.now()-t0);WORLD.ready=true;}))
+      WORLD.ms=Math.round(performance.now()-t0);WORLD.ready=true;mapRegionData();}))
     .catch(e=>{WORLD.err=String(e);console.warn('world region',e);const m=$('spMsg');if(m)m.textContent='Could not load '+REGION.city+'. Check the connection and reload.';});
 }
 // switch region: saved, then a reload builds the new world. resume (optional): the flight to start
-// there ({mode, base, type, tod}, or {arc} / {lesson}); without it the FLY screen opens.
+// there ({mode, base, pos, type, tod}, mode 'free' for a free flight from pos; or {arc} / {lesson}),
+// the aircraft, start, time and Easy/Hard filled in from the current picks where not given;
+// {screen:'fly'} or none: the FLY screen opens.
 function pickRegion(id,opts){
-  opts=opts||{};if(!REGIONS[id])id='az';
+  opts=opts||{};if(!REGIONS[id])id='az';const R=opts.resume;
   try{localStorage.setItem('kgeuRegion',id);
-    sessionStorage.setItem('kgeuResume',JSON.stringify(opts.resume?{start:Object.assign({pos:SPAWN_POS},opts.resume)}:{screen:'fly'}));}catch(e){}
+    sessionStorage.setItem('kgeuResume',JSON.stringify(R&&!R.screen?{start:Object.assign({pos:SPAWN_POS,type:savedType,tod:TOD.id,skill:SKILL},R)}:{screen:'fly'}));}catch(e){}
   (window.__kgeuReload||(()=>location.reload()))();
 }
 // ---------- state & input ----------
@@ -8839,7 +8887,7 @@ function musicLoadList(list){
 // still shows its text and clicks the squelch, which is a fine degraded mode
 function radioLoad(){
   if(RADIO.loaded||!actx)return;RADIO.loaded=true;
-  fetch('radio/clips.json').then(r=>r.json()).then(list=>{
+  fetch('radio/clips.json?v=2').then(r=>r.json()).then(list=>{   // ?v: a cached list from before 4.6b would miss the region clips
     RADIO.want=list.length;let i=0;
     const next=()=>{if(i>=list.length)return;const id=list[i++];
       fetch('radio/'+id+'.m4a').then(r=>r.arrayBuffer())
@@ -8977,7 +9025,7 @@ function vqPump(){
 function playLine(l){
   l.cut=false;l.dead=false;
   const live=radioLive(),sp=l.who==='Instructor';
-  RADIO.log.push({who:l.who,kind:l.kind,text:l.text,clips:Array.isArray(l.clips)?l.clips.slice():l.clips,t:st?+st.time.toFixed(2):0,amb:CHAT.some(p=>p.indexOf(l)>=0),type:AC.id});
+  RADIO.log.push({who:l.who,kind:l.kind,text:l.text,clips:Array.isArray(l.clips)?l.clips.slice():l.clips,t:st?+st.time.toFixed(2):0,amb:(REGION.az?CHAT:CHAT_R[REGION.id]||[]).some(p=>p.indexOf(l)>=0),type:AC.id});
   if(RADIO.log.length>200)RADIO.log.shift();
   if(live){                                                        // the grade card speaks without a subtitle
     atcEl.innerHTML='';const tx=document.createElement('span');tx.className='tx';atcEl.appendChild(tx);   // .tx clamps at three lines
@@ -9069,10 +9117,31 @@ const CHAT=[
  [L('Luke Tower','tower','Viper 21 flight, check wheels down, runway 3 left cleared to land.',['t_ch_t9']),
   L('Viper 21','fighter','Cleared to land, Viper 21.',['p_ch_p12'])]
 ];
+// a world region's own chatter (4.6b): generic callsigns, never a real airline. CHAT above is
+// Glendale, Luke and Phoenix traffic and only ever plays in Arizona.
+const CHAT_R={
+ rjtt:[[L('Skyline 22','heavy','Tokyo Tower, Skyline 22, ten miles south, runway 34 left.',['p_ch_jp_p1']),
+        L('Tokyo Tower','tower','Skyline 22, Tokyo Tower, runway 34 left, continue approach.',['t_ch_jp_t1'])],
+       [L('Pacific 7','heavy','Haneda Ground, Pacific 7, at the gate, request taxi.',['p_ch_jp_p2']),
+        L('Haneda Ground','tower','Pacific 7, Haneda Ground, runway 05, taxi via Charlie.',['t_ch_jp_t2'])],
+       [L('Orient 41','heavy','Tokyo Tower, Orient 41, ready runway 05.',['p_ch_jp_p3']),
+        L('Tokyo Tower','tower','Orient 41, runway 05, cleared for takeoff.',['t_ch_jp_t3'])]],
+ lfpg:[[L('Atlantic 310','heavy','de Gaulle Tower, Atlantic 310, established runway 27 right.',['p_ch_fr_p1']),
+        L('de Gaulle Tower','tower','Atlantic 310, de Gaulle Tower, runway 27 right, cleared to land.',['t_ch_fr_t1'])],
+       [L('Riviera 52','heavy','de Gaulle Ground, Riviera 52, request push and start.',['p_ch_fr_p2']),
+        L('de Gaulle Ground','tower','Riviera 52, de Gaulle Ground, push and start approved, facing east.',['t_ch_fr_t2'])],
+       [L('Lumiere 98','heavy','de Gaulle Tower, Lumiere 98, ready runway 26 left.',['p_ch_fr_p3']),
+        L('de Gaulle Tower','tower','Lumiere 98, runway 26 left, line up and wait.',['t_ch_fr_t3'])]],
+ sbrj:[[L('Carioca 15','heavy','Santos Dumont Tower, Carioca 15, over the bridge, runway 20 left.',['p_ch_br_p1']),
+        L('Santos Dumont Tower','tower','Carioca 15, Santos Dumont Tower, runway 20 left, cleared to land.',['t_ch_br_t1'])],
+       [L('Sugarloaf 8','ga','Santos Dumont Ground, Sugarloaf 8, request taxi.',['p_ch_br_p2']),
+        L('Santos Dumont Ground','tower','Sugarloaf 8, Santos Dumont Ground, runway 20 right, taxi via Alpha.',['t_ch_br_t2'])],
+       [L('Guanabara 3','ga','Santos Dumont Tower, Guanabara 3, ready runway 20 right.',['p_ch_br_p3']),
+        L('Santos Dumont Tower','tower','Guanabara 3, runway 20 right, cleared for takeoff, right turn out over the bay.',['t_ch_br_t3'])]]};
 const _rp=new V3();
 // one exchange of other traffic, lowest priority: it only waits a few seconds for the air
-function chatNow(){if(!REGION.az)return;   // the background chatter is Glendale and Luke traffic
-  const p=CHAT[chatI++%CHAT.length];let prev=null;
+function chatNow(){const C=REGION.az?CHAT:CHAT_R[REGION.id];if(!C)return;
+  const p=C[chatI++%C.length];let prev=null;
   p.forEach((l,i)=>{prev=vqAdd(l,{pri:3,ttl:6+i*6,dep:prev});});}
 function radioUpdate(dt){
   if(atcT>0){atcT-=dt;if(atcT<=0)atcEl.classList.remove('on');}
@@ -9201,7 +9270,10 @@ function rookieAssist(dt,t){
 // You start in the air a few miles out and the clock runs until the wheels touch the
 // target runway. Score is par over your time, weighted by the landing grade.
 const ARC={on:false,kind:'',t0:0,end:null,par:0,done:false,dist:0};
-const ARC_TARGETS=()=>RWY_ENDS.filter(e=>e.rwy.code==='KGEU'||e.rwy.code==='KLUF');
+// a world region has neither field: the same six ends by name, in Arizona's order, so the daily (same
+// worldwide) names the same runway on its card there; starting it switches to Arizona first
+const ARC_TARGETS=()=>REGION.az?RWY_ENDS.filter(e=>e.rwy.code==='KGEU'||e.rwy.code==='KLUF')
+  :[['KGEU','1'],['KGEU','19'],['KLUF','03L'],['KLUF','21R'],['KLUF','03R'],['KLUF','21L']].map(a=>({num:a[1],rwy:{code:a[0]}}));
 // the UTC date, so the daily challenge is the same worldwide and turns over at 00:00 UTC
 function todayKey(){const d=new Date();return d.getUTCFullYear()*10000+(d.getUTCMonth()+1)*100+d.getUTCDate();}
 function dayRng(k){let s=(k*2654435761)>>>0;return ()=>{s=(s+0x6D2B79F5)>>>0;let t=s;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
@@ -9394,13 +9466,13 @@ function hudClear(){
 const pauseOv=$('pauseOv');
 function openMenu(scr){if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.forced=null;hudClear();pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
 // the pause button, P and a backgrounded app all land here; the sheet shows while paused
-function togglePause(){if(RES.brief)resClose(RES.brief);paused=!paused;pauseOv.classList.toggle('on',paused);if(paused){radioFade(120);CARP.sync();PZ0={t:savedType,b:SPAWN_BASE,p:SPAWN_POS};pzApplyUI();if(window.stickReset)stickReset();musicUI();}}
+function togglePause(){if(RES.brief)resClose(RES.brief);paused=!paused;pauseOv.classList.toggle('on',paused);if(paused){radioFade(120);CARP.sync();PZ0={t:savedType,b:SPAWN_BASE,p:SPAWN_POS};PZ_LOC=null;locSel();pzApplyUI();requestAnimationFrame(locShow);if(window.stickReset)stickReset();musicUI();}}
 $('pResume').onclick=()=>{paused=false;pauseOv.classList.remove('on');initAudio();radioVolApply();};
 // Restart and Apply are one button: it restarts this flight (same start, mission or range) until
 // an aircraft, base or start is changed on the sheet, then it reads Apply and flies the new picks.
 // Time of day needs neither, it changes the sky at once.
 var PZ0=null;
-function pzChanged(){return !!PZ0&&(PZ0.t!==savedType||PZ0.b!==SPAWN_BASE||PZ0.p!==SPAWN_POS);}
+function pzChanged(){return !!PZ_LOC||!!PZ0&&(PZ0.t!==savedType||PZ0.b!==SPAWN_BASE||PZ0.p!==SPAWN_POS);}
 function pzApplyUI(){const b=$('pApply');if(b)b.textContent=pzChanged()?'Apply':'Restart';}
 function pzRestart(){start(st.mode==='final'||st.mode==='ramp'?(st.spawn||st.mode):(MISS.on?MISS.kind:STRIKE.active?'range':'runway'));}
 $('pMenu').onclick=()=>openMenu();
@@ -9579,6 +9651,7 @@ function schoolList(){
     b.className='lrow'+(done?' done':'')+(nx&&nx.id===l.id?' next':'');b.dataset.l=l.id;
     b.innerHTML='<span class="ln">'+(done?'\u2713':i+1)+'</span><div class="lt"><b></b><span></span></div><span class="lg">'+(g&&g!=='F'?g:'')+'<i class="go1">START</i></span>'+troHTML('lesson:'+l.id);
     b.querySelector('b').textContent=l.name;b.querySelector('.lt span').textContent=l.desc;
+    if(!REGION.az){const t=document.createElement('i');t.className='azTag';t.textContent='ARIZONA';b.appendChild(t);}   // flight school is at Glendale
     b.setAttribute('aria-label',l.name+(done?', finished':'')+(nx&&nx.id===l.id?', next lesson':''));
     b.onclick=()=>startLesson(l.id);b.querySelector('.tro').addEventListener('click',e=>{e.stopPropagation();e.preventDefault();if(LB)LB.lbOpen('lesson:'+l.id);});el.appendChild(b);});
 }
@@ -9740,9 +9813,42 @@ function firstTick(dt,d,a){
   if(LES.t>200)grade(0,'',[[0,'Ran out of time']],'took too long');
 }
 function warnFlash(){const w=document.getElementById('warn');if(w){w.textContent=LES.on==='engine'?'ENGINE FAILURE':'STALL';w.classList.add('on');setTimeout(()=>w.classList.remove('on'),2500);}}
+// ---- the location picker (4.6b): every airport, grouped by region, on FLY and in the pause sheet.
+// An airport of this region is a base pick as before. One in another region: from FLY the choice is
+// saved and pickRegion reloads back onto FLY there; in the pause sheet it waits for Apply, which
+// reloads into that region and starts the same free flight (aircraft, start, time) at once.
+const LOCS=[{reg:'az',g:'Arizona',a:[['kgeu','Glendale','KGEU, the home field, 7,150 ft'],['luke','Luke AFB','KLUF, F-16 base, two 10,000 ft runways']]},
+  {reg:'rjtt',g:'Japan',a:[['rjtt','Tokyo Haneda','RJTT, runways out in Tokyo Bay']]},
+  {reg:'lfpg',g:'France',a:[['lfpg','Paris CDG','LFPG, four parallel runways']]},
+  {reg:'sbrj',g:'Brazil',a:[['sbrj','Rio Santos Dumont','SBRJ, 4,340 ft on Guanabara Bay']]}];
+let PZ_LOC=null;   // the pause sheet: an airport in another region, picked, not applied yet
+function locBuild(el,pz){if(!el)return;el.innerHTML='';
+  for(const G of LOCS){const g=document.createElement('div');g.className='lgrp';g.dataset.reg=G.reg;
+    const h=document.createElement('span');h.className=pz?'glbl':'gcap';h.textContent=G.g.toUpperCase();g.appendChild(h);
+    const row=document.createElement('div');row.className='gchips';
+    for(const [b,n,d] of G.a){const c=document.createElement('button');c.className='pick chip loc';c.dataset.b=b;c.dataset.reg=G.reg;c.setAttribute('role','radio');
+      c.setAttribute('aria-label',n+', '+d);c.innerHTML='<b></b><span></span>';c.firstChild.textContent=n;c.lastChild.textContent=d;
+      c.addEventListener('click',()=>locPick(c.dataset.b,c.dataset.reg,pz));row.appendChild(c);}
+    g.appendChild(row);el.appendChild(g);}}
+locBuild($('locFly'),false);locBuild($('locPz'),true);
+function locPick(b,reg,pz){
+  if(reg===REGION_ID){if(pz)PZ_LOC=null;pickBase(b);return;}
+  if(pz){PZ_LOC={reg:reg,b:b};locSel();pzApplyUI();return;}
+  try{localStorage.setItem('kgeuBase',b);}catch(e){}
+  pickRegion(reg,{resume:{screen:'fly'}});}
+// the highlighted card: the base flown from, or in the pause sheet the other region's airport waiting for Apply
+function locSel(){document.querySelectorAll('.pick[data-b]').forEach(c=>{const on=PZ_LOC&&c.closest('#pauseOv')?c.dataset.b===PZ_LOC.b:c.dataset.b===SPAWN_BASE;
+  c.classList.toggle('sel',on);c.setAttribute('aria-checked',String(on));});}
+// bring the highlighted card into view in each row (only the rows that are showing have a width)
+function locShow(){document.querySelectorAll('.locs').forEach(L=>{const c=L.querySelector('.pick.sel');if(c&&L.clientWidth){
+  const g=c.closest('.lgrp'),x=g?g.offsetLeft:c.offsetLeft;if(x<L.scrollLeft||c.offsetLeft+c.offsetWidth>L.scrollLeft+L.clientWidth)L.scrollLeft=Math.max(0,x-4);}locFade(L);});}
+function locFade(L){const m=L.scrollWidth-L.clientWidth;L.classList.toggle('fl',L.scrollLeft>2);L.classList.toggle('fr',L.scrollLeft<m-2);}
+document.querySelectorAll('.locs').forEach(L=>L.addEventListener('scroll',()=>locFade(L),{passive:true}));
+addEventListener('resize',()=>requestAnimationFrame(()=>document.querySelectorAll('.locs').forEach(locFade)));
 function pickBase(id){SPAWN_BASE=BASES[id]?id:HOME(acType);try{localStorage.setItem('kgeuBase',SPAWN_BASE);}catch(e){}
-  document.querySelectorAll('.pick[data-b]').forEach(b=>b.classList.toggle('sel',b.dataset.b===SPAWN_BASE));sumUI();}
-document.querySelectorAll('.pick[data-b]').forEach(b=>b.addEventListener('click',()=>pickBase(b.dataset.b)));
+  locSel();sumUI();}
+// the haboob is Arizona's: no Haboob chip in a world region (setTOD falls back to day there)
+if(!REGION.az)document.querySelectorAll('.pick[data-tod="haboob"]').forEach(b=>{b.style.display='none';});
 document.querySelectorAll('.pick[data-tod]').forEach(b=>b.addEventListener('click',()=>{setTOD(b.dataset.tod);sumUI();}));
 const POS_OK=['runway','ramp','final1','final'];
 let SPAWN_POS='runway';try{const v=localStorage.getItem('kgeuPos');if(POS_OK.includes(v))SPAWN_POS=v;}catch(e){}
@@ -9766,7 +9872,7 @@ const NAV=[];let curScr='sHome',fromPause=false;
 function showScr(id){
   curScr=id;document.body.classList.toggle('menuOn',menu.classList.contains('on'));document.querySelectorAll('#menu .scr').forEach(e=>e.classList.toggle('on',e.id===id));
   menu.classList.toggle('see3d',id==='sFly');SHOW.on=id==='sFly'&&menu.classList.contains('on');
-  if(id==='sFly'){CARM.sync();sumUI();}
+  if(id==='sFly'){CARM.sync();sumUI();requestAnimationFrame(locShow);}
   if(id==='sSchool')schoolList();if(id==='sHome')startHereUI();if(id==='sArc')arcList();if(id==='sMis')misList();
   if(LB){if(id==='sLb')LB.lbRender();if(id==='sSet'||id==='sFly')LB.ui();}
 }
@@ -9806,6 +9912,11 @@ const AC_INFO={
   reaper:['MQ-9A Reaper','MQ-9A Reaper','A long winged drone that circles for hours and strikes from above.'],
   mq9b:['MQ-9B SkyGuardian','MQ-9B SkyGuardian','The bigger, longer winged Reaper built to fly over cities.'],
   c130:['C-130H Hercules','C-130 Hercules','A four engine cargo hauler that lands on dirt strips.']};
+// the aircraft's story text: Arizona's names Glendale (or Luke); a world region's names its own airport,
+// home runway and elevation from REGION, then the tip every flight shares
+function flySub(t){const T=TYPES[t]||TYPES.cessna;if(REGION.az||!T.sub2)return T.sub;
+  const r=REGION.rw.find(r=>r[0]===REGION.main||r[1]===REGION.main),ft=r?Math.round(r[2]*M2FT/10)*10:Math.round(RWY_LEN*M2FT/10)*10;
+  return T.sub2+' At '+REGION.base+': runway '+REGION.main+' is '+ft.toLocaleString('en-US')+' ft, field elevation '+FIELD_FT.toLocaleString('en-US')+' ft. Wind changes every flight.';}
 // ---- the carousel: loops forever both ways. The same component, compact, sits in
 // the pause sheet. Settling on an aircraft picks it, so both stay in sync. ----
 const wrapI=i=>((i%CAR.length)+CAR.length)%CAR.length;
@@ -9824,7 +9935,7 @@ function Carousel(root){
   root.querySelector('.arrow.l').onclick=e=>{e.stopPropagation();c.set(c.idx-1);};
   root.querySelector('.arrow.r').onclick=e=>{e.stopPropagation();c.set(c.idx+1);};
   root.querySelector('.story').onclick=e=>{e.stopPropagation();const t=CAR[wrapI(c.idx)],I=AC_INFO[t];
-    $('storyH').textContent=I[0]+'  '+TYPES[t].title;$('storyT').textContent=TYPES[t].sub;$('storyOv').classList.add('on');};
+    $('storyH').textContent=I[0]+'  '+TYPES[t].title;$('storyT').textContent=flySub(t);$('storyOv').classList.add('on');};
   c.win.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;c.drag={id:e.pointerId,x:e.clientX,p0:c.pos,t:performance.now(),moved:false};});
   c.win.addEventListener('pointermove',e=>{const d=c.drag;if(!d||e.pointerId!==d.id)return;const dx=e.clientX-d.x;if(Math.abs(dx)>6)d.moved=true;
     c.pos=d.p0-dx/c.win.clientWidth;});
@@ -9879,7 +9990,11 @@ function showRender(dt,c){
 // ---- where, when and go ----
 const POS_TXT={runway:'free flight on the runway',ramp:'free flight at the ramp',final1:'segment on 1 mile final',final:'segment on 3 mile final'};
 // the pause sheet's change flight panel: same picks, Apply restarts at once
-$('pApply').onclick=()=>{pauseOv.classList.remove('on');if(pzChanged())freeStart();else pzRestart();};
+// Apply with an airport of another region: reload into it and fly the same free flight there
+$('pApply').onclick=()=>{pauseOv.classList.remove('on');
+  if(PZ_LOC){const P=PZ_LOC;PZ_LOC=null;try{localStorage.setItem('kgeuBase',P.b);}catch(e){}
+    pickRegion(P.reg,{resume:{mode:'free',base:P.b,pos:SPAWN_POS,type:savedType,tod:TOD.id}});return;}
+  if(pzChanged())freeStart();else pzRestart();};
 function sumUI(){pzApplyUI();const el=$('sumLine');if(!el)return;const I=AC_INFO[savedType]||AC_INFO.cessna;
   el.textContent=I[1]+' at '+(!REGION.az?BASES[BASE0].name:SPAWN_BASE==='luke'?'Luke AFB':'Glendale')+', '+TOD.name.toLowerCase()+', '+POS_TXT[SPAWN_POS];}
 
@@ -9927,7 +10042,8 @@ function scoreOf(id){
 const TROPHY='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4M12 14v4M8 20h8"/></svg>';
 const troHTML=lb=>lb?'<span class="tro" role="button" aria-label="Leaderboard" data-lb="'+lb+'">'+TROPHY+'</span>':'';
 function cardHTML(o){const sc=o.score||scoreOf(o.id);
-  return troHTML(o.lb)+(ICONS[o.icon||o.id]||'')+'<div class="mt"><span class="ac">'+o.ac+'</span><b>'+o.name+'</b><span class="d">'+o.desc+'</span>'+
+  // from a world region every mission, arcade game and the strike is at Glendale or Luke: tagged, and starting one switches back
+  return troHTML(o.lb)+(ICONS[o.icon||o.id]||'')+'<div class="mt"><span class="ac">'+o.ac+(REGION.az?'':'<i class="azTag">ARIZONA</i>')+'</span><b>'+o.name+'</b><span class="d">'+o.desc+'</span>'+
     (o.soon?'<span class="sc soon">Coming soon</span>':'<span class="sc">'+stars(sc[0])+'<em>'+(sc[1]||'Not flown yet')+'</em></span>')+'</div>';}
 
 function fillCards(el,list){el.innerHTML='';list.forEach(o=>{const b=document.createElement('button');b.className='mcard'+(o.cls?' '+o.cls:'');b.dataset.m=o.id;b.innerHTML=cardHTML(o);b.onclick=o.go;if(o.soon)b.setAttribute('aria-disabled','true');
@@ -10112,6 +10228,8 @@ function drawSixPack(){
 }
 
 // ---------- map data: real Phoenix roads, water and parks from OpenStreetMap ----------
+// A world region (4.6b) has its own assets/map/<id>.bin, built in its ARP frame: every coordinate
+// moves by WOFF into the home runway frame, like the world JSON (WOFF is 0,0 in Arizona).
 // Built once, at build time, by tools/build_map_data.py into assets/map/phx.bin. The game
 // never calls Overpass. World metres (+X east, +Z south from KGEU), 2 m integers,
 // delta and varint coded. Map data (c) OpenStreetMap contributors, credited in Settings.
@@ -10125,15 +10243,15 @@ function mapParse(buf){
   const Q=U16()/100;U8();
   // one polyline: Float32 x,z pairs plus its bounding box
   const line=()=>{const n=V(),a=new Float32Array(n*2);let x=0,z=0,x0=1e9,z0=1e9,x1=-1e9,z1=-1e9;
-    for(let i=0;i<n;i++){x+=V();z+=V();const X=x*Q,Z=z*Q;a[i*2]=X;a[i*2+1]=Z;if(X<x0)x0=X;if(X>x1)x1=X;if(Z<z0)z0=Z;if(Z>z1)z1=Z;}
+    for(let i=0;i<n;i++){x+=V();z+=V();const X=x*Q-WOFF[0],Z=z*Q-WOFF[1];a[i*2]=X;a[i*2+1]=Z;if(X<x0)x0=X;if(X>x1)x1=X;if(Z<z0)z0=Z;if(Z>z1)z1=Z;}
     return {p:a,b:[x0,z0,x1,z1]};};
   const list=()=>{const n=U32(),out=[];for(let i=0;i<n;i++)out.push(line());return out;};
   for(let n=U8();n--;){const c=U8();MAPD.roads[c]=list();}
-  for(let n=U16();n--;){const x=I16()*Q,z=I16()*Q,l=U8();let r='';for(let i=0;i<l;i++)r+=String.fromCharCode(U8());MAPD.shields.push({x:x,z:z,ref:r});}
+  for(let n=U16();n--;){const x=I16()*Q-WOFF[0],z=I16()*Q-WOFF[1],l=U8();let r='';for(let i=0;i<l;i++)r+=String.fromCharCode(U8());MAPD.shields.push({x:x,z:z,ref:r});}
   for(let n=U8();n--;){const k=U8();MAPD.polys[k]=list();}
   for(let n=U8();n--;){const k=U8();MAPD.wlines[k]=list();}
   MAPD.taxi=list();MAPD.apron=list();
-  const W=U16(),H=U16(),G=U16(),gx=I16()*Q,gz=I16()*Q,len=U32();
+  const W=U16(),H=U16(),G=U16(),gx=I16()*Q-WOFF[0],gz=I16()*Q-WOFF[1],len=U32();
   MAPD.urbanZ={W:W,H:H,G:G,x0:gx,z0:gz,data:u.subarray(o,o+len)};o+=len;
   return true;
 }
@@ -10165,16 +10283,19 @@ function mapQuery(x0,z0,x1,z1,cb){
     for(let i=0;i<a.length;i+=2){const L=a[i],f=a[i+1];if(MAPD.seen[L][f]===st)continue;MAPD.seen[L][f]=st;
       const F=MAPD.layers[L].f[f],b=F.b;if(b[2]<x0||b[0]>x1||b[3]<z0||b[1]>z1)continue;cb(MAPD.layers[L].name,F);}}
 }
+// a world region's base raster needs its terrain and water: ready waits for WORLD (never in Arizona)
 function mapLoad(){
-  fetch('assets/map/phx.bin?v=1').then(r=>r.ok?r.arrayBuffer():null).then(b=>{
-    if(!b||!mapParse(b))return;return mapInflate().then(()=>{mapIndex();MAPD.ready=true;if(typeof mapDataReady==="function")mapDataReady();});
+  fetch('assets/map/'+(REGION.az?'phx':REGION.id)+'.bin?v=1').then(r=>r.ok?r.arrayBuffer():null).then(b=>{
+    if(!b||!mapParse(b))return;return mapInflate().then(()=>{mapIndex();
+      const fin=()=>{if(!WORLD.ready){if(!WORLD.err)setTimeout(fin,250);return;}
+        if(!REGION.az)mapRegionData();MAPD.ready=true;if(typeof mapDataReady==="function")mapDataReady();};fin();});
   }).catch(()=>{});
 }
 mapLoad();
 
 // ---------- maps: a heading up mini map, and a full north up map with destinations ----------
 const mc=document.getElementById('map'),mx=mc.getContext('2d');let ms=92;
-const LANDMARKS=[
+const LANDMARKS=!REGION.az?[]:[   // a world region's: its landmarks from WORLD.data (mapRegionData)
   {name:'White Tank Mountains',x:-23200,z:-6900,rx:6500,rz:12500,rot:0.12,kind:'mtn'},
   {name:'Camelback',x:31400,z:350,rx:1900,rz:900,rot:0.25,kind:'mtn'},
   {name:'State Farm Stadium',x:3480,z:-979,rx:170,rz:130,rot:0,kind:'stadium'}];
@@ -10260,10 +10381,12 @@ function hbMapPoly(ctx,P,dp){
 // own terrain as hillshade so the White Tanks, the Estrellas and Camelback read as real
 // hills. Everything under the labels is drawn once into 256 px tiles and kept (LRU),
 // so panning and pinching only composite cached canvases.
-const MPAL={city:[34,36,40],desert:[82,70,56],out:'#524638',water:'#0c1a2e',waterLine:'#143054',
+const MPAL={city:[34,36,40],desert:[82,70,56],green:[62,70,56],out:'#524638',water:'#0c1a2e',waterLine:'#143054',
   park:'rgba(88,150,96,.34)',golf:'rgba(104,172,108,.44)',local:'#5c5a57',local2:'#77736c',major:'#bdb5a8',major2:'#9c968d',fwy:'#F6C177',fwyCase:'#26170b',fwyLink:'#c99a5c',
   apron:'rgba(210,214,220,.10)',taxi:'rgba(220,224,230,.30)'};
-const MBASE={x0:-34000,z0:-28000,x1:38000,z1:30000,res:125,c:null};
+// a world region: its +-half square around the ARP, in the home runway frame (512 x 512 at most)
+const MBASE=REGION.az?{x0:-34000,z0:-28000,x1:38000,z1:30000,res:125,c:null}
+  :{x0:-REGION.half-WOFF[0],z0:-REGION.half-WOFF[1],x1:REGION.half-WOFF[0],z1:REGION.half-WOFF[1],res:125,c:null};
 function mbaseBuild(){
   const R=MBASE.res,W=Math.round((MBASE.x1-MBASE.x0)/R),H=Math.round((MBASE.z1-MBASE.z0)/R);
   const hgt=new Float32Array(W*H);
@@ -10279,13 +10402,16 @@ function mbaseBuild(){
   const dens=(wx,wz)=>{if(!G)return 0;const gx=clamp((wx-U.x0)/U.G-0.5,0,U.W-1.001),gz=clamp((wz-U.z0)/U.G-0.5,0,U.H-1.001),i=Math.floor(gx),j=Math.floor(gz),fx=gx-i,fz=gz-j;
     return (G[j*U.W+i]*(1-fx)+G[j*U.W+i+1]*fx)*(1-fz)+(G[(j+1)*U.W+i]*(1-fx)+G[(j+1)*U.W+i+1]*fx)*fz;};
   const Lx=-0.62,Lz=-0.62,Ly=0.48;   // sun from the north west, 29 degrees up
+  const wet=!REGION.az&&TERR.ready,land=REGION.az?MPAL.desert:MPAL.green;   // a world region: green grey country, not desert
   for(let j=0;j<H;j++)for(let i=0;i<W;i++){
     const h=hgt[j*W+i],hx=hgt[j*W+Math.min(W-1,i+1)]-hgt[j*W+Math.max(0,i-1)],hz=hgt[Math.min(H-1,j+1)*W+i]-hgt[Math.max(0,j-1)*W+i];
     // surface normal from the slopes; relief a little exaggerated so low ranges still read
     const nx=-hx/(2*R)*2.2,nz=-hz/(2*R)*2.2,nl=Math.hypot(nx,1,nz),sh=(nx*Lx+Ly+nz*Lz)/nl/Ly;
-    const t=smooth(0.12,0.34,dens(MBASE.x0+(i+0.5)*R,MBASE.z0+(j+0.5)*R)),lift=Math.min(1,h/900)*0.18;
-    const k=Math.max(0.45,Math.min(1.6,1+(sh-1)*0.9))+lift,o=(j*W+i)*4;
-    for(let ch=0;ch<3;ch++)d[o+ch]=Math.min(255,(MPAL.desert[ch]*(1-t)+MPAL.city[ch]*t)*k);
+    const wx=MBASE.x0+(i+0.5)*R,wz=MBASE.z0+(j+0.5)*R,o=(j*W+i)*4;
+    if(wet&&isWater(wx,wz)){d[o]=12;d[o+1]=26;d[o+2]=46;d[o+3]=255;continue;}   // a world region's sea, bays and rivers (MPAL.water)
+    const t=smooth(0.12,0.34,dens(wx,wz)),lift=Math.min(1,h/900)*0.18;
+    const k=Math.max(0.45,Math.min(1.6,1+(sh-1)*0.9))+lift;
+    for(let ch=0;ch<3;ch++)d[o+ch]=Math.min(255,(land[ch]*(1-t)+MPAL.city[ch]*t)*k);
     d[o+3]=255;}
   x.putImageData(im,0,0);MBASE.c=c;
 }
@@ -10388,7 +10514,8 @@ function fmSize(){const d=Math.min(window.devicePixelRatio||1,2),W=Math.round(in
 // the opening view for a w x h screen: every airport at once, the aircraft somewhere on screen, in the part the legend leaves free
 function fmView(w,h){const lw=legW();
   let x0=st.pos.x,x1=x0,z0=st.pos.z,z1=z0;for(const a of AIRPORTS){x0=Math.min(x0,a[2]);x1=Math.max(x1,a[2]);z0=Math.min(z0,a[3]);z1=Math.max(z1,a[3]);}
-  const s=Math.min((w-150-lw)/(x1-x0+4000),(h-170)/(z1-z0+4000));return {s:s,cx:(x0+x1)/2+lw/2/s,cz:(z0+z1)/2};}
+  const pad=REGION.az?4000:16000;   // a world region has one airport: open on the city around it
+  const s=Math.min((w-150-lw)/(x1-x0+pad),(h-170)/(z1-z0+pad));return {s:s,cx:(x0+x1)/2+lw/2/s,cz:(z0+z1)/2};}
 // pin the tiles of the opening view, in this orientation and the other one (a 24 px margin covers the safe area shifting)
 function fmPins(){const W=innerWidth,H=innerHeight,out=new Set();
   for(const [w,h] of [[W,H],[H,W]]){const v=fmView(w,h);if(!(v.s>0))continue;const hw=(w/2+24)/v.s,hh=(h/2+24)/v.s;mtKeys(v.s,v.cx-hw,v.cz-hh,v.cx+hw,v.cz+hh,out);}
@@ -10479,17 +10606,30 @@ function rrect(ctx,x,y,w,h,r){ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y
 // places, from their real coordinates in the same flat frame as the map data
 const GEO0={x:wX(RWY_LEN/2,0),z:wZ(RWY_LEN/2,0)};
 const geoW=(lat,lon)=>({x:GEO0.x+(lon+112.29517)*111320*Math.cos(33.52683*Math.PI/180),z:GEO0.z-(lat-33.52683)*110950});
-const PLACES=[['Phoenix',33.4484,-112.0740,3],['Glendale',33.5387,-112.1860,2],['Peoria',33.5806,-112.2374,2],['Surprise',33.6292,-112.3680,2],
+// a world region: filled from WORLD.data by mapRegionData (the biggest first), like TERRAIN and LANDMARKS
+const PLACES=!REGION.az?[]:[['Phoenix',33.4484,-112.0740,3],['Glendale',33.5387,-112.1860,2],['Peoria',33.5806,-112.2374,2],['Surprise',33.6292,-112.3680,2],
   ['Goodyear',33.4353,-112.3582,2],['Tempe',33.4255,-111.9400,2],['Scottsdale',33.4942,-111.9261,2],['Buckeye',33.3703,-112.5838,2],
   ['Sun City',33.5975,-112.2718,1],['El Mirage',33.6131,-112.3246,1],['Litchfield Park',33.4934,-112.3580,1],['Tolleson',33.4500,-112.2593,1],
   ['Laveen',33.3628,-112.1699,1],['Paradise Valley',33.5310,-111.9426,1]].map(a=>Object.assign(geoW(a[1],a[2]),{name:a[0],rank:a[3]}));
-const TERRAIN=[{name:'White Tank Mountains',x:-23200,z:-6900},{name:'Sierra Estrella',x:-6500,z:21800},{name:'Hedgpeth Hills',x:12500,z:-17800},
+const TERRAIN=!REGION.az?[]:[{name:'White Tank Mountains',x:-23200,z:-6900},{name:'Sierra Estrella',x:-6500,z:21800},{name:'Hedgpeth Hills',x:12500,z:-17800},
   Object.assign(geoW(33.3350,-112.0600),{name:'South Mountain'})];
 // one card per airport, beside its runways
-const APTS=[{code:'KGEU',name:'Glendale',kind:'airport',pri:810},{code:'KLUF',name:'Luke AFB',kind:'airbase',pri:815},
+const APTS=!REGION.az?[{code:REGION.icao,name:REGION.base,kind:'airport',pri:820}]:[{code:'KGEU',name:'Glendale',kind:'airport',pri:810},{code:'KLUF',name:'Luke AFB',kind:'airbase',pri:815},
   {code:'KPHX',name:'Sky Harbor',kind:'airport',pri:820},{code:'LZ',name:'Assault Strip',kind:'airbase',pri:790}];
 for(const A of APTS){const rs=RUNWAYS.filter(r=>r.code===A.code);A.x=rs.reduce((s,r)=>s+r.x,0)/rs.length;A.z=rs.reduce((s,r)=>s+r.z,0)/rs.length;
   A.r=Math.max(...rs.map(r=>Math.hypot(r.x-A.x,r.z-A.z)+r.len/2));A.label=A.name+' · '+A.code;}
+// a world region's labels from its data file, in the home runway frame: the landmarks (one per name,
+// a bridge's two pylons are one), the 40 biggest places (rank 3 the city, 2 the big towns), the 8
+// highest named peaks; only names the map font can draw (Latin script)
+function mapRegionData(){
+  const d=WORLD.data;if(!d||mapRegionData.done)return;mapRegionData.done=true;
+  const mv=o=>({x:o.x-WOFF[0],z:o.z-WOFF[1]}),lat=n=>typeof n==='string'&&/^[\u0020-\u024f\u1e00-\u1eff\u2018-\u201d]+$/.test(n),seen=new Set();
+  for(const l of d.landmarks||[]){const n=String(l.name||'').replace(/\s*\(.*\)\s*$/,'');if(!lat(n)||seen.has(n))continue;seen.add(n);
+    LANDMARKS.push(Object.assign(mv(l),{name:n,kind:'landmark'}));}
+  (d.places||[]).filter(p=>lat(p.name)).sort((a,b)=>(b.pop||0)-(a.pop||0)).slice(0,40)
+    .forEach((p,i)=>PLACES.push(Object.assign(mv(p),{name:p.name,rank:i===0?3:i<8||(p.pop||0)>=200000?2:1})));
+  (d.peaks||[]).filter(p=>lat(p.name)).sort((a,b)=>(b.ele||0)-(a.ele||0)).slice(0,8).forEach(p=>TERRAIN.push(Object.assign(mv(p),{name:p.name})));
+}
 const SHIELD_STYLE={'I-10':'i','I-17':'i','101':'l','202':'l','303':'l'};
 // everything on the map with an icon, where it is right now
 const EGG_NAMES={egg_hangar:'@OhRabah hangar',egg_billboard:'@OhRabah billboard',egg_rooftop:'@OhRabah rooftop sign',egg_flag:'@OhRabah flag',egg_tow:'@OhRabah banner tow'};
@@ -10497,6 +10637,7 @@ const MPRI={haboob:760,school:700,drop:690,range:690,race:680,landmark:650,egg:6
 const _poiV=new V3();
 function raceStart(dist,off,e){const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h))+off;return {x:e.x+Math.sin(back)*dist,z:e.z-Math.cos(back)*dist};}
 function mapPOIs(){
+  if(!REGION.az)return LANDMARKS.slice();   // a world region: its landmarks; the missions, races, school, haboob and eggs are Arizona's
   const out=[{kind:'landmark',x:3480,z:-979,name:'State Farm Stadium'},{kind:'landmark',x:31400,z:350,name:'Camelback Mountain'},
     {kind:'landmark',x:21000,z:7800,name:'Downtown Phoenix'},{kind:'drop',x:DROPZ.x,z:DROPZ.z,name:'C-130 airdrop zone'},
     {kind:'range',x:RANGE.x,z:RANGE.z,name:'Strike range'},{kind:'school',x:APC.x,z:APC.z,name:'Flight school'}];
@@ -10602,7 +10743,9 @@ function fmHit(X,Y){let best=null,bd=26;for(const e of RWY_ENDS){const q=fmP(e.x
 // ---- the legend: one row per icon type. A tap lights those icons up and flies to the nearest ----
 const LEG_KINDS=['airport','airbase','landmark','drop','range','race','school','haboob','egg'];
 function legBuild(){
-  const L=$('mapLegL'),kinds=LEG_KINDS.filter(k=>k!=='haboob'||HB.on),key=kinds.join();if(L.dataset.k===key)return;L.dataset.k=key;L.innerHTML='';
+  let kinds=LEG_KINDS.filter(k=>k!=='haboob'||HB.on);
+  if(!REGION.az){const have=new Set(APTS.map(A=>A.kind));for(const P of mapPOIs())have.add(P.kind);kinds=kinds.filter(k=>have.has(k));}   // only what the region has
+  const L=$('mapLegL'),key=kinds.join();if(L.dataset.k===key)return;L.dataset.k=key;L.innerHTML='';
   for(const k of kinds){const b=document.createElement('button');b.className='lrow';b.dataset.kind=k;
     const im=document.createElement('img');im.alt='';im.src=mIconSprite(k,22).toDataURL();b.appendChild(im);b.appendChild(document.createTextNode(MICON[k].n));
     tapBtn(b,()=>legPick(k));L.appendChild(b);}
@@ -12716,7 +12859,7 @@ window.__kgeu.TCAS={levels:tcasLevels,state:()=>({ta:TCAS.list.some(o=>tcasLvl(o
 window.__kgeu.tcasConflict=tcasConflict;window.__kgeu.tcasVoiceLog=TCAS.voiceLog;
 window.__kgeu.LB=LB;try{LB.boot();}catch(e){console.warn('leaderboards',e);}
 // world regions (4.6a)
-Object.assign(window.__kgeu,{REGION:REGION,REGIONS:REGIONS,WORLD:WORLD,pickRegion:pickRegion,isWater:isWater,TERR:TERR,RUNWAYS:RUNWAYS,WB:WB,AL:AL,OBST:OBST,
+Object.assign(window.__kgeu,{flySub:flySub,CHAT_R:CHAT_R,APTS:APTS,PLACES:PLACES,TERRAIN:TERRAIN,LANDMARKS:LANDMARKS,locShow:locShow,REGION:REGION,REGIONS:REGIONS,WORLD:WORLD,pickRegion:pickRegion,isWater:isWater,TERR:TERR,RUNWAYS:RUNWAYS,WB:WB,AL:AL,OBST:OBST,
   wframe:()=>({rh:RH,len:RWY_LEN,thr01:THR01,thr19:THR19,woff:WOFF.slice(),fieldFt:FIELD_FT,home:HOME_RWY,base0:BASE0}),
   tris:()=>renderer.info.render.triangles,rinfo:()=>({tri:renderer.info.render.triangles,calls:renderer.info.render.calls,geo:renderer.info.memory.geometries,tex:renderer.info.memory.textures})});
 worldLoad();
@@ -12724,9 +12867,10 @@ worldLoad();
 (function(){let r=null;try{r=JSON.parse(sessionStorage.getItem('kgeuResume')||'null');sessionStorage.removeItem('kgeuResume');}catch(e){}
   if(!r)return;
   const go=()=>{const sp=$('splash');if(!WORLD.ready||(sp&&!sp.classList.contains('done'))){if(!WORLD.err)setTimeout(go,200);return;}
-    if(r.start){const S=r.start;if(S.tod&&TOD_SET[S.tod])setTOD(S.tod);
-      if(S.arc){pickType(S.type||savedType,1);arcStart(S.arc);}
+    if(r.start){const S=r.start;if(S.skill&&S.skill!==SKILL)setSkill(S.skill);if(S.tod&&TOD_SET[S.tod])setTOD(S.tod);
+      if(S.arc){if(S.type&&TYPES[S.type])pickType(S.type);arcStart(S.arc);}
       else if(S.lesson)startLesson(S.lesson);
+      else if(S.mode==='free'){if(S.type&&TYPES[S.type])pickType(S.type);if(S.base)pickBase(S.base);freeStart(S.pos);}   // the pause sheet's Apply
       else{if(S.type&&TYPES[S.type])pickType(S.type,1);start(S.mode||'runway',S.base);}}
     else openMenu('sFly');};
   go();})();
