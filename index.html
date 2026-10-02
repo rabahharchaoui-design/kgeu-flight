@@ -669,7 +669,9 @@ label.sens b{ color:var(--ink); min-width:74px; }
 .mcard .sc{ display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:var(--sand); margin-top:2px; }
 .mcard .sc em{ font-style:normal; color:#f0d6ad; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .stars{ font-style:normal; color:var(--orange); letter-spacing:1px; font-size:13px; } .stars u{ text-decoration:none; color:rgba(246,193,119,.22); }
-#arcCards{ grid-template-columns:1fr 1fr; }
+#arcCards{ grid-template-columns:1fr 1fr; align-content:start; overflow-y:auto; touch-action:pan-y; }
+/* the World airports group under the arcade cards: the six Arizona games fill the first screen, the group scrolls up below them */
+.cards .cgrp{ grid-column:1 / -1; font-size:11px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--brown); padding:6px 2px 0; }
 #misCards{ grid-template-columns:1fr 1fr; } #misCards .mcard[data-m=daily]{ grid-column:1 / -1; }
 #menu #misCards .mcard[data-m=daily]{ background:linear-gradient(90deg,var(--rust),var(--brown)); } #menu #misCards .mcard[data-m=daily] .ac{ color:var(--sand); } #menu #misCards .mcard[data-m=daily] .d{ color:#ffe9cc; } #misCards .mcard[data-m=daily] .cd{ color:#fff4e0; } #misCards .mcard[data-m=daily] .tro{ color:var(--sand); }
 /* six arcade cards: the featured one takes one cell so they sit three rows by two, like before */
@@ -8020,7 +8022,7 @@ function worldLoad(){
   fetch('assets/world/'+REGION.id+'.json?v=1').then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(d=>
     Promise.all([worldInflate(d.terrain.b64),worldInflate(d.terrain.waterB64),worldInflate(d.urban.b64)]).then(b=>{
       terrSet(d,new Int16Array(b[0]),new Uint8Array(b[1]));WORLD.data=d;WORLD.urb=new Uint8Array(b[2]);worldParks(d);
-      buildWorld(d);tfcRegion();
+      buildWorld(d);tfcRegion();if(LB)LB.fameApplyCity();   // the city billboard's champion, from the cached fame
       tcx=1e9;rebuildTerrain(st.pos.x,st.pos.z);
       WORLD.ms=Math.round(performance.now()-t0);WORLD.ready=true;mapRegionData();}))
     .catch(e=>{WORLD.err=String(e);console.warn('world region',e);const m=$('spMsg');if(m)m.textContent='Could not load '+REGION.city+'. Check the connection and reload.';});
@@ -9997,12 +9999,25 @@ const ARC={on:false,kind:'',t0:0,end:null,par:0,done:false,dist:0};
 // worldwide) names the same runway on its card there; starting it switches to Arizona first
 const ARC_TARGETS=()=>REGION.az?RWY_ENDS.filter(e=>e.rwy.code==='KGEU'||e.rwy.code==='KLUF')
   :[['KGEU','1'],['KGEU','19'],['KLUF','03L'],['KLUF','21R'],['KLUF','03R'],['KLUF','21L']].map(a=>({num:a[1],rwy:{code:a[0]}}));
+// the world airports (LEADERBOARD.md): the 5 mile landing challenge to each region's home runway, a board each.
+// aptEnd(id): that runway end by name ({region, num, icao, name}), and the runway end itself (end) when the region is loaded
+const APT_IDS=['rjtt','lfpg','sbrj'],DAILY_REGIONS=['az'].concat(APT_IDS);
+function aptEnd(id){const R=REGIONS[id];return {region:id,num:R.main,icao:R.icao,name:R.base,rwy:{code:R.icao,apt:R.base},
+  end:REGION.id===id?RWY_ENDS.find(e=>e.num===R.main)||null:null};}
+const aptBoard=id=>'apt:'+REGIONS[id].icao;
+// the airport a target end is at, for cards and the HUD
+const endApt=e=>e.name||(e.rwy.code==='KGEU'?'Glendale':e.rwy.code==='KLUF'?'Luke AFB':e.rwy.apt);
+// the board (and the records key) of an arcade kind
+const arcBoard=k=>k==='daily'?'daily':k==='landing1'?'arc:landing1':k==='apt'?aptBoard(REGION.id):'arc:landing';
+// start a world airport's challenge: in its region at once, from anywhere else after the region switch
+function aptStart(id){if(REGION.id!==id){pickRegion(id,{resume:{arc:'apt',region:id,type:savedType,tod:TOD.id}});return;}arcStart('apt');}
 // the UTC date, so the daily challenge is the same worldwide and turns over at 00:00 UTC
 function todayKey(){const d=new Date();return d.getUTCFullYear()*10000+(d.getUTCMonth()+1)*100+d.getUTCDate();}
 function dayRng(k){let s=(k*2654435761)>>>0;return ()=>{s=(s+0x6D2B79F5)>>>0;let t=s;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
-// the same challenge for everyone on a given day: aircraft, target, start, time of day and wind
-function dailySpec(){const r=dayRng(todayKey()),T=ARC_TARGETS();
-  const o={type:CAR[Math.floor(r()*CAR.length)],end:T[Math.floor(r()*T.length)],dist:6500+r()*4000,off:(r()*2-1)*1.3,alt:1800+r()*1600};
+// the same challenge for everyone on a given day: the region (one of four), aircraft, target, start, time of day and wind.
+// The region is the first draw, so the rest keeps Arizona's structure; a world region's target is its home runway end.
+function dailySpec(){const r=dayRng(todayKey()),region=DAILY_REGIONS[Math.floor(r()*DAILY_REGIONS.length)],T=region==='az'?ARC_TARGETS():[aptEnd(region)];
+  const o={region:region,type:CAR[Math.floor(r()*CAR.length)],end:T[Math.floor(r()*T.length)],dist:6500+r()*4000,off:(r()*2-1)*1.3,alt:1800+r()*1600};
   o.tod=['day','sunset','night'][Math.floor(r()*3)];o.wdir=10*(1+Math.floor(r()*36));o.wkt=2+Math.floor(r()*11);o.day=todayKey();return o;}
 function placeAir(x,z,aglFt,h,kt){
   const y=Math.max(0,groundHeight(x,z))+aglFt/M2FT+GEAR,V=kt/MS2KT/Math.sqrt(1.097*Math.exp(-y/9200)/1.225);
@@ -10011,13 +10026,18 @@ function placeAir(x,z,aglFt,h,kt){
   st.ezCfg='clean';st.ez=0;st.ias=kt/MS2KT;snapCamera=true;
 }
 function arcStart(kind){
-  if(!REGION.az){pickRegion('az',{resume:{arc:kind,type:savedType,tod:TOD.id}});return;}   // the arcade is at Glendale and Luke
+  if(kind==='apt'&&REGION.az)return;   // a world airport's challenge only flies in its region (aptStart switches)
+  const D=kind==='daily'?dailySpec():null,reg=kind==='apt'?REGION.id:D?D.region:'az';
+  // the arcade is at Glendale and Luke, the daily wherever today's is: from elsewhere switch first, the run starts after the reload
+  if(REGION.id!==reg){pickRegion(reg,{resume:{arc:kind,region:reg,type:savedType,tod:TOD.id}});return;}
   const g1=RWY_ENDS.find(e=>e.rwy.code==='KGEU'&&e.num==='1');
   // the 1 mile challenge starts lined up on the centre line, on the 3 degree path, at approach speed
-  const sp=kind==='daily'?dailySpec():kind==='landing1'?{type:savedType,end:g1,dist:1852,off:0,alt:1852*Math.tan(GS)*M2FT,gs:1}
-    :{type:savedType,end:g1,dist:9000,off:0.9,alt:2500};
+  const sp=D?D:kind==='landing1'?{type:savedType,end:g1,dist:1852,off:0,alt:1852*Math.tan(GS)*M2FT,gs:1}
+    :{type:savedType,end:kind==='apt'?aptEnd(REGION.id):g1,dist:9000,off:0.9,alt:2500};
+  if(sp.end&&sp.end.region)sp.end=sp.end.end;   // a world region's home runway end, by name: the end itself
+  if(!sp.end)return;
   const keepTod=kind==='daily'?(ARC.prevTod||TOD.id):null;
-  pickType(sp.type,1);start('runway',sp.end.rwy.code==='KLUF'?'luke':'kgeu');
+  pickType(sp.type,1);start('runway',!REGION.az?BASE0:sp.end.rwy.code==='KLUF'?'luke':'kgeu');
   if(kind==='daily'){setTOD(sp.tod);try{localStorage.setItem('kgeuTOD',keepTod);}catch(e){}ARC.prevTod=keepTod;hbSync(true);
     st.windBase=st.windDir=sp.wdir;st.windKt=sp.wkt;st.windPh=0;}
   const e=sp.end,back=Math.atan2(-Math.sin(e.h),Math.cos(e.h))+sp.off;         // bearing from the threshold out along the approach, swung aside
@@ -10027,18 +10047,21 @@ function arcStart(kind){
     if(easy){st.flapIdx=AC.landFlap;st.gearDown=true;st.gearPos=1;}else st.flapIdx=AC.finalFlap;
     trimSpawn(st,-GS);}
   Object.assign(ARC,{on:true,kind:kind,t0:st.time,end:e,done:false,dist:sp.dist,par:Math.round((sp.dist+2500)/(AC.vapp*1.3)+25),practice:false});
-  if(LB)LB.runStart(kind==='daily'?'daily':kind==='landing1'?'arc:landing1':'arc:landing');
+  if(LB)LB.runStart(arcBoard(kind));
   DEST=e;document.body.classList.add('hasDest');destUI(true);
-  toast((kind==='daily'?'Daily challenge: ':kind==='landing1'?'1 mile challenge: ':'Landing challenge: ')+e.rwy.apt+' runway '+e.num+'. Go!');
+  toast((kind==='daily'?'Daily challenge: ':kind==='landing1'?'1 mile challenge: ':kind==='apt'?REGION.base+' landing: ':'Landing challenge: ')+(kind==='apt'?'':arcApt(e)+' ')+'runway '+e.num+'. Go!');
 }
+// the airport on the HUD and in the toast: a world region's full name (Tokyo Haneda), Arizona's short one (Glendale)
+const arcApt=e=>REGION.az?e.rwy.apt:REGION.base;
 function arcTick(){
   if(!ARC.on||ARC.done)return;
-  const t=st.time-ARC.t0;missHud((ARC.kind==='daily'?(ARC.practice?'Practice: ':'Daily: '):'')+fmtT(t)+'  (par '+fmtT(ARC.par)+')',ARC.end.rwy.apt+' runway '+ARC.end.num,t>ARC.par);
+  const t=st.time-ARC.t0;missHud((ARC.kind==='daily'?(ARC.practice?'Practice: ':'Daily: '):'')+fmtT(t)+'  (par '+fmtT(ARC.par)+')',arcApt(ARC.end)+' runway '+ARC.end.num,t>ARC.par);
 }
 function arcTouchdown(ev){
   if(!ARC.on||ARC.done)return;
   const g=gradeLanding(ev),secs=st.time-ARC.t0;ARC.done=true;
-  const fix=runwayFix(ev.x,ev.z),right=fix&&ARC.end&&(fix.name.indexOf(ARC.end.rwy.code==='KGEU'?'Glendale':'Luke')>=0);
+  // the right runway: Glendale's, any of Luke's, or in a world region the home runway (either end of its pavement)
+  const fix=runwayFix(ev.x,ev.z),E=ARC.end,right=!!(fix&&E&&(!REGION.az?fix.num===E.rwy.lo||fix.num===E.rwy.hi:fix.name.indexOf(E.rwy.code==='KGEU'?'Glendale':'Luke')>=0));
   // the results card comes once the aircraft has stopped (or 20 s into the rollout)
   resArm(()=>{if(running&&ARC.on)arcResult(g,secs,right);},20);
 }
@@ -10046,18 +10069,18 @@ const GF={A:1,B:0.9,C:0.8,D:0.7,F:0};
 function arcResult(g,secs,right){
   const letter=g?g.letter:'F',pts=right?Math.round(1000*Math.min(1.5,ARC.par/secs)*GF[letter]):0;
   const stars=!right||letter==='F'?0:secs<=ARC.par&&'AB'.includes(letter)?3:secs<=ARC.par*1.3?2:1;
-  const key=ARC.kind==='daily'?'arc:daily:'+todayKey():ARC.kind==='landing1'?'arc:landing1':'arc:landing';
+  const key=ARC.kind==='daily'?'arc:daily:'+todayKey():arcBoard(ARC.kind);
   const rec={pts:pts,secs:Math.round(secs),letter:letter,stars:stars,ac:AC.name};
   const better=pts>0&&scRecord(key,rec);
   // the challenge grade (LEADERBOARD.md): A 1,000+, B 850+, C 700+, D 500+, F below, on the wrong runway or after an F landing
   const cl=!right||letter==='F'||pts<=0?'F':pts>=1000?'A':pts>=850?'B':pts>=700?'C':pts>=500?'D':'F';
-  const name=ARC.kind==='daily'?'Daily challenge':ARC.kind==='landing1'?'1 mile landing challenge':'Landing challenge';
-  const why=!right?'wrong runway, target was '+ARC.end.rwy.apt+' '+ARC.end.num:letter==='F'?'too rough to count':(better?'new best, ':'')+pts+' points';
+  const name=ARC.kind==='daily'?'Daily challenge':ARC.kind==='landing1'?'1 mile landing challenge':ARC.kind==='apt'?REGION.base+' landing':'Landing challenge';
+  const why=!right?'wrong runway, target was '+arcApt(ARC.end)+' '+ARC.end.num:letter==='F'?'too rough to count':(better?'new best, ':'')+pts+' points';
   const stats=[['Time',fmtT(secs)+'  (par '+fmtT(ARC.par)+')'],['Landing',g?letter+'  '+g.line:'off the runway']];
   if(g)stats.push(['Touchdown',g.fpm+' fpm, '+Math.round(g.kt)+' kt'],['Aim point',Math.round(Math.abs(g.along))+' m '+(g.along<0?'short':'long')],['Centreline',g.off.toFixed(1)+' m']);
   stats.push(['Best',SCORE.best[key]?SCORE.best[key].pts+' pts, '+fmtT(SCORE.best[key].secs):'none yet']);
   runLog('arcade',{game:ARC.kind,pts:pts,secs:Math.round(secs),letter:letter});
-  const lb=ARC.kind==='daily'?'daily':ARC.kind==='landing1'?'arc:landing1':'arc:landing';
+  const lb=arcBoard(ARC.kind);
   if(LB){if(pts>0)LB.runEnd(lb,pts,{secs:secs});else LB.runCancel(lb);}
   missHud(null);RES.kind='arc';
   resOpen(arcOv,{letter:cl,title:name+': '+why,score:resNum(pts)+' pts',sub:AC.name,stars:stars,stats:stats,board:pts>0?lb:''});
@@ -10067,6 +10090,7 @@ function arcScore(id){
   if(id==='landing'){const r=SCORE.best['arc:landing'];return r?[r.stars,r.pts+' pts, '+fmtT(r.secs)]:[0,''];}
   if(id==='landing1'){const r=SCORE.best['arc:landing1'];return r?[r.stars,r.pts+' pts, '+fmtT(r.secs)]:[0,''];}
   if(id==='daily'){const r=SCORE.best['arc:daily:'+todayKey()];return r?[r.stars,r.pts+' pts today']:[0,''];}
+  if(id.startsWith('apt:')){const r=SCORE.best[id];return r?[r.stars,r.pts+' pts, '+fmtT(r.secs)]:[0,''];}
   return [0,''];
 }
 // ================= photo mode (the Action Shot) =================
@@ -10766,20 +10790,25 @@ const TROPHY='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-
 const troHTML=lb=>lb?'<span class="tro" role="button" aria-label="Leaderboard" data-lb="'+lb+'">'+TROPHY+'</span>':'';
 function cardHTML(o){const sc=o.score||scoreOf(o.id);
   // from a world region every mission, arcade game and the strike is at Glendale or Luke: tagged, and starting one switches back
-  return troHTML(o.lb)+(ICONS[o.icon||o.id]||'')+'<div class="mt"><span class="ac">'+o.ac+(REGION.az?'':'<i class="azTag">ARIZONA</i>')+'</span><b>'+o.name+'</b><span class="d">'+o.desc+'</span>'+
+  // (the daily and the world airports say their airport instead, so they carry no tag)
+  return troHTML(o.lb)+(ICONS[o.icon||o.id]||'')+'<div class="mt"><span class="ac">'+o.ac+(REGION.az||o.here?'':'<i class="azTag">ARIZONA</i>')+'</span><b>'+o.name+'</b><span class="d">'+o.desc+'</span>'+
     (o.soon?'<span class="sc soon">Coming soon</span>':'<span class="sc">'+stars(sc[0])+'<em>'+(sc[1]||'Not flown yet')+'</em></span>')+'</div>';}
 
-function fillCards(el,list){el.innerHTML='';list.forEach(o=>{const b=document.createElement('button');b.className='mcard'+(o.cls?' '+o.cls:'');b.dataset.m=o.id;b.innerHTML=cardHTML(o);b.onclick=o.go;if(o.soon)b.setAttribute('aria-disabled','true');
+function fillCards(el,list){el.innerHTML='';list.forEach(o=>{if(o.head){const h=document.createElement('div');h.className='cgrp';h.textContent=o.head;el.appendChild(h);return;}const b=document.createElement('button');b.className='mcard'+(o.cls?' '+o.cls:'');b.dataset.m=o.id;b.innerHTML=cardHTML(o);b.onclick=o.go;if(o.soon)b.setAttribute('aria-disabled','true');
   const t=b.querySelector('.tro');if(t)t.addEventListener('click',e=>{e.stopPropagation();e.preventDefault();if(LB)LB.lbOpen(o.lb);});el.appendChild(b);});}
 // the daily challenge card: same for everyone, a countdown to the next one, and whether today's official attempt is still there
-function dailyCard(){const D=dailySpec(),DI=AC_INFO[D.type];let used=false;try{const d=JSON.parse(localStorage.getItem('kgeuDaily')||'{}');used=d.day===D.day&&!!d.used;}catch(e){}
-  return {id:'daily',lb:'daily',ac:'Daily challenge',name:DI[1]+' to '+(D.end.rwy.code==='KGEU'?'Glendale ':'Luke ')+D.end.num,desc:(used?'Official attempt flown, practice only. ':'Same worldwide. One official attempt. ')+'Next in <i class="cd">'+dailyLeft()+'</i>',go:()=>arcStart('daily')};}
+// It names today's airport and runway (one of four regions a day), the aircraft, the time of day and the wind;
+// GO from another region switches there and the run (and the day's one attempt) starts after the reload.
+// wide: the MISSIONS card, a full row, which also says it is the same worldwide
+function dailyCard(wide){const D=dailySpec(),DI=AC_INFO[D.type];let used=false;try{const d=JSON.parse(localStorage.getItem('kgeuDaily')||'{}');used=d.day===D.day&&!!d.used;}catch(e){}
+  return {id:'daily',lb:'daily',ac:'Daily challenge',here:1,name:endApt(D.end)+', runway '+D.end.num,
+    desc:DI[1]+', '+D.tod+', wind '+String(D.wdir).padStart(3,'0')+' at '+D.wkt+'. '+(used?'Official attempt flown, practice only. ':wide?'Same worldwide. One official attempt. ':'One official attempt. ')+'Next in <i class="cd">'+dailyLeft()+'</i>',go:()=>arcStart('daily')};}
 function dailyLeft(){const n=Date.now(),d=new Date(n),nx=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()+1),s=Math.max(0,Math.floor((nx-n)/1000));
   return Math.floor(s/3600)+':'+String(Math.floor(s/60)%60).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
 setInterval(()=>{if(!menu.classList.contains('on')||(curScr!=='sMis'&&curScr!=='sArc'))return;const t=dailyLeft();document.querySelectorAll('.mcard .cd').forEach(e=>e.textContent=t);},1000);
 function misList(){
   const B=SCORE.best;
-  fillCards($('misCards'),[dailyCard(),
+  fillCards($('misCards'),[dailyCard(1),
     {id:'short',lb:'mission:short',ac:'C-130H Hercules',name:'Short field landing',desc:'Stop a Hercules on a 3,000 ft dirt strip.',go:()=>{pickType('c130',1);start('short');}},
     {id:'dash',lb:'mission:dash',ac:'F-16C Viper',name:'Luke to Glendale dash',desc:'Wheels up at Luke, down at Glendale. Beat 3 minutes.',go:()=>{pickType('f16',1);start('runway','luke');}}]);
 }
@@ -10791,7 +10820,10 @@ function arcList(){
     {id:'landing',lb:'arc:landing',ac:AC_INFO[savedType][1],name:'Landing challenge',desc:'Start 5 miles out. Beat the clock to runway 1.',go:()=>arcStart('landing')},
     {id:'landing1',lb:'arc:landing1',ac:AC_INFO[savedType][1],name:'1 mile landing challenge',desc:'Lined up, 300 ft, 1 mile out. Beat the clock to runway 1.',go:()=>arcStart('landing1')},
     {id:'drop',lb:'arc:drop',ac:'C-130H Hercules',name:'Airdrop challenge',desc:'Put the bundle on the drop zone.',go:()=>{pickType('c130',1);start('drop');}},
-    {id:'range',lb:'arc:strike',ac:'MQ-9A Reaper',name:'Strike range',desc:'Find the targets, lock on, four missiles.',go:()=>{pickType('reaper',1);start('range');}}]);
+    {id:'range',lb:'arc:strike',ac:'MQ-9A Reaper',name:'Strike range',desc:'Find the targets, lock on, four missiles.',go:()=>{pickType('reaper',1);start('range');}},
+    // the world airports, below: each flies in its own region (tapping one from elsewhere switches there)
+    {head:'World airports'}].concat(APT_IDS.map(id=>{const R=REGIONS[id],b=aptBoard(id);
+      return {id:b,lb:b,icon:'landing',here:1,cls:'apt',ac:AC_INFO[savedType][1],name:R.base,score:arcScore(b),desc:'5 mile landing challenge at '+R.base+', runway '+R.main+'.',go:()=>aptStart(id)};})));
 }
 // ---- first launch: one screen, two big buttons ----
 function funnelPick(v){setSkill(v);$('funnel').classList.remove('on');startHereUI();if(v==='rookie')startLesson('first');}
@@ -11365,7 +11397,7 @@ function mapPOIs(){
     {kind:'landmark',x:21000,z:7800,name:'Downtown Phoenix'},{kind:'drop',x:DROPZ.x,z:DROPZ.z,name:'C-130 airdrop zone'},
     {kind:'range',x:RANGE.x,z:RANGE.z,name:'Strike range'},{kind:'school',x:APC.x,z:APC.z,name:'Flight school'}];
   {const e=RWY_ENDS.find(e=>e.rwy.code==='KGEU'&&e.num==='1');out.push(Object.assign(raceStart(9000,0.9,e),{kind:'race',name:'Landing challenge start'}));
-   const D=dailySpec();out.push(Object.assign(raceStart(D.dist,D.off,D.end),{kind:'race',name:'Daily challenge start'}));}
+   const D=dailySpec();if(D.region==='az')out.push(Object.assign(raceStart(D.dist,D.off,D.end),{kind:'race',name:'Daily challenge start'}));}   // on days the daily is in Arizona
   if(HB.on)out.push({kind:'haboob',x:HB.C.x,z:HB.C.z,name:'Haboob'});
   for(const o of EGG.list){o.getWorldPosition(_poiV);out.push({kind:'egg',x:_poiV.x,z:_poiV.z,name:EGG_NAMES[o.name]||'@OhRabah'});}
   return out;
@@ -13029,7 +13061,7 @@ function tick(t,skipRender){
 // it switched off, so nothing is fetched and no request can fail in their console.
 var LB=null;
 LB=(function(){
-const APP_VER='2026-10-01-phone2';          // keep version.json in step when shipping
+const APP_VER='2026-10-02-world';          // keep version.json in step when shipping
   const ORIGINS=['https://rabahharchaoui-design.github.io','http://localhost:8765'];
   let over='';try{over=localStorage.getItem('kgeuLBUrl')||'';}catch(e){}
   const E={url:over||'https://pfs-scores.rabahharchaoui.workers.dev',enabled:!!over||ORIGINS.includes(location.origin),online:null,
@@ -13058,6 +13090,9 @@ const APP_VER='2026-10-01-phone2';          // keep version.json in step when sh
   board('arc:strike',{name:'Strike accuracy',group:'Arcade',how:'0 to 100: hits 45%, average miss 30%, time on target 25%'});
   LESSONS.forEach(l=>board('lesson:'+l.id,{name:l.name,group:'Flight school',how:'The lesson score, 0 to 100'}));
   board('free:landing',{name:'Free flight landing',group:'Free flight',how:'The landing grade points, 0 to 100'});
+  // the world airports: the 5 mile landing challenge to each region's home runway (aptStart switches region when needed)
+  APT_IDS.forEach(id=>board(aptBoard(id),{name:REGIONS[id].base+' landing',group:'World airports',ghost:1,go:()=>aptStart(id),
+    how:'Points: 1,000 x par / your time (up to 1.5x), x the landing grade. Runway '+REGIONS[id].main}));
   const fmtS=(b,v)=>{const B=BOARDS[b];if(v==null)return '';if(B.fmt==='time'){const m=Math.floor(v/60),s=v-m*60;return m+':'+(s<10?'0':'')+s.toFixed(1);}
     if(B.fmt==='m')return (Math.round(v*10)/10)+' m';return num(v)+' pts';};
   const AC_SHORT={cessna:'C172',alpha:'Alpha',f16:'F-16',reaper:'MQ-9A',mq9b:'MQ-9B',c130:'C-130'};
@@ -13286,7 +13321,13 @@ const APP_VER='2026-10-01-phone2';          // keep version.json in step when sh
     // upload now, not on the first frame they come into view
     try{renderer.initTexture(fameBB.tex);renderer.initTexture(fameHG.tex);}catch(e){}
   }
-  function fameFetch(){api('/fame').then(j=>{if(j&&j.top){E.fame={day:j.day,daily:j.daily,top:j.top,at:Date.now()};save('kgeuFame',E.fame);fameDraw();}},()=>{});}
+  // a /fame answer (or a test's payload): cached for the next launch, then on the hangar, the billboard and the city billboard
+  function fameApply(j){if(!j||!j.top)return;E.fame={day:j.day,daily:j.daily,top:j.top,apt:j.apt||null,at:Date.now()};save('kgeuFame',E.fame);fameDraw();fameApplyCity();}
+  function fameFetch(){api('/fame').then(fameApply,()=>{});}
+  // a world region's @OhRabah city billboard: the all time best on its airport's board, either mode
+  function fameApplyCity(){
+    if(REGION.az||typeof CITYBB==='undefined')return;const a=E.fame&&E.fame.apt&&E.fame.apt[REGION.icao],cs=a&&a.cs?String(a.cs).toUpperCase():null;
+    if(CITYBB.champ!==cs)CITYBB.setChamp(cs);}
 
   // ---- the player's callsign, small, on the F-16 canopy rail and on the nose of the others
   const CS_INK={f16:'#101316',cessna:'#1d3557',alpha:'#1d2a3a',c130:'#16181a',reaper:'#eef1f3',mq9b:'#eef1f3'};
@@ -13492,7 +13533,7 @@ const APP_VER='2026-10-01-phone2';          // keep version.json in step when sh
   function armFree(){E.armed=true;}
   return {E:E,BOARDS:BOARDS,ORDER:ORDER,board:board,runStart:runStart,runEnd:runEnd,runCancel:runCancel,frame:frame,reset:reset,armFree:armFree,
     boot:boot,csHold:()=>csHold,paintModel:paintModel,paintAll:paintAll,lbOpen:lbOpen,lbRender:lbRender,race:race,ui:ui,flush:flush,csOpen:csOpen,dice:dice,
-    fameDraw:fameDraw,fameFetch:fameFetch,ghostStart:ghostStart,decodePath:decodePath,rankSVG:rankSVG,utcDay:utcDay,fmtS:fmtS,showBadge:showBadge,ghostOff:ghostOff,
+    fameDraw:fameDraw,fameFetch:fameFetch,fameApply:fameApply,fameApplyCity:fameApplyCity,ghostStart:ghostStart,decodePath:decodePath,rankSVG:rankSVG,utcDay:utcDay,fmtS:fmtS,showBadge:showBadge,ghostOff:ghostOff,
     get P(){return E.P;}};
 })();
 
@@ -13521,7 +13562,7 @@ window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runM
   RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,ticker:()=>{const e=document.getElementById('tk'),c=document.getElementById('tkCtl');return {on:e.classList.contains('on'),paused:e.classList.contains('paused'),anim:getComputedStyle(document.getElementById('tkT')).animationName,scroll:e.classList.contains('scroll'),open:c.classList.contains('on'),text:e.querySelector('#tkT i').textContent,vis:e.offsetParent!==null&&getComputedStyle(e).display!=='none',ctlVis:c.offsetParent!==null};},tickerForce:n=>{TK.force=n||null;tkUI();},tickerOpen:()=>tkOpen(),tickerClose:()=>{TK.open=false;tkUI();},musicTick:musicTick,MUSIC:MUSIC,actx:()=>actx,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,VQ:VQ,vqLog:clear=>{const r=VQ.log.map(e=>Object.assign({},e));if(clear)VQ.log.length=0;return r;},vqAdd:(who,kind,text,clips,o)=>vqAdd(L(who,kind,text,clips),o),coach2:coach2,chatNow:()=>chatNow(),atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),bannerShow:(k,t)=>bannerShow(k,t),badgeHide:()=>badgeHide(),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
-  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num}},setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day}},aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   // @OhRabah easter eggs (3.10): where each one is, whether its lights are on, and the tow banner
   eggs:()=>EGG.list.map(o=>{const p=o.getWorldPosition(new V3()),r={name:o.name,x:p.x,y:p.y,z:p.z,ry:o.rotation.y,lit:(o.name==='egg_billboard'||o.name==='egg_rooftop')&&EGG.lit,visible:o.visible};
     if(o.name==='egg_tow'){const b=EGG.tow.ban.getWorldPosition(new V3()),f=new V3(0,0,-1).applyQuaternion(o.quaternion);r.banner={x:b.x,y:b.y,z:b.z};r.fwd=[f.x,f.y,f.z];}return r;}),

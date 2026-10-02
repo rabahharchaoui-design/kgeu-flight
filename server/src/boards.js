@@ -23,9 +23,13 @@ export const BOARDS = {
   'arc:drop':       { dir: -1, min: 0, max: 3000, minSecs: 15, ref: [0, 150] },
   'arc:strike':     { dir: 1, min: 0, max: 100, minSecs: 15, ref: 100 },
   'free:landing':   { dir: 1, min: 0, max: 100, minSecs: 8, ref: 100 },
+  // world airports: the 5 mile landing challenge to the region's home runway (34R, 26L, 20L)
+  'apt:RJTT':       { dir: 1, min: 0, max: 1500, minSecs: 20, parMax: 480, ghost: 1, ref: 1000 },
+  'apt:LFPG':       { dir: 1, min: 0, max: 1500, minSecs: 20, parMax: 480, ghost: 1, ref: 1000 },
+  'apt:SBRJ':       { dir: 1, min: 0, max: 1500, minSecs: 20, parMax: 480, ghost: 1, ref: 1000 },
 };
 // future modes register on the server in one line too, e.g.
-//   BOARDS['apt:KPHX'] = { dir: 1, min: 0, max: 100, minSecs: 20, ref: 100 };
+//   BOARDS['dogfight:red'] = { dir: 1, min: 0, max: 1000, minSecs: 30, ref: 1000 };
 // and a whole family can share limits by prefix:
 const FAMILIES = [
   // ['apt:', { dir: 1, min: 0, max: 100, minSecs: 20, ref: 100 }],

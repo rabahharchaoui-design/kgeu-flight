@@ -82,6 +82,12 @@ async def fly_arcade(pg, kind, wait_start=9):
     """Start an arcade run from its card path, let the wall clock pass the board minimum, autoland it, wait for the end."""
     if kind != 'daily': await pg.evaluate(f"()=>{K}.pick('cessna')")
     await pg.evaluate(f"()=>{K}.arcStart('{kind}')")
+    # the daily may be at a world airport today: arcStart then switches region, and the run starts after the reload
+    for _ in range(360):
+        try:
+            if await pg.evaluate(f"()=>!!(window.__kgeu&&{K}.ARC&&{K}.ARC.on&&{K}.ARC.kind==='{kind}'&&{K}.running())"): break
+        except Exception: pass
+        await pg.wait_for_timeout(250)
     await pg.wait_for_timeout(wait_start * 1000)
     await pg.evaluate(f"()=>{K}.auto()")
     if await pg.evaluate(f"()=>{{const a={K}.state().ap;return !!a&&a.mode==='orbit'}}"): await pg.evaluate(f"()=>{K}.auto()")   # a Reaper's first tap orbits

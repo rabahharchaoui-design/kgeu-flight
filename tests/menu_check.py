@@ -9,19 +9,32 @@ ok = Checks()
 CAR = ['cessna','alpha','f16','reaper','mq9b','c130']
 CAR_AFTER_10 = CAR[(CAR.index('c130') + 10) % 6]
 SCREENS = ['sHome', 'sFly', 'sMis', 'sSchool', 'sArc', 'sSet', 'sHelp']
-FIT = """(id)=>{const s=document.getElementById(id);const W=innerWidth,H=innerHeight;const bad=[];
+# ARCADE scrolls by design (World airports): its first screen is checked without the three .apt cards, then ARC_SCROLLED
+FIT = """(arg)=>{const [id,skip]=Array.isArray(arg)?arg:[arg,null];const s=document.getElementById(id);const W=innerWidth,H=innerHeight;const bad=[];
   if(s.scrollHeight>s.clientHeight+1||s.scrollWidth>s.clientWidth+1)bad.push('scrolls '+s.scrollWidth+'x'+s.scrollHeight);
   // the location row scrolls sideways (4.6b): a card counts by the part its row shows, a card scrolled out of sight not at all
   const RC=e=>{const r=e.getBoundingClientRect(),L=e.closest('.locs');if(!L)return r;const q=L.getBoundingClientRect(),x0=Math.max(r.left,q.left),x1=Math.max(x0,Math.min(r.right,q.right));
     return {left:x0,right:x1,top:r.top,bottom:r.bottom,width:x1-x0,height:r.height};};
-  s.querySelectorAll('button,input,.chip').forEach(e=>{const r0=e.getBoundingClientRect(),r=RC(e);if(r.width<0.5||getComputedStyle(e).visibility==='hidden')return;
+  const keep=e=>!(skip&&e.closest(skip));
+  s.querySelectorAll('button,input,.chip').forEach(e=>{if(!keep(e))return;const r0=e.getBoundingClientRect(),r=RC(e);if(r.width<0.5||getComputedStyle(e).visibility==='hidden')return;
     if(r.left<-0.5||r.top<-0.5||r.right>W+0.5||r.bottom>H+0.5)bad.push('off screen '+(e.id||e.textContent.trim().slice(0,16)));
     if(e.matches('button')&&(r0.width<43.5||r0.height<43.5))bad.push('small '+(e.id||e.textContent.trim().slice(0,16))+' '+Math.round(r0.width)+'x'+Math.round(r0.height));});
-  const hits=[...s.querySelectorAll('button')].filter(e=>RC(e).width>=0.5).map(e=>[e,RC(e)]);
+  const hits=[...s.querySelectorAll('button')].filter(e=>keep(e)&&RC(e).width>=0.5).map(e=>[e,RC(e)]);
   for(let i=0;i<hits.length;i++)for(let j=i+1;j<hits.length;j++){const a=hits[i][1],b=hits[j][1];
     if(hits[i][0].contains(hits[j][0])||hits[j][0].contains(hits[i][0]))continue;
     if(Math.min(a.right,b.right)-Math.max(a.left,b.left)>1&&Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>1)bad.push('overlap '+hits[i][0].textContent.trim().slice(0,10)+' / '+hits[j][0].textContent.trim().slice(0,10));}
   return bad;}"""
+# the World airports cards after scrolling the ARCADE grid to the end: inside the grid's box and the screen, 44 px, no overlaps
+ARC_SCROLLED = """()=>{const g=document.getElementById('arcCards');g.scrollTop=1e4;const G=g.getBoundingClientRect(),W=innerWidth,H=innerHeight,bad=[];
+  const cards=[...g.querySelectorAll('.mcard.apt')];if(cards.length!==3)bad.push('apt cards '+cards.length);
+  if(g.scrollHeight<=g.clientHeight+1)bad.push('grid does not scroll');
+  cards.forEach(e=>{const r=e.getBoundingClientRect();
+    if(r.top<G.top-0.5||r.bottom>G.bottom+0.5||r.left<-0.5||r.right>W+0.5||r.bottom>H+0.5)bad.push('off screen '+e.textContent.trim().slice(0,16));
+    if(r.width<43.5||r.height<43.5)bad.push('small '+e.dataset.m);});
+  const vis=[...g.querySelectorAll('.mcard')].map(e=>[e,e.getBoundingClientRect()]).filter(x=>x[1].bottom>G.top&&x[1].top<G.bottom);
+  for(let i=0;i<vis.length;i++)for(let j=i+1;j<vis.length;j++){const a=vis[i][1],b=vis[j][1];
+    if(Math.min(a.right,b.right)-Math.max(a.left,b.left)>1&&Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>1)bad.push('overlap '+vis[i][0].dataset.m+' / '+vis[j][0].dataset.m);}
+  g.scrollTop=0;return bad;}"""
 
 async def main():
     srv, url = serve()
@@ -32,7 +45,13 @@ async def main():
             tag = f"{vp['width']}x{vp['height']}"
             for sid in SCREENS:
                 await pg.evaluate(f"()=>{{window.__kgeu.openFly();window.__kgeu.nav('{sid}')}}"); await pg.wait_for_timeout(250)
-                bad = await pg.evaluate(FIT, sid)
+                if sid == 'sArc':
+                    bad = await pg.evaluate(FIT, [sid, '.mcard.apt'])
+                    ok(f'{tag} sArc: the six Arizona cards and the daily fit with no scrolling, 44 px targets, no overlaps', not bad, bad[:4])
+                    bad = await pg.evaluate(ARC_SCROLLED)
+                    ok(f'{tag} sArc: the three World airports cards scroll into view, 44 px targets, no overlaps', not bad, bad[:4])
+                    continue
+                bad = await pg.evaluate(FIT, [sid, None])
                 ok(f'{tag} {sid} fits with no scrolling, 44 px targets, no overlaps', not bad, bad[:4])
             if vp['width'] == 667:
                 home = await pg.evaluate("""()=>{window.__kgeu.nav('sHome',true);return [...document.querySelectorAll('#sHome button')].map(b=>b.id)}""")

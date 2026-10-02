@@ -170,13 +170,14 @@ async def main():
         # (d) Arizona tags; the airdrop switches back to Arizona
         await pg.evaluate(f"()=>{K}.openMenu('sMis')"); await pg.wait_for_timeout(300)
         m = await pg.evaluate("()=>[...document.querySelectorAll('#misCards .mcard')].map(c=>[c.dataset.m,!!c.querySelector('.azTag')&&c.querySelector('.azTag').textContent])")
-        ok('rjtt MISSIONS: every card tagged ARIZONA', m and all(x[1] == 'ARIZONA' for x in m), m)
+        ok('rjtt MISSIONS: every card tagged ARIZONA but the daily, which names its airport instead', m and all(x[1] == 'ARIZONA' for x in m if x[0] != 'daily') and [x[1] for x in m if x[0] == 'daily'] == [False], m)
         await pg.evaluate(f"()=>{K}.nav('sSchool')"); await pg.wait_for_timeout(300)
         sch = await pg.evaluate("()=>[...document.querySelectorAll('#school .lrow')].map(c=>!!c.querySelector('.azTag'))")
         ok('rjtt SCHOOL: every lesson tagged ARIZONA', sch and all(sch), sch)
         await pg.evaluate(f"()=>{K}.nav('sArc')"); await pg.wait_for_timeout(300)
         a = await pg.evaluate("()=>[...document.querySelectorAll('#arcCards .mcard')].map(c=>[c.dataset.m,!!c.querySelector('.azTag')])")
-        ok('rjtt ARCADE: every card tagged ARIZONA, the strike too', a and all(x[1] for x in a) and any(x[0] == 'range' for x in a), a)
+        ok('rjtt ARCADE: every Arizona card tagged ARIZONA, the strike too; the daily and the world airports not', a and all(x[1] for x in a if x[0] != 'daily' and not x[0].startswith('apt:'))
+           and not any(x[1] for x in a if x[0] == 'daily' or x[0].startswith('apt:')) and any(x[0] == 'range' for x in a) and sum(x[0].startswith('apt:') for x in a) == 3, a)
         await finger(pg, '#arcCards .mcard[data-m="drop"]'); await pg.wait_for_timeout(300)
         k = await pg.evaluate("()=>({r:localStorage.getItem('kgeuRegion'),res:JSON.parse(sessionStorage.getItem('kgeuResume')||'null'),rl:window.__reloaded})")
         s0 = (k['res'] or {}).get('start') or {}
