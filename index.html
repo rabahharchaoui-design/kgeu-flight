@@ -4644,6 +4644,8 @@ function skyPaint(k){
     col.copy(HAZE).lerp(top,Math.pow(t,0.5));c.setXYZ(i,col.r,col.g,col.b);}
   c.needsUpdate=true;
 }
+// things built later (the world regions) that change with the time of day: called at the end of setTOD
+const TOD_HOOKS=[];
 function setTOD(id){
   // the dust storm is Arizona's: day in a world region, the saved Haboob kept for coming back
   const fb=id==='haboob'&&!REGION.az;if(fb)id='day';
@@ -4661,6 +4663,7 @@ function setTOD(id){
   for(const L of AL_LAYERS)if(L.pts)L.pts.visible=TOD.lights>0;
   EGG.lit=TOD.lights>0;EGG.litMat.emissiveIntensity=TOD.night?1:TOD.lights*0.6;EGG.mat.emissiveIntensity=TOD.night?0:0.3*(1-TOD.lights);   // @OhRabah signs: off by day, dim at sunset
   if(cloudMat){const c=CLOUD_TOD[TOD.id]||CLOUD_TOD.day;cloudMat.color.setHex(c[0]);cloudMat.emissive.setHex(c[1]);}
+  for(const f of TOD_HOOKS)f();
   // the gunmetal drones: a faint lift at dusk and night so the airframe still reads against a dark sky
   if(HD&&HD.MAT.gunmetal)HD.MAT.gunmetal.emissive.setHex(0x1f242b).multiplyScalar(TOD.night?1:TOD.id==='sunset'?0.35:0);
   const b=document.getElementById('todV');if(b)b.textContent=TOD.name;
@@ -6230,7 +6233,7 @@ const EGG=(function(){
     x.save();x.translate(x0,(h-ih)/2);x.scale(k,k);
     x.fillStyle='#FF0000';x.fill(new Path2D(YT_BOX));x.fillStyle='#FFFFFF';x.fill(new Path2D(YT_TRI));x.restore();
     x.fillStyle=dark?'#ffffff':'#0f0f0f';x.textAlign='left';x.textBaseline='middle';x.fillText('@OhRabah',x0+iw+gap,h/2+fs*0.06);};
-  const E={tex:tex(1024,256,draw(false)),texDk:tex(1024,256,draw(true)),lit:false,list:[],t:0,yaw:null,tow:null};
+  const E={tex:tex(1024,256,draw(false)),texDk:tex(1024,256,draw(true)),lit:false,list:[],t:0,yaw:null,tow:null,YT_BOX:YT_BOX,YT_TRI:YT_TRI};
   // the day boards get a touch of self light so the side away from the sun still reads; none at night
   E.mat=new THREE.MeshLambertMaterial({map:E.tex,emissive:0xffffff,emissiveMap:E.tex,emissiveIntensity:0.3});
   E.litMat=new THREE.MeshLambertMaterial({map:E.texDk,emissive:0xffffff,emissiveMap:E.texDk,emissiveIntensity:0});
@@ -6295,6 +6298,39 @@ if(REGION.az)(function(){
    scene.add(rig);ban.name='egg_banner';
    EGG.tow={o:o,rig:rig,ban:ban,base:g.attributes.position.array.slice(),nb:g.attributes.normal.array.slice()};}
 })();
+// ---------- city billboards (4.2): the @OhRabah board at a world region's airport ----------
+// The Arizona egg_billboard's build (18 x 5 m, 8 m up on two posts, lit like EGG.lit), with the YouTube
+// mark unmodified, the handle, and a second line for the city champion: "TOKYO #1  <CALLSIGN>", or
+// "TOKYO #1  COULD BE YOU" while there is none. CITYBB.setChamp(cs) redraws every board's texture.
+function cityBBDraw(city,champ){return (x,w,h)=>{
+  x.fillStyle='#0b0c0e';x.fillRect(0,0,w,h);
+  const k=6,iw=28*k,ih=20*k,gap=34,room=w-80-iw-gap,l2=city.toUpperCase()+' #1  '+(champ||'COULD BE YOU');
+  let f1=128,f2=56;x.font='800 '+f1+'px '+F;let t1=x.measureText('@OhRabah').width;x.font='800 '+f2+'px '+F;let t2=x.measureText(l2).width;
+  if(t1>room){f1=Math.floor(f1*room/t1);t1=room;}if(t2>room){f2=Math.floor(f2*room/t2);t2=room;}
+  const x0=(w-iw-gap-Math.max(t1,t2))/2;
+  x.save();x.translate(x0,(h-ih)/2);x.scale(k,k);
+  x.fillStyle='#FF0000';x.fill(new Path2D(EGG.YT_BOX));x.fillStyle='#FFFFFF';x.fill(new Path2D(EGG.YT_TRI));x.restore();
+  x.textAlign='left';x.textBaseline='middle';
+  x.fillStyle='#ffffff';x.font='800 '+f1+'px '+F;x.fillText('@OhRabah',x0+iw+gap,h*0.37);
+  x.fillStyle='#f2c230';x.font='800 '+f2+'px '+F;x.fillText(l2,x0+iw+gap,h*0.78);};}
+const CITYBB={list:[],champ:null,ver:0,
+  setChamp(cs){CITYBB.champ=cs?String(cs).toUpperCase():null;CITYBB.ver++;
+    for(const b of CITYBB.list){const c=b.tex.image;cityBBDraw(b.city,CITYBB.champ)(c.getContext('2d'),c.width,c.height);b.tex.needsUpdate=true;}}};
+// x,z: the foot of the board; hdg: the true heading (degrees) the face looks toward; L: a light layer for
+// its four floods (one of its own, built here, when not given)
+function buildCityBillboard(x,z,hdg,cityName,L){
+  const own=!L;if(own)L=makeLightLayer('CITYBB_'+cityName);
+  const t=tex(1024,256,cityBBDraw(cityName,CITYBB.champ)),mat=new THREE.MeshLambertMaterial({map:t,emissive:0xffffff,emissiveMap:t,emissiveIntensity:EGG.litMat.emissiveIntensity});
+  const y0=groundHeight(x,z),G=new THREE.Group();G.position.set(x,y0,z);G.rotation.y=Math.PI-hdg*Math.PI/180;
+  const b=new THREE.Mesh(eggSheet(18,5,1,1,true,0.6),mat);b.position.y=10.5;G.add(b);
+  G.add(new THREE.Mesh(eggBoxes([[0.45,13,0.45,-5.5,6.5,0],[0.45,13,0.45,5.5,6.5,0]].concat(eggFrame(18,5,10.5,0.7))),lam(0x6b6e72)));
+  G.name='city_billboard';scene.add(G);G.updateMatrixWorld(true);
+  const p=new V3();for(const s of [-1,1])for(const u of [-4.5,4.5]){p.set(u,7.9,s*1.6).applyMatrix4(G.matrixWorld);L.addLight(p.x,p.y,p.z,0xffd49a);}
+  if(own){L.build();L.pts.visible=TOD.lights>0;}
+  OBST.push({kind:'circ',x:x,z:z,r:9,h:y0+13.5,name:'a billboard'});
+  const o={g:G,tex:t,mat:mat,city:cityName,x:x,z:z,hdg:hdg};CITYBB.list.push(o);
+  if(!CITYBB.hook){CITYBB.hook=()=>{for(const q of CITYBB.list)q.mat.emissiveIntensity=EGG.litMat.emissiveIntensity;};TOD_HOOKS.push(CITYBB.hook);}
+  return o;}
 const _eP=new V3(),_eC=new V3();
 // flag and banner cloth: a CPU sine on the vertices, normals from its slope. Only near the camera.
 function eggUpdate(dt){
@@ -7023,6 +7059,7 @@ function wbQuad(G,a,b,c,d,col){G.p.push(...a,...b,...c,...a,...c,...d);if(col)fo
 function wbMesh(G,mat,name,flat){
   if(!G.p.length)return null;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(G.p,3));
   if(G.c.length)g.setAttribute('color',new THREE.Float32BufferAttribute(G.c,3));
+  if(G.uv&&G.uv.length)g.setAttribute('uv',new THREE.Float32BufferAttribute(G.uv,2));
   if(flat){const n=new Float32Array(G.p.length);for(let i=1;i<n.length;i+=3)n[i]=1;g.setAttribute('normal',new THREE.BufferAttribute(n,3));}else g.computeVertexNormals();
   g.computeBoundingSphere();const m=new THREE.Mesh(g,mat);m.name=name;scene.add(m);WB.tris[name]=(WB.tris[name]||0)+G.p.length/9;return m;}
 // a polygon [[x,z],...] as ground triangles at height y(x,z)
@@ -7077,6 +7114,31 @@ const holdTex=tex(64,32,(x,w,h)=>{x.clearRect(0,0,w,h);x.fillStyle='#e8b923';
   for(let i=0;i<w;i+=10){x.fillRect(i,3,6,3);x.fillRect(i,10,6,3);}x.fillRect(0,18,w,3);x.fillRect(0,25,w,3);});
 function wbSignTex(letter,text){return tex(256,56,(x,w,h)=>{x.fillStyle='#111';x.fillRect(0,0,w,h);x.fillStyle='#f2c230';x.fillRect(64,3,w-67,h-6);
   x.font='800 40px '+F;x.textAlign='center';x.textBaseline='middle';x.fillText(letter,32,h/2+2);x.fillStyle='#111';x.fillText(text,64+(w-67)/2,h/2+2);});}
+// terminals: the three wall bands of before (so the same triangles), textured: u along the walls in
+// 8 m bays, v up the 14 m; the roof samples the light lip at the top of the texture
+function wbTerminal(G,P,y0){
+  let s=0;
+  for(let i=0,j=P.length-1;i<P.length;j=i++){const a=P[j],b=P[i],l=Math.hypot(a[0]-b[0],a[1]-b[1]);if(l<0.5)continue;
+    const u0=s/8,u1=(s+l)/8;s+=l;
+    for(const B of [[0,4.5],[4.5,11],[11,14]]){wbQuad(G,[a[0],y0+B[0],a[1]],[b[0],y0+B[0],b[1]],[b[0],y0+B[1],b[1]],[a[0],y0+B[1],a[1]]);
+      const v0=B[0]/14,v1=B[1]/14;G.uv.push(u0,v0,u1,v0,u1,v1,u0,v0,u1,v1,u0,v1);}}
+  const n0=G.p.length;wbPoly(G,P,()=>y0+14);for(let k=n0;k<G.p.length;k+=3)G.uv.push(0.5,13.6/14);}
+// one 8 m bay, 14 m tall: concrete base, dark glass from 4.5 to 12 m with a light mullion, a wall band and a
+// 1 m light lip (the roof slab's edge). The night map: the glass band glowing warm from inside, the rest dark.
+function wbTermTex(night){
+  return tex(64,128,(x,w,h)=>{const Y=m=>h-m/14*h;
+    if(night){x.fillStyle='#000';x.fillRect(0,0,w,h);const g=x.createLinearGradient(0,Y(12),0,Y(4.5));g.addColorStop(0,'#ffe2b0');g.addColorStop(1,'#d89a50');
+      x.fillStyle=g;x.fillRect(0,Y(12),w,Y(4.5)-Y(12));x.fillStyle='#000';x.fillRect(0,Y(12),3,Y(4.5)-Y(12));x.fillRect(0,Y(8.3),w,1);return;}
+    x.fillStyle='#c6c7c3';x.fillRect(0,0,w,h);
+    const g=x.createLinearGradient(0,Y(12),0,Y(4.5));g.addColorStop(0,'#3d5366');g.addColorStop(0.5,'#22313e');g.addColorStop(1,'#2c3c4a');
+    x.fillStyle=g;x.fillRect(0,Y(12),w,Y(4.5)-Y(12));
+    x.fillStyle='#d6d8da';x.fillRect(0,Y(12),3,Y(4.5)-Y(12));x.fillRect(0,Y(8.3),w,1);
+    x.fillStyle='#d8d8d4';x.fillRect(0,Y(13),w,Y(12)-Y(13));x.fillStyle='#6d6f72';x.fillRect(0,Y(13)-1,w,2);
+    x.fillStyle='#efefeb';x.fillRect(0,0,w,Y(13)-1);},[1,1]);}
+function wbTermMat(){
+  const d=wbTermTex(false),n=wbTermTex(true);d.wrapT=n.wrapT=THREE.ClampToEdgeWrapping;
+  const m=new THREE.MeshLambertMaterial({map:d,emissive:0xffffff,emissiveMap:n,emissiveIntensity:0,side:THREE.DoubleSide});
+  const f=()=>{m.emissiveIntensity=TOD.night?0.9:TOD.lights*0.5;};TOD_HOOKS.push(f);f();return m;}
 function buildWorld(d){
   const t0=performance.now(),mv=p=>[p[0]-WOFF[0],p[1]-WOFF[1]],gh=(x,z)=>groundHeight(x,z);
   const terms=(d.terminals||[]).map(P=>P.map(mv)),hangs=(d.hangars||[]).map(P=>P.map(mv)),aprons=(d.aprons||[]).map(P=>P.map(mv));
@@ -7125,15 +7187,16 @@ function buildWorld(d){
   wbMesh(apG,lam(0x8a8984),'aprons',true);
   if(poles.length){const pm=new THREE.InstancedMesh(new THREE.CylinderGeometry(0.2,0.3,18,5).translate(0,9,0),lam(0x8a8d90),poles.length),M=new THREE.Matrix4();
     poles.forEach((p,i)=>{M.makeTranslation(p[0],gh(p[0],p[1]),p[1]);pm.setMatrixAt(i,M);});pm.name='apronPoles';scene.add(pm);WB.tris.apronPoles=poles.length*10;}
-  // ---- terminals (14 m, a dark glass band, a light roof), hangars (16 m, the long side a dark door) ----
-  const bG=wbGeo(),WALL=[0.80,0.80,0.78],GLASS=[0.20,0.27,0.33],ROOF=[0.86,0.86,0.84],HW=[0.70,0.71,0.70],HD=[0.30,0.32,0.34],HR=[0.62,0.64,0.66];
-  for(const P of terms){const c=wbCentroid(P),y0=gh(c[0],c[1]);wbBuilding(bG,P,y0,[[0,4.5,WALL],[4.5,11,GLASS],[11,14,WALL]],ROOF);
+  // ---- terminals (14 m: the window band texture, a light roof, lit inside at night), hangars (16 m, the long side a dark door) ----
+  const bG=wbGeo(),tG=wbGeo(),HW=[0.70,0.71,0.70],HD=[0.30,0.32,0.34],HR=[0.62,0.64,0.66];tG.uv=[];
+  for(const P of terms){const c=wbCentroid(P),y0=gh(c[0],c[1]);wbTerminal(tG,P,y0);
     let b=[1e9,1e9,-1e9,-1e9];for(const p of P){b=[Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])];}
     OBST.push({kind:'poly',P:P,b:b,h:y0+14,name:'the terminal'});}
   for(const P of hangs){const c=wbCentroid(P),y0=gh(c[0],c[1]);wbBuilding(bG,P,y0,[[0,16,HW]],HR,HD);
     let b=[1e9,1e9,-1e9,-1e9];for(const p of P){b=[Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])];}
     OBST.push({kind:'poly',P:P,b:b,h:y0+16,name:'a hangar'});}
-  wbMesh(bG,new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide}),'buildings');WB.n.terminals=terms.length;WB.n.hangars=hangs.length;
+  wbMesh(bG,new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide}),'buildings');WB.n.terminals=terms.length;
+  {const m=wbMesh(tG,wbTermMat(),'terminals');if(m)WB.termMat=m.material;}WB.n.hangars=hangs.length;
   // ---- the control tower at its OSM spot, and the beacon on its roof ----
   {const T=mv([d.tower.x,d.tower.z]),H=REGION.twrH||40,y0=gh(T[0],T[1]),pale=lam(0xd9d6cf);
     const sh=new THREE.Mesh(new THREE.CylinderGeometry(H*0.05,H*0.075,H-7,12),pale);sh.position.set(T[0],y0+(H-7)/2,T[1]);scene.add(sh);
@@ -7196,15 +7259,55 @@ function buildWorld(d){
       bx.position.set(x,gh(x,z)+0.75,z);bx.rotation.y=Math.atan2(-h.tx,-h.tz);bx.name='taxiSign';scene.add(bx);});
     WB.n.holds=holds.length;}
   L.build();L.pts.visible=TOD.lights>0;WB.n.lights=L.count();
+  if(REGION.id==='rjtt')WORLD.clear=[[TKY.bb.x,TKY.bb.z,90]];
   buildWorldCity(d);
+  if(REGION.id==='rjtt')buildTokyo(d);
   WB.ms=Math.round(performance.now()-t0);
 }
 // ---- the city: instanced boxes from the urban density grid; motorways, trunk and primary roads; long bridges ----
 const W_CITY=[['#c9ccd0','#a9adb3','#8e9399','#e8e9ea','#b5b8bc','#7d8288','#f2f2f0'],          // Tokyo: cool greys, some white
               ['#e6dcc6','#d9cdb3','#efe6d2','#cfc3a8','#e0d5bd','#ebe3d1','#d4c9b0'],          // Paris: cream limestone
               ['#f4f2ee','#efe3c8','#e8d0c0','#d8e4e0','#f0e0a8','#e6c6c6','#ffffff']];         // Rio: white and pastel
+// lit windows on the city boxes at night, per region (Tokyo). One 32 x 32 m tile: 8 bays of 4 m by 8
+// floors of 4 m. The day map only shades the glass a little (the instance colour carries the city); the
+// night map is the emissive one: dark, about half the windows lit warm or cool. One corner
+// (the top left) is plain wall, white by day, black at night: the roofs sample it.
+const W_CITY_WIN={rjtt:1};
+function worldWinTex(night){
+  return tex(256,256,(x,w,h)=>{x.fillStyle=night?'#000':'#fff';x.fillRect(0,0,w,h);
+    for(let j=0;j<8;j++)for(let i=0;i<8;i++){const r=hash(i*31+7,j*17+3),q=hash(i*13+5,j*29+11),X=i*32+4,Yp=j*32+7;
+      if(night){if(i===0&&j===0)continue;if(r<0.5){const k=0.55+0.45*q;x.fillStyle=q<0.22?`rgba(200,225,255,${k})`:`rgba(255,${200+Math.round(30*q)},${130+Math.round(50*q)},${k})`;x.fillRect(X,Yp,24,18);}}
+      else{if(i===0&&j===0)continue;x.fillStyle=r<0.5?'#b9c2cc':'#a9b4bf';x.fillRect(X,Yp,24,18);}}},[1,1]);}
+// the city box: a unit box standing on its base, roofs darker than the walls through the vertex colour
+// (Paris: zinc grey); one geometry and one material for every city box (and Tokyo's skyline towers)
+function worldCityGeo(){
+  if(WORLD.cityGeo)return WORLD.cityGeo;const pal=REGION.pal||0;
+  const g=new THREE.BoxGeometry(1,1,1).translate(0,0.5,0),pc=g.attributes.position,col=new Float32Array(pc.count*3),rf=pal===1?[0.58,0.62,0.68]:[0.82,0.82,0.83];
+  for(let i=0;i<pc.count;i++){const top=pc.getY(i)>0.99&&g.attributes.normal.getY(i)>0.5;col.set(top?rf:[1,1,1],i*3);}
+  g.setAttribute('color',new THREE.BufferAttribute(col,3));return WORLD.cityGeo=g;}
+function worldCityMat(){
+  if(WORLD.cityMat)return WORLD.cityMat;
+  if(!W_CITY_WIN[REGION.id])return WORLD.cityMat=new THREE.MeshLambertMaterial({vertexColors:true});
+  const m=new THREE.MeshLambertMaterial({vertexColors:true,map:worldWinTex(false),emissive:0xffffff,emissiveMap:worldWinTex(true),emissiveIntensity:0});
+  // the box's uv from its instance scale, so the windows keep their 4 m size on every box; roofs on the plain corner
+  m.onBeforeCompile=sh=>{sh.vertexShader=sh.vertexShader.replace('#include <uv_vertex>',`#include <uv_vertex>
+#ifdef USE_UV
+  #ifdef USE_INSTANCING
+  vec3 wS=vec3(length(instanceMatrix[0].xyz),length(instanceMatrix[1].xyz),length(instanceMatrix[2].xyz));
+  #else
+  vec3 wS=vec3(1.0);
+  #endif
+  vUv=abs(normal.y)>0.5?vec2(0.01,0.99):uv*vec2(abs(normal.x)>0.5?wS.z:wS.x,wS.y)/32.0;
+#endif`);
+    // at night the fog takes less of the lit city (uWinFog), so the far windows still glow
+    sh.uniforms.uWinFog=WORLD.winFog;
+    sh.fragmentShader='uniform float uWinFog;\n'+sh.fragmentShader.replace('#include <fog_fragment>',THREE.ShaderChunk.fog_fragment.replace('fogColor, fogFactor )','fogColor, fogFactor*uWinFog )'));};
+  m.customProgramCacheKey=()=>'cityWin';
+  WORLD.winFog={value:1};
+  const f=()=>{m.emissiveIntensity=TOD.night?1:TOD.lights*0.35;WORLD.winFog.value=TOD.night?0.5:1;};TOD_HOOKS.push(f);f();
+  return WORLD.cityMat=m;}
 function buildWorldCity(d){
-  const U=d.urban,urb=WORLD.urb,pal=REGION.pal||0;
+  const U=d.urban,urb=WORLD.urb,pal=REGION.pal||0,clr=WORLD.clear||[];   // clr: [x,z,r] kept free of boxes
   if(urb){
     const cand=[];
     for(let j=0;j<U.h;j++)for(let i=0;i<U.w;i++){const v=urb[j*U.w+i];if(v<40)continue;
@@ -7216,15 +7319,11 @@ function buildWorldCity(d){
     const B=[];
     for(const c of cand){const n=c[3]<100?1:c[3]<170?2:3;
       for(let k=0;k<n&&B.length<6000;k++){const r1=hash(c[4]*3+k,c[5]*5+1),r2=hash(c[4]*5+k,c[5]*3+2),r3=hash(c[4]+k*11,c[5]+7);
-        const x=c[1]+(r1-0.5)*U.cell*0.75,z=c[2]+(r2-0.5)*U.cell*0.75;if(isWater(x,z))continue;
+        const x=c[1]+(r1-0.5)*U.cell*0.75,z=c[2]+(r2-0.5)*U.cell*0.75;if(isWater(x,z)||clr.some(q=>Math.hypot(x-q[0],z-q[1])<q[2]))continue;
         const h=clamp(10+50*Math.pow(c[3]/255,1.3)*(0.45+r3*0.9),10,60);B.push([x,z,25+r3*45,25+r1*45,h,r2*1.57]);}
       if(B.length>=6000)break;}
     if(B.length){
-      // roofs darker than the walls through the vertex colour (Paris: zinc grey), the instance colour does the rest
-      const g=new THREE.BoxGeometry(1,1,1).translate(0,0.5,0),pc=g.attributes.position,col=new Float32Array(pc.count*3),rf=pal===1?[0.58,0.62,0.68]:[0.82,0.82,0.83];
-      for(let i=0;i<pc.count;i++){const top=pc.getY(i)>0.99&&g.attributes.normal.getY(i)>0.5;col.set(top?rf:[1,1,1],i*3);}
-      g.setAttribute('color',new THREE.BufferAttribute(col,3));
-      const im=new THREE.InstancedMesh(g,new THREE.MeshLambertMaterial({vertexColors:true}),B.length),M=new THREE.Matrix4(),Q=new Q4(),S=new V3(),Pp=new V3(),c=new THREE.Color(),P=W_CITY[pal];
+      const g=worldCityGeo(),im=new THREE.InstancedMesh(g,worldCityMat(),B.length),M=new THREE.Matrix4(),Q=new Q4(),S=new V3(),Pp=new V3(),c=new THREE.Color(),P=W_CITY[pal];
       B.forEach((b,i)=>{Q.setFromAxisAngle(_yUp,b[5]);S.set(b[2],b[4],b[3]);Pp.set(b[0],groundHeight(b[0],b[1])-1,b[1]);M.compose(Pp,Q,S);im.setMatrixAt(i,M);im.setColorAt(i,c.set(P[Math.floor(hash(i,31)*P.length)]));});
       im.name='cityBoxes';im.userData.heat=0.55;im.userData.irVar=0.1;scene.add(im);WB.n.city=B.length;WB.tris.city=B.length*12;}
   }
@@ -7242,9 +7341,11 @@ function buildWorldCity(d){
   const R=d.roads||{},mG=wbGeo(),pG=wbGeo();
   for(const l of (R.motorway||[]).concat(R.trunk||[]))if(l.length>1)ribbon(mG,mvP(l),24,(x,z)=>yAt(x,z));
   for(const l of (R.primary||[]))if(l.length>1)ribbon(pG,mvP(l),14,(x,z)=>yAt(x,z)+0.02);
-  // the long bridges: a deck 30 m up, sloping down at both ends, on piers every 150 m
-  const bG=wbGeo(),piers=[];
-  for(const b of d.bridges||[]){const P=mvP(b.pts);if(P.length<2)continue;let len=0;for(let k=0;k+1<P.length;k++)len+=Math.hypot(P[k+1][0]-P[k][0],P[k+1][1]-P[k][1]);
+  // the long bridges: a deck 30 m up, sloping down at both ends, on piers every 150 m. Not where a
+  // landmark bridge is built by hand (its pylons in the landmarks: the Rainbow Bridge)
+  const bG=wbGeo(),piers=[],pyl=(d.landmarks||[]).filter(l=>l.kind==='bridge_pylon').map(l=>[l.x-WOFF[0],l.z-WOFF[1]]);
+  for(const b of d.bridges||[]){const P=mvP(b.pts);if(P.length<2)continue;
+    if(pyl.some(q=>P.some((p,k)=>k+1<P.length&&segD(q[0],q[1],p[0],p[1],P[k+1][0],P[k+1][1])<150)))continue;let len=0;for(let k=0;k+1<P.length;k++)len+=Math.hypot(P[k+1][0]-P[k][0],P[k+1][1]-P[k][1]);
     if(len<400)continue;const ramp=Math.min(300,len*0.25);let s=0;
     const dist=[0];for(let k=0;k+1<P.length;k++)dist.push(dist[k]+Math.hypot(P[k+1][0]-P[k][0],P[k+1][1]-P[k][1]));
     // the deck height along the bridge from the arc length, sampled on the ribbon's own points
@@ -7256,6 +7357,160 @@ function buildWorldCity(d){
   wbMesh(mG,lam(0x3b3d40),'roads',true);wbMesh(pG,lam(0x4a4c4f),'roadsPrimary',true);wbMesh(bG,new THREE.MeshLambertMaterial({color:0x8d9095,side:THREE.DoubleSide}),'bridges',true);
   if(piers.length){const im=new THREE.InstancedMesh(new THREE.BoxGeometry(5,1,5).translate(0,0.5,0),lam(0x9a9ca0),piers.length),M=new THREE.Matrix4(),Q=new Q4(),S=new V3(),Pp=new V3();
     piers.forEach((p,i)=>{S.set(1,32,1);Pp.set(p[0],p[2],p[1]);M.compose(Pp,Q,S);im.setMatrixAt(i,M);});im.name='bridgePiers';scene.add(im);WB.tris.piers=piers.length*12;}
+}
+// ---------- Tokyo (4.2): landmarks, skyline, night, billboard ----------
+// Built by buildWorld after the city, only in the rjtt region, from WORLD.data.landmarks (ARP frame,
+// moved by WOFF). Tokyo Tower and the Skytree are lattice silhouettes in one vertex coloured mesh each,
+// with a night material swapped in (warm orange, cool blue purple); the Rainbow Bridge is two H towers,
+// a deck 30 m up on its anchorages, CatmullRom main cables and hangers (the generic bridge ribbon is
+// skipped there); the skyline clusters are extra city boxes (the same geometry and window material,
+// lit at night); warm neon glows over the busiest districts at night; Mount Fuji, really 95 km west
+// south west and far outside the fog, stands at 42 km on bearing TKY.fujiBrg, drawn without fog so it
+// shows over the haze, and moved round to the north west so it is ahead on final to 34R and after
+// takeoff; the @OhRabah board on the Ota waterfront across the canal past the end of 34R, facing the
+// approach. Everything has a name; TKY.tris has the triangles per part for the tests.
+const TKY={bb:{x:wX(THR01+4750,-220),z:wZ(THR01+4750,-220)},fujiBrg:309,fujiReal:null,fujiDist:42000,tris:{},parts:{},night:[],built:false};
+const tkRGB=h=>{const c=new THREE.Color(h);return [c.r,c.g,c.b];};
+// a square beam from a to b, half widths ra and rb (8 triangles, no caps)
+function tkBeam(G,a,b,ra,rb,col){
+  const d=new V3(b[0]-a[0],b[1]-a[1],b[2]-a[2]).normalize(),u=Math.abs(d.y)>0.9?new V3(1,0,0):new V3(0,1,0);
+  u.cross(d).normalize();const w=new V3().crossVectors(d,u).normalize(),S=[[1,1],[-1,1],[-1,-1],[1,-1]];
+  const C=(p,r,s)=>[p[0]+(u.x*s[0]+w.x*s[1])*r,p[1]+(u.y*s[0]+w.y*s[1])*r,p[2]+(u.z*s[0]+w.z*s[1])*r];
+  for(let i=0;i<4;i++){const s0=S[i],s1=S[(i+1)%4];wbQuad(G,C(a,ra,s0),C(a,ra,s1),C(b,rb,s1),C(b,rb,s0),col);}}
+// a three.js geometry into a vertex coloured triangle list
+function tkAdd(G,geo,col,x,y,z){const g=geo.index?geo.toNonIndexed():geo;g.translate(x||0,y||0,z||0);
+  const a=g.attributes.position.array;for(let i=0;i<a.length;i++)G.p.push(a[i]);for(let i=0;i<a.length/3;i++)G.c.push(col[0],col[1],col[2]);}
+function tkMesh(G,mat,name){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(G.p,3));
+  g.setAttribute('color',new THREE.Float32BufferAttribute(G.c,3));g.computeVertexNormals();g.computeBoundingSphere();const m=new THREE.Mesh(g,mat);m.name=name;return m;}
+// e: [emissive, intensity, fog off] for a night material (the lit towers skip the fog so they still read from the finals)
+const tkMat=e=>new THREE.MeshLambertMaterial(Object.assign({vertexColors:true,side:THREE.DoubleSide},e?{emissive:e[0],emissiveIntensity:e[1],fog:!e[2]}:{}));
+function tkTris(o){let n=0;o.traverse(m=>{if(!m.isMesh)return;const g=m.geometry,t=(g.index?g.index.count:g.attributes.position.count)/3;n+=t*(m.isInstancedMesh?m.count:1);});return Math.round(n);}
+// a landmark: day and night materials on its meshes, swapped by the time of day
+function tkNight(meshes,day,night){TKY.night.push({ms:meshes,day:day,night:night});}
+function buildTokyo(d){
+  const lm={};for(const l of d.landmarks||[])lm[l.id]=[l.x-WOFF[0],l.z-WOFF[1]];
+  const gh=(x,z)=>groundHeight(x,z),L=makeLightLayer('TKY'),add=(o,name)=>{o.name=name;scene.add(o);TKY.parts[name]=o;return o;};
+  const RED=AL_C.red;
+  // ---- Tokyo Tower: 333 m, four tapered legs braced to 250 m, decks at 150 and 250, antenna ----
+  if(lm.tokyo_tower){const [x,z]=lm.tokyo_tower,y0=gh(x,z),G=wbGeo(),OR=tkRGB(0xf0561e),WH=tkRGB(0xf3f1ec),
+      band=y=>(y<45||Math.floor(y/333*11)%2===0)?OR:WH,hw=y=>3.5+36.5*Math.pow(1-Math.min(y,250)/250,1.9),th=y=>1+2.6*(1-y/250),
+      LV=[0,25,55,90,125,150,185,220,250],S4=[[1,1],[-1,1],[-1,-1],[1,-1]];
+    for(let k=0;k+1<LV.length;k++){const y1=LV[k],y2=LV[k+1],h1=hw(y1),h2=hw(y2),c=band((y1+y2)/2);
+      for(const s of S4)tkBeam(G,[s[0]*h1,y1,s[1]*h1],[s[0]*h2,y2,s[1]*h2],th(y1),th(y2),c);
+      for(let i=0;i<4;i++){const a=S4[i],b=S4[(i+1)%4];
+        if(k>0){tkBeam(G,[a[0]*h1,y1,a[1]*h1],[b[0]*h2,y2,b[1]*h2],0.45,0.45,c);tkBeam(G,[b[0]*h1,y1,b[1]*h1],[a[0]*h2,y2,a[1]*h2],0.45,0.45,c);}
+        if(y2!==150&&y2!==250)tkBeam(G,[a[0]*h2,y2,a[1]*h2],[b[0]*h2,y2,b[1]*h2],0.7,0.7,band(y2));}}
+    const dw=2*hw(150)+12,GL=tkRGB(0x34465a),DK=tkRGB(0xd9d9d4);
+    tkAdd(G,new THREE.BoxGeometry(dw,7,dw),DK,0,146.5,0);tkAdd(G,new THREE.BoxGeometry(dw-2,8,dw-2),GL,0,154,0);tkAdd(G,new THREE.BoxGeometry(dw,1.2,dw),DK,0,158.6,0);
+    tkAdd(G,new THREE.BoxGeometry(15,6,15),GL,0,251,0);tkAdd(G,new THREE.BoxGeometry(16,1,16),DK,0,254.5,0);
+    tkBeam(G,[0,255,0],[0,292,0],3.0,1.5,OR);tkBeam(G,[0,292,0],[0,312,0],1.0,0.7,WH);tkBeam(G,[0,312,0],[0,333,0],0.7,0.3,OR);
+    const day=tkMat(),night=tkMat([0xff7424,0.85,1]),m=tkMesh(G,day,'tokyo_tower_mesh'),T=new THREE.Group();T.add(m);T.position.set(x,y0,z);add(T,'tokyo_tower');
+    tkNight([m],day,night);
+    for(const s of S4){for(const y of [12,40,70,100,130])L.addLight(x+s[0]*(hw(y)+1.5),y0+y,z+s[1]*(hw(y)+1.5),0xffa95a,0,0,false);
+      L.addLight(x+s[0]*dw/2,y0+159.5,z+s[1]*dw/2,0xffc27a,0,0,false);L.addLight(x+s[0]*8,y0+255.5,z+s[1]*8,0xffc27a,0,0,false);}
+    L.addLight(x,y0+333.5,z,RED,3,0,false);L.addLight(x,y0+255.5,z,RED,3,0.5,false);
+    OBST.push({kind:'circ',x:x,z:z,r:40,h:y0+60,name:'Tokyo Tower'},{kind:'circ',x:x,z:z,r:dw/2,h:y0+160,name:'Tokyo Tower'},{kind:'circ',x:x,z:z,r:5,h:y0+333,name:'Tokyo Tower'});}
+  // ---- Tokyo Skytree: 634 m, a tapered six sided shaft with ring bands, decks at 350 and 450, antenna ----
+  if(lm.skytree){const [x,z]=lm.skytree,y0=gh(x,z),G=wbGeo(),P=tkRGB(0xe4edf5),B=tkRGB(0xc9d4de),GL=tkRGB(0x8796a8),r=y=>36-21*y/330;
+    tkAdd(G,new THREE.CylinderGeometry(15,36,330,6,1,true),P,0,165,0);
+    for(const y of [60,140,220,290])tkAdd(G,new THREE.CylinderGeometry(r(y)+1.2,r(y)+1.2,4,6,1,true),B,0,y,0);
+    tkAdd(G,new THREE.CylinderGeometry(13.5,15,10,6,1,true),P,0,335,0);
+    tkAdd(G,new THREE.CylinderGeometry(23,21,18,12),GL,0,349,0);tkAdd(G,new THREE.CylinderGeometry(23.6,23.6,1.5,12),P,0,358.5,0);
+    tkAdd(G,new THREE.CylinderGeometry(10.5,13.5,82,6,1,true),P,0,399,0);tkAdd(G,new THREE.CylinderGeometry(13,13,3,6,1,true),B,0,400,0);
+    tkAdd(G,new THREE.CylinderGeometry(16.5,15.5,12,12),GL,0,446,0);
+    tkAdd(G,new THREE.CylinderGeometry(8.5,10,43,6,1,true),P,0,473.5,0);
+    tkAdd(G,new THREE.CylinderGeometry(1.2,4.5,139,6,1,true),P,0,564.5,0);tkAdd(G,new THREE.CylinderGeometry(3.6,3.6,6,6,1,true),B,0,560,0);
+    const day=tkMat(),night=tkMat([0x7b6cff,0.9,1]),m=tkMesh(G,day,'skytree_mesh'),T=new THREE.Group();T.add(m);T.position.set(x,y0,z);add(T,'skytree');
+    tkNight([m],day,night);
+    L.addLight(x,y0+634.5,z,RED,3,0,false);L.addLight(x,y0+496,z,RED,3,0.5,false);
+    for(let i=0;i<6;i++){const a=i*Math.PI/3;L.addLight(x+Math.cos(a)*24,y0+359,z+Math.sin(a)*24,0xb8c4ff,0,0,false);L.addLight(x+Math.cos(a)*17,y0+452.5,z+Math.sin(a)*17,0xb8c4ff,0,0,false);}
+    OBST.push({kind:'circ',x:x,z:z,r:32,h:y0+330,name:'the Tokyo Skytree'},{kind:'circ',x:x,z:z,r:23,h:y0+495,name:'the Tokyo Skytree'},{kind:'circ',x:x,z:z,r:4,h:y0+634,name:'the Tokyo Skytree'});}
+  // ---- Rainbow Bridge: between the two pylons, built along its own axis (local +x, the deck 30 wide on z) ----
+  if(lm.rainbow_n&&lm.rainbow_s){const a=lm.rainbow_n,b=lm.rainbow_s,ex=b[0]-a[0],ez=b[1]-a[1],Lb=Math.hypot(ex,ez),h=Lb/2,WT=tkRGB(0xf4f4f0),GR=tkRGB(0xb9bcc0);
+    const B=new THREE.Group();B.position.set((a[0]+b[0])/2,0,(a[1]+b[1])/2);B.rotation.y=Math.atan2(-ez,ex);
+    const day=tkMat(),night=tkMat([0xd6deff,0.45]),ms=[];
+    for(const [s,nm] of [[-1,'rainbow_tower_n'],[1,'rainbow_tower_s']]){const G=wbGeo();
+      for(const zz of [-14,14])tkAdd(G,new THREE.BoxGeometry(8,120,5),WT,0,60,zz);
+      for(const y of [24,78,116])tkAdd(G,new THREE.BoxGeometry(6,4,28),WT,0,y,0);
+      const m=tkMesh(G,day,nm);m.position.x=s*h;B.add(m);ms.push(m);}
+    const G=wbGeo(),cy=x=>40+80*Math.pow(x/h,2),end=h+150;
+    tkAdd(G,new THREE.BoxGeometry(2*end-40,4,30),GR,0,28,0);
+    for(const s of [-1,1]){tkAdd(G,new THREE.BoxGeometry(40,34,44),GR,s*end,17,0);tkAdd(G,new THREE.BoxGeometry(14,6,40),GR,s*h,1,0);
+      for(const t of [0.33,0.66])tkAdd(G,new THREE.BoxGeometry(8,26,20),GR,s*(h+(end-h)*t),13,0);}
+    for(const zz of [-14,14]){
+      const pts=[];for(let i=0;i<=6;i++){const x=-h+Lb*i/6;pts.push(new V3(x,cy(x),zz));}
+      tkAdd(G,new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),12,0.7,4,false),WT);
+      for(const s of [-1,1])tkAdd(G,new THREE.TubeGeometry(new THREE.LineCurve3(new V3(s*h,120,zz),new V3(s*(end-20),34,zz)),1,0.7,4,false),WT);
+      for(let i=1;i<=10;i++){const x=-h+Lb*i/11;tkBeam(G,[x,30,zz],[x,cy(x),zz],0.2,0.2,WT);}}
+    const m=tkMesh(G,day,'rainbow_deck');B.add(m);ms.push(m);add(B,'rainbow_bridge');tkNight(ms,day,night);
+    B.updateMatrixWorld(true);const p=new V3(),at=(x,y,zz)=>p.set(x,y,zz).applyMatrix4(B.matrixWorld);
+    for(const zz of [-14,14]){for(let i=0;i<=20;i++){const x=-h+Lb*i/20;at(x,cy(x)+1,zz);L.addLight(p.x,p.y,p.z,0xf4f6ff,0,0,false);}
+      for(const s of [-1,1])for(let i=1;i<=4;i++){const t=i/5,x=s*(h+(end-20-h)*t);at(x,120+(34-120)*t+1,zz);L.addLight(p.x,p.y,p.z,0xf4f6ff,0,0,false);}
+      for(const s of [-1,1]){at(s*h,121,zz);L.addLight(p.x,p.y,p.z,RED,3,0,false);}}
+    for(const s of [-1,1]){at(s*h,0,0);OBST.push({kind:'circ',x:p.x,z:p.z,r:16,h:120,name:'the Rainbow Bridge'});}}
+  // ---- skyline clusters: [dx, dz, w, d, h, base], offsets turned by the cluster's angle ----
+  {const C=[
+      {k:'shinjuku',at:lm.shinjuku,ang:0.12,b:[[-350,110,110,45,48],[-375,110,34,34,240,48],[-322,110,34,34,240,48],
+        [0,0,48,48,223],[0,0,30,30,12,223],[160,-120,40,50,210],[-130,-210,38,38,200],[60,-340,42,42,190],[230,120,40,40,180],
+        [-190,330,46,36,235],[310,-260,36,36,170],[-10,250,50,40,205],[120,190,30,30,160],[-260,-60,40,30,185]]},
+      {k:'marunouchi',at:[-1804-WOFF[0],-14595-WOFF[1]],ang:0.05,b:[[0,0,50,40,200],[110,-60,45,45,180],[-120,40,40,50,165],[60,160,45,35,150],
+        [-60,-180,40,40,195],[200,90,36,36,140],[-220,-90,44,36,125],[160,-220,40,40,170],[-180,200,38,30,135]]},
+      {k:'shiodome',at:[-2444-WOFF[0],-12752-WOFF[1]],ang:0.3,b:[[0,0,45,35,180],[120,80,40,40,150],[-90,140,36,36,120]]},
+      {k:'shinagawa',at:[-4100-WOFF[0],-8800-WOFF[1]],ang:0.3,b:[[0,0,50,40,145],[130,-60,45,35,120],[60,140,40,40,100]]},
+      {k:'odaiba',at:[-1064-WOFF[0],-8605-WOFF[1]],ang:-0.5,b:[[-36,0,18,32,123],[36,0,18,32,123],[0,0,54,30,8,30],[0,0,54,30,8,60],[0,0,90,32,5,118],
+        [-220,120,90,60,62],[200,-110,80,70,85],[40,-260,95,55,70]]}];
+    const B=[],GLASS=['#9aa5b1','#8b96a3','#a9b3bd','#7f8b98','#b7c0c8','#909aa6','#a3aeb9'];
+    for(const c of C){if(!c.at)continue;const cs=Math.cos(c.ang),sn=Math.sin(c.ang);
+      for(const t of c.b){const x=c.at[0]+t[0]*cs-t[1]*sn,z=c.at[1]+t[0]*sn+t[1]*cs;if(isWater(x,z))continue;
+        const y0=gh(x,z);B.push([x,y0+(t[5]||0),z,t[2],t[4],t[3],c.ang]);
+        if(!t[5]&&t[4]>=90)OBST.push({kind:'circ',x:x,z:z,r:Math.max(t[2],t[3])/2,h:y0+t[4],name:'a skyscraper'});}}
+    const im=new THREE.InstancedMesh(worldCityGeo(),worldCityMat(),B.length),M=new THREE.Matrix4(),Q=new Q4(),S=new V3(),Pp=new V3(),col=new THREE.Color();
+    B.forEach((b,i)=>{Q.setFromAxisAngle(_yUp,-b[6]);S.set(b[3],b[4],b[5]);Pp.set(b[0],b[1],b[2]);M.compose(Pp,Q,S);im.setMatrixAt(i,M);im.setColorAt(i,col.set(GLASS[Math.floor(hash(i,57)*GLASS.length)]));});
+    im.userData.heat=0.55;add(im,'tokyo_skyline');TKY.n=B.length;
+    // the Fuji TV sphere, between the Odaiba slabs
+    const o=C[4];if(o.at&&!isWater(o.at[0],o.at[1])){const s=new THREE.Mesh(new THREE.SphereGeometry(16,12,8),lam(0xb9c1c9,{emissive:0x000000}));
+      s.position.set(o.at[0],gh(o.at[0],o.at[1])+100,o.at[1]);add(s,'fujitv_sphere');}}
+  // ---- neon: soft additive glows over the busiest districts, at night only ----
+  {const glow=tex(128,128,(x,w,h)=>{const g=x.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(0.35,'rgba(255,255,255,0.45)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,w,h);});
+    const PK=tkRGB(0xff4f9a),OG=tkRGB(0xff9a3c),CY=tkRGB(0x3cd8ff),Gp=[],Gc=[],Gu=[];
+    const site=(x,z,r,c,k)=>{const y=gh(x,z)+7,q=[[x-r,z-r,0,0],[x+r,z-r,1,0],[x+r,z+r,1,1],[x-r,z+r,0,1]];
+      for(const i of [0,2,1,0,3,2]){Gp.push(q[i][0],y,q[i][1]);Gu.push(q[i][2],q[i][3]);Gc.push(c[0]*k,c[1]*k,c[2]*k);}};
+    const S=[[lm.shinjuku||[0,0],PK],[[-8085-WOFF[0],-12652-WOFF[1]],CY],[[-1994-WOFF[0],-13545-WOFF[1]],OG],[[-6884-WOFF[0],-19965-WOFF[1]],PK],[[-4370-WOFF[0],-8745-WOFF[1]],OG]];
+    S.forEach((s,i)=>{const [x,z]=s[0];site(x,z,1400,s[1],0.55);site(x+500*(i%2?1:-1),z-400,800,i%2?OG:CY,0.5);});
+    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(Gp,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(Gu,2));
+    g.setAttribute('color',new THREE.Float32BufferAttribute(Gc,3));g.computeBoundingSphere();
+    const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({map:glow,vertexColors:true,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+    m.renderOrder=1;m.visible=false;add(m,'tokyo_neon');}
+  // ---- the city's street lights: points over the urban grid (density weighted, about 3,000), warm sodium, white, a few cool ----
+  {const U=d.urban,urb=WORLD.urb,CL=makeLightLayer('TKY_CITY');let tot=0;
+    if(urb){for(let i=0;i<urb.length;i++)if(urb[i]>=60)tot+=urb[i]/255;
+      const k=3000/Math.max(1,tot);
+      for(let j=0;j<U.h;j++)for(let i=0;i<U.w;i++){const v=urb[j*U.w+i];if(v<60)continue;
+        const n=v/255*k,c=Math.floor(n)+(hash(i*3+1,j*7+2)<n%1?1:0);
+        for(let q=0;q<c;q++){const x=U.x0+(i+hash(i+q*17,j*5+3))*U.cell-WOFF[0],z=U.z0+(j+hash(i*7+q,j+q*13+9))*U.cell-WOFF[1];
+          if(isWater(x,z)||terrZoneD(x,z)<300)continue;const r=hash(i*11+q,j*3+q);
+          CL.addLight(x,gh(x,z)+6,z,r<0.6?0xffb35c:r<0.9?0xfff2d6:0xcfe0ff,0,0,false);}}}
+    CL.build();CL.pts.visible=TOD.lights>0;TKY.CL=CL;TKY.cityLights=CL.count();}
+  // ---- Mount Fuji: a 3,000 m cone at 42 km, snow on the top 30%, no fog, its colour washed toward the haze ----
+  {const f=lm.fuji;if(f){const fx=f[0]+WOFF[0],fz=f[1]+WOFF[1];TKY.fujiReal=((Math.atan2(fx,-fz)*180/Math.PI)+360)%360;}
+    const b=TKY.fujiBrg*Math.PI/180,x=APC.x+Math.sin(b)*TKY.fujiDist,z=APC.z-Math.cos(b)*TKY.fujiDist,V=(r,y)=>new THREE.Vector2(r,y);
+    const lo=new THREE.LatheGeometry([V(0,-400),V(13000,-400),V(12000,0),V(8200,500),V(5600,1100),V(3700,2100)],24),
+      cap=new THREE.LatheGeometry([V(3700,2100),V(2200,2550),V(900,2900),V(350,3000),V(0,2985)],24);
+    const mL=new THREE.MeshBasicMaterial({color:0x5f6f86,fog:false,side:THREE.DoubleSide}),mC=new THREE.MeshBasicMaterial({color:0xf2f5fa,fog:false,side:THREE.DoubleSide});
+    const F=new THREE.Group();F.add(new THREE.Mesh(lo,mL),new THREE.Mesh(cap,mC));F.position.set(x,0,z);add(F,'fuji');TKY.fuji={x:x,z:z,mL:mL,mC:mC};}
+  // ---- the @OhRabah board, facing the approach to 34R ----
+  TKY.bbo=buildCityBillboard(TKY.bb.x,TKY.bb.z,((RH*180/Math.PI+180)%360+360)%360,'Tokyo',L);
+  L.build();L.pts.visible=TOD.lights>0;TKY.L=L;
+  for(const k in TKY.parts)TKY.tris[k]=tkTris(TKY.parts[k]);TKY.tris.city_billboard=tkTris(TKY.bbo.g);
+  TKY.built=true;TOD_HOOKS.push(tkTOD);tkTOD();
+}
+const _tkC=new THREE.Color(),_tkH=new THREE.Color();
+function tkTOD(){
+  if(!TKY.built)return;const n=!!TOD.night;
+  for(const o of TKY.night)for(const m of o.ms)m.material=n?o.night:o.day;
+  if(TKY.parts.tokyo_neon)TKY.parts.tokyo_neon.visible=n;
+  const F=TKY.fuji;if(F){_tkH.setHex(TOD.haze);const k=n?0.25:1,w=n?0.25:TOD.id==='day'?0.38:0.45;
+    F.mL.color.copy(_tkC.setHex(0x5f6f86).multiplyScalar(k).lerp(_tkH,w));F.mC.color.copy(_tkC.setHex(0xf2f5fa).multiplyScalar(n?0.32:1).lerp(_tkH,w*0.8));}
 }
 // the parks onto the terrain grid (green in terrainColor)
 function worldParks(d){
@@ -12859,7 +13114,7 @@ window.__kgeu.TCAS={levels:tcasLevels,state:()=>({ta:TCAS.list.some(o=>tcasLvl(o
 window.__kgeu.tcasConflict=tcasConflict;window.__kgeu.tcasVoiceLog=TCAS.voiceLog;
 window.__kgeu.LB=LB;try{LB.boot();}catch(e){console.warn('leaderboards',e);}
 // world regions (4.6a)
-Object.assign(window.__kgeu,{flySub:flySub,CHAT_R:CHAT_R,APTS:APTS,PLACES:PLACES,TERRAIN:TERRAIN,LANDMARKS:LANDMARKS,locShow:locShow,REGION:REGION,REGIONS:REGIONS,WORLD:WORLD,pickRegion:pickRegion,isWater:isWater,TERR:TERR,RUNWAYS:RUNWAYS,WB:WB,AL:AL,OBST:OBST,
+Object.assign(window.__kgeu,{flySub:flySub,CHAT_R:CHAT_R,APTS:APTS,PLACES:PLACES,TERRAIN:TERRAIN,LANDMARKS:LANDMARKS,locShow:locShow,REGION:REGION,REGIONS:REGIONS,WORLD:WORLD,pickRegion:pickRegion,isWater:isWater,TERR:TERR,RUNWAYS:RUNWAYS,WB:WB,AL:AL,OBST:OBST,TKY:TKY,CITYBB:CITYBB,buildCityBillboard:buildCityBillboard,
   wframe:()=>({rh:RH,len:RWY_LEN,thr01:THR01,thr19:THR19,woff:WOFF.slice(),fieldFt:FIELD_FT,home:HOME_RWY,base0:BASE0}),
   tris:()=>renderer.info.render.triangles,rinfo:()=>({tri:renderer.info.render.triangles,calls:renderer.info.render.calls,geo:renderer.info.memory.geometries,tex:renderer.info.memory.textures})});
 worldLoad();
