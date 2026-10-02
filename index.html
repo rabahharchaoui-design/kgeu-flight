@@ -1381,7 +1381,7 @@ function airportZoneDist(x,z){if(!REGION.az)return terrZoneD(x,z);const u=toU(x,
 // 400 m; sea cells at 0 (the water plane) and, by the sea, land never under it. Paris rivers keep their
 // height. groundHeight is bilinear between cell centres; isWater is the nearest cell of the water mask.
 // Until the data is in, the ground is flat at 0 and nothing is water (FLY waits for WORLD.ready).
-const TERR={ready:false,W:0,H:0,c:200,ox:0,oz:0,h:null,wat:null,fw:null,segs:[],aero:[],pv:null,tw:[],ap:[]};
+const TERR={ready:false,W:0,H:0,c:200,ox:0,oz:0,h:null,wat:null,fw:null,segs:[],aero:[],pv:null,tw:[],ap:[],bumps:[]};
 function pipXZ(P,x,z){let c=false;for(let i=0,j=P.length-1;i<P.length;j=i++){const a=P[i],b=P[j];
   if((a[1]>z)!==(b[1]>z)&&x<(b[0]-a[0])*(z-a[1])/(b[1]-a[1])+a[0])c=!c;}return c;}
 function segD(x,z,ax,az,bx,bz){const ex=bx-ax,ez=bz-az,L=ex*ex+ez*ez,t=L>0?clamp(((x-ax)*ex+(z-az)*ez)/L,0,1):0;return Math.hypot(x-ax-ex*t,z-az-ez*t);}
@@ -1419,13 +1419,26 @@ function terrSet(d,hAbs,wat){
     TERR.ap.push({P:P,b:[bx0,bz0,bx1,bz1]});put(bx0,bz0,bx1,bz1,-1-n);}
   TERR.pv=pv;TERR.ready=true;
 }
-function terrH(x,z){
+function terrH(x,z,noBump){
   const T=TERR;if(!T.ready)return 0;
   const gx=clamp((x-T.ox)/T.c-0.5,0,T.W-1.0001),gz=clamp((z-T.oz)/T.c-0.5,0,T.H-1.0001),i=gx|0,j=gz|0,fx=gx-i,fz=gz-j,k=j*T.W+i,h=T.h;
-  return (h[k]*(1-fx)+h[k+1]*fx)*(1-fz)+(h[k+T.W]*(1-fx)+h[k+T.W+1]*fx)*fz;
+  let v=(h[k]*(1-fx)+h[k+1]*fx)*(1-fz)+(h[k+T.W]*(1-fx)+h[k+T.W+1]*fx)*fz;
+  if(!noBump)for(const b of T.bumps){const dx=x-b.x,dz=z-b.z;if(dx>b.r||dx<-b.r||dz>b.r||dz<-b.r)continue;const d=Math.hypot(dx,dz);if(d>=b.r)continue;
+    // a smooth max of the ground and the bump (up to 40 m of blend, none at its rim), so a shoulder already higher is kept
+    const t=b.h*Math.pow(0.5+0.5*Math.cos(Math.PI*d/b.r),b.p),k=Math.min(40,t*0.5)+1e-6,q=Math.max(k-Math.abs(t-v),0)/k;v=Math.max(v,t)+q*q*k*0.25;}
+  return v;
 }
+// TERR.bump(x,z,radius,height,p): a mountain the grid flattened (its 120 to 200 m cells cut the peaks), a
+// raised cosine of the given radius reaching height (metres in the frame: over the home runway) at x,z, the
+// ground lifted to it where lower (a smooth max, so the grid's own shoulders stay). p (default 1): the
+// profile to that power, under 1 a rounder dome with steeper sides. Set before the terrain mesh is built.
+// rock: the top bare granite in terrainColor. Never water under a bump. The terrain mesh leaves the bumps out
+// (meshGH): its vertices, 250 to 400 m apart, would tent them into the bay; each bump has a mesh cap of its own.
+TERR.bump=(x,z,r,h,p,rock)=>{TERR.bumps.push({x:x,z:z,r:r,h:h,p:p||1,rock:!!rock});};
+function meshGH(x,z){return REGION.az||!TERR.bumps.length?groundHeight(x,z):terrH(x,z,true);}
 function isWater(x,z){
   const T=TERR;if(REGION.az||!T.ready)return false;
+  for(const b of T.bumps)if(Math.abs(x-b.x)<b.r*0.8&&Math.abs(z-b.z)<b.r*0.8&&Math.hypot(x-b.x,z-b.z)<b.r*0.8)return false;
   const i=clamp(Math.floor((x-T.ox)/T.c),0,T.W-1),j=clamp(Math.floor((z-T.oz)/T.c),0,T.H-1);
   if(T.wat[j*T.W+i]===1)return true;
   // a finer mask where the grid's cells are wider than the river (the Seine through Paris, 25 m cells)
@@ -4861,8 +4874,8 @@ const terrain=new THREE.Mesh(tGeo,new THREE.MeshLambertMaterial({vertexColors:tr
 const T_STEP=T_SIZE/T_SEG;
 function terrainMeshH(x,z,cache){
   const gx=x/T_STEP,gz=z/T_STEP,i=Math.floor(gx),k=Math.floor(gz),fx=gx-i,fz=gz-k;
-  const H=(a,b)=>{if(!cache)return groundHeight(a*T_STEP,b*T_STEP);const key=a*100003+b;let v=cache.get(key);
-    if(v===undefined){v=groundHeight(a*T_STEP,b*T_STEP);cache.set(key,v);}return v;};
+  const H=(a,b)=>{if(!cache)return meshGH(a*T_STEP,b*T_STEP);const key=a*100003+b;let v=cache.get(key);
+    if(v===undefined){v=meshGH(a*T_STEP,b*T_STEP);cache.set(key,v);}return v;};
   const h00=H(i,k),h01=H(i,k+1),h10=H(i+1,k);
   if(fx+fz<=1)return h00+(h10-h00)*fx+(h01-h00)*fz;
   const h11=H(i+1,k+1);return h11+(h01-h11)*(1-fx)+(h10-h11)*(1-fz);
@@ -4897,9 +4910,13 @@ function terrColorW(h,x,z){
   const m=smooth(0.35,0.65,vnoise(x/1100+3,z/1100-7));
   _c.setRGB(lerp(P.lo[0],P.lo2[0],m)+n*0.05,lerp(P.lo[1],P.lo2[1],m)+n*0.04,lerp(P.lo[2],P.lo2[2],m)+n*0.03);
   if(h>30)_c.lerp(_c2.setRGB(P.hill[0],P.hill[1],P.hill[2]),smooth(30,P.hillH,h));
-  if(h>300)_c.lerp(_c2.setRGB(0.50+n*0.04,0.49+n*0.04,0.47+n*0.03),smooth(300,520,h));
+  if(h>300&&REGION.id!=='sbrj')_c.lerp(_c2.setRGB(0.50+n*0.04,0.49+n*0.04,0.47+n*0.03),smooth(300,520,h));
   const u=urbAt(x,z);if(u>15)_c.lerp(_c2.setRGB(P.city[0],P.city[1],P.city[2]),smooth(15,150,u)*0.85);
   if(parkAt(x,z))_c.lerp(_c2.setRGB(0.27,0.42,0.22),0.7);
+  // Rio (4.4): bare grey brown granite on the steep faces and over the top of Sugarloaf (a rock bump); the rest the forest green
+  if(REGION.id==='sbrj'&&h>25){const e=30,sl=Math.hypot(terrH(x+e,z)-terrH(x-e,z),terrH(x,z+e)-terrH(x,z-e))/(2*e);let k=smooth(0.75,1.15,sl);
+    for(const b of TERR.bumps)if(b.rock){const d=Math.hypot(x-b.x,z-b.z);if(d<b.r)k=Math.max(k,smooth(b.r*0.95,b.r*0.55,d));}
+    if(k>0)_c.lerp(_c2.setRGB(0.50+n*0.05,0.46+n*0.04,0.41+n*0.03),k);}
   const B=TERR.aeroB;if(B&&x>B[0]&&x<B[2]&&z>B[1]&&z<B[3]&&pipXZ(TERR.aero,x,z))_c.lerp(_c2.setRGB(0.50,0.55,0.40),0.5);
   return _c;
 }
@@ -4924,7 +4941,7 @@ function rebuildTerrain(x,z){
   const cx=Math.round(x/4000)*4000,cz=Math.round(z/4000)*4000;
   if(cx===tcx&&cz===tcz) return; tcx=cx;tcz=cz;
   const W=!REGION.az&&TERR.ready;
-  for(let i=0;i<tPos.count;i++){const wx=tBase[i*2]+cx,wz=tBase[i*2+1]+cz,h=groundHeight(wx,wz);tPos.setY(i,W&&isWater(wx,wz)?h-1.5:h);const c=terrainColor(h,wx,wz);tCol[i*3]=c.r;tCol[i*3+1]=c.g;tCol[i*3+2]=c.b;}
+  for(let i=0;i<tPos.count;i++){const wx=tBase[i*2]+cx,wz=tBase[i*2+1]+cz,h=meshGH(wx,wz);tPos.setY(i,W&&isWater(wx,wz)?h-1.5:h);const c=terrainColor(h,wx,wz);tCol[i*3]=c.r;tCol[i*3+1]=c.g;tCol[i*3+2]=c.b;}
   tPos.needsUpdate=true;tGeo.attributes.color.needsUpdate=true;tGeo.computeVertexNormals();tGeo.computeBoundingSphere();terrain.position.set(cx,0,cz);
   if(waterPlane)waterPlane.position.set(cx,-0.4,cz);
 }
@@ -7145,6 +7162,7 @@ function wbTermMat(){
   const m=new THREE.MeshLambertMaterial({map:d,emissive:0xffffff,emissiveMap:n,emissiveIntensity:0,side:THREE.DoubleSide});
   const f=()=>{m.emissiveIntensity=TOD.night?0.9:TOD.lights*0.5;};TOD_HOOKS.push(f);f();return m;}
 function buildWorld(d){
+  if(REGION.id==='sbrj')rioPrep(d);
   const t0=performance.now(),mv=p=>[p[0]-WOFF[0],p[1]-WOFF[1]],gh=(x,z)=>groundHeight(x,z);
   const terms=(d.terminals||[]).map(P=>P.map(mv)),hangs=(d.hangars||[]).map(P=>P.map(mv)),aprons=(d.aprons||[]).map(P=>P.map(mv));
   const L=makeLightLayer(REGION.icao);AL[REGION.icao]=L;
@@ -7272,6 +7290,7 @@ function buildWorld(d){
   buildWorldCity(d);
   if(REGION.id==='rjtt')buildTokyo(d);
   if(REGION.id==='lfpg')buildParis(d);
+  if(REGION.id==='sbrj')buildRio(d);
   WB.ms=Math.round(performance.now()-t0);
 }
 // ---- the city: instanced boxes from the urban density grid; motorways, trunk and primary roads; long bridges ----
@@ -7282,7 +7301,7 @@ const W_CITY=[['#c9ccd0','#a9adb3','#8e9399','#e8e9ea','#b5b8bc','#7d8288','#f2f
 // floors of 4 m. The day map only shades the glass a little (the instance colour carries the city); the
 // night map is the emissive one: dark, about half the windows lit warm or cool. One corner
 // (the top left) is plain wall, white by day, black at night: the roofs sample it.
-const W_CITY_WIN={rjtt:1,lfpg:1};
+const W_CITY_WIN={rjtt:1,lfpg:1,sbrj:1};
 // the windows' uv on a box from its instance scale, so they keep their 4 m size on every box; roofs on the plain corner
 const CITY_WIN_UV=`#include <uv_vertex>
 #ifdef USE_UV
@@ -7349,8 +7368,8 @@ function buildWorldCity(d){
   }
   // roads: ribbons on the terrain mesh (sampled every 250 m), 0.3 m up, never under the water plane
   const cache=new Map(),yAt=(x,z)=>{let y=terrainMeshH(x,z,cache)+0.3;if(REGION.sea)y=Math.max(y,0.4);return y;};
-  function ribbon(G,P,w,yf){
-    const S=[];for(let k=0;k+1<P.length;k++){const a=P[k],b=P[k+1],l=Math.hypot(b[0]-a[0],b[1]-a[1]),n=Math.max(1,Math.ceil(l/250));
+  function ribbon(G,P,w,yf,step){
+    const S=[];for(let k=0;k+1<P.length;k++){const a=P[k],b=P[k+1],l=Math.hypot(b[0]-a[0],b[1]-a[1]),n=Math.max(1,Math.ceil(l/(step||250)));
       for(let i=0;i<n;i++)S.push([a[0]+(b[0]-a[0])*i/n,a[1]+(b[1]-a[1])*i/n]);}
     S.push(P[P.length-1]);if(S.length<2)return;
     let prev=null;const tot=S.length;
@@ -7369,14 +7388,18 @@ function buildWorldCity(d){
     if(len<400)continue;const ramp=Math.min(300,len*0.25);let s=0;
     const dist=[0];for(let k=0;k+1<P.length;k++)dist.push(dist[k]+Math.hypot(P[k+1][0]-P[k][0],P[k+1][1]-P[k][1]));
     // the deck height along the bridge from the arc length, sampled on the ribbon's own points
-    const hAt=(x,z,i,tot)=>{const t=i/(tot-1)*len,k=Math.min(t,len-t);return Math.max(yAt(x,z),REGION.sea?0.4:-1e9)+2+28*smooth(0,ramp,k);};
-    ribbon(bG,P,20,hAt);
+    // Rio (4.4): the Rio-Niteroi bridge's raised navigation span (RIO.hump), sampled every 50 m, its deck points kept for the night lights
+    const rio=REGION.id==='sbrj'&&RIO.hc,rn=rio&&P.some((p,k)=>k+1<P.length&&segD(RIO.hc[0],RIO.hc[1],p[0],p[1],P[k+1][0],P[k+1][1])<800),nit=rio&&/Niter/.test(b.name||'');
+    const hm=(x,z)=>rn?rioHump(x,z):0;
+    const hAt=(x,z,i,tot)=>{const t=i/(tot-1)*len,k=Math.min(t,len-t),y=Math.max(yAt(x,z),REGION.sea?0.4:-1e9)+2+28*smooth(0,ramp,k)+hm(x,z);
+      if(nit)RIO.deck.push([x,y,z]);return y;};
+    ribbon(bG,P,20,hAt,rn?50:250);
     for(let k=0;k+1<P.length;k++){const a=P[k],bb=P[k+1],l=Math.hypot(bb[0]-a[0],bb[1]-a[1]);
-      for(let t=(150-s%150)%150;t<l&&piers.length<300;t+=150){const tt=dist[k]+t;if(tt<ramp||tt>len-ramp)continue;const x=a[0]+(bb[0]-a[0])*t/l,z=a[1]+(bb[1]-a[1])*t/l;piers.push([x,z,yAt(x,z)-1]);}
+      for(let t=(150-s%150)%150;t<l&&piers.length<300;t+=150){const tt=dist[k]+t;if(tt<ramp||tt>len-ramp)continue;const x=a[0]+(bb[0]-a[0])*t/l,z=a[1]+(bb[1]-a[1])*t/l;piers.push([x,z,yAt(x,z)-1,hm(x,z)]);}
       s+=l;}}
   wbMesh(mG,lam(0x3b3d40),'roads',true);wbMesh(pG,lam(0x4a4c4f),'roadsPrimary',true);wbMesh(bG,new THREE.MeshLambertMaterial({color:0x8d9095,side:THREE.DoubleSide}),'bridges',true);
   if(piers.length){const im=new THREE.InstancedMesh(new THREE.BoxGeometry(5,1,5).translate(0,0.5,0),lam(0x9a9ca0),piers.length),M=new THREE.Matrix4(),Q=new Q4(),S=new V3(),Pp=new V3();
-    piers.forEach((p,i)=>{S.set(1,32,1);Pp.set(p[0],p[2],p[1]);M.compose(Pp,Q,S);im.setMatrixAt(i,M);});im.name='bridgePiers';scene.add(im);WB.tris.piers=piers.length*12;}
+    piers.forEach((p,i)=>{S.set(1,32+(p[3]||0),1);Pp.set(p[0],p[2],p[1]);M.compose(Pp,Q,S);im.setMatrixAt(i,M);});im.name='bridgePiers';scene.add(im);WB.tris.piers=piers.length*12;}
 }
 // a region's street lights: points over the urban grid (cells of density 60 and up, density weighted, about
 // n of them), never on the water or the field; col(r) the colour for a random r in [0,1)
@@ -7742,6 +7765,220 @@ function parisTick(force){
   _pH.setHex(TOD.haze);const cp=camera.position;
   for(const o of PARIS.wash){const dd=Math.hypot(cp.x-o.p[0],cp.z-o.p[1]),w=(TOD.night?0.15:TOD.id==='day'?0.35:0.4)*smooth(2500,30000,dd);
     o.m.userData.wash.value.set(_pH.r,_pH.g,_pH.b,w);}
+}
+// ---------- Rio (4.4): the mountains at their real height, Sugarloaf and its cable car, Christ, Copacabana, night, billboard ----------
+// rioPrep runs in buildWorld before the airport and the city: the Copacabana bay put back into the water mask
+// (the data's coast misses the crescent: its ocean starts 1 km out), the mountains the 120 m grid flattened
+// raised with TERR.bump (Sugarloaf 396 m, a steep bald granite dome; Morro da Urca 220; Corcovado 710; the
+// Dois Irmaos ridge to 500 only where the grid has it under 300), the Centro towers (none within 1 km of
+// the 20L centre line), the @OhRabah board on the Centro waterfront right of the 20L final, and the spots
+// kept free of city boxes. buildRio, after the city: a mesh cap over each raised mountain (the terrain mesh,
+// 250 to 400 m between its vertices, would cut a 350 m dome to a stub), the cable car (Praia Vermelha,
+// Urca, Sugarloaf; one cabin per span gliding back and forth in rioTick), Christ the Redeemer on Corcovado
+// (38 m, floodlit white and drawn without fog at night), Copacabana (sand, the wave line, the black and
+// white promenade, Avenida Atlantica, a row of hotels), the Centro towers and the Museum of Tomorrow, three
+// favela clusters on the hills, boats at anchor and two ferries crossing to Niteroi, the bridge's lights.
+// Everything named; RIO.tris has the triangles per part for the tests.
+const RIO={tris:{},parts:{},night:[],lm:{},n:{},deck:[],hc:null,t:0,built:false,cabins:[],ferries:[],towers:[],arc:null,bb:null,cv:null,dois:false};
+// the Rio-Niteroi bridge's navigation span: 42 m over the 30 m deck (72 m clear) along its middle 300 m, sloping off over 450 m
+function rioHump(x,z){const c=RIO.hc;return c?42*smooth(600,150,Math.hypot(x-c[0],z-c[1])):0;}
+// Copacabana's waterline (ARP frame): Leme, the middle of the beach, Posto 6 by the fort
+const RIO_ARC=[[-560,5820],[-1960,6705],[-2560,8240]];
+// the open sea in front of it, seaward of the arc, to where the data's ocean begins (ARP frame)
+const RIO_SEA=[[-2300,8800],[1700,8800],[1700,6050],[300,6050],[-350,5900]];
+// favela clusters (ARP frame): Santa Teresa above Centro, Cantagalo and Babilonia above Copacabana
+const RIO_FAV=[[-2600,1900],[-3420,7620],[-660,5250]];
+function rioPrep(d){
+  const lm=RIO.lm,mv=p=>[p[0]-WOFF[0],p[1]-WOFF[1]],T=TERR,E=REGION.elev;for(const l of d.landmarks||[])lm[l.id]=mv([l.x,l.z]);
+  const pk={};for(const p of d.peaks||[])pk[p.name]=mv([p.x,p.z]);
+  if(lm.niteroi_bridge)RIO.hc=lm.niteroi_bridge;
+  // ---- the beach line: a circular arc through the three points, sampled every 25 m, inland normals ----
+  {const [A,B,C]=RIO_ARC.map(mv),ax=B[0]-A[0],az=B[1]-A[1],bx=C[0]-A[0],bz=C[1]-A[1],D=2*(ax*bz-az*bx);
+    const ux=(bz*(ax*ax+az*az)-az*(bx*bx+bz*bz))/D,uz=(ax*(bx*bx+bz*bz)-bx*(ax*ax+az*az))/D,cx=A[0]+ux,cz=A[1]+uz,R=Math.hypot(ux,uz);
+    let a0=Math.atan2(A[1]-cz,A[0]-cx),a1=Math.atan2(C[1]-cz,C[0]-cx),am=Math.atan2(B[1]-cz,B[0]-cx);
+    // the way round from A to C that passes B
+    const wrap=a=>{while(a<a0)a+=Math.PI*2;return a;};a1=wrap(a1);am=wrap(am);if(am>a1)a1-=Math.PI*2;
+    const L=Math.abs(a1-a0)*R,N=Math.ceil(L/25),pts=[];
+    for(let i=0;i<=N;i++){const a=a0+(a1-a0)*i/N,nx=Math.cos(a),nz=Math.sin(a),sg=Math.sign(a1-a0);
+      pts.push({x:cx+nx*R,z:cz+nz*R,nx:nx,nz:nz,tx:-nz*sg,tz:nx*sg,s:L*i/N});}
+    RIO.arc={pts:pts,len:L,c:[cx,cz],R:R};
+    // the bay in front of it into the water mask (water cells at 0, like the rest of the sea)
+    const P=pts.map(p=>[p.x,p.z]).concat(RIO_SEA.map(mv));
+    let b=[1e9,1e9,-1e9,-1e9];for(const p of P){b=[Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])];}
+    let n=0;for(let j=Math.max(0,Math.floor((b[1]-T.oz)/T.c));j<=Math.min(T.H-1,Math.floor((b[3]-T.oz)/T.c));j++)
+      for(let i=Math.max(0,Math.floor((b[0]-T.ox)/T.c));i<=Math.min(T.W-1,Math.floor((b[2]-T.ox)/T.c));i++){
+        const k=j*T.W+i;if(T.wat[k])continue;if(pipXZ(P,T.ox+(i+0.5)*T.c,T.oz+(j+0.5)*T.c)){T.wat[k]=1;T.h[k]=0;n++;}}
+    RIO.n.seaCells=n;}
+  // ---- the mountains ----
+  const bump=(name,x,z,r,h,p,rock)=>{TERR.bump(x,z,r,h,p,rock);TERR.bumps[TERR.bumps.length-1].name=name;};
+  if(lm.sugarloaf)bump('sugarloaf',lm.sugarloaf[0],lm.sugarloaf[1],350,396-E,0.6,true);
+  if(lm.urca)bump('morro_da_urca',lm.urca[0],lm.urca[1],300,220-E,0.8);
+  const cv=pk.Corcovado||lm.cristo;if(cv){RIO.cv=cv;bump('corcovado',cv[0],cv[1],700,710-E,0.9);}
+  // Dois Irmaos behind Ipanema and Leblon (the twin peaks, ARP frame), lifted to 500 m only if the grid has them under 300
+  {const D2=[[-8170,8526],[-7880,8380]].map(mv);let top=-1e9;
+    for(const p of D2)for(let r=0;r<=480;r+=120)for(let a=0;a<6.28;a+=0.79)top=Math.max(top,terrH(p[0]+Math.cos(a)*r,p[1]+Math.sin(a)*r));
+    RIO.doisTop=Math.round(top+E);if(top+E<300){D2.forEach((p,i)=>bump('dois_irmaos_'+i,p[0],p[1],1200,500-E));RIO.dois=true;}}
+  // ---- the board: Centro waterfront by Praca Maua, right of the 20L final, inside 1 nm of the threshold and 35 degrees ----
+  // dry for 320 m round (the terrain mesh, 400 m between its vertices on a phone, shows the bay that far
+  // inland of the water cells' edge), the spot nearest 1,200 m out and 700 m right
+  {let best=1e9;for(let u=-500;u>=-1800;u-=50)for(let v=200;v<=1200;v+=50){
+    if(Math.hypot(u,v)>1800||Math.atan2(v,-u)>33*Math.PI/180)continue;const sc=Math.hypot(u+1200,v-700);if(sc>=best)continue;
+    const x=wX(THR01+u,v),z=wZ(THR01+u,v);if(groundHeight(x,z)<0.2||(TERR.aero.length&&pipXZ(TERR.aero,x,z))||isWater(x,z))continue;
+    let wet=false;for(let r=80;r<=320&&!wet;r+=80)for(let a=0;a<8&&!wet;a++)wet=isWater(x+Math.cos(a*0.785)*r,z+Math.sin(a*0.785)*r);
+    if(wet)continue;best=sc;RIO.bb={x:x,z:z,u:u,v:v};}}
+  if(!RIO.bb)RIO.bb={x:wX(THR01-900,480),z:wZ(THR01-900,480),u:-900,v:480};
+  // ---- the Centro towers, north west of the field: 80 to 150 m, never within 1 km of the 20L centre line nor on the field ----
+  const ctr=[-1750,-650],mus=lm.museu||mv([-1700,-1769]);RIO.mus=mus;
+  for(let q=0;q<900&&RIO.towers.length<22;q++){const a=hash(q,401)*Math.PI*2,r=520*Math.sqrt(hash(q,402)),x=ctr[0]+Math.cos(a)*r,z=ctr[1]+Math.sin(a)*r;
+    if(Math.abs(toV(x,z))<1080||terrZoneD(x,z)<300||Math.hypot(x-mus[0],z-mus[1])<200||Math.hypot(x-RIO.bb.x,z-RIO.bb.z)<150)continue;
+    if([[0,0],[40,0],[-40,0],[0,40],[0,-40]].some(o=>isWater(x+o[0],z+o[1]))||RIO.towers.some(t=>Math.hypot(t.x-x,t.z-z)<75))continue;
+    RIO.towers.push({x:x,z:z,w:28+hash(q,403)*18,d:26+hash(q,404)*16,h:80+hash(q,405)*70,a:hash(q,406)*0.4});}
+  // ---- the spots kept free of city boxes ----
+  const cl=[[RIO.bb.x,RIO.bb.z,90],[mus[0],mus[1],200]];
+  for(const t of RIO.towers)cl.push([t.x,t.z,Math.max(t.w,t.d)*0.7+20]);
+  for(const p of RIO.arc.pts)if(Math.round(p.s)%75<25)cl.push([p.x+p.nx*125,p.z+p.nz*125,160]);
+  for(const f of RIO_FAV.map(mv))cl.push([f[0],f[1],420]);
+  for(const b of TERR.bumps)cl.push([b.x,b.z,Math.min(b.r*1.05,500)]);
+  if(lm.cable_base)cl.push([lm.cable_base[0],lm.cable_base[1],70]);
+  WORLD.clear=cl;
+}
+// a mesh cap over a raised mountain: a polar grid on groundHeight, coloured like the terrain, the rim sunk under the terrain mesh
+function rioCap(b,name){
+  const NR=16,NS=40,RR=b.r*1.15,V=[];
+  for(let i=0;i<=NR;i++){const r=RR*i/NR,row=[];
+    for(let k=0;k<(i?NS:1);k++){const a=k/NS*Math.PI*2,x=b.x+Math.cos(a)*r,z=b.z+Math.sin(a)*r,h=groundHeight(x,z),c=terrainColor(h,x,z);
+      row.push([x,h-6*smooth(b.r*0.85,RR,r),z,[c.r,c.g,c.b]]);}V.push(row);}
+  // indexed, so the normals are smooth over the dome
+  const pos=[],col=[],idx=[],id=[];V.forEach(row=>{const r=[];for(const v of row){r.push(pos.length/3);pos.push(v[0],v[1],v[2]);col.push(...v[3]);}id.push(r);});
+  for(let k=0;k<NS;k++)idx.push(id[0][0],id[1][(k+1)%NS],id[1][k]);
+  for(let i=1;i<NR;i++)for(let k=0;k<NS;k++){const a=id[i][k],bq=id[i][(k+1)%NS],c=id[i+1][(k+1)%NS],dd=id[i+1][k];idx.push(a,bq,c,a,c,dd);}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  g.setIndex(idx);g.computeVertexNormals();g.computeBoundingSphere();const m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({vertexColors:true}));m.name=name;m.userData.heat=0.2;return m;}
+function buildRio(d){
+  const lm=RIO.lm,gh=(x,z)=>groundHeight(x,z),L=makeLightLayer('RIO'),add=(o,name)=>{o.name=name;scene.add(o);RIO.parts[name]=o;return o;};
+  const night=(ms,day,nm)=>RIO.night.push({ms:ms,day:day,night:nm}),mv=p=>[p[0]-WOFF[0],p[1]-WOFF[1]];
+  // ---- the mountain caps ----
+  for(const b of TERR.bumps)add(rioCap(b,b.name+'_cap'),b.name);
+  // ---- the cable car: stations at Praia Vermelha, on Urca and on Sugarloaf, two cables a span, a cabin on each ----
+  if(lm.cable_base&&lm.urca&&lm.sugarloaf){const C=new THREE.Group(),G=wbGeo(),ST=tkRGB(0xd8d4cc),CB=tkRGB(0x2b2e33),S=[lm.cable_base,lm.urca,lm.sugarloaf];
+    const top=S.map((p,i)=>{const y=gh(p[0],p[1]),w=i?16:14;tkAdd(G,new THREE.BoxGeometry(w,9,12),ST,p[0],y+3.5,p[1]);tkAdd(G,new THREE.BoxGeometry(w+2,1,14),CB,p[0],y+8.5,p[1]);
+      L.addLight(p[0],y+10,p[1],0xfff0d2,0,0,false);OBST.push({kind:'circ',x:p[0],z:p[1],r:9,h:y+9,name:'the cable car station'});return y+7;});
+    for(let s=0;s<2;s++){const a=S[s],b=S[s+1],ex=b[0]-a[0],ez=b[1]-a[1],l=Math.hypot(ex,ez),px=-ez/l*2.2,pz=ex/l*2.2,sag=l*0.03;
+      const A=new V3(a[0],top[s],a[1]),B=new V3(b[0],top[s+1],b[1]),M=A.clone().add(B).multiplyScalar(0.5);M.y-=2*sag;
+      const cur=new THREE.QuadraticBezierCurve3(A,M,B);
+      for(const sg of [-1,1]){const o=new V3(px*sg,0,pz*sg);tkAdd(G,new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(A.clone().add(o),M.clone().add(o),B.clone().add(o)),20,0.35,4,false),CB);}
+      const cab=new THREE.Group(),cg=wbGeo();tkAdd(cg,new THREE.BoxGeometry(4,3,4),tkRGB(0x9cc4d6),0,-4.5,0);tkAdd(cg,new THREE.BoxGeometry(4.3,0.5,4.3),tkRGB(0xd23a2a),0,-2.8,0);
+      tkAdd(cg,new THREE.BoxGeometry(0.3,2.6,0.3),CB,0,-1.3,0);cab.add(tkMesh(cg,tkMat(),'cable_cabin_mesh'));cab.rotation.y=Math.atan2(ex,ez);cab.name='cable_cabin';C.add(cab);
+      RIO.cabins.push({g:cab,c:cur,ph:s?0.62:0.27,per:300});}
+    C.add(tkMesh(G,tkMat(),'cable_lines'));add(C,'cable_car');rioTick(0);}
+  // ---- Christ the Redeemer: 30 m on an 8 m pedestal on the summit of Corcovado, arms out to 28 m, facing the field ----
+  if(RIO.cv){const [x,z]=RIO.cv,y0=gh(x,z),G=wbGeo(),SS=tkRGB(0xdcd6c6),PD=tkRGB(0xb9b3a6);
+    tkAdd(G,new THREE.BoxGeometry(9,10,9),PD,0,3,0);tkAdd(G,new THREE.BoxGeometry(7,6,8),PD,0,0,-9);
+    tkAdd(G,new THREE.CylinderGeometry(1.7,3.3,24,10),SS,0,20,0);tkAdd(G,new THREE.BoxGeometry(5,3,2.8),SS,0,30.5,0);
+    tkAdd(G,new THREE.BoxGeometry(28,2,2.2),SS,0,30.6,0);tkAdd(G,new THREE.CylinderGeometry(0.8,0.9,1.6,8),SS,0,32.8,0);
+    tkAdd(G,new THREE.SphereGeometry(1.9,10,8).scale(1,1.15,1),SS,0,35.8,0);
+    const day=tkMat(),nm=tkMat([0xf4f6ff,0.9,1]),me=tkMesh(G,day,'christ_mesh'),X=new THREE.Group();X.add(me);
+    X.position.set(x,y0,z);X.rotation.y=Math.atan2(-x,-z);add(X,'christ_redeemer');night([me],day,nm);RIO.christBase=y0;
+    for(const s of [[1,1],[-1,1],[-1,-1],[1,-1]])L.addLight(x+s[0]*6,y0+9,z+s[1]*6,0xffffff,0,0,false);L.addLight(x,y0+39,z,0xffffff,0,0,false);
+    OBST.push({kind:'circ',x:x,z:z,r:5,h:y0+38,name:'Christ the Redeemer'},{kind:'circ',x:x,z:z,r:14,lo:y0+29,h:y0+32,name:'Christ the Redeemer'});}
+  // ---- Copacabana: the sea in front, the wave line, the sand, the promenade, Avenida Atlantica, the hotels ----
+  if(RIO.arc){const P=RIO.arc.pts,cache=new Map(),base=(x,z)=>Math.max(terrainMeshH(x,z,cache),0);
+    const strip=(G,o0,o1,lift)=>{for(let i=0;i+1<P.length;i++){const a=P[i],b=P[i+1],q=(p,o)=>{const x=p.x+p.nx*o,z=p.z+p.nz*o;return [x,base(x,z)+lift,z];};
+      const A0=q(a,o0),A1=q(a,o1),B0=q(b,o0),B1=q(b,o1);wbTriUp(G,A0,B0,B1);wbTriUp(G,A0,B1,A1);}};
+    // the promenade keeps its uv with the winding (wbTriUp would swap vertices under it): u along the beach in 24 m tiles
+    const sea=wbGeo(),wave=wbGeo(),sand=wbGeo(),road=wbGeo(),pr=wbGeo();pr.uv=[];
+    strip(sea,-380,-8,0.3);strip(wave,-8,0,0.45);strip(sand,0,100,0.45);strip(road,112,140,0.45);
+    for(let i=0;i+1<P.length;i++){const a=P[i],b=P[i+1],q=(p,o)=>{const x=p.x+p.nx*o,z=p.z+p.nz*o;return [x,base(x,z)+0.45,z];};
+      const A0=q(a,100),A1=q(a,112),B0=q(b,100),B1=q(b,112),u0=a.s/24,u1=b.s/24,up=(B0[2]-A0[2])*(A1[0]-A0[0])-(B0[0]-A0[0])*(A1[2]-A0[2])>=0;
+      if(up){pr.p.push(...A0,...B0,...B1,...A0,...B1,...A1);pr.uv.push(u0,0,u1,0,u1,1,u0,0,u1,1,u0,1);}
+      else{pr.p.push(...A0,...B1,...B0,...A0,...A1,...B1);pr.uv.push(u0,0,u1,1,u1,0,u0,0,u0,1,u1,1);}}
+    const mk=(G,mat,name)=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(G.p,3));
+      if(G.uv&&G.uv.length)g.setAttribute('uv',new THREE.Float32BufferAttribute(G.uv,2));const n=new Float32Array(G.p.length);for(let i=1;i<n.length;i+=3)n[i]=1;
+      g.setAttribute('normal',new THREE.BufferAttribute(n,3));g.computeBoundingSphere();const m=new THREE.Mesh(g,mat);return add(m,name);};
+    const seaM=mk(sea,new THREE.MeshPhongMaterial({color:0x1d4a66,specular:0x8fa3b5,shininess:70}),'copacabana_sea');seaM.userData.heat=0.05;seaM.userData.irVar=0;
+    mk(wave,lam(0xf4f7f8),'copacabana_waves');mk(sand,lam(0xeadcb4),'copacabana_sand');mk(road,lam(0x3f4144),'avenida_atlantica');
+    const pt=tex(256,64,(x,w,h)=>{x.fillStyle='#1d1d1f';x.fillRect(0,0,w,h);x.fillStyle='#f1eee6';
+      for(let b=0;b<4;b++){x.beginPath();for(let i=0;i<=w;i+=4){const y=h*(b+0.5)/4+Math.sin(i/w*Math.PI*4)*h*0.09;i?x.lineTo(i,y-3):x.moveTo(i,y-3);}
+        for(let i=w;i>=0;i-=4){const y=h*(b+0.5)/4+Math.sin(i/w*Math.PI*4)*h*0.09;x.lineTo(i,y+3);}x.fill();}},[1,1]);
+    mk(pr,lam(0xffffff,{map:pt}),'copacabana_promenade');
+    // the hotels: white and cream boxes 30 to 90 m along the avenue, facing the sea, lit windows at night
+    const HC=['#f4f2ee','#efe6cf','#f7f4ea','#e9dfc4','#ffffff','#ece6d8'],H=[];
+    for(let s=50,q=0;s<RIO.arc.len-40;q++){const i=Math.min(P.length-1,Math.round(s/RIO.arc.len*(P.length-1))),p=P[i],w=26+hash(q,511)*18,dp=20+hash(q,512)*12,h=30+hash(q,513)*60;
+      const o=146+dp/2,x=p.x+p.nx*o,z=p.z+p.nz*o;s+=w+16+hash(q,514)*14;if(isWater(x,z))continue;H.push([x,z,w,dp,h,Math.atan2(-p.tz,p.tx)]);}
+    if(H.length){const im=new THREE.InstancedMesh(worldCityGeo(),worldCityMat(),H.length),M=new THREE.Matrix4(),Q=new Q4(),Sc=new V3(),Pp=new V3(),c=new THREE.Color();
+      H.forEach((b,i)=>{Q.setFromAxisAngle(_yUp,b[5]);Sc.set(b[2],b[4],b[3]);Pp.set(b[0],gh(b[0],b[1])-1,b[1]);M.compose(Pp,Q,Sc);im.setMatrixAt(i,M);im.setColorAt(i,c.set(HC[Math.floor(hash(i,515)*HC.length)]));});
+      im.userData.heat=0.5;add(im,'copacabana_hotels');RIO.n.hotels=H.length;RIO.hotels=H;}
+    // the avenue's lights along the promenade
+    for(let i=0;i<P.length;i+=2){const p=P[i],x=p.x+p.nx*106,z=p.z+p.nz*106;L.addLight(x,base(x,z)+8,z,0xffc27a,0,0,false);}}
+  // ---- Centro: the office towers (lit windows) and the Museum of Tomorrow on the Maua pier ----
+  if(RIO.towers.length){const GL=['#a9b6c2','#c9d0d6','#8fa1b2','#e4e6e8','#b4bec8','#9aa9b8','#d7dbde'],T=RIO.towers;
+    const im=new THREE.InstancedMesh(worldCityGeo(),worldCityMat(),T.length),M=new THREE.Matrix4(),Q=new Q4(),Sc=new V3(),Pp=new V3(),c=new THREE.Color();
+    T.forEach((t,i)=>{const y0=gh(t.x,t.z);Q.setFromAxisAngle(_yUp,t.a);Sc.set(t.w,t.h+1,t.d);Pp.set(t.x,y0-1,t.z);M.compose(Pp,Q,Sc);im.setMatrixAt(i,M);im.setColorAt(i,c.set(GL[Math.floor(hash(i,521)*GL.length)]));
+      if(t.h>=90)OBST.push({kind:'circ',x:t.x,z:t.z,r:Math.max(t.w,t.d)/2,h:y0+t.h,name:'a skyscraper'});});
+    im.userData.heat=0.55;add(im,'centro_towers');RIO.n.towers=T.length;}
+  {const [x,z]=RIO.mus,y0=gh(x,z),G=wbGeo(),WT=tkRGB(0xf3f3ef),GY=tkRGB(0xbfc3c6),hl=150,hw=22;
+    tkAdd(G,new THREE.BoxGeometry(250,10,36),GY,0,5,0);
+    // the long white wedge roof: a ridge from 9 m at the ends to 22 m, cantilevered past the body to a point at each end
+    const r=[[-hl,8,0],[-110,12,0],[0,22,0],[110,12,0],[hl,8,0]],e=(p,s)=>[p[0],p[1]-4-(Math.abs(p[0])>120?2:0),s*hw*(1-Math.pow(Math.abs(p[0])/hl,4))];
+    for(let i=0;i+1<r.length;i++)for(const s of [-1,1]){const a=r[i],b=r[i+1];wbQuad(G,a,b,e(b,s),e(a,s),WT);}
+    const day=tkMat(),nm=tkMat([0xe8f0ff,0.45,1]),me=tkMesh(G,day,'museum_of_tomorrow_mesh'),Mu=new THREE.Group();Mu.add(me);Mu.position.set(x,y0,z);Mu.rotation.y=-55*Math.PI/180;
+    add(Mu,'museum_of_tomorrow');night([me],day,nm);Mu.updateMatrixWorld(true);const p=new V3();
+    for(const u of [-90,0,90]){p.set(u,0,0).applyMatrix4(Mu.matrixWorld);OBST.push({kind:'circ',x:p.x,z:p.z,r:24,h:y0+20,name:'the Museum of Tomorrow'});}}
+  // ---- the favelas: 3 clusters of 150 small boxes on the slopes above 60 m, warm reds, oranges, pale blues; warm lights at night ----
+  {const FC=['#c8553d','#e07b39','#d9a35b','#e8c39e','#a9c6d8','#c96f53','#f0d8b8','#b84a32','#9fb8c8'],B=[];
+    RIO_FAV.map(mv).forEach((f,ci)=>{let n=0;for(let q=0;q<6000&&n<150;q++){const a=hash(q+ci*7000,601)*Math.PI*2,r=420*Math.sqrt(hash(q+ci*7000,602)),x=f[0]+Math.cos(a)*r,z=f[1]+Math.sin(a)*r;
+      const y=gh(x,z),lo=q<4000?60:35;if(y<lo||y>300||isWater(x,z))continue;
+      const sl=Math.hypot(gh(x+8,z)-gh(x-8,z),gh(x,z+8)-gh(x,z-8))/16;if(sl>1.1)continue;
+      const w=6+hash(q,603)*5,dp=6+hash(q,604)*5,h=6+hash(q,605)*4;B.push([x,y-sl*Math.max(w,dp)*0.5-0.5,z,w,h+sl*Math.max(w,dp)*0.5,dp,hash(q,606)*1.57]);n++;}
+      RIO.n['fav'+ci]=n;});
+    if(B.length){const g=new THREE.BoxGeometry(1,1,1).translate(0,0.5,0),im=new THREE.InstancedMesh(g,lam(0xffffff),B.length),M=new THREE.Matrix4(),Q=new Q4(),Sc=new V3(),Pp=new V3(),c=new THREE.Color();
+      B.forEach((b,i)=>{Q.setFromAxisAngle(_yUp,b[6]);Sc.set(b[3],b[4],b[5]);Pp.set(b[0],b[1],b[2]);M.compose(Pp,Q,Sc);im.setMatrixAt(i,M);im.setColorAt(i,c.set(FC[Math.floor(hash(i,607)*FC.length)]));
+        if(hash(i,608)<0.5)L.addLight(b[0],b[1]+b[4]+0.5,b[2],hash(i,609)<0.7?0xffb35c:0xfff0d2,0,0,false);});
+      im.userData.heat=0.45;add(im,'favelas');RIO.n.favelas=B.length;}}
+  // ---- Guanabara Bay: boats at anchor between the field and Niteroi (clear of the 20L final), two ferries Praca XV to Niteroi ----
+  {const wet=(x,z,m)=>isWater(x,z)&&isWater(x+m,z)&&isWater(x-m,z)&&isWater(x,z+m)&&isWater(x,z-m);
+    const hull=wbGeo(),WH=tkRGB(0xf6f6f2),BL=tkRGB(0x2c3e57),GL2=tkRGB(0x5d7385);
+    tkAdd(hull,new THREE.BoxGeometry(4,1.8,11),WH,0,0.6,0);tkAdd(hull,new THREE.BoxGeometry(2.8,1.8,2.8).rotateY(Math.PI/4),WH,0,0.6,5.5);
+    tkAdd(hull,new THREE.BoxGeometry(3,1.8,4),GL2,0,2.4,-1);tkAdd(hull,new THREE.BoxGeometry(4.1,0.3,11.1),BL,0,-0.2,0);
+    const bo=[];for(let q=0;q<4000&&bo.length<9;q++){const x=lerp(700,2600,hash(q,701)),z=lerp(-2600,500,hash(q,702));
+      if(Math.abs(toV(x,z))<700||!wet(x,z,60)||bo.some(b=>Math.hypot(b[0]-x,b[1]-z)<180))continue;bo.push([x,z,hash(q,703)*6.28]);}
+    if(bo.length){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(hull.p,3));g.setAttribute('color',new THREE.Float32BufferAttribute(hull.c,3));g.computeVertexNormals();
+      const im=new THREE.InstancedMesh(g,new THREE.MeshLambertMaterial({vertexColors:true}),bo.length),M=new THREE.Matrix4(),Q=new Q4(),Sc=new V3(1,1,1),Pp=new V3();
+      bo.forEach((b,i)=>{Q.setFromAxisAngle(_yUp,b[2]);Pp.set(b[0],0,b[1]);M.compose(Pp,Q,Sc);im.setMatrixAt(i,M);L.addLight(b[0],5,b[1],0xffffff,0,0,false);});
+      im.userData.heat=0.4;add(im,'bay_boats');RIO.n.boats=bo.length;}
+    // the ferry route: the water nearest Praca XV clear of the final, to the water nearest the Niteroi terminal, all of it water
+    const near=(p,ok)=>{let best=null;for(let r=0;r<3500&&!best;r+=40)for(let a=0;a<6.28&&!best;a+=0.2){const x=p[0]+Math.cos(a)*r,z=p[1]+Math.sin(a)*r;if(wet(x,z,40)&&ok(x,z))best=[x,z];}return best;};
+    const A=near(mv([-1116,-818]),(x,z)=>toU(x,z)<THR01-1300&&Math.abs(toV(x,z))<1500),B=near(mv([3981,-1857]),()=>true);
+    let ok=!!(A&&B);if(ok)for(let t=0;t<=1;t+=0.02)if(!isWater(lerp(A[0],B[0],t),lerp(A[1],B[1],t))){ok=false;break;}
+    RIO.ferryRoute=ok?[A,B]:null;
+    if(ok){const fg=wbGeo(),fc=wbGeo();tkAdd(fg,new THREE.BoxGeometry(10,3,40),WH,0,1,0);tkAdd(fg,new THREE.BoxGeometry(10.2,0.4,40.2),BL,0,-0.4,0);
+      tkAdd(fc,new THREE.BoxGeometry(8.5,4.5,30),tkRGB(0xe8ecee),0,4.75,0);tkAdd(fc,new THREE.BoxGeometry(8.6,1.2,30.1),GL2,0,5.2,0);tkAdd(fc,new THREE.BoxGeometry(5,2.5,8),WH,0,8.2,0);
+      const fd=tkMat(),fn=tkMat([0xffd9a0,0.5]),hd=tkMat(),FG=new THREE.Group();
+      for(let k=0;k<2;k++){const F=new THREE.Group(),mc=tkMesh(fc,fd,'ferry_cabin');F.add(tkMesh(fg,hd,'ferry_hull'),mc);F.name='ferry';night([mc],fd,fn);
+        RIO.ferries.push({g:F,a:A,b:B,ph:k?0.5:0.1,per:1000});FG.add(F);}
+      add(FG,'bay_ferries');rioTick(0);}}
+  // ---- the Rio-Niteroi bridge's lights, both edges, every 100 m along the deck ----
+  for(let i=0;i+1<RIO.deck.length;i+=2){const a=RIO.deck[i],b=RIO.deck[i+1],ex=b[0]-a[0],ez=b[2]-a[2],l=Math.hypot(ex,ez);if(l<1||l>400)continue;
+    for(const s of [-1,1])L.addLight(a[0]-ez/l*10*s,a[1]+1.5,a[2]+ex/l*10*s,0xffd49a,0,0,false);}
+  RIO.n.deckLights=RIO.deck.length;RIO.deckTop=RIO.deck.reduce((m,p)=>Math.max(m,p[1]),0);
+  // ---- the city's street lights, warm, and the board facing the approach to 20L ----
+  {const CL=worldStreetLights(d,'RIO_CITY',3000,r=>r<0.7?0xffb35c:r<0.93?0xfff0d2:0xd8e4ff);RIO.CL=CL;RIO.cityLights=CL.count();}
+  RIO.bbo=buildCityBillboard(RIO.bb.x,RIO.bb.z,((RH*180/Math.PI+180)%360+360)%360,'Rio',L);
+  L.build();L.pts.visible=TOD.lights>0;RIO.L=L;
+  for(const k in RIO.parts)RIO.tris[k]=tkTris(RIO.parts[k]);RIO.tris.city_billboard=tkTris(RIO.bbo.g);
+  RIO.built=true;TOD_HOOKS.push(rioTOD);rioTOD();
+}
+function rioTOD(){
+  if(!RIO.built)return;const n=!!TOD.night;
+  for(const o of RIO.night)for(const m of o.ms)m.material=n?o.night:o.day;
+}
+// every frame: the cable car cabins and the ferries, eased back and forth (dt 0 while paused)
+const _rP=new V3();
+function rioTick(dt){
+  RIO.t+=dt;const t=RIO.t;
+  for(const c of RIO.cabins){const e=0.5-0.5*Math.cos((t/c.per+c.ph)*Math.PI*2);c.c.getPoint(e,_rP);c.g.position.copy(_rP);}
+  for(const f of RIO.ferries){const ph=(t/f.per+f.ph)*Math.PI*2,e=0.5-0.5*Math.cos(ph),dir=Math.sin(ph)>=0?1:-1;
+    f.g.position.set(lerp(f.a[0],f.b[0],e),0,lerp(f.a[1],f.b[1],e));f.g.rotation.y=Math.atan2((f.b[0]-f.a[0])*dir,(f.b[1]-f.a[1])*dir);}
 }
 // the parks onto the terrain grid (green in terrainColor)
 function worldParks(d){
@@ -12697,6 +12934,7 @@ function tick(t,skipRender){
   if(running&&!paused){updateTraffic(dt);updateCars(dt);eggUpdate(dt);}
   updatePeople(dt,ts);
   if(PARIS.built)parisTick(false);
+  if(RIO.built)rioTick(running&&!paused?dt:0);
   if(running&&!paused&&!st.crashed){
     if(STRIKE.built){rangeMoving(dt);targetsTick(dt);}
     if(STRIKE.active||(camMode===2&&hasBall()))sensorUpdate(dt);
@@ -13346,7 +13584,7 @@ window.__kgeu.TCAS={levels:tcasLevels,state:()=>({ta:TCAS.list.some(o=>tcasLvl(o
 window.__kgeu.tcasConflict=tcasConflict;window.__kgeu.tcasVoiceLog=TCAS.voiceLog;
 window.__kgeu.LB=LB;try{LB.boot();}catch(e){console.warn('leaderboards',e);}
 // world regions (4.6a)
-Object.assign(window.__kgeu,{flySub:flySub,CHAT_R:CHAT_R,APTS:APTS,PLACES:PLACES,TERRAIN:TERRAIN,LANDMARKS:LANDMARKS,locShow:locShow,REGION:REGION,REGIONS:REGIONS,WORLD:WORLD,pickRegion:pickRegion,isWater:isWater,TERR:TERR,RUNWAYS:RUNWAYS,WB:WB,AL:AL,OBST:OBST,TKY:TKY,PARIS:PARIS,CITYBB:CITYBB,buildCityBillboard:buildCityBillboard,
+Object.assign(window.__kgeu,{flySub:flySub,CHAT_R:CHAT_R,APTS:APTS,PLACES:PLACES,TERRAIN:TERRAIN,LANDMARKS:LANDMARKS,locShow:locShow,REGION:REGION,REGIONS:REGIONS,WORLD:WORLD,pickRegion:pickRegion,isWater:isWater,TERR:TERR,RUNWAYS:RUNWAYS,WB:WB,AL:AL,OBST:OBST,TKY:TKY,PARIS:PARIS,RIO:RIO,CITYBB:CITYBB,buildCityBillboard:buildCityBillboard,
   wframe:()=>({rh:RH,len:RWY_LEN,thr01:THR01,thr19:THR19,woff:WOFF.slice(),fieldFt:FIELD_FT,home:HOME_RWY,base0:BASE0}),
   tris:()=>renderer.info.render.triangles,rinfo:()=>({tri:renderer.info.render.triangles,calls:renderer.info.render.calls,geo:renderer.info.memory.geometries,tex:renderer.info.memory.textures})});
 worldLoad();
