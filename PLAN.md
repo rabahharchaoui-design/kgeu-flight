@@ -48,9 +48,6 @@ Tag: pre-world. Branch: world. Report: WORLD_REPORT.md. One commit for the traff
 - [x] (done 3b8e484 + 4.6b: one region at a time, saved choice and reload with resume; location picker by region on FLY and pause; haboob and Arizona modes gated; tower/ground/runway clips per airport; per region map; world_check, world_ui_check) 4.6 HOW IT PLUGS IN. Each airport is its own region, only one loaded at a time on demand, small downloads. Fly screen and pause menu Change flight panel: the location row becomes a picker grouped by region: ARIZONA (Glendale, Luke AFB), JAPAN (Tokyo Haneda), FRANCE (Paris CDG), BRAZIL (Rio Santos Dumont), each a small card with a one line description. The Haboob option only appears for Arizona. All aircraft fly everywhere. Mini map and full map show the current region's runways, taxiways, landmarks, and traffic, with runway numbers, and set destination works. Radio: tower clips via the say pipeline in English: "Tokyo Tower", "de Gaulle Tower", "Santos Dumont Tower", with correct runway numbers. Start positions (Runway, Ramp, 3 mile final) work at every airport; the ramp start faces the terminal. One tasteful @OhRabah billboard per city in a civilian spot visible on approach, YouTube icon unmodified. Existing missions and arcade games stay in Arizona.
 - [x] (done: run_all list in batches, fps A/B vs pre-world 0.97 to 1.10 on every scenario, five fixes after the pass, region switch heap 1.05x after five switches; known: music_check crossfade timing and scorch speckle flake on the baseline too, scores/upgrade csStat timeout pre-existing; merged to master, WORLD_REPORT.md) 4.END Full pass and fps comparison. Required: every aircraft spawns at every airport and start position, traffic flies and lands at every airport, a scripted head on conflict triggers Traffic Advisory then Resolution Advisory then "Clear of conflict", TCAS quiet on final, each region loads and unloads cleanly with no memory growth after switching regions 5 times, landmarks visible on final at each airport, the map shows each region with traffic, no console errors, no fps regression. Screenshots per airport day and night (final approach, ramp start view, right after takeoff) plus a TCAS Resolution Advisory in progress, into overnight-screenshots/world. If it passes: merge world into master, push, live check. Write WORLD_REPORT.md with data sources, what was moved closer than real life, and an iPhone hand test list including a TCAS encounter.
 
-=== STOP HERE UNLESS TOLD OTHERWISE ===
-(Rabah checks weekly usage in the morning. Only he moves this line.)
-
 ## SESSION 5: RED FLAG DOGFIGHT
 Tag: pre-dogfight. Branch: dogfight. Report: DOGFIGHT_REPORT.md. Replace the "Red Flag Dogfight, coming soon" arcade card with the real game.
 
@@ -95,3 +92,6 @@ Orchestrated run: builder subagent implements, tester subagent verifies at iPhon
 
 ### DONE
 - [x] Write ../chain/report-0929.md with: each item's status, commit hash, what changed, anything skipped and why, and before/after frame times. End it with an iPhone hand test checklist covering every item above.
+
+=== STOP HERE UNLESS TOLD OTHERWISE ===
+(Rabah checks weekly usage in the morning. Only he moves this line.)
