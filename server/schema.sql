@@ -64,3 +64,10 @@ CREATE TABLE IF NOT EXISTS hits(
   ts        INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS hits_k ON hits(kind, who, ts);
+-- achievements that gave rank XP (the dogfight's Ace, Guns Kill, Flare Save, Untouchable): once per player, ever
+CREATE TABLE IF NOT EXISTS achs(
+  player_id INTEGER NOT NULL,
+  ach       TEXT NOT NULL,
+  created   INTEGER NOT NULL,
+  PRIMARY KEY(player_id, ach)
+);
