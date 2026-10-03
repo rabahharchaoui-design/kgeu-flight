@@ -155,7 +155,7 @@ async def main():
         await step(pg, 2.5); await pg.wait_for_timeout(300)
         r = await pg.evaluate(f"()=>({{why:{K}.DF.why,ej:{K}.DF.ej,on:{K}.DF.on,card:document.getElementById('arcOv').classList.contains('on'),title:document.getElementById('aTitle').textContent,lines:document.getElementById('aLines').innerText,crash:document.body.classList.contains('crashOn'),plane:{K}.plane().g.visible}})")
         ok('the third hit is the eject: EJECT EJECT, the jet gone, the run over', s['hits'] == 3 and 'EJECT' in w and r['ej'] and not r['on'] and r['why'] == 'hits' and not r['plane'], (s, w, r))
-        ok('the results card (not the crash card) says shot down, you ejected, hits 3 of 3', r['card'] and not r['crash'] and 'shot down, you ejected' in r['title'] and '3 of 3' in r['lines'], (r['title'], r['lines']))
+        ok('the results card (not the crash card) says shot down, you ejected, hits 3 of 3', r['card'] and not r['crash'] and 'shot down, you ejected' in r['title'].lower() and '3 of 3' in r['lines'], (r['title'], r['lines']))
         # ---- FLARES at 1.5 s to go with DF.test.decoy=1: no hit, Good flares, 28 left ----
         await start(pg)
         await pg.evaluate(f"()=>{{{K}.DF.test.decoy=1;}}")
