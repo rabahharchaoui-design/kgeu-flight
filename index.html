@@ -6744,7 +6744,7 @@ function tfcSchedule(){
   for(let k=0;k<TFC.plans.length&&TFC.list.length<TFC_MIN;k++){const p=TFC.plans[k];if(tfcAlive(p.type)<p.count.max)tfcSpawnPlan(p,{},false);}
 }
 TFC.update=function(dt){
-  const on=running&&!MISS.on&&!ARC.on&&!STRIKE.active&&!LES.on;
+  const on=running&&!MISS.on&&!ARC.on&&!STRIKE.active&&!LES.on&&!DF.live;
   if(on!==TFC.shown){TFC.shown=on;for(const o of TFC.list)o.m.g.visible=on;}
   if(!on||!(dt>0))return;
   const t0=performance.now();
@@ -6806,7 +6806,7 @@ const TC_NAMES=['OTHER','PROXIMATE','TA','RA'],TC_COL=['#ffffff','#ffffff','#ffb
 const TCAS={on:true,t:0,dT:0,list:[],ra:null,sense:0,raT:0,repT:0,clear:false,inhibit:'off',voiceLog:[],busy:0,src:null,shown:false,
   el:document.getElementById('tcas'),big:document.getElementById('tcasRA'),ctx:null,dpr:1,band:''};
 try{TCAS.on=localStorage.getItem('kgeuTcas')!=='0';}catch(e){}
-const tcasLive=()=>running&&!MISS.on&&!ARC.on&&!STRIKE.active&&!LES.on;
+const tcasLive=()=>running&&!MISS.on&&!ARC.on&&!STRIKE.active&&!LES.on&&!DF.live;
 // the player on an approach: within 30 degrees of the extended centreline of the runway it is heading for
 // (approachEnd, the destination runway, or any end it is lined up with on a short final), inside 5 nm
 function tcasOnApproach(){
@@ -8532,7 +8532,7 @@ function onLanding(e){
   let better=false;
   if(AC.id==='cessna'||AC.id==='alpha'||AC.id==='mq9b')better=scRecord(AC.id,g);
   if(dash&&dash.better)better=true;
-  const free=!ARC.on&&!LES.on&&!MISS.on&&!STRIKE.active,flightT=st.time-RES.freeT0;RES.freeT0=st.time;
+  const free=!ARC.on&&!LES.on&&!MISS.on&&!STRIKE.active&&!DF.live,flightT=st.time-RES.freeT0;RES.freeT0=st.time;
   const seg=free&&!dash&&st.mode==='final'&&!RES.segDone;if(seg)RES.segDone=true;   // the segment's own landing; later ones are free flight
   const rows=g.parts.map(p=>'<div class="gl"><span>'+p[0]+'</span><b>'+p[1]+
     '<i class="pt'+(p[2]>=80?' good':p[2]<55?' bad':'')+'">'+p[2]+'</i></b></div>');
@@ -8550,7 +8550,7 @@ function onLanding(e){
     parts:g.parts.map(p=>[p[0],p[1],p[2]]),when:Date.now()});runLog('landing',{letter:g.letter,pts:g.pts,where:g.where});SCORE.recent.length=Math.min(SCORE.recent.length,10);scSave();
   gradeBadge(g);
   if(better)bannerShow('NEW RECORD',REC[AC.id]?REC[AC.id].fmt(SCORE.best[AC.id]||g):'');
-  if(LB&&!ARC.on&&!LES.on&&!MISS.on&&!STRIKE.active){LB.runEnd('free:landing',g.pts);LB.armFree();}
+  if(LB&&!ARC.on&&!LES.on&&!MISS.on&&!STRIKE.active&&!DF.live){LB.runEnd('free:landing',g.pts);LB.armFree();}
 }
 // the C-130 missions feed the same record store
 function logMission(r,letter){
@@ -8825,9 +8825,9 @@ $('lRec').onclick=()=>{resClose(landOv);recOpen();};
 $('mFree').onclick=()=>{resClose(missOv);missReset();paused=false;};
 $('mMenu').onclick=()=>resMenu(missOv);
 $('mRetry').onclick=()=>{resClose(missOv);start(MISS.kind==='drop'?'drop':'short');};
-$('aFree').onclick=()=>{resClose(arcOv);arcStop();paused=false;};
+$('aFree').onclick=()=>{resClose(arcOv);arcStop();dfStop();paused=false;};
 $('aHub').onclick=()=>resMenu(arcOv);
-$('aRetry').onclick=()=>{resClose(arcOv);if(RES.kind==='strike')start('range');else arcStart(ARC.kind);};
+$('aRetry').onclick=()=>{resClose(arcOv);if(RES.kind==='strike')start('range');else if(RES.kind==='df')dfStart();else arcStart(ARC.kind);};
 
 // ================= Drop zone guidance =================
 // So nobody has to guess where the drop zone is: its icon on both maps with the waypoint
@@ -9547,8 +9547,9 @@ function musicTick(){
 function musicNext(){
   if(!actx||!musicGain||MUSIC.busy)return;
   if(!musicPlaying()){musicUserPlay();return;}
+  if(musicForcedName())return;                         // the dogfight's loop: Next does not move off it
   if(MUSIC.cur<0||!MUSIC.slots[MUSIC.cur]||!musicWanted())return;
-  musicAdvance(actx.currentTime+0.03);                 // the forced loop just starts again
+  musicAdvance(actx.currentTime+0.03);
 }
 // back up to whatever played before this, if the shuffle history has one
 function musicPrev(){
@@ -10007,6 +10008,12 @@ function rookieAssist(dt,t){
 // You start in the air a few miles out and the clock runs until the wheels touch the
 // target runway. Score is par over your time, weighted by the landing grade.
 const ARC={on:false,kind:'',t0:0,end:null,par:0,done:false,dist:0};
+// the Red Flag Dogfight's state (the mode itself is below, after the arcade): C is the arena centre over the
+// Barry M. Goldwater Range, 17 nm southwest of Luke (bearing 220), the far southwest corner of the built world
+// (the real range is farther, past Gila Bend). on: a run is being fought; live: the mode owns this flight
+// (on, or over and showing its card) until dfStop. waves: bandits per round, 90 s a round.
+const DF={on:false,live:false,done:false,built:false,C:{x:-28000,z:22000},R:12*1852,waves:[1,2,3,4],ROUND:90,
+  bandits:[],pool:[],wave:0,t:90,bank:[],kills:0,gunKills:0,hits:0,clearT:0,fightT:0,flares:30,won:false,out:0,gap:0,why:''};
 // a world region has neither field: the same six ends by name, in Arizona's order, so the daily (same
 // worldwide) names the same runway on its card there; starting it switches to Arizona first
 const ARC_TARGETS=()=>REGION.az?RWY_ENDS.filter(e=>e.rwy.code==='KGEU'||e.rwy.code==='KLUF')
@@ -10105,6 +10112,209 @@ function arcScore(id){
   if(id==='daily'){const r=SCORE.best['arc:daily:'+todayKey()];return r?[r.stars,r.pts+' pts today']:[0,''];}
   if(id.startsWith('apt:')){const r=SCORE.best[id];return r?[r.stars,r.pts+' pts, '+fmtT(r.secs)]:[0,''];}
   return [0,''];
+}
+// ================= Red Flag Dogfight =================
+// The player's F-16 out of Luke against aggressor F-16s over the Barry M. Goldwater Range. A run is
+// four rounds of 90 s with 1, 2, 3 and 4 bandits; clear a wave and the seconds left are banked (DF.bank,
+// 5.5 turns them into a time bonus), then a 4 s breather and the next wave. It ends on a win, a round
+// clock at 0, three hits (dfHit, 5.3 brings the bandits' weapons), a crash, or 10 s outside the 12 nm
+// arena. The weapons (5.2) call dfKill(b,'fox2'|'gun'); the tests call dfKill(b,'test').
+// Bandits: the HD F-16 baked once into one vertex coloured mesh in a blue gray splinter camo (decals,
+// gear and hinge lines left off) plus its canopy, shared by every bandit; three boxes beyond 2 nm.
+// Their own kinematic flight model: heading, flight path angle, bank and speed, 350 to 480 kt indicated,
+// turn rate held under 7 g, never below 6,000 ft, steered back inside the arena.
+const DF_KT0=350,DF_KT1=480,DF_G=7,DF_FLOOR=6000,DF_LOD=2*1852,DF_SPLINTER=['#5b7591','#8a9aab','#3e4e63'];
+const dfY=ft=>(ft-FIELD_FT)/M2FT+GEAR,dfFt=y=>(y-GEAR)*M2FT+FIELD_FT;
+const dfTAS=(kt,y)=>kt/MS2KT/Math.sqrt(1.097*Math.exp(-y/9200)/1.225);   // indicated to true, as placeAir does
+const DFM={};   // the shared bandit geometry and materials, built on the first run
+function dfBuild(){
+  if(DF.built)return;DF.built=true;
+  let src=null;try{src=HD?HD.buildF16HD({gold:false,gear:TYPES.f16.gear||1.5}):null;}catch(e){src=null;}
+  if(!src)src=buildF16();
+  const g=src.g;if(g.parent)g.parent.remove(g);g.position.set(0,0,0);g.quaternion.identity();g.updateMatrixWorld(true);
+  const skip=new Set();for(const o of [src.gear,src.ab])if(o)o.traverse(c=>skip.add(c));
+  // splinter: which side of five planes a point is on picks one of three tones, so the blocks have straight edges on any surface
+  const PL=[[0.8,0,0.6,0.4],[-0.5,0.3,0.81,-1.6],[0.92,-0.2,-0.34,-0.9],[0.3,0.1,0.95,3.1],[-0.86,0.25,0.45,1.2]],T=DF_SPLINTER.map(c=>new THREE.Color(c));
+  const BELLY=new THREE.Color('#b3bcc6'),NOSE=new THREE.Color('#4a5058'),c=new THREE.Color();
+  const camo=(x,y,z,ny)=>{if(z<-6.78&&Math.hypot(x,y)<0.56)return NOSE;if(ny<-0.45&&y<0.05)return BELLY;
+    let k=0;for(let i=0;i<PL.length;i++){const p=PL[i];if(p[0]*Math.abs(x)+p[1]*y+p[2]*z>p[3])k+=i+1;}return T[k%3];};
+  const P=[],N=[],C=[],U=[];let can=null;
+  g.traverse(o=>{
+    if(!o.isMesh||skip.has(o))return;const mt=o.material;
+    if(o.name==='canopy'){can=o.geometry.clone().applyMatrix4(o.matrixWorld);can=new THREE.Mesh(can,HD?HD.MAT.canopy(false):mt);return;}
+    if(!mt||mt.isShaderMaterial||mt.isMeshBasicMaterial||mt.transparent)return;   // decals, hinge lines, the old burner cone
+    let ge=o.geometry.clone();ge.morphAttributes={};ge.applyMatrix4(o.matrixWorld);if(ge.index)ge=ge.toNonIndexed();if(!ge.attributes.normal)ge.computeVertexNormals();
+    const pa=ge.attributes.position,na=ge.attributes.normal,ua=ge.attributes.uv,paint=mt.vertexColors&&ge.attributes.color;
+    if(!paint)c.copy(mt.map&&mt.metalness>0.8?new THREE.Color('#57524c'):mt.color||new THREE.Color('#777'));
+    for(let i=0;i<pa.count;i++){const x=pa.getX(i),y=pa.getY(i),z=pa.getZ(i);P.push(x,y,z);N.push(na.getX(i),na.getY(i),na.getZ(i));
+      const k=paint?camo(x,y,z,na.getY(i)):c;C.push(k.r,k.g,k.b);if(ua)U.push(ua.getX(i),ua.getY(i));else U.push(0.5,0.5);}
+    ge.dispose();});
+  const bg=new THREE.BufferGeometry();bg.setAttribute('position',new THREE.Float32BufferAttribute(P,3));bg.setAttribute('normal',new THREE.Float32BufferAttribute(N,3));
+  bg.setAttribute('color',new THREE.Float32BufferAttribute(C,3));bg.setAttribute('uv',new THREE.Float32BufferAttribute(U,2));bg.computeBoundingSphere();
+  DFM.body=bg;DFM.mat=new THREE.MeshStandardMaterial({map:HD?HD.MAT.skinA:null,vertexColors:true,metalness:0.16,roughness:0.56,envMapIntensity:0.3});
+  DFM.can=can;DFM.tris=P.length/9;
+  const B=(w,h,d,x,y,z,col)=>[tfcAt(new THREE.BoxGeometry(w,h,d),x,y,z),col];
+  DFM.lod=tfcMerge([B(1.4,1.2,15,0,0,0,0x5b7591),B(9.5,0.12,4,0,-0.05,1.6,0x8a9aab),B(0.1,3,2.5,0,1.8,5.5,0x3e4e63)]);
+  const ab=new THREE.ConeGeometry(0.42,1,10);ab.rotateX(Math.PI/2);ab.translate(0,0,0.5);DFM.abG=ab;
+  DFM.abM=new THREE.MeshBasicMaterial({color:0xffa040,transparent:true,opacity:0.8,depthWrite:false,blending:THREE.AdditiveBlending,fog:false});
+}
+// a bandit from the pool (one not flying or falling), its meshes sharing DFM
+function dfBandit(){
+  for(const b of DF.pool)if(!b.alive&&!b.fall)return b;
+  const g=new THREE.Group();g.name='bandit';g.userData.heat=0.7;
+  const body=new THREE.Mesh(DFM.body,DFM.mat);g.add(body);let can=null;if(DFM.can){can=new THREE.Mesh(DFM.can.geometry,DFM.can.material);can.renderOrder=3;g.add(can);}
+  const lod=new THREE.Mesh(DFM.lod,TFC_MAT);lod.visible=false;g.add(lod);
+  const ab=new THREE.Mesh(DFM.abG,DFM.abM);ab.position.set(0,0.02,6.28);ab.visible=false;ab.renderOrder=4;ab.userData.heat=1;g.add(ab);
+  g.visible=false;scene.add(g);
+  const b={g:g,body:body,can:can,lod:lod,ab:ab,p:new V3(),v:new V3(),alive:false,fall:false,state:'MERGE',hp:1,hdg:0,gam:0,bank:0,spd:200,st:0,i:0,abOn:0,smk:0,ft:0};
+  DF.pool.push(b);return b;
+}
+// a wave: n bandits 3 to 5 nm out, spread in bearing in front of the player, 12,000 to 18,000 ft, pointing at the player
+function dfWave(n){
+  DF.bandits.length=0;
+  _dfE.setFromQuaternion(st.quat,'YXZ');const ph=-_dfE.y;
+  for(let i=0;i<n;i++){const b=dfBandit();
+    const brg=ph+(n>1?(i-(n-1)/2)*0.95:0)+(DF.wave>1?(Math.random()-0.5)*0.35:0),d=(3+Math.random()*2)*1852;
+    let x=st.pos.x+Math.sin(brg)*d,z=st.pos.z-Math.cos(brg)*d;
+    const dc=Math.hypot(x-DF.C.x,z-DF.C.z),rm=DF.R*0.85;if(dc>rm){x=DF.C.x+(x-DF.C.x)*rm/dc;z=DF.C.z+(z-DF.C.z)*rm/dc;}   // inside the arena
+    b.p.set(x,dfY(12000+Math.random()*6000),z);b.hdg=Math.atan2(st.pos.x-x,-(st.pos.z-z));b.gam=0;b.bank=0;
+    b.spd=dfTAS(440,b.p.y);b.alive=true;b.fall=false;b.state='MERGE';b.hp=1;b.st=0;b.i=i;b.abOn=0;
+    b.g.visible=true;b.body.visible=true;if(b.can)b.can.visible=true;dfPose(b);DF.bandits.push(b);}
+}
+function dfPose(b){
+  b.v.set(Math.sin(b.hdg)*Math.cos(b.gam),Math.sin(b.gam),-Math.cos(b.hdg)*Math.cos(b.gam)).multiplyScalar(b.spd);
+  b.g.position.copy(b.p);_dfE.set(b.gam,-b.hdg,-b.bank,'YXZ');b.g.quaternion.setFromEuler(_dfE);
+}
+const _dfD=new V3(),_dfR=new V3(),_dfE=new THREE.Euler(0,0,0,'YXZ');
+// one bandit, one step: the state machine picks where it wants to point, the kinematics follow under the g limit
+function dfFly(b,dt){
+  const P=st.pos,dx=P.x-b.p.x,dy=P.y-b.p.y,dz=P.z-b.p.z,rng=Math.hypot(dx,dy,dz),fw=_dfR.copy(b.v).normalize();
+  const los=_dfD.set(dx,dy,dz).divideScalar(Math.max(1,rng));
+  const ata=fw.dot(los);                                               // > 0: the player is ahead of it
+  const behind=ata<-0.55&&rng<1.5*1852;                                // the player sits on its tail inside 1.5 nm
+  b.st+=dt;
+  if(b.state==='MERGE'){if(rng<1852||ata<0.2)b.state='TURN',b.st=0;}
+  else if(b.state==='TURN'){if(behind)b.state='EVADE',b.st=0;else if(b.st>25&&rng>2*1852)b.state='EXTEND',b.st=0;}
+  else if(b.state==='EVADE'){if(b.st>4&&!behind)b.state=Math.random()<0.4?'EXTEND':'TURN',b.st=0;}
+  else if(b.state==='EXTEND'){if(b.st>8||rng>3*1852)b.state='MERGE',b.st=0;}
+  // where it wants to point
+  let tx,ty,tz,kt;
+  if(b.state==='MERGE'){tx=dx;ty=dy;tz=dz;kt=460;}
+  else if(b.state==='TURN'){const lag=1.2+0.4*b.i;tx=dx-st.vel.x*lag;ty=dy-st.vel.y*lag;tz=dz-st.vel.z*lag;kt=410;}   // lag pursuit: into the player's six
+  else if(b.state==='EVADE'){const s=((b.i&1)?1:-1),h=b.hdg+s*1.6;tx=Math.sin(h);tz=-Math.cos(h);ty=-0.25;kt=380;}  // a hard break turn, nose a little low
+  else{tx=-dx;ty=-0.15*rng;tz=-dz;kt=480;}                                                    // extend away, burner
+  const tl=Math.hypot(tx,ty,tz)||1;tx/=tl;ty/=tl;tz/=tl;
+  // the arena: steer back in past 10 nm, hard past 11.5
+  const cx=DF.C.x-b.p.x,cz=DF.C.z-b.p.z,cd=Math.hypot(cx,cz),w=clamp((cd-10*1852)/(1.5*1852),0,1);
+  if(w>0){tx=tx*(1-w)+cx/cd*w;tz=tz*(1-w)+cz/cd*w;}
+  // the floor: nose up under 7,000 ft, never below 6,000; no higher than 24,000
+  const ft=dfFt(b.p.y);if(ft<7000)ty=Math.max(ty,0.35*clamp((7000-ft)/1000,0,1));if(ft>24000)ty=Math.min(ty,-0.1);
+  const hd=Math.atan2(tx,-tz),gd=clamp(Math.atan2(ty,Math.hypot(tx,tz)),-0.6,0.6);
+  const V=b.spd,wMax=9.81*Math.sqrt(DF_G*DF_G-1)/V,eh=wrapPi(hd-b.hdg);
+  // bank for the turn it wants (rolled at up to 200 deg/s), and the turn that bank gives: never past 7 g
+  const wc=clamp(eh*1.6,-wMax,wMax),bt=Math.atan(wc*V/9.81);
+  b.bank+=clamp(bt-b.bank,-3.5*dt,3.5*dt);
+  b.hdg=wrapPi(b.hdg+9.81*Math.tan(b.bank)/V*dt);
+  b.gam+=clamp((gd-b.gam)*1.5,-0.3,0.3)*dt;
+  // speed: toward the state's, gravity along the path, 350 to 480 kt indicated
+  const vt=dfTAS(kt,b.p.y),acc=clamp(vt-V,-7,9)-9.81*Math.sin(b.gam)*0.6;
+  b.spd=clamp(V+acc*dt,dfTAS(DF_KT0,b.p.y),dfTAS(DF_KT1,b.p.y));
+  b.abOn+=((acc>3||b.state==='EXTEND'?1:0)-b.abOn)*Math.min(1,dt*4);
+  b.v.set(Math.sin(b.hdg)*Math.cos(b.gam),Math.sin(b.gam),-Math.cos(b.hdg)*Math.cos(b.gam)).multiplyScalar(b.spd);
+  b.p.addScaledVector(b.v,dt);
+  const fy=dfY(DF_FLOOR);if(b.p.y<fy){b.p.y=fy;if(b.gam<0)b.gam=0;}
+}
+// a kill: the airburst, then it falls burning and smoking to a ground impact (the crash fireball and scorch)
+function dfKill(b,how){
+  if(!b||!b.alive)return;b.alive=false;b.fall=true;b.ft=0;b.smk=0;b.ab.visible=false;b.hp=0;
+  b.v.y-=25;b.spin=(Math.random()<0.5?-1:1)*(1.5+Math.random());
+  explode(b.p.x,b.p.y,b.p.z,{scale:0.7,air:true,glow:false,smokeSec:5,boomDelay:camera.position.distanceTo(b.p)/340});
+  if(!DF.on||DF.done)return;
+  DF.kills++;if(how==='gun')DF.gunKills++;
+  if(DF.bandits.some(x=>x.alive))return;
+  // the wave is down: bank the seconds left, then a breather and the next one (or the win)
+  DF.bank[DF.wave-1]=Math.max(0,DF.t);DF.clearT+=DF.ROUND-DF.t;
+  if(DF.wave>=DF.waves.length){DF.won=true;dfEnd('win');return;}
+  DF.gap=4;toast('Splash! Wave '+DF.wave+' clear, '+Math.ceil(DF.t)+' s banked');
+}
+function dfFall(b,dt){
+  b.ft+=dt;b.v.y-=9.81*dt;const k=Math.exp(-0.05*dt);b.v.x*=k;b.v.z*=k;b.p.addScaledVector(b.v,dt);
+  b.bank+=b.spin*dt;b.gam+=(-1.1-b.gam)*Math.min(1,dt*0.6);b.hdg=Math.atan2(b.v.x,-b.v.z);
+  b.g.position.copy(b.p);_dfE.set(b.gam,-b.hdg,-b.bank,'YXZ');b.g.quaternion.setFromEuler(_dfE);
+  // a smoke trail and flame out of it, from the shared rings
+  b.smk-=dt;if(b.smk<=0){b.smk=0.07;
+    fxDyn('trail',b.p.x,b.p.y,b.p.z,b.v.x*0.05,1.5,b.v.z*0.05,4,5,22,0.8,0);
+    if(b.ft<12)fxDyn('burn',b.p.x,b.p.y,b.p.z,b.v.x*0.6,b.v.y*0.6,b.v.z*0.6,0.5,6,6,0.9,0);}
+  const gy=groundHeight(b.p.x,b.p.z);
+  if(b.p.y<=gy+2){b.fall=false;b.g.visible=false;
+    explode(b.p.x,gy,b.p.z,{scale:1.1,smokeSec:25,debris:6,boomDelay:camera.position.distanceTo(b.p)/340});}
+}
+function dfStart(){
+  // the range is Arizona's: from a world region switch there first, the run starts after the reload
+  if(!REGION.az){pickRegion('az',{resume:{df:1,region:'az',type:'f16',tod:TOD.id}});return;}
+  if(!WORLD.ready){toast('Loading '+REGION.city+'…');return;}
+  pickType('f16',1);start('runway','luke');
+  // no haboob over the range: the day sky for this run, the saved choice comes back on the next start()
+  if(TOD.id==='haboob'){const p=TOD.id;setTOD('day');try{localStorage.setItem('kgeuTOD',p);}catch(e){}ARC.prevTod=p;hbSync(true);}
+  dfBuild();
+  // in over the range from the Luke side, 7 nm out from the centre, heading in
+  const ux=LUKE.x-DF.C.x,uz=LUKE.z-DF.C.z,ul=Math.hypot(ux,uz),x=DF.C.x+ux/ul*13000,z=DF.C.z+uz/ul*13000,h=Math.atan2(DF.C.x-x,-(DF.C.z-z));
+  placeAir(x,z,15000-FIELD_FT-Math.max(0,groundHeight(x,z))*M2FT,h,400);
+  st.gearDown=false;st.gearPos=0;st.flapIdx=0;trimSpawn(st,0);st.mode='dogfight';   // trimmed for level flight at 400 ktA.land=1;A.tko=1;
+  Object.assign(DF,{on:true,live:true,done:false,wave:1,t:DF.ROUND,bank:[],kills:0,gunKills:0,hits:0,clearT:0,fightT:0,flares:30,won:false,out:0,gap:0,why:''});
+  for(const b of DF.pool){b.alive=false;b.fall=false;b.g.visible=false;}
+  dfWave(DF.waves[0]);
+  MUSIC.forced='dogfight.m4a';if(!MUSIC.titles['dogfight.m4a'])MUSIC.titles['dogfight.m4a']='Pocket Sim Original — Dogfight';musicTick();
+  toast('Red Flag: fight\'s on. Wave 1, one bandit ahead');
+}
+function dfHit(){if(!DF.on||DF.done)return;DF.hits++;if(DF.hits>=3)dfEnd('hits');}
+function dfTick(dt){
+  if(!DF.live)return;
+  const live=running&&!paused;
+  if(live){
+    for(const b of DF.pool){if(b.alive){const n=Math.ceil(dt/0.034);for(let i=0;i<n;i++)dfFly(b,dt/n);dfPose(b);}else if(b.fall)dfFall(b,dt);}
+    // the near model or the three boxes, by range from the camera; the burner when it accelerates
+    for(const b of DF.pool){if(!b.g.visible)continue;const far=camera.position.distanceTo(b.p)>DF_LOD;
+      b.body.visible=!far;if(b.can)b.can.visible=!far;b.lod.visible=far;
+      b.ab.visible=b.alive&&!far&&b.abOn>0.3;if(b.ab.visible)b.ab.scale.set(1,1,2+b.abOn*3.5+Math.random()*0.6);}
+  }
+  if(!DF.on||DF.done)return;
+  if(st.crashed){dfEnd('crash');return;}
+  if(!live)return;
+  // the soft wall: 10 s outside the arena ends the run
+  const out=Math.hypot(st.pos.x-DF.C.x,st.pos.z-DF.C.z)>DF.R;DF.out=out?DF.out+dt:0;
+  if(DF.out>10){dfEnd('arena');return;}
+  if(DF.gap>0){DF.gap-=dt;
+    missHud('WAVE '+DF.wave+'/'+DF.waves.length+' CLEAR  KILLS '+DF.kills,out?'Return to the range':'Next wave in '+Math.max(1,Math.ceil(DF.gap)),out);
+    if(DF.gap<=0){DF.wave++;DF.t=DF.ROUND;dfWave(DF.waves[DF.wave-1]);const n=DF.bandits.length;toast('Wave '+DF.wave+': '+n+' bandits inbound');}
+    return;}
+  DF.t=Math.max(0,DF.t-dt);DF.fightT+=dt;
+  let left=0;for(const b of DF.bandits)if(b.alive)left++;
+  missHud('WAVE '+DF.wave+'/'+DF.waves.length+'  '+fmtT(Math.ceil(DF.t))+'  KILLS '+DF.kills,
+    out?'Return to the range  '+Math.max(0,Math.ceil(10-DF.out))+' s':left+(left===1?' bandit':' bandits')+' left',out||DF.t<15);
+  if(DF.t<=0)dfEnd('time');
+}
+// the end of a run: the record, the run log and the results card (a crash keeps the crash card instead)
+function dfEnd(why){
+  if(!DF.on||DF.done)return;DF.done=true;DF.why=why;DF.on=false;
+  const cleared=DF.won?DF.waves.length:DF.wave-1,pts=DF.kills*100,secs=Math.round(DF.won?DF.clearT:DF.fightT);
+  // placeholder score and stars until 5.5: 100 a kill, a star per wave past the first
+  const stars=DF.won?3:cleared>=2?2:cleared>=1?1:0,letter=DF.kills>=10?'A':DF.kills>=6?'B':DF.kills>=3?'C':DF.kills>=1?'D':'F';
+  const better=pts>0&&scRecord('arc:dogfight',{pts:pts,kills:DF.kills,waves:cleared,hits:DF.hits,secs:secs,stars:stars,won:DF.won});
+  runLog('dogfight',{kills:DF.kills,waves:cleared,hits:DF.hits,won:DF.won,why:why,secs:secs});
+  missHud(null);
+  if(why==='crash')return;
+  const B=SCORE.best['arc:dogfight'],what=DF.won?'all four waves cleared':why==='time'?'out of time in wave '+DF.wave:why==='hits'?'shot down':'left the range';
+  const stats=[['Kills',DF.kills+' of 10'+(DF.gunKills?'  ('+DF.gunKills+' guns)':'')],['Waves cleared',cleared+' of '+DF.waves.length],['Hits taken',DF.hits+' of 3'],
+    ['Time',fmtT(secs)],['Best',B?B.pts+' pts, '+B.kills+' kills':'none yet']];
+  resArm(()=>{if(!running||!DF.live)return;RES.kind='df';
+    resOpen(arcOv,{letter:letter,title:'Red Flag Dogfight: '+what+(better?', new best':''),score:resNum(pts)+' pts',sub:AC.name,stars:stars,stats:stats,board:''});},DF.won?3:1.5);
+}
+// the mode is over: bandits hidden, the music back to the playlist
+function dfStop(){
+  if(!DF.live&&!DF.on)return;DF.on=false;DF.live=false;DF.done=false;DF.gap=0;DF.out=0;
+  for(const b of DF.pool){b.alive=false;b.fall=false;b.g.visible=false;}DF.bandits.length=0;
+  if(MUSIC.forced==='dogfight.m4a')MUSIC.forced=null;if(st.mode==='dogfight')st.mode='runway';
 }
 // ================= photo mode (the Action Shot) =================
 // Freeze the frame, hide the HUD, orbit and zoom around the aircraft by finger, and
@@ -10214,7 +10424,7 @@ function hudClear(){
   STRIKE.active=false;tgtMarkHide();
   if(camMode>1)camMode=0;   // the ball view is entered in flight, where its autopilot can take over
   if(sensOn){sensOn=false;hudSens.classList.remove('on');document.body.classList.remove('sensorOn');glc.style.filter='';}
-  lesEnd();arcStop();missReset();DASH.on=false;   // missReset: the pallet, the mission card, the drop camera, dzStop
+  lesEnd();arcStop();dfStop();missReset();DASH.on=false;   // missReset: the pallet, the mission card, the drop camera, dzStop
   guideShow(null);crashClear();cfgReset();badgeHide();
   for(const b of $('badges').children)badgeOff(b);
   toastT=0;toastEl.classList.remove('on');warnEl.classList.remove('on');atcEl.classList.remove('on');
@@ -10234,7 +10444,7 @@ $('pResume').onclick=()=>{paused=false;pauseOv.classList.remove('on');initAudio(
 var PZ0=null;
 function pzChanged(){return !!PZ_LOC||!!PZ0&&(PZ0.t!==savedType||PZ0.b!==SPAWN_BASE||PZ0.p!==SPAWN_POS);}
 function pzApplyUI(){const b=$('pApply');if(b)b.textContent=pzChanged()?'Apply':'Restart';}
-function pzRestart(){start(st.mode==='final'||st.mode==='ramp'?(st.spawn||st.mode):(MISS.on?MISS.kind:STRIKE.active?'range':'runway'));}
+function pzRestart(){if(DF.live){dfStart();return;}start(st.mode==='final'||st.mode==='ramp'?(st.spawn||st.mode):(MISS.on?MISS.kind:STRIKE.active?'range':'runway'));}
 $('pMenu').onclick=()=>openMenu();
 function freeStart(mode){pickType(savedType);pickPos(mode||SPAWN_POS);start(SPAWN_POS);}
 function landDetails(){if(!running||st.crashed||menu.classList.contains('on'))return;badgeHide();resShow(landOv,false);}
@@ -10247,7 +10457,7 @@ document.getElementById('recReset').onclick=e=>{
   scReset();resetArmed=0;e.target.textContent='Reset all records';e.target.classList.remove('arm');
   toast('All records and achievements erased');};
 // the crash card: RETRY flies the same start again (runway, ramp, final or mission, same base)
-function crashRetry(){start(CRASH.mode||'runway',CRASH.base);}
+function crashRetry(){if(CRASH.mode==='dogfight'){dfStart();return;}start(CRASH.mode||'runway',CRASH.base);}
 tapBtn($('cRetry'),crashRetry);
 tapBtn($('cMenu'),()=>{crashEl.classList.remove('on');crashTopEl.classList.remove('on');openMenu();});
 document.getElementById('bFull').onclick=()=>{const d=document.documentElement;if(document.fullscreenElement){document.exitFullscreen&&document.exitFullscreen();return;}
@@ -10797,6 +11007,7 @@ function scoreOf(id){
   if(id==='school'){const g=LESSONS.map(l=>schoolBest[schoolAc+':'+l.id]).filter(Boolean),pass=g.filter(x=>x!=='F').length,a=g.filter(x=>x==='A').length;
     return g.length?[a>=5?3:a>=3?2:pass?1:0,pass+' of 5 passed']:[0,''];}
   if(id==='landing'||id==='landing1'||id==='daily')return arcScore(id);
+  if(id==='dogfight'){r=B['arc:dogfight'];return r?[r.stars,r.pts+' pts, '+r.kills+' kills']:[0,''];}
   return [0,''];
 }
 const TROPHY='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4M12 14v4M8 20h8"/></svg>';
@@ -10828,7 +11039,7 @@ function misList(){
 function arcList(){
   const D=dailySpec(),DI=AC_INFO[D.type];
   fillCards($('arcCards'),[
-    {id:'dogfight',ac:'Featured',name:'Red Flag Dogfight',desc:'F-16 against F-16 over the range.',soon:1,cls:'feat',go:()=>toast('Red Flag Dogfight is coming soon')},
+    {id:'dogfight',ac:'Featured',name:'Red Flag Dogfight',desc:'Your F-16 against aggressor F-16s over the Goldwater Range.',cls:'feat',go:()=>dfStart()},
     dailyCard(),
     {id:'landing',lb:'arc:landing',ac:AC_INFO[savedType][1],name:'Landing challenge',desc:'Start 5 miles out. Beat the clock to runway 1.',go:()=>arcStart('landing')},
     {id:'landing1',lb:'arc:landing1',ac:AC_INFO[savedType][1],name:'1 mile landing challenge',desc:'Lined up, 300 ft, 1 mile out. Beat the clock to runway 1.',go:()=>arcStart('landing1')},
@@ -11307,7 +11518,7 @@ const fmW=(X,Y)=>[FM.cx+(X-innerWidth/2)/FM.scale,FM.cz+(Y-innerHeight/2)/FM.sca
 const MICON={
   airport:{c:'#2f8fcf',n:'Airport'},airbase:{c:'#6f7f2e',n:'Military airfield'},landmark:{c:'#c9922c',n:'Landmark'},
   drop:{c:'#D98A3D',n:'C-130 airdrop'},range:{c:'#c93d33',n:'Strike range'},race:{c:'#7d5bd0',n:'Race and time trial'},
-  school:{c:'#23905c',n:'Flight school'},haboob:{c:'#a8733c',n:'Haboob'},egg:{c:'#d63f78',n:'@OhRabah'}};
+  school:{c:'#23905c',n:'Flight school'},haboob:{c:'#a8733c',n:'Haboob'},egg:{c:'#d63f78',n:'@OhRabah'},dogfight:{c:'#4f6d93',n:'Red Flag Dogfight'}};
 const MICON_SPR=new Map();
 function mGlyph(x,kind){   // drawn in a -10..10 box, white
   x.fillStyle='#fff';x.strokeStyle='#fff';x.lineCap='round';x.lineJoin='round';x.lineWidth=2;x.beginPath();
@@ -11332,6 +11543,9 @@ function mGlyph(x,kind){   // drawn in a -10..10 box, white
     x.beginPath();x.lineWidth=1.3;x.moveTo(8,-1);x.lineTo(8,5);x.stroke();}
   else if(kind==='haboob'){   // three gusts
     x.lineWidth=1.9;for(const [y,a,b] of [[-5,-8,5],[0,-6,8],[5,-8,3]]){x.moveTo(a,y);x.lineTo(b,y);x.quadraticCurveTo(b+3.5,y,b+3.5,y-2.2);}x.stroke();}
+  else if(kind==='dogfight'){   // two jets crossing
+    for(const [tx,ty,r] of [[-3.4,1.6,0.75],[3.4,-1.6,-2.4]]){x.save();x.translate(tx,ty);x.rotate(r);x.scale(0.62,0.62);x.beginPath();
+      x.moveTo(0,-9);x.lineTo(7.5,6);x.lineTo(2.5,4.5);x.lineTo(0,8.5);x.lineTo(-2.5,4.5);x.lineTo(-7.5,6);x.closePath();x.fill();x.restore();}}
   else if(kind==='egg'){x.font='900 17px '+F;x.textAlign='center';x.textBaseline='middle';x.fillText('@',0,0.5);}
   else if(kind==='pin'){x.arc(0,0,3,0,TAU);x.fill();}
 }
@@ -11380,7 +11594,7 @@ const PLACES=!REGION.az?[]:[['Phoenix',33.4484,-112.0740,3],['Glendale',33.5387,
   ['Sun City',33.5975,-112.2718,1],['El Mirage',33.6131,-112.3246,1],['Litchfield Park',33.4934,-112.3580,1],['Tolleson',33.4500,-112.2593,1],
   ['Laveen',33.3628,-112.1699,1],['Paradise Valley',33.5310,-111.9426,1]].map(a=>Object.assign(geoW(a[1],a[2]),{name:a[0],rank:a[3]}));
 const TERRAIN=!REGION.az?[]:[{name:'White Tank Mountains',x:-23200,z:-6900},{name:'Sierra Estrella',x:-6500,z:21800},{name:'Hedgpeth Hills',x:12500,z:-17800},
-  Object.assign(geoW(33.3350,-112.0600),{name:'South Mountain'})];
+  Object.assign(geoW(33.3350,-112.0600),{name:'South Mountain'}),{name:'Barry M. Goldwater Range',x:DF.C.x,z:DF.C.z+2600}];
 // one card per airport, beside its runways
 const APTS=!REGION.az?[{code:REGION.icao,name:REGION.base,kind:'airport',pri:820}]:[{code:'KGEU',name:'Glendale',kind:'airport',pri:810},{code:'KLUF',name:'Luke AFB',kind:'airbase',pri:815},
   {code:'KPHX',name:'Sky Harbor',kind:'airport',pri:820},{code:'LZ',name:'Assault Strip',kind:'airbase',pri:790}];
@@ -11401,14 +11615,14 @@ function mapRegionData(){
 const SHIELD_STYLE={'I-10':'i','I-17':'i','101':'l','202':'l','303':'l'};
 // everything on the map with an icon, where it is right now
 const EGG_NAMES={egg_hangar:'@OhRabah hangar',egg_billboard:'@OhRabah billboard',egg_rooftop:'@OhRabah rooftop sign',egg_flag:'@OhRabah flag',egg_tow:'@OhRabah banner tow'};
-const MPRI={haboob:760,school:700,drop:690,range:690,race:680,landmark:650,egg:600};
+const MPRI={haboob:760,school:700,drop:690,range:690,dogfight:690,race:680,landmark:650,egg:600};
 const _poiV=new V3();
 function raceStart(dist,off,e){const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h))+off;return {x:e.x+Math.sin(back)*dist,z:e.z-Math.cos(back)*dist};}
 function mapPOIs(){
   if(!REGION.az)return LANDMARKS.slice();   // a world region: its landmarks; the missions, races, school, haboob and eggs are Arizona's
   const out=[{kind:'landmark',x:3480,z:-979,name:'State Farm Stadium'},{kind:'landmark',x:31400,z:350,name:'Camelback Mountain'},
     {kind:'landmark',x:21000,z:7800,name:'Downtown Phoenix'},{kind:'drop',x:DROPZ.x,z:DROPZ.z,name:'C-130 airdrop zone'},
-    {kind:'range',x:RANGE.x,z:RANGE.z,name:'Strike range'},{kind:'school',x:APC.x,z:APC.z,name:'Flight school'}];
+    {kind:'range',x:RANGE.x,z:RANGE.z,name:'Strike range'},{kind:'dogfight',x:DF.C.x,z:DF.C.z,name:'Red Flag Dogfight'},{kind:'school',x:APC.x,z:APC.z,name:'Flight school'}];
   {const e=RWY_ENDS.find(e=>e.rwy.code==='KGEU'&&e.num==='1');out.push(Object.assign(raceStart(9000,0.9,e),{kind:'race',name:'Landing challenge start'}));
    const D=dailySpec();if(D.region==='az')out.push(Object.assign(raceStart(D.dist,D.off,D.end),{kind:'race',name:'Daily challenge start'}));}   // on days the daily is in Arizona
   if(HB.on)out.push({kind:'haboob',x:HB.C.x,z:HB.C.z,name:'Haboob'});
@@ -11509,7 +11723,7 @@ function fmHit(X,Y){let best=null,bd=26;for(const e of RWY_ENDS){const q=fmP(e.x
     if(dd<bd||!best){bd=dd;best=h.end||h;}}
   return best;}
 // ---- the legend: one row per icon type. A tap lights those icons up and flies to the nearest ----
-const LEG_KINDS=['airport','airbase','landmark','drop','range','race','school','haboob','egg'];
+const LEG_KINDS=['airport','airbase','landmark','drop','range','dogfight','race','school','haboob','egg'];
 function legBuild(){
   let kinds=LEG_KINDS.filter(k=>k!=='haboob'||HB.on);
   if(!REGION.az){const have=new Set(APTS.map(A=>A.kind));for(const P of mapPOIs())have.add(P.kind);kinds=kinds.filter(k=>have.has(k));}   // only what the region has
@@ -12144,7 +12358,7 @@ function explode(x,y,z,opt){opt=opt||{};
   if(!o){o=FX[0];for(const e of FX)if(e.t>o.t)o=e;}
   o.on=true;o.t=0;o.frames=0;o.x=x;o.y=Math.max(y,gy);o.z=z;o.gy=gy;o.s=s;
   o.T=2.6*Math.sqrt(s);o.H=250*Math.sqrt(s);
-  o.smokeSec=opt.smokeSec!==undefined?opt.smokeSec:60;o.bf=opt.baseFade||0.04;o.fireSec=opt.fireSec||0;o.glow=opt.glow!==false;
+  o.smokeSec=opt.smokeSec!==undefined?opt.smokeSec:60;o.bf=opt.baseFade||0.04;o.fireSec=opt.fireSec||0;o.glow=opt.glow!==false;o.air=!!opt.air;   // air: a burst in the sky, nothing on the ground under it
   o.end=Math.max(o.smokeSec,o.fireSec,o.T)+2;fxLast=o;
   // size goes with scale, so a bunker is plainly twice a truck
   const R=14*s,S=44*s;
@@ -12159,9 +12373,9 @@ function explode(x,y,z,opt){opt=opt||{};
   {const fl=o.flash;fl.visible=true;fl.p.set(x,o.y+3*Math.sqrt(s),z);fl.a=1;fl.sz=90*s;fl.c.setRGB(1,0.97,0.9);}
   // the column: phases spread evenly along it, so it is continuous from the base up
   for(let i=0;i<FX_SM;i++){const m=o.sm[i];m.live=true;m.p=(i+Math.random()*0.6)/FX_SM;fxPuff(m);m.q.visible=false;}
-  o.ring.visible=o.dust.visible=true;const my=terrainMeshH(x,z);o.ring.position.set(x,my+0.6,z);o.dust.position.set(x,my+0.45,z);
+  o.ring.visible=o.dust.visible=!o.air;const my=terrainMeshH(x,z);o.ring.position.set(x,my+0.6,z);o.dust.position.set(x,my+0.45,z);
   o.ring.scale.setScalar(0.01);o.dust.scale.setScalar(0.01);
-  fxScorchLay(o.scorch,x,z,(13+Math.random()*4)*Math.pow(s,0.8));o.scorch.material.opacity=0.8;
+  if(o.air)o.scorch.visible=false;else{fxScorchLay(o.scorch,x,z,(13+Math.random()*4)*Math.pow(s,0.8));o.scorch.material.opacity=0.8;}
   o.glowM.position.set(x,my+0.35,z);o.glowM.visible=false;
   const n=Math.min(3,opt.secondary||0);o.secN=n;
   for(let i=0;i<3;i++){const e=o.sec[i];e.done=i>=n;e.t=0.4+Math.random()*1.1;
@@ -12961,7 +13175,7 @@ function tick(t,skipRender){
     if(ev.type==='liftoff') clusters.forEach(c=>{if(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)<1500){c.cheer=4;}});
   }
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.classList.remove('on');}
-  missUpdate(dt);dzUpdate(dt);if(running&&!paused)arcTick();logTime(dt);dashUpdate(dt);bannerUpdate(dt);if(LB)LB.frame();
+  missUpdate(dt);dzUpdate(dt);if(running&&!paused)arcTick();dfTick(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);if(LB)LB.frame();
   {const show=!rookie()&&camMode===1&&(AC.id==='cessna'||AC.id==='alpha')&&running&&!st.crashed;
    if(spCan){spCan.classList.toggle('on',show);if(show)drawSixPack();}}
   radioUpdate(dt);cfgUpdate(dt);resTick(dt);
@@ -13538,7 +13752,7 @@ const APP_VER='2026-10-02-world';          // keep version.json in step when shi
   }
   function reset(){E.runs={};E.rec=null;E.armed=true;if(E.ghost&&E.ghost.st!==st)ghostOff();}
   function frame(){
-    if(E.armed&&running&&!paused&&!st.crashed){E.armed=false;if(!ARC.on&&!LES.on&&!MISS.on&&!STRIKE.active&&st.mode!=='school')runStart('free:landing');}
+    if(E.armed&&running&&!paused&&!st.crashed){E.armed=false;if(!ARC.on&&!LES.on&&!MISS.on&&!STRIKE.active&&!DF.live&&st.mode!=='school')runStart('free:landing');}
     if(E.rec&&running&&!paused)recTick();
     if(E.ghost)ghostTick();
     if(fameBB)fameBB.mat.emissiveIntensity=EGG.litMat.emissiveIntensity;
@@ -13637,6 +13851,8 @@ window.__kgeu.TCAS={levels:tcasLevels,state:()=>({ta:TCAS.list.some(o=>tcasLvl(o
   shown:TCAS.shown,on:TCAS.on,raT:TCAS.raT}),tcasConflict:tcasConflict,setTcas:setTcas,T:TCAS,tcasVoiceLog:TCAS.voiceLog};
 window.__kgeu.tcasConflict=tcasConflict;window.__kgeu.tcasVoiceLog=TCAS.voiceLog;
 window.__kgeu.LB=LB;try{LB.boot();}catch(e){console.warn('leaderboards',e);}
+// the Red Flag Dogfight (5.1)
+Object.assign(window.__kgeu,{DF:DF,DFM:DFM,dfStart:dfStart,dfKill:dfKill,dfHit:dfHit,dfEnd:dfEnd,dfStop:dfStop});
 // world regions (4.6a)
 Object.assign(window.__kgeu,{flySub:flySub,CHAT_R:CHAT_R,APTS:APTS,PLACES:PLACES,TERRAIN:TERRAIN,LANDMARKS:LANDMARKS,locShow:locShow,REGION:REGION,REGIONS:REGIONS,WORLD:WORLD,pickRegion:pickRegion,isWater:isWater,TERR:TERR,RUNWAYS:RUNWAYS,WB:WB,AL:AL,OBST:OBST,TKY:TKY,PARIS:PARIS,RIO:RIO,CITYBB:CITYBB,buildCityBillboard:buildCityBillboard,
   wframe:()=>({rh:RH,len:RWY_LEN,thr01:THR01,thr19:THR19,woff:WOFF.slice(),fieldFt:FIELD_FT,home:HOME_RWY,base0:BASE0}),
@@ -13647,7 +13863,8 @@ worldLoad();
   if(!r)return;
   const go=()=>{const sp=$('splash');if(!WORLD.ready||(sp&&!sp.classList.contains('done'))){if(!WORLD.err)setTimeout(go,200);return;}
     if(r.start){const S=r.start;if(S.skill&&S.skill!==SKILL)setSkill(S.skill);if(S.tod&&TOD_SET[S.tod])setTOD(S.tod);
-      if(S.arc){if(S.type&&TYPES[S.type])pickType(S.type);arcStart(S.arc);}
+      if(S.df)dfStart();
+      else if(S.arc){if(S.type&&TYPES[S.type])pickType(S.type);arcStart(S.arc);}
       else if(S.lesson)startLesson(S.lesson);
       else if(S.mode==='free'){if(S.type&&TYPES[S.type])pickType(S.type);if(S.base)pickBase(S.base);freeStart(S.pos);}   // the pause sheet's Apply
       else{if(S.type&&TYPES[S.type])pickType(S.type,1);start(S.mode||'runway',S.base);}}

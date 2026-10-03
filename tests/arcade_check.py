@@ -13,10 +13,10 @@ async def main():
         assert await pg.evaluate(f"()=>{K}.dailyRegion('az')") == 'az'
         await pg.evaluate(f"()=>{{{K}.openMenu();{K}.nav('sArc')}}"); await pg.wait_for_timeout(300)
         cards = await pg.evaluate("()=>[...document.querySelectorAll('#arcCards .mcard')].map(c=>({id:c.dataset.m,ico:!!c.querySelector('svg.ico'),stars:!!c.querySelector('.stars'),soon:!!c.querySelector('.soon'),t:c.querySelector('b').textContent}))")
-        ok('featured Red Flag Dogfight, coming soon, is first', cards[0]['id'] == 'dogfight' and cards[0]['soon'] and cards[0]['t'] == 'Red Flag Dogfight', cards[:1])
+        ok('featured Red Flag Dogfight is first, playable (no Coming soon)', cards[0]['id'] == 'dogfight' and not cards[0]['soon'] and cards[0]['t'] == 'Red Flag Dogfight', cards[:1])
         ok('airdrop, strike range, 5 and 1 mile landing challenges and daily challenge cards', sorted(c['id'] for c in cards[1:6]) == ['daily', 'drop', 'landing', 'landing1', 'range'], [c['id'] for c in cards])
         ok('then the World airports group: Tokyo, Paris and Rio', [c['id'] for c in cards[6:]] == ['apt:RJTT', 'apt:LFPG', 'apt:SBRJ'], [c['id'] for c in cards])
-        ok('every game card has an icon and a 1 to 3 star rating', all(c['ico'] and c['stars'] for c in cards[1:]))
+        ok('every game card has an icon and a 1 to 3 star rating', all(c['ico'] and c['stars'] for c in cards))
         r = await pg.evaluate("()=>{const s=document.getElementById('sArc');const bad=[];if(s.scrollHeight>s.clientHeight+1)bad.push('scrolls');s.querySelectorAll('.mh button, #arcCards .mcard:not(.apt)').forEach(e=>{const r=e.getBoundingClientRect();if(r.bottom>innerHeight+0.5||r.right>innerWidth+0.5)bad.push('off '+e.textContent.slice(0,12));if(r.height<43.5)bad.push('small')});return bad}")
         ok('the six Arizona arcade cards fit one iPhone landscape screen, the screen does not scroll', not r, r)
         r = await pg.evaluate("()=>{const c=document.getElementById('arcCards');c.scrollTop=1e4;const out=[...c.querySelectorAll('.cgrp, .mcard.apt')].map(e=>{const r=e.getBoundingClientRect();return r.bottom<=innerHeight+0.5&&r.top>=c.getBoundingClientRect().top-0.5});c.scrollTop=0;return out}")
@@ -61,9 +61,6 @@ async def main():
         else:
             ok(f"daily challenge at {d1['region']}: switches region with a daily resume", s['rl'] == 1 and s['reg'] == d1['region'] and ((s['res'] or {}).get('start') or {}).get('arc') == 'daily' and not s['on'], (s, d1))
             await pg.evaluate("()=>{localStorage.setItem('kgeuRegion','az');sessionStorage.removeItem('kgeuResume');}")
-        await pg.evaluate(f"()=>{{{K}.openMenu();{K}.nav('sArc')}}"); await pg.wait_for_timeout(200)
-        await finger(pg, '#arcCards [data-m="dogfight"]'); await pg.wait_for_timeout(200)
-        ok('coming soon does not start anything', await pg.evaluate("()=>document.getElementById('menu').classList.contains('on')"))
         ok('no page errors', not pg.errs, pg.errs[:3])
         await b.close()
     sys.exit(ok.done('arcade_check'))

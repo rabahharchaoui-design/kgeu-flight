@@ -52,7 +52,7 @@ async def main():
         # the legend: every icon type, a tap lights them up and flies to the nearest
         await pg.evaluate(f"()=>{K}.fmOpen()")
         leg = await pg.evaluate("()=>[...document.querySelectorAll('#mapLegL .lrow')].map(b=>b.dataset.kind)")
-        ok('legend lists every icon type', leg == ['airport', 'airbase', 'landmark', 'drop', 'range', 'race', 'school', 'egg'], leg)
+        ok('legend lists every icon type', leg == ['airport', 'airbase', 'landmark', 'drop', 'range', 'dogfight', 'race', 'school', 'egg'], leg)
         await finger(pg, '#mapLegL .lrow[data-kind="drop"]'); await pg.wait_for_timeout(2500)
         await pg.evaluate(f"()=>{K}.fmFlush()")
         r = await pg.evaluate(f"""()=>{{const L={K}.LBL(),d=L.placed.find(p=>p.kind==='drop'),W=innerWidth,H=innerHeight;
