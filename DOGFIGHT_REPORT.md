@@ -152,3 +152,12 @@ Everything else
 17. Existing install: open the home screen app; it should reload once to the new build with your callsign,
     records and settings intact.
 18. On 2026-10-07 (UTC) the Daily Challenge should be the dogfight.
+
+## Live
+
+Merged to master as 729816e and pushed. GitHub Pages rebuilt by itself inside a minute (`version.json` reads
+`2026-10-03-dogfight`), so no build was requested through the API. `tests/live_check.py` passes against
+https://rabahharchaoui-design.github.io/kgeu-flight/ and now also starts the dogfight there: the card, the
+briefing, FIGHT'S ON, a live bandit, `dogfight.m4a` forced, no console errors. The Worker
+(https://pfs-scores.rabahharchaoui.workers.dev) answers for `df:score:hard`. A `pre-dogfight` worktree used
+for the baseline comparisons is left at `~/Developer/cc-test/kgeu-predf`.

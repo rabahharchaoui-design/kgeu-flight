@@ -119,6 +119,22 @@ async def main():
         await pg.evaluate("()=>window.__kgeu.openMenu()")
         await pg.wait_for_timeout(300)
     chk('no console errors while spawning', len(errs)==n0, str(errs[n0:n0+2]))
+    # the Red Flag Dogfight starts on the live site: card, briefing, FIGHT'S ON, a bandit, the dogfight song
+    n1=len(errs)
+    await pg.evaluate("()=>window.__kgeu.nav('sArc')")
+    chk('arcade hub has the dogfight, not coming soon', await pg.is_visible('#arcCards [data-m="dogfight"]') and 'oming soon' not in await pg.inner_text('#arcCards [data-m="dogfight"]'))
+    await pg.evaluate("()=>document.querySelector('#arcCards [data-m=\"dogfight\"]').click()")
+    for _ in range(40):
+        if await pg.is_visible('#dfbGo'): break
+        await pg.wait_for_timeout(500)
+    chk('dogfight briefing says Sound on', 'Sound on for the full experience' in await pg.evaluate("()=>document.body.innerText"))
+    await pg.evaluate("()=>document.getElementById('dfbGo').click()")
+    await pg.wait_for_timeout(4000)
+    d=await pg.evaluate("()=>{const K=window.__kgeu,D=K.DF;return [!!D.on,D.wave,D.bandits.filter(b=>b.alive).length,K.MUSIC?K.MUSIC.forced:null,K.state().type];}")
+    chk('dogfight runs on the live site', d[0] and d[2]>=1 and d[4]=='f16', str(d))
+    chk('no console errors in the dogfight', len(errs)==n1, str(errs[n1:n1+2]))
+    await pg.evaluate("()=>window.__kgeu.openMenu()")
+    await pg.wait_for_timeout(300)
     # the radio clips must actually come down from the live host
     await pg.evaluate("()=>window.__kgeu.initAudio()")
     for _ in range(50):
