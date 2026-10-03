@@ -24,6 +24,7 @@ async def main():
         await pg.wait_for_function(f"()=>{K}.warm()", timeout=30000)
 
         # 1. a mission (daily), started by a real tap from the menu
+        await pg.evaluate(f"()=>{K}.dailyRegion('az')")   # today's daily may be at a world airport: keep it here
         await pg.evaluate(f"(s)=>{{{K}.openMenu();{K}.nav(s);}}", 'sMis')
         await pg.wait_for_timeout(250)
         await finger(pg, '#misCards .mcard[data-m=daily]')

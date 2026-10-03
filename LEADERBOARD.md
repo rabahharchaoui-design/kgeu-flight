@@ -72,16 +72,28 @@ game's `runMode()`), including the first flight lesson's assists. Every board ha
 | `lesson:engine` | Engine failure | lesson score | higher | 15 s | 0 to 100 | |
 | `lesson:pattern` | Pattern and touch and go | lesson score | higher | 45 s | 0 to 100 | |
 | `free:landing` | Free flight landing | landing points | higher | 8 s | 0 to 100 | |
+| `apt:RJTT` | Tokyo Haneda landing | arcade points | higher | 20 s | 0 to 1,500 | yes |
+| `apt:LFPG` | Paris CDG landing | arcade points | higher | 20 s | 0 to 1,500 | yes |
+| `apt:SBRJ` | Rio Santos Dumont landing | arcade points | higher | 20 s | 0 to 1,500 | yes |
 
-**Arcade points** (daily, 5 mile and 1 mile landing challenges), unchanged from the arcade:
+**Arcade points** (daily, 5 mile and 1 mile landing challenges, world airports), unchanged from the arcade:
 
     par    = round((start distance m + 2500) / (1.3 x approach speed m/s) + 25)   seconds
     points = round(1000 x min(1.5, par / your time) x G)
     G      = A 1.0, B 0.9, C 0.8, D 0.7 from the landing grade; F or the wrong runway scores nothing
 
 The clock runs from the start in the air to the wheels touching the target runway. The server
-also checks `points <= 1000 x min(1.5, parMax / time)` with parMax 480 s (5 mile and daily) and
+also checks `points <= 1000 x min(1.5, parMax / time)` with parMax 480 s (5 mile, daily and world airports) and
 180 s (1 mile), the slowest aircraft's par.
+
+**World airports** (`apt:` + the airport's ICAO code, group World airports on the Boards screen): the 5 mile
+landing challenge flown to the region's home runway, Tokyo Haneda 34R, Paris CDG 26L, Rio Santos Dumont 20L.
+The start is the 5 mile challenge's (9,000 m out, 0.9 rad aside, 2,500 ft, 1.35 x Vapp) and the score is the same
+arcade points: par from the start distance to the home runway and the aircraft's approach speed, times the
+landing grade; either end of the home runway counts, any other runway scores nothing. The server checks parMax
+480 s like the 5 mile board. The cards are under the Arizona games on ARCADE; tapping one from another region
+switches there first (`aptStart(region)`, `pickRegion` with a resume) and the run, its token included, starts
+after the reload. Each board's all time best is lettered on that airport's @OhRabah city billboard (see Fame).
 
 **Landing points** (free flight landings, and the grade inside arcade points), 0 to 100:
 
@@ -153,15 +165,24 @@ share limits with a prefix in `FAMILIES` in boards.js.
 ## Daily challenge
 
 Seeded by the UTC date (`yyyymmdd`), so it is identical worldwide and turns over at 00:00 UTC
-(17:00 in Arizona): the same aircraft, target runway, start point, distance and height, time of
+(17:00 in Arizona): the same region, aircraft, target runway, start point, distance and height, time of
 day (day, sunset or night) and wind (direction and speed). Gusts stay random. It is the first
-card on MISSIONS (and still on ARCADE) with a countdown to the next one.
+card on MISSIONS (and still on ARCADE) with a countdown to the next one; the card names the airport
+and runway, the aircraft, the time of day and the wind ("Rio Santos Dumont, runway 20L", "MQ-9A
+Reaper, night, wind 100 at 5").
+
+The region rotates: one region per UTC day, drawn from four (Arizona, Tokyo Haneda, Paris CDG, Rio
+Santos Dumont) with the seed's first draw, so an Arizona day keeps the rest of its draws as before
+(a Glendale or Luke runway end). On a world airport's day the target is that region's home runway
+end (34R, 26L, 20L). A day in another region switches the player there: GO saves the region and a
+resume, the page reloads, and the daily starts in the new region with the day's time and wind.
 
 One official attempt a day: the Worker hands out one daily token per player per UTC day; the
 next request that day answers `practice`, the HUD says Practice and nothing is submitted. Offline,
 the game remembers the day's attempt locally and uses a pool token; the server still refuses a
 second daily score for that day. A run that is started counts as the attempt even if it is
-abandoned.
+abandoned. When the day's daily is in another region, nothing is counted before the reload: the local
+mark (`kgeuDaily`) and the token request happen when the run starts in the new region.
 
 ## Ranks and XP
 
@@ -240,7 +261,9 @@ copy of the leader's aircraft (the best ghost of either mode) with their callsig
 
 Fetched once per launch and cached: today's daily #1 (Hard first) is lettered under the @OhRabah
 billboard by State Farm Stadium, and the all time top 3 by XP are painted on the KGEU hangar next
-to the @OhRabah hangar banner. The player's callsign is painted small on the F-16 canopy rail and
+to the @OhRabah hangar banner. At a world airport, the all time best on its `apt:` board (either mode)
+is lettered on the @OhRabah city billboard ("TOKYO #1  CALLSIGN", "COULD BE YOU" while there is none),
+from the `apt` field of `/fame` (cached in `kgeuFame` like the rest). The player's callsign is painted small on the F-16 canopy rail and
 on the nose of every other aircraft.
 
 ## Updating the app
@@ -312,7 +335,9 @@ The HTTP API, for reference: `GET /health`, `GET /name?cs=`, `GET /board?b=&p=to
 (answers `{board, mode:'all', period, dir, total, rows:[{r, cs, score, secs, ac, mode, xp, rank, creator, when}],
 me:{r, cs, score, mode, ...}, ghost, now, day}`: one row per player, their best across Easy and Hard, `mode` is
 `easy` or `hard`; `total` counts each player once; an `m` parameter is ignored),
-`GET /ghost?b=` (the best ghost of either mode; `m` ignored), `GET /fame`, `GET /ranks`, `POST /signup {cs,key[,secret]}`,
+`GET /ghost?b=` (the best ghost of either mode; `m` ignored), `GET /fame` (answers `{day, daily:{cs, score, mode}|null,
+top:[{cs, xp, rank, creator}], apt:{RJTT:{cs, score, mode}|null, LFPG:..., SBRJ:...}}`: `apt` is each world airport's
+all time best accepted score across both modes, ties to the earliest, banned players left out), `GET /ranks`, `POST /signup {cs,key[,secret]}`,
 `POST /restore {cs,key,code}`, `POST /me {cs,key}`, `POST /rename {cs,key,to}`,
 `POST /token {cs,key,board,mode}`, `POST /pool {cs,key,n}`,
 `POST /submit {cs,key,token,board,mode,score,secs,ac,wx,when[,path]}`. CORS and POSTs are

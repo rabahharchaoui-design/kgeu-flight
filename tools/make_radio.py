@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Pre-record every ATC line with the macOS `say` command.
 
+The cockpit voice (TCAS, c_* clips) is Daniel, Enhanced if installed, and is
+played dry in the game.
+
 Two Enhanced voices: Samantha for the controllers, Evan for the pilots. Female
 tower against male pilot is the pairing that stays readable through a band
 limited radio filter, where two male voices blur together.
@@ -20,6 +23,9 @@ OUT = os.path.join(ROOT, 'radio')
 TOWER_VOICE = 'Samantha (Enhanced)'
 PILOT_VOICE = 'Evan (Enhanced)'
 TOWER_RATE, PILOT_RATE = 200, 190          # controllers talk faster than pilots
+# the cockpit voice (TCAS): calm male, played dry in the game, not through the radio
+COCKPIT_VOICES = ('Daniel (Enhanced)', 'Daniel')
+COCKPIT_RATE = 175
 
 # ---- said by both sides: the pilot calls the facility, the tower calls the aircraft ----
 BOTH = {
@@ -28,6 +34,13 @@ BOTH = {
     'luke_tower':       'Luke Tower',
     'luke_ground':      'Luke Ground',
     'phoenix_approach': 'Phoenix Approach',
+    # world regions (4.6b): the tower and ground of each region's airport
+    'tokyo_tower':         'Tokyo Tower',
+    'tokyo_ground':        'Haneda Ground',
+    'degaulle_tower':      'de Gaulle Tower',
+    'degaulle_ground':     'de Gaulle Ground',
+    'santosdumont_tower':  'Santos Dumont Tower',
+    'santosdumont_ground': 'Santos Dumont Ground',
     'cs_skyhawk':       'Skyhawk eight four zero one lima',
     'cs_skyhawk_s':     'Skyhawk zero one lima',
     'cs_viper':         'Viper one',
@@ -45,6 +58,17 @@ TOWER = {
     'rwy_1':   'runway one',              'rwy_19':  'runway one niner',
     'rwy_03l': 'runway zero three left',  'rwy_03r': 'runway zero three right',
     'rwy_21l': 'runway two one left',     'rwy_21r': 'runway two one right',
+    # world regions (4.6b): every runway end at Haneda, de Gaulle and Santos Dumont
+    'rwy_34r': 'runway three four right', 'rwy_34l': 'runway three four left',
+    'rwy_16r': 'runway one six right',    'rwy_16l': 'runway one six left',
+    'rwy_04':  'runway zero four',        'rwy_22':  'runway two two',
+    'rwy_05':  'runway zero five',        'rwy_23':  'runway two three',
+    'rwy_26l': 'runway two six left',     'rwy_26r': 'runway two six right',
+    'rwy_27l': 'runway two seven left',   'rwy_27r': 'runway two seven right',
+    'rwy_08l': 'runway zero eight left',  'rwy_08r': 'runway zero eight right',
+    'rwy_09l': 'runway zero niner left',  'rwy_09r': 'runway zero niner right',
+    'rwy_20l': 'runway two zero left',    'rwy_20r': 'runway two zero right',
+    'rwy_02l': 'runway zero two left',    'rwy_02r': 'runway zero two right',
 
     'cleared_to':     'cleared for takeoff.',
     'cleared_land':   'cleared to land.',
@@ -82,6 +106,9 @@ TOWER = {
     'tfc_c17':    'a C-seventeen.',
     'tfc_reaper': 'an M Q nine.',
     'tfc_banner': 'a banner tow plane.',
+    'tfc_airliner': 'an airliner.',
+    'tfc_f16':      'an F-sixteen.',
+    'tfc_heli':     'a helicopter.',
 
     'gila_range':  'Gila Range Control,',
     'cleared_hot': 'you are cleared hot. Range is clear, four targets.',
@@ -126,6 +153,16 @@ CHATTER_TOWER = {
     'ch_t7': 'Cessna seven three eight golf echo, runway one, taxi via alpha.',
     'ch_t8': 'Reach four eight two, direct Luke approved, maintain eight thousand.',
     'ch_t9': 'Viper two one flight, check wheels down. Runway three left, cleared to land.',
+    # world regions (4.6b): generic callsigns only, never a real airline
+    'ch_jp_t1': 'Skyline two two, Tokyo Tower, runway three four left, continue approach.',
+    'ch_jp_t2': 'Pacific seven, Haneda Ground, runway zero five, taxi via charlie.',
+    'ch_jp_t3': 'Orient four one, runway zero five, cleared for takeoff.',
+    'ch_fr_t1': 'Atlantic three one zero, de Gaulle Tower, runway two seven right, cleared to land.',
+    'ch_fr_t2': 'Riviera five two, de Gaulle Ground, push and start approved, facing east.',
+    'ch_fr_t3': 'Lumiere nine eight, runway two six left, line up and wait.',
+    'ch_br_t1': 'Carioca one five, Santos Dumont Tower, runway two zero left, cleared to land.',
+    'ch_br_t2': 'Sugarloaf eight, Santos Dumont Ground, runway two zero right, taxi via alpha.',
+    'ch_br_t3': 'Guanabara three, runway two zero right, cleared for takeoff, right turn out over the bay.',
 }
 CHATTER_PILOT = {
     'ch_p1': 'Luke tower, viper two one, flight of two, initial, runway three left.',
@@ -140,11 +177,44 @@ CHATTER_PILOT = {
     'ch_p10': 'Viper two two, bingo.',
     'ch_p11': 'Copy. Viper two one flight, knock it off. Rejoin, R T B.',
     'ch_p12': 'Cleared to land, viper two one.',
+    # world regions (4.6b)
+    'ch_jp_p1': 'Tokyo Tower, Skyline two two, ten miles south, runway three four left.',
+    'ch_jp_p2': 'Haneda Ground, Pacific seven, at the gate, request taxi.',
+    'ch_jp_p3': 'Tokyo Tower, Orient four one, ready runway zero five.',
+    'ch_fr_p1': 'de Gaulle Tower, Atlantic three one zero, established runway two seven right.',
+    'ch_fr_p2': 'de Gaulle Ground, Riviera five two, request push and start.',
+    'ch_fr_p3': 'de Gaulle Tower, Lumiere nine eight, ready runway two six left.',
+    'ch_br_p1': 'Santos Dumont Tower, Carioca one five, over the bridge, runway two zero left.',
+    'ch_br_p2': 'Santos Dumont Ground, Sugarloaf eight, request taxi.',
+    'ch_br_p3': 'Santos Dumont Tower, Guanabara three, ready runway two zero right.',
+}
+
+# ---- cockpit voice, c_*: TCAS callouts (Hard) and plain English versions (Easy) ----
+COCKPIT = {
+    'tcas_traffic':     'Traffic, traffic.',
+    'tcas_climb':       'Climb, climb.',
+    'tcas_descend':     'Descend, descend.',
+    'tcas_climb_now':   'Increase climb, increase climb.',
+    'tcas_descend_now': 'Increase descent, increase descent.',
+    'tcas_clear':       'Clear of conflict.',
+    'tcas_e_traffic':   'Plane nearby!',
+    'tcas_e_climb':     'Plane nearby! Climb now!',
+    'tcas_e_descend':   'Plane nearby! Descend now!',
+    'tcas_e_clear':     'All clear.',
 }
 
 
+def cockpit_voice(voices=None):
+    if voices is None:
+        voices = subprocess.run(['say', '-v', '?'], capture_output=True, text=True).stdout
+    for v in COCKPIT_VOICES:
+        if any(line.startswith(v + ' ') or line.startswith(v + '\t') for line in voices.splitlines()):
+            return v
+    return None
+
+
 def manifest():
-    """id -> (voice tag, text). Tower clips are t_*, pilot clips p_*."""
+    """id -> (voice tag, text). Tower clips are t_*, pilot clips p_*, cockpit c_*."""
     m = {}
     for k, v in BOTH.items():
         m['t_' + k] = ('t', v)
@@ -153,6 +223,7 @@ def manifest():
     for k, v in CHATTER_TOWER.items():  m['t_' + k] = ('t', v)
     for k, v in PILOT.items():          m['p_' + k] = ('p', v)
     for k, v in CHATTER_PILOT.items():  m['p_' + k] = ('p', v)
+    for k, v in COCKPIT.items():        m['c_' + k] = ('c', v)
     return m
 
 
@@ -165,7 +236,10 @@ TRIM = ('silenceremove=start_periods=1:start_silence=0.02:start_threshold=-50dB:
 def render(cid, voice, text, tmp):
     aiff = os.path.join(tmp, cid + '.aiff')
     m4a = os.path.join(OUT, cid + '.m4a')
-    v, rate = (TOWER_VOICE, TOWER_RATE) if voice == 't' else (PILOT_VOICE, PILOT_RATE)
+    if voice == 'c':
+        v, rate = cockpit_voice(), COCKPIT_RATE
+    else:
+        v, rate = (TOWER_VOICE, TOWER_RATE) if voice == 't' else (PILOT_VOICE, PILOT_RATE)
     subprocess.run(['say', '-v', v, '-r', str(rate), '-o', aiff, text], check=True)
     subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', aiff, '-af', TRIM,
                     '-ac', '1', '-c:a', 'aac', '-b:a', '64k', m4a], check=True)
@@ -192,6 +266,9 @@ def main():
         if v not in voices:
             print(f'voice not installed: {v}', file=sys.stderr)
             return 2
+    if not cockpit_voice(voices):
+        print(f'voice not installed: {COCKPIT_VOICES[0]} or {COCKPIT_VOICES[1]}', file=sys.stderr)
+        return 2
 
     os.makedirs(OUT, exist_ok=True)
     tmp = os.path.join(OUT, '.tmp')
@@ -212,7 +289,7 @@ def main():
 
     json.dump(sorted(m.keys()), open(os.path.join(OUT, 'clips.json'), 'w'), indent=0)
     print(f'{len(m)} clips, {total/1024:.0f} KB total, average {total/len(m)/1024:.1f} KB')
-    print(f'tower voice {TOWER_VOICE}, pilot voice {PILOT_VOICE}')
+    print(f'tower voice {TOWER_VOICE}, pilot voice {PILOT_VOICE}, cockpit voice {cockpit_voice(voices)}')
     return 0
 
 

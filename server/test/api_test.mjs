@@ -185,13 +185,22 @@ async function main() {
   ok('first daily token is official', !!d1.token && !d1.practice);
   const d2 = await tokenFor(you, 'daily');
   ok('second daily token of the day is practice', d2.practice === true && !d2.token);
+  const ta = await tokenFor(me, 'apt:RJTT');
+  ok('world airport token issued (apt:RJTT)', !!ta.token, JSON.stringify(ta));
   await sleep(20500);
+  const sa1 = await call('/submit', Object.assign({ board: 'apt:RJTT', mode: 'hard', score: 1100, secs: 95, ac: 'cessna', wx: 'night 40@8', when: Date.now(), token: ta.token, path: await encPath(line(95, 40)) }, me));
+  ok('world airport run accepted (apt:RJTT)', sa1.s === 200 && sa1.j.ok && sa1.j.rank === 1, JSON.stringify(sa1.j));
+  const ba = await call('/board?b=apt:RJTT&p=all&cs=' + A);
+  ok('apt:RJTT board lists it', ba.j.rows && ba.j.rows.length === 1 && ba.j.rows[0].cs === A && ba.j.rows[0].score === 1100 && ba.j.me && ba.j.me.r === 1, JSON.stringify(ba.j.rows));
+  ok('apt:RJTT points too high for the time refused', (await call('/submit', Object.assign({ board: 'apt:RJTT', mode: 'hard', score: 1500, secs: 400, ac: 'cessna', when: Date.now(), token: (await call('/pool', Object.assign({ n: 1 }, me))).j.tokens[0], path: await encPath(line(400, 40)) }, me))).j.reason === 'points too high for a 400 s run');
   const ds = await call('/submit', Object.assign({ board: 'daily', mode: 'hard', score: 800, secs: 90, ac: 'f16', wx: 'day', when: Date.now(), token: d1.token, path: await encPath(line(90, 100)) }, you));
   ok('official daily attempt accepted', ds.s === 200, JSON.stringify(ds.j));
   const yp = (await call('/pool', Object.assign({ n: 1 }, you))).j.tokens[0];
   ok('second daily score of the day refused', (await call('/submit', Object.assign({ board: 'daily', mode: 'hard', score: 900, secs: 90, ac: 'f16', when: Date.now(), token: yp, path: await encPath(line(90, 100)) }, you))).j.reason === 'second official daily attempt');
   const fm = await call('/fame');
   ok('fame: today\'s daily #1 and the top 3 by XP', fm.j.daily && fm.j.daily.cs === B && fm.j.top.length >= 2, JSON.stringify(fm.j));
+  ok('fame: the world airport champions (apt.RJTT, nobody yet at LFPG and SBRJ)', fm.j.apt && fm.j.apt.RJTT && fm.j.apt.RJTT.cs === A && fm.j.apt.RJTT.score === 1100 && fm.j.apt.RJTT.mode === 'hard'
+    && 'LFPG' in fm.j.apt && 'SBRJ' in fm.j.apt && (LIVE || (fm.j.apt.LFPG === null && fm.j.apt.SBRJ === null)), JSON.stringify(fm.j.apt));
 
   // ---- rename: old scores follow, once per 30 days
   const C = tag();

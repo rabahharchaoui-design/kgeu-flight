@@ -41,6 +41,7 @@ async def main():
             await pg.wait_for_timeout(150)
 
             # a mission -> pause sheet
+            await pg.evaluate(f"()=>{K}.dailyRegion('az')")   # today's daily may be at a world airport: keep it here
             await pg.evaluate(f"(s)=>{{{K}.openMenu();{K}.nav(s);}}", 'sMis')
             await pg.wait_for_timeout(250)
             await finger(pg, '#misCards .mcard[data-m=daily]')

@@ -84,6 +84,8 @@ async def main():
         pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'rookie' if '--easy' in sys.argv else 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'})
         await pg.wait_for_function(f"()=>{K}.warm()", timeout=30000)
         ok('warm up at the menu finished (every aircraft and the drop zone built and compiled)', True)
+        # today's daily may be at a world airport (the rotation): pin it to Arizona so its tap starts a flight, no reload
+        await pg.evaluate(f"()=>{K}.dailyRegion('az')")
         cdp = await pg.context.new_cdp_session(pg)
         async def touch(kind, pts):
             await cdp.send('Input.dispatchTouchEvent', {'type': kind, 'touchPoints': [

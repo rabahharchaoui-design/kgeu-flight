@@ -419,11 +419,20 @@ async function ghost(c) {
   return json({ ghost: { cs: g.cs, creator: !!g.creator, score: g.score, secs: g.secs, ac: g.ac, path: JSON.parse(g.path) } });
 }
 
-// fame in the world: today's daily #1 on the billboard, the top 3 by XP on the hangar wall
+// fame in the world: today's daily #1 on the billboard, the top 3 by XP on the hangar wall,
+// and each world airport's all time best on its city billboard
+const APT_FAME = ['RJTT', 'LFPG', 'SBRJ'];
 async function fame(c) {
   const day = dayOf(c.now);
   const d = await c.env.DB.prepare(`SELECT p.callsign cs, s.score, s.mode FROM scores s JOIN players p ON p.id=s.player_id
     WHERE s.board='daily' AND s.day=? AND p.banned=0 ORDER BY (s.mode='hard') DESC, s.score DESC, s.created ASC LIMIT 1`).bind(day).first();
   const top = (await c.env.DB.prepare('SELECT callsign cs, xp, creator FROM players WHERE banned=0 AND xp>0 ORDER BY xp DESC, created ASC LIMIT 3').all()).results;
-  return json({ day, daily: d || null, top: top.map(x => ({ cs: x.cs, xp: x.xp, rank: rankOf(x.xp).name, creator: !!x.creator })) });
+  // the world airports' city billboards: the all time best on each apt: board, either mode
+  const apt = {};
+  await Promise.all(APT_FAME.map(async icao => {
+    const r = await c.env.DB.prepare(`SELECT p.callsign cs, s.score, s.mode FROM scores s JOIN players p ON p.id=s.player_id
+      WHERE s.board=? AND p.banned=0 ORDER BY s.score DESC, s.created ASC LIMIT 1`).bind('apt:' + icao).first();
+    apt[icao] = r ? { cs: r.cs, score: r.score, mode: r.mode === 'easy' ? 'easy' : 'hard' } : null;
+  }));
+  return json({ day, daily: d || null, top: top.map(x => ({ cs: x.cs, xp: x.xp, rank: rankOf(x.xp).name, creator: !!x.creator })), apt });
 }

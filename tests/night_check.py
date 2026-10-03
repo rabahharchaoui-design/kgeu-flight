@@ -50,8 +50,8 @@ async def main():
             A = await pg.evaluate("()=>window.__kgeu.acLights()")
             c(f'{typ}: no light pool by day', A['poolOpacity'] == 0, A)
             await pg.evaluate("()=>window.__kgeu.stepFrame(0,true)")
-        c('traffic: nav/strobe lights on the Cessna, F-16s, MQ-9 and banner tow',
-          sum(1 for x in A['traffic'] if x > 0) == 5, A['traffic'])
+        c('traffic: nav/strobe lights on the banner tow and every AI aircraft (6 to 10 of them)',
+          7 <= len(A['traffic']) <= 11 and all(x > 0 for x in A['traffic']), A['traffic'])
         for base, typ in [('kgeu', 'cessna'), ('luke', 'c130')]:
             await pg.evaluate("([t,b])=>{const K=window.__kgeu;K.setTOD('night');K.pick(t);K.pickBase(b);K.start('final');}", [typ, base])
             await pg.wait_for_timeout(300)
