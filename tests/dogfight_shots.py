@@ -14,9 +14,10 @@
 #
 # 5.2 shot names: buttons (also writes 52_buttons_568.png), search, lock, missile, gun, killcam
 # 5.3 shot names: lock, launch, launch_easy, flares, hit2, harddeck, eject, launch_568, high
+# 5.4 shot names: brief, brief_easy, brief_568, brief_silent, arrows (also writes 54b_arrows_568.png), lock, awacs
 import asyncio, os, argparse
 from playwright.async_api import async_playwright
-from harness import serve, launch, page, finger, IPHONE_15
+from harness import serve, launch, page, finger, IPHONE_15, THREE, splash_gone, IGNORE
 
 OUT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'overnight-screenshots', 'dogfight'))
 K = 'window.__kgeu'
@@ -76,7 +77,7 @@ async def wait_lock(pg, timeout=4.0):
 async def dfstart_f16(pg):
     """The 5.2 shots place bandits by hand, so skip the menu/card flow and start the dogfight
     directly as tests/dogfight_weapons_check.py does, with the aircraft forced to the F-16."""
-    await pg.evaluate(f"()=>{K}.dfStart()")
+    await pg.evaluate(f"()=>{{{K}.DF.test.noBrief=true;{K}.dfStart();}}")
     await pg.wait_for_timeout(500)
     await fast(pg, 0.3)
 
@@ -386,9 +387,147 @@ SHOTS_53 = {
 }
 
 
+# ===================== 5.4 (54b: the briefing card, voices, arrows, amber lock) =====================
+IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
+
+
+async def new_page_ios(b, url, skill='pilot'):
+    """An iPhone-UA context with no navigator.audioSession stub at all (unlike the real iPhone this
+    doesn't have one, which is Chromium's actual default) -- IS_IOS reads true from the UA string, so
+    the briefing card's 'Turn off silent mode' line shows, matching dogfight_voice_check.py's own case."""
+    ctx = await b.new_context(viewport=IPHONE_15, has_touch=True, is_mobile=True, device_scale_factor=2, user_agent=IPHONE_UA)
+    pg = await ctx.new_page()
+    pg.errs = []
+    pg.on('pageerror', lambda e: pg.errs.append(str(e)))
+    pg.on('console', lambda m: pg.errs.append(m.text) if m.type == 'error' and not any(k in m.text for k in IGNORE) else None)
+    await pg.route('**/three.min.js', lambda r: r.fulfill(body=THREE, content_type='application/javascript'))
+    await pg.route('**/fonts.googleapis.com/**', lambda r: r.abort())
+    await pg.route('**/fonts.gstatic.com/**', lambda r: r.abort())
+    await ctx.add_init_script('(()=>{if(sessionStorage.getItem("__seeded"))return;sessionStorage.setItem("__seeded","1");localStorage.clear();'
+        f'localStorage.setItem("kgeuOnboard",{skill!r});localStorage.setItem("kgeuTut","1");localStorage.setItem("kgeuType","f16");}})()')
+    await pg.goto(url)
+    await pg.wait_for_function('()=>window.__kgeu', timeout=30000)
+    await splash_gone(pg)
+    await pg.wait_for_timeout(300)
+    return pg
+
+
+async def dfopen_brief(pg):
+    """From the menu: Arcade -> tap the Red Flag Dogfight card -> the briefing card shows (no test.noBrief,
+    the normal path a player takes)."""
+    await pg.evaluate(f"()=>{{{K}.openMenu();{K}.nav('sArc')}}"); await pg.wait_for_timeout(300)
+    await finger(pg, '#arcCards [data-m="dogfight"]'); await pg.wait_for_timeout(500)
+
+
+async def shot54b_brief(pg, name):
+    await dfopen_brief(pg)
+    r = await pg.evaluate("""()=>{const g=document.getElementById('dfbGo').getBoundingClientRect();
+      return {mode:document.getElementById('dfbMode').textContent,fits:g.bottom<=innerHeight&&g.top>=0,btn:[g.width,g.height]}}""")
+    print(f'  {name}: state', r)
+    path = os.path.join(OUT, name)
+    await pg.screenshot(path=path, timeout=120000)
+    print('  wrote', path)
+
+
+async def shot54b_brief_hard(pg):
+    await shot54b_brief(pg, '54b_brief.png')
+
+
+async def shot54b_brief_easy(pg):
+    await shot54b_brief(pg, '54b_brief_easy.png')
+
+
+async def shot54b_brief_568(pg):
+    await shot54b_brief(pg, '54b_brief_568.png')
+
+
+async def shot54b_brief_silent(pg):
+    await dfopen_brief(pg)
+    r = await pg.evaluate("""()=>{const s=document.getElementById('dfbSil');
+      return {sil:!s.hidden&&s.offsetParent!==null,txt:s.textContent,as:'audioSession' in navigator}}""")
+    print('  brief_silent: state', r)
+    path = os.path.join(OUT, '54b_brief_silent.png')
+    await pg.screenshot(path=path, timeout=120000)
+    print('  wrote', path)
+
+
+async def shot54b_arrows(pg):
+    # bandits at 3, 6 and 9 o'clock (off=+-pi/2 and pi, the same placement dogfight_defense_check.py's
+    # own arrows() check uses) plus a forced launch off the 6 o'clock one (bandits[0] -- test.launchAt
+    # always fires it) so the red missile arrow shows alongside the three green bandit arrows.
+    await pg.evaluate(f"()=>{{{K}.DF.test.noBanditFire=true;{K}.DF.test.noBrief=true;{K}.dfStart();}}")
+    await pg.wait_for_timeout(400); await fast(pg, 0.2)
+    await pg.evaluate(f"()=>{K}.DF.test.wave(3)")
+    for i, off in ((0, SIX), (1, -1.5708), (2, 1.5708)):
+        await place(pg, i, 3000 if i == 0 else 2000, off)
+    await pg.evaluate(f"()=>{K}.DF.test.launchAt()")
+    await fast(pg, 0.2)
+    a = await pg.evaluate(f"()=>({{rwr:{K}.DF.rwr,n:{K}.DF.bandits.filter(b=>b.alive).length}})")
+    print('  arrows: state', a)
+    await shot(pg, '54b_arrows.png')
+    await pg.set_viewport_size({'width': 568, 'height': 320}); await pg.wait_for_timeout(400); await fast(pg, 0.1)
+    await shot(pg, '54b_arrows_568.png')
+    await pg.set_viewport_size(IPHONE_15)
+
+
+async def shot54b_lock(pg):
+    await dfstart_f16(pg)
+    await place(pg, 0, 1500, SIX)
+    t = await wait_rwr(pg, 'lock')
+    print('  lock: t', t)
+    # the amber edges (#dfVig .a, keyframes dfVa) pulse 0.3 -> 1 opacity on a real-wallclock CSS animation
+    # (the sim itself stays frozen -- stepFrame holds loopHeld -- so nothing else moves). This headless,
+    # software-rendered browser only advances that animation's clock at an actual style query, not during
+    # one long idle wait_for_timeout (a single big sleep then a single read comes back pinned at the 0.3
+    # start value); polling with a style read every 50 ms, like wait_rwr's own fast-forward loop, walks it
+    # forward for real and lets the screenshot land once it's within sight of its brightest frame.
+    await settle(pg, 4)
+    await pg.evaluate("()=>{const el=document.getElementById('dfVig');el.classList.remove('lock');void el.offsetHeight;el.classList.add('lock');}")
+    op = 0.0
+    for _ in range(20):
+        await pg.wait_for_timeout(50)
+        op = float(await pg.evaluate("()=>getComputedStyle(document.getElementById('dfVig').querySelector('.a')).opacity"))
+        if op >= 0.9:
+            break
+    print('  lock: peak opacity', round(op, 2))
+    path = os.path.join(OUT, '54b_lock.png')
+    await pg.screenshot(path=path, timeout=120000)
+    print('  wrote', path)
+
+
+async def shot54b_awacs(pg):
+    await dfstart_f16(pg)
+    await kill_wave(pg)
+    await fast(pg, 4.2)   # DF.gap is a fixed 4 s; wave 2 spawns and dfPicture() queues Sentry's call right after
+    # dfPicture() only queues the call (vqAdd); the wave-clear "Splash"/"Picture clean" lines queued just
+    # before it have to finish airing first, so poll (in small sim ticks) until the Sentry picture line is
+    # actually the one on the air, not just the toast or the previous call's leftover text in the strip.
+    t = 0.0
+    while t < 12.0:
+        live = await pg.evaluate(f"()=>{{const c={K}.VQ.cur;return c&&c.line&&c.line.text||''}}")
+        if live.startswith('Sentry,'):
+            break
+        await fast(pg, 0.2); t += 0.2
+    w = await pg.evaluate("""()=>({wave:window.__kgeu.DF.wave,sub:document.getElementById('dfSub').classList.contains('on'),
+      txt:document.getElementById('dfSub').innerText})""")
+    print('  awacs: waited', round(t, 1), 'state', w)
+    await shot(pg, '54b_awacs.png')
+
+
+SHOTS_54B = {
+    'brief': (shot54b_brief_hard, None, 'pilot', False),
+    'brief_easy': (shot54b_brief_easy, None, 'rookie', False),
+    'brief_568': (shot54b_brief_568, {'width': 568, 'height': 320}, 'pilot', False),
+    'brief_silent': (shot54b_brief_silent, None, 'pilot', True),
+    'arrows': (shot54b_arrows, None, 'pilot', False),
+    'lock': (shot54b_lock, None, 'pilot', False),
+    'awacs': (shot54b_awacs, None, 'pilot', False),
+}
+
+
 async def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--set', choices=['51', '52', '53'], default='51')
+    ap.add_argument('--set', choices=['51', '52', '53', '54b'], default='51')
     ap.add_argument('--only', default=None, help='comma-separated subset of 5.2/5.3 shot names')
     args = ap.parse_args()
 
@@ -417,7 +556,7 @@ async def main():
                 else:
                     print(f'  no console errors ({name})')
                 await pg.close()
-        else:
+        elif args.set == '53':
             names = args.only.split(',') if args.only else list(SHOTS_53.keys())
             for name in names:
                 name = name.strip()
@@ -426,6 +565,22 @@ async def main():
                     print('  unknown 5.3 shot:', name); continue
                 fn, vp, skill = entry
                 pg = await new_page(b, url, 'f16', vp=vp or IPHONE_15, skill=skill or 'pilot')
+                await fn(pg)
+                if pg.errs:
+                    print(f'  console errors ({name}):', pg.errs[:5])
+                else:
+                    print(f'  no console errors ({name})')
+                await pg.close()
+        else:
+            names = args.only.split(',') if args.only else list(SHOTS_54B.keys())
+            for name in names:
+                name = name.strip()
+                entry = SHOTS_54B.get(name)
+                if not entry:
+                    print('  unknown 54b shot:', name); continue
+                fn, vp, skill, ios = entry
+                pg = await new_page_ios(b, url, skill=skill or 'pilot') if ios else \
+                    await new_page(b, url, 'f16', vp=vp or IPHONE_15, skill=skill or 'pilot')
                 await fn(pg)
                 if pg.errs:
                     print(f'  console errors ({name}):', pg.errs[:5])

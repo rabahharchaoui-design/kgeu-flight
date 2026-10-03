@@ -34,7 +34,7 @@ async def until(pg, cond, mx, probe=None, at=0):
     return await pg.evaluate(UNTIL, [cond, mx, probe, at])
 
 async def start(pg, quiet=True):
-    await pg.evaluate(f"()=>{{const D={K}.DF;D.test.noBanditFire={'true' if quiet else 'false'};D.test.decoy=0;D.test.noDecoy=false;{K}.dfStart();}}")
+    await pg.evaluate(f"()=>{{const D={K}.DF;D.test.noBanditFire={'true' if quiet else 'false'};D.test.decoy=0;D.test.noDecoy=false;{K}.DF.test.noBrief=true;{K}.dfStart();}}")
     await pg.wait_for_timeout(400); await step(pg, 0.2)
 
 def ovl(a, b):
@@ -61,6 +61,43 @@ async def layout(pg, label):
     fb = [k for k in ('fox', 'gun', 'view', 'thr', 'sub') if r[k] and ovl(f, r[k])]
     ok(f'{label}: FLARES 60 pt or larger, on screen, overlapping nothing', f and min(f['w'], f['h']) >= 60 and not fb and f['x'] + f['w'] <= r['W'] and f['y'] + f['h'] <= r['H'], (f, fb))
 
+# 5.4 A1: the edge arrows ride a track clear of the HUD. Three bandits at 3, 6 and 9 o'clock and a missile at 6
+# o'clock: every arrow and its label clear of every piece of furniture, none on another, the missile's at the bottom
+ARROWS = """()=>{const u=document.getElementById('uiroot').getBoundingClientRect(),R=e=>{if(typeof e==='string')e=document.querySelector(e);if(!e)return null;const c=getComputedStyle(e);
+    if(c.display==='none'||c.visibility==='hidden')return null;const r=e.getBoundingClientRect();return r.width<1?null:{x:r.x,y:r.y,w:r.width,h:r.height}};
+  const f={};for(const [k,s] of [['map','#map'],['hud','#hud'],['pause','#bPause'],['card','#miss'],['tk','#tk'],['stick','#stickHint'],['view','#bCam'],['fox','#bFox'],['gun','#bGun'],['flr','#bFlr'],['thr','#thr']]){const r=R(s);if(r)f[k]=r;}
+  const sb=document.getElementById('dfSub').getBoundingClientRect();f.strip={x:sb.x,y:sb.bottom-28,w:sb.width,h:28};
+  const a=[...document.querySelectorAll('#dfHud .dfArr.on')].map(e=>({k:'g',b:R(e.firstChild),t:R(e.lastChild),txt:e.innerText}));
+  const m=document.querySelector('#dfHud .dfMw.on');if(m)a.push({k:'r',b:R(m.firstChild),t:R(m.lastChild),txt:m.innerText,vis:m.classList.contains('vis')});
+  return {f:f,a:a,W:innerWidth,H:innerHeight}}"""
+
+async def arrows(pg, label):
+    await start(pg)
+    await pg.evaluate(f"()=>{K}.DF.test.wave(3)")
+    for i, off in ((0, 3.14159), (1, -1.5708), (2, 1.5708)):
+        await pg.evaluate(PLACE, [i, 3000 if i == 0 else 2000, off])
+    await pg.evaluate(f"()=>{K}.DF.test.launchAt()"); await step(pg, 0.2)
+    r = await pg.evaluate(ARROWS)
+    hits = []
+    for x in r['a']:
+        for part in ('b', 't'):
+            if not x[part]: continue
+            hits += [(x['k'], x['txt'], part, k) for k, fr in r['f'].items() if ovl(x[part], fr)]
+            if x[part]['x'] < 0 or x[part]['y'] < 0 or x[part]['x'] + x[part]['w'] > r['W'] or x[part]['y'] + x[part]['h'] > r['H']: hits.append((x['k'], part, 'off screen'))
+    pairs = []
+    for i in range(len(r['a'])):
+        for j in range(i + 1, len(r['a'])):
+            for p1 in ('b', 't'):
+                for p2 in ('b', 't'):
+                    a, b2 = r['a'][i][p1], r['a'][j][p2]
+                    if a and b2 and ovl(a, b2): pairs.append((r['a'][i]['txt'], r['a'][j]['txt']))
+    g = [x for x in r['a'] if x['k'] == 'g']; m = next((x for x in r['a'] if x['k'] == 'r'), None)
+    ok(f'{label}: three bandit arrows and the missile arrow, each with its label', len(g) == 3 and m and not m['vis'] and all(x['t'] for x in r['a']) and re.match(r"^(5|6|7) o'clock", m['txt'] or ''), [(x['k'], x['txt']) for x in r['a']])
+    ok(f'{label}: no arrow or label on the gauges, map, pause, wave card, ticker, stick, VIEW, weapons, throttle or call strip', not hits, hits[:6])
+    ok(f'{label}: no two arrows or labels overlap (the green one makes way for the red)', not pairs, pairs[:4])
+    ok(f'{label}: the missile at 6 o\'clock rides the bottom of the track, above the call strip', m and m['b']['y'] + m['b']['h'] / 2 > r['H'] * 0.6 and m['b']['y'] + m['b']['h'] <= r['f']['strip']['y'], m and m['b'])
+    return r
+
 async def main():
     srv, url = serve()
     async with async_playwright() as p:
@@ -74,14 +111,22 @@ async def main():
             await step(pg, 5)
             seen.add(await pg.evaluate("()=>{const a=document.getElementById('atc');return a.classList.contains('on')&&getComputedStyle(a).display!=='none'?a.innerText:''}"))
         await pg.evaluate(f"()=>{K}.chatNow()"); await step(pg, 1)
-        lg = await pg.evaluate(f"()=>({{radio:{K}.radioLog(false).map(l=>l.text),vq:{K}.vqLog(false).map(l=>l.text),on:{K}.DF.on}})")
+        lg = await pg.evaluate(f"()=>{{const F=w=>w!=='VIPER 2'&&w!=='SENTRY'&&w!=='COCKPIT';return {{radio:{K}.radioLog(false).filter(l=>F(l.who)).map(l=>l.text),vq:{K}.vqLog(false).filter(l=>F(l.who)).map(l=>l.text),on:{K}.DF.on}}}}")   # 5.4: the fight's own calls do play
         ok('60 sim seconds of dogfight: no tower or chatter line plays, no tower subtitle shows', lg['on'] and not lg['radio'] and not lg['vq'] and seen <= {''}, (lg, seen))
         # ---- the subtitle strip, the wave card and FLARES at 844x390 and 568x320 ----
         await layout(pg, '844x390')
+        await arrows(pg, '844x390')
         await pg.set_viewport_size({'width': 568, 'height': 320}); await pg.wait_for_timeout(400); await step(pg, 0.2)
         await layout(pg, '568x320')
+        await arrows(pg, '568x320')
+        # Easy's launch line fits the 568 strip on one line, no ellipsis
+        await pg.evaluate(f"()=>{{{K}.setSkill('rookie');{K}.DF.subAge=9;{K}.dfCall('launch');}}")
+        ez = await pg.evaluate("()=>{const s=document.querySelector('#dfSub span');return {t:s.textContent,fit:s.scrollWidth<=s.clientWidth+1,h:s.getBoundingClientRect().height}}")
+        await pg.evaluate(f"()=>{K}.setSkill('pilot')")
+        ok('568x320: the Easy launch subtitle fits the strip on one line without an ellipsis', ez['t'] == 'Missile! Tap FLARES, turn hard!' and ez['fit'] and ez['h'] < 30, ez)
         await pg.set_viewport_size({'width': 932, 'height': 430}); await pg.wait_for_timeout(400); await step(pg, 0.2)
         await layout(pg, '932x430')
+        await arrows(pg, '932x430')
         await pg.set_viewport_size(IPHONE_15); await pg.wait_for_timeout(300)
         # ---- RWR: a bandit parked 1.5 km on our six (Hard: lock after 3 s, launch 2 to 4 s later, none in a wave's first 8 s) ----
         await start(pg, quiet=False)
@@ -135,7 +180,7 @@ async def main():
             s = await pg.evaluate(ST)
             res.append({'hits': s['hits'], 'auto': s['auto'], 'nAuto': s['calls'].count('autoflare'), 'flares': s['flares']})
             await step(pg, 2.2)
-        ok('Easy launch subtitle in plain English', ez == 'Enemy missile! Tap FLARES and turn hard!', ez)
+        ok('Easy launch subtitle in plain English', ez == 'Missile! Tap FLARES, turn hard!', ez)
         ok('Easy: the jet flares by itself at the first two missiles (no hits), the third gets through',
            [x['nAuto'] for x in res] == [1, 2, 2] and [x['hits'] for x in res] == [0, 0, 1] and res[1]['auto'] == 0, res)
         await pg.evaluate(f"()=>{K}.setSkill('pilot')")

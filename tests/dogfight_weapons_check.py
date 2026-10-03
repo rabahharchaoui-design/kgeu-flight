@@ -52,7 +52,7 @@ async def main():
     async with async_playwright() as p:
         b = await launch(p)
         pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuType': 'f16'})
-        await pg.evaluate(f"()=>{{{K}.DF.test.noBanditFire=true;{K}.dfStart();}}"); await pg.wait_for_timeout(500); await step(pg, 0.3)   # 5.3's bandit missiles off here
+        await pg.evaluate(f"()=>{{{K}.DF.test.noBanditFire=true;{K}.DF.test.noBrief=true;{K}.dfStart();}}"); await pg.wait_for_timeout(500); await step(pg, 0.3)   # 5.3's bandit missiles off here
         L = await layout(pg, '844x390')
         ok('in the dogfight AUTO LAND, GEAR and BRAKE are hidden, VIEW stays', not L['auto'] and not L['gear'] and not L['brake'] and L['r']['view']['vis'], L)
         cfg = await pg.evaluate(f"()=>{K}.DF.cfg()")
@@ -81,9 +81,9 @@ async def main():
         while t < 12 and alive:
             await step(pg, 0.1); t += 0.1
             alive = await pg.evaluate(f"()=>{K}.DF.bandits[0].alive")
-        k = await pg.evaluate(f"()=>({{kills:{K}.DF.kills,call:{K}.DF.lastCall,atc:document.getElementById('dfSub').innerText,kc:{K}.DF.kc,t:{K}.DF.t,dim:document.body.classList.contains('dfKc')}})")
+        k = await pg.evaluate(f"()=>({{kills:{K}.DF.kills,call:{K}.DF.calls.slice(-2).join(' '),atc:document.getElementById('dfSub').innerText,kc:{K}.DF.kc,t:{K}.DF.t,dim:document.body.classList.contains('dfKc')}})")
         ok('the missile takes more than 1 s of sim time and kills', not alive and t > 1.0, round(t, 1))
-        ok('the kill counts and the call says Splash one', k['kills'] == 1 and k['call'] == 'Splash one' and 'Splash one' in k['atc'], k)
+        ok('the kill counts and the call says Splash one (then 5.4\'s Picture clean)', k['kills'] == 1 and k['call'] == 'splash clean' and 'Splash one' in k['atc'], k)
         ok('the last kill of the wave starts the kill cam (HUD dimmed)', k['kc'] > 0 and k['dim'], k)
         t0 = k['t']
         await step(pg, 1.0)

@@ -13,6 +13,9 @@ without gaps, then written as mono AAC at 64 kbps.
 
     python3 tools/make_radio.py            # write radio/*.m4a and radio/clips.json
     python3 tools/make_radio.py --check    # report what is missing, write nothing
+
+Red Flag Dogfight (d_*): the cockpit warning voice d_c_* (Samantha, dry), the wingman Viper 2 d_w_* and the
+AWACS controller Sentry d_a_* (DF_VOICES: the first installed voice of each list, both radio filtered).
 """
 import json, os, subprocess, sys, shutil
 
@@ -26,6 +29,15 @@ TOWER_RATE, PILOT_RATE = 200, 190          # controllers talk faster than pilots
 # the cockpit voice (TCAS): calm male, played dry in the game, not through the radio
 COCKPIT_VOICES = ('Daniel (Enhanced)', 'Daniel')
 COCKPIT_RATE = 175
+# Red Flag Dogfight (5.4): three more voices, the first one installed of each list. The cockpit warning voice
+# (d_c_*) is calm and female and played dry, like a "Bitching Betty"; the wingman Viper 2 (d_w_*) and the AWACS
+# controller Sentry (d_a_*) go through the radio filter, so they are a male and a female voice that are neither
+# the tower (Samantha) nor the pilot (Evan).
+DF_VOICES = {
+    'dc': (('Samantha (Enhanced)', 'Samantha'), 180),
+    'dw': (('Nathan (Enhanced)', 'Tom (Enhanced)', 'Tom', 'Alex', 'Reed (English (US))', 'Daniel'), 205),
+    'da': (('Noelle (Enhanced)', 'Ava (Enhanced)', 'Allison (Enhanced)', 'Karen', 'Moira (English (Ireland))', 'Moira'), 195),
+}
 
 # ---- said by both sides: the pilot calls the facility, the tower calls the aircraft ----
 BOTH = {
@@ -203,6 +215,66 @@ COCKPIT = {
     'tcas_e_clear':     'All clear.',
 }
 
+# ---- Red Flag Dogfight (5.4): cockpit warnings d_c_*, the wingman d_w_*, the AWACS controller d_a_* ----
+DF_COCKPIT = {
+    'launch':   'Missile launch.',
+    'pullup':   'Pull up.',
+    'bingo':    'Bingo.',
+    'warning':  'Warning.',
+    'flares':   'Flares.',
+    'altitude': 'Altitude.',
+}
+DF_NUMW = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']
+DF_WING = dict({
+    'fox2':       'Fox two!',
+    'guns':       'Guns, guns, guns!',
+    'tally1':     'Tally one!',
+    'tally2':     'Tally two!',
+    'goodkill':   'Good kill!',
+    'break_r':    'Break right!',
+    'break_l':    'Break left!',
+    'winchester': 'Winchester.',
+    'niceflares': 'Nice flares!',
+    'six':        "He's on your six!",
+    'kio':        'Knock it off, knock it off.',
+}, **{f'splash_{n}': f'Splash {DF_NUMW[n]}!' for n in range(1, 11)})
+# a picture call is stitched: sentry, count, bearing, miles number, miles, angels, angels number
+DF_AWACS = dict({
+    'bandit':   'Bandit, bandit.',
+    'sentry':   'Sentry,',
+    'g1':       'single bandit,',
+    'g2':       'two bandits,',
+    'g3':       'three bandits,',
+    'g4':       'four bandits,',
+    'miles':    'miles,',
+    'angels':   'angels',
+    'clean':    'Picture clean.',
+    'fightson': "Fight's on.",
+    'deck':     'Hard deck, hard deck.',
+    'hot':      'Range is hot.',
+    'rtr':      'Return to the range.',
+    's30':      'Thirty seconds.',
+    'kio':      'Knock it off. Good work, Viper.',
+}, **{'b_' + k: w + ',' for k, w in (('n', 'north'), ('ne', 'northeast'), ('e', 'east'), ('se', 'southeast'),
+                                       ('s', 'south'), ('sw', 'southwest'), ('w', 'west'), ('nw', 'northwest'))},
+   **{f'num_{n}': w for n, w in ((5, 'five'), (10, 'ten'), (11, 'eleven'), (12, 'twelve'), (13, 'thirteen'), (14, 'fourteen'),
+                                 (15, 'fifteen'), (16, 'sixteen'), (17, 'seventeen'), (18, 'eighteen'), (19, 'nineteen'), (20, 'twenty'))})
+
+
+def installed(names, voices):
+    for v in names:
+        if any(line.startswith(v + ' ') or line.startswith(v + '\t') for line in voices.splitlines()):
+            return v
+    return None
+
+
+_VOICES = None
+def voice_list():
+    global _VOICES
+    if _VOICES is None:
+        _VOICES = subprocess.run(['say', '-v', '?'], capture_output=True, text=True).stdout
+    return _VOICES
+
 
 def cockpit_voice(voices=None):
     if voices is None:
@@ -224,6 +296,9 @@ def manifest():
     for k, v in PILOT.items():          m['p_' + k] = ('p', v)
     for k, v in CHATTER_PILOT.items():  m['p_' + k] = ('p', v)
     for k, v in COCKPIT.items():        m['c_' + k] = ('c', v)
+    for k, v in DF_COCKPIT.items():     m['d_c_' + k] = ('dc', v)
+    for k, v in DF_WING.items():        m['d_w_' + k] = ('dw', v)
+    for k, v in DF_AWACS.items():       m['d_a_' + k] = ('da', v)
     return m
 
 
@@ -238,6 +313,8 @@ def render(cid, voice, text, tmp):
     m4a = os.path.join(OUT, cid + '.m4a')
     if voice == 'c':
         v, rate = cockpit_voice(), COCKPIT_RATE
+    elif voice in DF_VOICES:
+        v, rate = installed(DF_VOICES[voice][0], voice_list()), DF_VOICES[voice][1]
     else:
         v, rate = (TOWER_VOICE, TOWER_RATE) if voice == 't' else (PILOT_VOICE, PILOT_RATE)
     subprocess.run(['say', '-v', v, '-r', str(rate), '-o', aiff, text], check=True)
@@ -270,6 +347,11 @@ def main():
         print(f'voice not installed: {COCKPIT_VOICES[0]} or {COCKPIT_VOICES[1]}', file=sys.stderr)
         return 2
 
+    for tag, (names, _) in DF_VOICES.items():
+        if not installed(names, voices):
+            print(f'no dogfight voice installed for {tag}: tried {", ".join(names)}', file=sys.stderr)
+            return 2
+
     os.makedirs(OUT, exist_ok=True)
     tmp = os.path.join(OUT, '.tmp')
     os.makedirs(tmp, exist_ok=True)
@@ -290,6 +372,10 @@ def main():
     json.dump(sorted(m.keys()), open(os.path.join(OUT, 'clips.json'), 'w'), indent=0)
     print(f'{len(m)} clips, {total/1024:.0f} KB total, average {total/len(m)/1024:.1f} KB')
     print(f'tower voice {TOWER_VOICE}, pilot voice {PILOT_VOICE}, cockpit voice {cockpit_voice(voices)}')
+    df = [c for c in m if c.startswith('d_')]
+    dsz = sum(os.path.getsize(os.path.join(OUT, c + '.m4a')) for c in df)
+    print(f'dogfight: {len(df)} clips, {dsz/1024:.0f} KB; cockpit {installed(DF_VOICES["dc"][0], voices)}, '
+          f'wingman {installed(DF_VOICES["dw"][0], voices)}, AWACS {installed(DF_VOICES["da"][0], voices)}')
     return 0
 
 
