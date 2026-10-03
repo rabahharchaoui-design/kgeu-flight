@@ -24,6 +24,8 @@ every write goes through the Worker, which checks it, and every refusal lands in
 | `version.json` | the build id the page checks on launch (keep equal to `APP_VER` in index.html) |
 | `tests/scores_check.py` | end to end in the game against `wrangler dev` |
 | `tests/lb_merge_check.py` | the one list board screen with a stubbed Worker: EASY/HARD chip per row fits at 568x320 to portrait |
+| `tests/lb_boards_check.py` | the game's boards and boards.js in step (ids, direction, single mode), and the dogfight day rule on both sides |
+| `tests/dogfight_lb_check.py` | the dogfight on the boards with a stubbed Worker: one token at FIGHT'S ON, one submit with `df`, the card's rank, PB and achievement XP lines, abandon, Easy and Hard boards, the dogfight daily |
 | `tests/upgrade_check.py` | in place upgrade from the `prescores` build |
 | `tests/scores_fps.py` | same-session frame rate A/B with a callsign, fame boards and a ghost |
 
@@ -37,12 +39,15 @@ Secrets on the Worker (set with `npx wrangler secret put NAME`, never in the rep
 - `players`: callsign (unique, upper case), key_hash (HMAC of the device key), rec_hash (HMAC of
   the recovery code), created, xp, creator (1 for OHRABAH), renamed (last change), banned.
 - `scores`: board, player_id, callsign, mode (`easy`/`hard`), score, secs (run time), ac (aircraft),
-  wx (time of day and wind, e.g. `night 40@8`), day (UTC yyyymmdd), created, token (unique).
+  wx (time of day and wind, e.g. `night 40@8`), day (UTC yyyymmdd), created, token (unique: the run token id; a
+  dogfight run's fan out rows use the same id plus `:k`, `:c`, `:g`).
 - `ghosts`: score_id, board, mode, player_id, score, secs, ac, path (compressed), created.
   Top 10 per board and mode only, one per player.
 - `flagged`: created, callsign, ip, board, reason, payload (the refused request, up to 2 KB).
 - `tokens`: jti, player_id, board (`*` for an offline pool token), mode, t0, day, used.
 - `hits`: rate limit log (kind, who, ts).
+- `achs`: player_id, ach, created, primary key (player_id, ach): achievements that have given their rank XP, once per
+  player ever (`CREATE TABLE IF NOT EXISTS`, so applying schema.sql to the live database is additive).
 
 ## Boards and score formulas
 
@@ -75,6 +80,17 @@ game's `runMode()`), including the first flight lesson's assists. Every board ha
 | `apt:RJTT` | Tokyo Haneda landing | arcade points | higher | 20 s | 0 to 1,500 | yes |
 | `apt:LFPG` | Paris CDG landing | arcade points | higher | 20 s | 0 to 1,500 | yes |
 | `apt:SBRJ` | Rio Santos Dumont landing | arcade points | higher | 20 s | 0 to 1,500 | yes |
+| `df:score:easy`, `df:score:hard` | Dogfight score (Easy), (Hard) | dogfight points | higher | 20 s | 0 to 3,000 | |
+| `df:kills:easy`, `df:kills:hard` | Dogfight kills | kills in one run | higher | (fan out) | 0 to 10 | |
+| `df:clear:easy`, `df:clear:hard` | Dogfight clear time | s, one decimal, wins only | lower | (fan out) | 45 to 390 | |
+| `df:guns:easy`, `df:guns:hard` | Dogfight gun kills | gun kills in one run, 1 or more | higher | (fan out) | 0 to 10 | |
+
+**The Red Flag Dogfight boards are the exception to the merge: Easy and Hard are separate boards.** Each `df:` board
+has a `mode` (`easy` or `hard`, in boards.js and in `LB.board`): the server refuses a run in the other mode ("wrong
+mode for this board"), the Boards screen lists them as separate entries in the group Red Flag Dogfight ("Dogfight score
+(Hard)") and their rows carry no EASY/HARD chip. A run that went Easy at any moment is Easy (`runMode()`): started in
+Hard, it is submitted to `df:score:easy` on its Hard token (the one case a token crosses boards). Ties rank by the
+earlier run as everywhere.
 
 **Arcade points** (daily, 5 mile and 1 mile landing challenges, world airports), unchanged from the arcade:
 
@@ -127,6 +143,24 @@ at Glendale, lower is better. The score is the run time itself.
 **Lessons**: the lesson's own 0 to 100 score (A 90+, B 80+, C 70+, D 60+). A failed lesson is not
 submitted.
 
+**Red Flag Dogfight** (`dfScore()` in index.html), four rounds of 90 s with 1, 2, 3 and 4 bandits:
+
+    points = 100 x kills + 100 x gun kills + 2 x banked seconds + 250 for the win - 75 x hits     (never under 0)
+    banked = the seconds left on each cleared wave's clock, whole seconds up
+
+One run token per run, requested at FIGHT'S ON for `df:score:<mode>`, and ONE submission at the end to
+`df:score:<mode>` carrying the whole run: `score, secs` (the fight time, wave clocks only), `ac:'f16'`, `wx` and
+`df:{kills, guns, hits, waves, won, clear, bank, flares, ach:[...]}` (clear: the clear time when won, else null; bank:
+the banked seconds; flares: flares used; ach: the achievement ids earned in the run). The server checks it, writes the
+score row and **fans it out** to the sibling boards of the same mode on the same token id plus a suffix: kills
+(`:k`), the clear time only if won (`:c`), the gun kills only if any (`:g`); `df:kills`, `df:clear` and `df:guns`
+take no submissions of their own. One token and one rate limit hit per run. A run with no points and no kills is not
+sent (its token is dropped); an abandoned run (main menu, restart) drops its token (`LB.runCancel`). Offline, the
+queued item and pool tokens work as for every board (the queued payload carries `df`). The answer is the score board's
+as usual plus `df:{kills:{score,rank,total,pb,best,top10}, clear:{...}|null, guns:{...}|null}`, `ach:[{id,xp}]` (newly
+awarded achievement XP) and `achXp`; the results card shows the score board line, one small line with any personal
+bests on the other three, a "+150 XP  ACE" line per new achievement and the rank up when the XP crosses one.
+
 ## The results card and its grades
 
 Every run ends on one card (index.html, *the results card*): the letter grade, the score, the key
@@ -177,6 +211,19 @@ Santos Dumont) with the seed's first draw, so an Arizona day keeps the rest of i
 end (34R, 26L, 20L). A day in another region switches the player there: GO saves the region and a
 resume, the page reloads, and the daily starts in the new region with the day's time and wind.
 
+**Dogfight days.** A day is a dogfight day when `Math.floor(Date.UTC(y, m, d) / 86400000) % 5 === 3` (the UTC day
+number; `dfDayOf` in index.html, `dfDay` in boards.js). Every other day draws exactly what it drew before (the landing
+draws are still made on a dogfight day). On a dogfight day the daily card (MISSIONS and ARCADE) reads Red Flag Dogfight,
+Barry M. Goldwater Range, F-16 and the mode, with the countdown; GO starts the dogfight in Arizona (from another region
+after the switch and resume) with its dice seeded from the day (`DF.seed`, yyyymmdd), so it is the same fight
+worldwide. The daily score is `min(1500, round(dfScore().score / 2))`, submitted to `daily` (one official attempt,
+practice after, as always) with the same `df` block and no flight path; it does not go to the regular dogfight boards.
+The server checks a daily on a dogfight day with the dogfight caps (2 x score against the formula cap, +2) instead of
+`parMax` and refuses one without `df`; on any other day a daily carrying `df` is refused. Tests: `K.dailyKind('dogfight'
+|'landing'|null)` forces the kind; `K.dailyRegion('az')` still pins a landing daily. (Dogfight days in October 2026:
+the 2nd, 7th, 12th, 17th, 22nd, 27th.) Locally `npm test` runs wrangler dev with `DEV_DFDAY=1`, which lets the test's
+`x-pfs-dfday` header pick the kind of day; the deployed Worker has no such variable and ignores the header.
+
 One official attempt a day: the Worker hands out one daily token per player per UTC day; the
 next request that day answers `practice`, the HUD says Practice and nothing is submitted. Offline,
 the game remembers the day's attempt locally and uses a pool token; the server still refuses a
@@ -189,9 +236,14 @@ mark (`kgeuDaily`) and the token request happen when the run starts in the new r
 The server gives XP for every accepted run:
 
     XP = round((10 + 40 x q) x (1.25 in Hard, 1 in Easy)) + 15 for a personal best + 25 for the top 10
-    q  = score / reference (100 for 0-100 boards, 1000 for arcade and short field),
+    q  = score / reference (100 for 0-100 boards, 1000 for arcade and short field, 1500 for dogfight score),
          or for lower-is-better boards (worst - score) / (worst - best):
          airdrop best 0 m worst 150 m, dash best 120 s worst 300 s; clamped to 0..1
+
+A dogfight run earns this XP once, for its score row (or its daily row), never for the fan out rows. **Achievements**
+give rank XP once per player, ever (table `achs`), on an accepted dogfight submission (regular or daily) that claims
+them consistently: Ace 150, Guns Kill 75, Flare Save 50, Untouchable 200. Achievements unlocked offline go with the
+queued run.
 
 | Rank | XP |
 |---|---|
@@ -235,6 +287,17 @@ told so on its next launch. A callsign can change once every 30 days in Settings
   8 percent) and never move faster than the aircraft can (ground speed limits in `AC_VMAX`:
   Cessna 130, Alpha 110, MQ-9A and B 180, C-130 240, F-16 580 m/s).
 - More than 30 submissions an hour per device or per IP are refused.
+- Dogfight runs (`df:score:*`, and the daily on a dogfight day), each refusal flagged with its reason:
+  - ranges: score 0 to 3,000; kills and guns integers 0 to 10, guns <= kills; hits integer 0 to 3; waves 0 to 4; won
+    only with kills 10, waves 4 and hits under 3;
+  - time: secs >= 20, secs >= 4 x kills, a win needs secs >= 45, and the wall time since the token (not for pool tokens)
+    must cover the largest of those minus 2 s; secs <= 4 x 90 + 30;
+  - points: score <= max(0, 100 x kills + 100 x guns + 2 x bank + 250 if won - 75 x hits) + 1, with bank <=
+    max(0, 90 x waves - 4 x kills) (+1 a wave for the whole second rounding);
+  - clear: only with a win, and 45 <= clear <= secs + 1; a win must carry it;
+  - aircraft f16 only;
+  - achievements: known ids only; ace needs kills >= 5, guns needs guns >= 1, untouchable needs a win with hits 0,
+    flaresave needs flares >= 1.
 - The daily challenge counts once per player per UTC day.
 - Every refusal is written to `flagged` with the reason and the request.
 
@@ -305,12 +368,15 @@ npx wrangler d1 execute pfs-scores --remote --command "SELECT datetime(created/1
 # delete a cheater: ban (hidden from boards and fame, their key stops working) and remove their runs
 npx wrangler d1 execute pfs-scores --remote --command "UPDATE players SET banned=1, xp=0 WHERE callsign='CHEATER'; DELETE FROM ghosts WHERE player_id=(SELECT id FROM players WHERE callsign='CHEATER'); DELETE FROM scores WHERE player_id=(SELECT id FROM players WHERE callsign='CHEATER')"
 #   to remove them completely (and free the callsign) also run:
-npx wrangler d1 execute pfs-scores --remote --command "DELETE FROM tokens WHERE player_id=(SELECT id FROM players WHERE callsign='CHEATER'); DELETE FROM players WHERE callsign='CHEATER'"
+npx wrangler d1 execute pfs-scores --remote --command "DELETE FROM tokens WHERE player_id=(SELECT id FROM players WHERE callsign='CHEATER'); DELETE FROM achs WHERE player_id=(SELECT id FROM players WHERE callsign='CHEATER'); DELETE FROM players WHERE callsign='CHEATER'"
 #   unban:
 npx wrangler d1 execute pfs-scores --remote --command "UPDATE players SET banned=0 WHERE callsign='CHEATER'"
 
 # delete one bad score (its id from the queries above)
 npx wrangler d1 execute pfs-scores --remote --command "DELETE FROM ghosts WHERE score_id=123; DELETE FROM scores WHERE id=123"
+
+# one player's achievement XP awards
+npx wrangler d1 execute pfs-scores --remote --command "SELECT a.ach, datetime(a.created/1000,'unixepoch') at FROM achs a JOIN players p ON p.id=a.player_id WHERE p.callsign='HABOOB'"
 
 # reset a board (both modes; add AND mode='hard' for one). XP already earned stays.
 npx wrangler d1 execute pfs-scores --remote --command "DELETE FROM ghosts WHERE board='arc:landing'; DELETE FROM scores WHERE board='arc:landing'"
@@ -340,5 +406,5 @@ top:[{cs, xp, rank, creator}], apt:{RJTT:{cs, score, mode}|null, LFPG:..., SBRJ:
 all time best accepted score across both modes, ties to the earliest, banned players left out), `GET /ranks`, `POST /signup {cs,key[,secret]}`,
 `POST /restore {cs,key,code}`, `POST /me {cs,key}`, `POST /rename {cs,key,to}`,
 `POST /token {cs,key,board,mode}`, `POST /pool {cs,key,n}`,
-`POST /submit {cs,key,token,board,mode,score,secs,ac,wx,when[,path]}`. CORS and POSTs are
+`POST /submit {cs,key,token,board,mode,score,secs,ac,wx,when[,path][,df]}` (df: the dogfight's stats, see above). CORS and POSTs are
 limited to `https://rabahharchaoui-design.github.io` and `http://localhost:8765`.

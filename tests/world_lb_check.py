@@ -115,7 +115,7 @@ async def main():
                   ['apt:SBRJ', 'Rio Santos Dumont landing', 'World airports', True, 'function', True]], bd)
         await pg.evaluate(f"()=>{{{K}.openMenu();{K}.LB.lbOpen()}}"); await pg.wait_for_timeout(600)
         lbt = await pg.evaluate("()=>[...document.querySelectorAll('#lbList h3, #lbList [data-lbb]')].map(e=>e.textContent).join('|')")
-        ok('(a) the Boards screen lists the World airports group and its three boards', lbt.endswith('World airports|Tokyo Haneda landing|Paris CDG landing|Rio Santos Dumont landing'), lbt[-120:])
+        ok('(a) the Boards screen lists the World airports group and its three boards', 'World airports|Tokyo Haneda landing|Paris CDG landing|Rio Santos Dumont landing' in lbt, lbt[-120:])
         await pg.evaluate(f"()=>{{{K}.openMenu();{K}.nav('sArc')}}"); await pg.wait_for_timeout(400)
         cards = await pg.evaluate(ARCCARDS)
         apt = [c for c in cards if c['id'].startswith('apt:')]
@@ -168,11 +168,12 @@ async def main():
         print('\n--- daily rotation ---')
         seen.clear()
         pg = await newpage(b, url, BASE)
-        scan = await pg.evaluate(f"()=>{{const out=[];for(let i=0;i<40;i++){{sessionStorage.setItem('__off',String(i*86400000));const d={K}.dailySpec();out.push([i,d.region,d.day]);}}sessionStorage.setItem('__off','0');return out}}")
+        scan = await pg.evaluate(f"()=>{{const out=[];for(let i=0;i<40;i++){{sessionStorage.setItem('__off',String(i*86400000));const d={K}.dailySpec();out.push([i,d.region,d.day,d.kind]);}}sessionStorage.setItem('__off','0');return out}}")
         ok('(c) every one of the four regions comes up in a 12 day scan', {x[1] for x in scan[:12]} == {'az', 'rjtt', 'lfpg', 'sbrj'}, [x[1] for x in scan[:12]])
         ok('(c) one spec a day: the 40 days are 40 different dates', len({x[2] for x in scan}) == 40)
-        paris = next((x[0] for x in scan if x[1] == 'lfpg'), None)
+        paris = next((x[0] for x in scan if x[1] == 'lfpg' and x[3] == 'landing'), None)   # not a dogfight day (one in five)
         ok('(c) a Paris day in the scan', paris is not None, scan[:12])
+        ok('(c) one day in five is a dogfight day, the region draws unchanged', sum(x[3] == 'dogfight' for x in scan) == 8, [x[3] for x in scan[:10]])
         await pg.context.close()
         off = (paris or 0) * 86400000
         pg = await newpage(b, url, BASE, off)

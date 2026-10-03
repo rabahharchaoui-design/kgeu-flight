@@ -15,7 +15,7 @@
 # 5.2 shot names: buttons (also writes 52_buttons_568.png), search, lock, missile, gun, killcam
 # 5.3 shot names: lock, launch, launch_easy, flares, hit2, harddeck, eject, launch_568, high
 # 5.4 shot names: brief, brief_easy, brief_568, brief_silent, arrows (also writes 54b_arrows_568.png), lock, awacs
-import asyncio, os, argparse
+import asyncio, os, json, argparse
 from playwright.async_api import async_playwright
 from harness import serve, launch, page, finger, IPHONE_15, THREE, splash_gone, IGNORE
 
@@ -525,9 +525,266 @@ SHOTS_54B = {
 }
 
 
+# ===================== 5.5 =====================
+# Red Flag Dogfight modes, scoring and the eight leaderboards. Hooks lifted from
+# tests/dogfight_modes_check.py (TURN, for the sustained-9g grey vision shot) and
+# tests/dogfight_lb_check.py (the stubbed Worker at http://lb.test, win(), the daily hooks).
+WK = 'http://lb.test'
+ME = 'HABOOB'
+CORS55 = {'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'}
+ROWS55 = [{'r': 1, 'cs': 'VIPER', 'score': 1700, 'secs': 250, 'ac': 'f16', 'mode': 'hard', 'xp': 900, 'rank': 'Wingman', 'creator': False, 'when': 0},
+          {'r': 2, 'cs': 'EAGLE', 'score': 1550, 'secs': 230, 'ac': 'f16', 'mode': 'hard', 'xp': 700, 'rank': 'Wingman', 'creator': False, 'when': 0},
+          {'r': 3, 'cs': ME, 'score': 1200, 'secs': 210, 'ac': 'f16', 'mode': 'hard', 'xp': 400, 'rank': 'Rookie', 'creator': False, 'when': 0}]
+
+
+async def worker55(route):
+    req = route.request
+    path = req.url[len(WK):].split('?')[0]
+    if req.method == 'OPTIONS':
+        return await route.fulfill(status=204, headers=CORS55)
+    body = {}
+    try:
+        body = json.loads(req.post_data or '{}')
+    except Exception:
+        pass
+    sub = {'ok': True, 'rank': 3, 'total': 40, 'pb': True, 'top10': True, 'best': body.get('score'), 'xp': 400, 'gain': 60, 'rankName': 'Wingman',
+           'df': {'kills': {'score': 10, 'rank': 1, 'total': 12, 'pb': True, 'top10': True}, 'clear': {'score': 250, 'rank': 14, 'total': 20, 'pb': True, 'top10': False}, 'guns': None},
+           'ach': [{'id': 'ace', 'xp': 150}], 'achXp': 150}
+    ans = {'/health': {'ok': True}, '/me': {'cs': ME, 'xp': 250, 'creator': False}, '/pool': {'tokens': []}, '/fame': {'day': 0, 'daily': None, 'top': []},
+           '/token': {'token': 'tok.1', 't0': 0, 'day': 0}, '/submit': sub,
+           '/board': {'board': 'df:score:hard', 'mode': 'hard', 'period': 'today', 'dir': 1, 'total': 40, 'rows': ROWS55, 'me': None, 'ghost': None, 'now': 0, 'day': 0},
+           '/ghost': {'ghost': None}}.get(path, {})
+    await route.fulfill(status=200, headers=CORS55, content_type='application/json', body=json.dumps(ans))
+
+
+async def new_page_lb(b, url, type_='f16', vp=IPHONE_15, skill='pilot', scores=None):
+    storage = {'kgeuOnboard': skill, 'kgeuTut': '1', 'kgeuType': type_, 'kgeuLBUrl': WK,
+               'kgeuLB': json.dumps({'cs': ME, 'key': 'a' * 48, 'xp': 250})}
+    if scores:
+        storage['kgeuScores'] = json.dumps(scores)
+    ctx = await b.new_context(viewport=vp, has_touch=True, is_mobile=True, device_scale_factor=2)
+    pg = await ctx.new_page()
+    pg.errs = []
+    pg.on('pageerror', lambda e: pg.errs.append(str(e)))
+    pg.on('console', lambda m: pg.errs.append(m.text) if m.type == 'error' and not any(k in m.text for k in IGNORE) else None)
+    await ctx.route('**/three.min.js', lambda r: r.fulfill(body=THREE, content_type='application/javascript'))
+    await ctx.route('**/fonts.googleapis.com/**', lambda r: r.abort())
+    await ctx.route('**/fonts.gstatic.com/**', lambda r: r.abort())
+    await ctx.route(WK + '/**', worker55)
+    await ctx.add_init_script('(()=>{if(sessionStorage.getItem("__seeded"))return;sessionStorage.setItem("__seeded","1");localStorage.clear();'
+                              + ''.join(f'localStorage.setItem({k!r},{v!r});' for k, v in storage.items()) + '})()')
+    await pg.goto(url)
+    await pg.wait_for_function('()=>window.__kgeu', timeout=30000)
+    await splash_gone(pg)
+    await pg.wait_for_timeout(500)
+    return pg
+
+
+async def report(pg, name):
+    if pg.errs:
+        print(f'  console errors ({name}):', pg.errs[:5])
+    else:
+        print(f'  no console errors ({name})')
+
+
+async def until(pg, cond, max_secs, dt=0.1):
+    n = int(round(max_secs / dt))
+    return await pg.evaluate("""([cond,dt,n])=>{const K=window.__kgeu,D=K.DF,f=new Function('K','D','return ('+cond+')');
+      for(let i=0;i<n;i++){K.stepFrame(dt,false,true);if(f(K,D))return true;}return false;}""", [cond, dt, n])
+
+
+async def kill_wave_how(pg, how):
+    await pg.evaluate(f"(h)=>{{const D={K}.DF;D.bandits.slice().forEach((b,i)=>{{if(b.alive){K}.dfKill(b,Array.isArray(h)?h[i%h.length]:h);}});}}", how)
+
+
+async def start55(pg, skill):
+    await pg.evaluate(f"()=>{{const K={K},D=K.DF;K.setSkill('{skill}');D.test.seed=null;D.test.hold=false;D.test.noBanditFire=true;D.test.noBrief=true;K.windSeed(7);K.dfStart();}}")
+    await pg.wait_for_timeout(300)
+    await fast(pg, 0.2)
+
+
+async def win55(pg):
+    for w in range(4):
+        await fast(pg, 2.5)
+        await kill_wave_how(pg, ['fox2', 'gun'] if w == 1 else 'fox2')
+        await until(pg, "D.gap<=0&&D.bandits.some(b=>b.alive)||!D.on", 10) if w < 3 else await until(pg, "!D.on", 2)
+
+
+CARD55 = "()=>({on:document.getElementById('arcOv').classList.contains('on'),title:document.getElementById('aTitle').textContent,lines:document.getElementById('aLines').innerText})"
+
+
+async def s55_results_win(b, url):
+    pg = await new_page_lb(b, url)
+    await pg.evaluate(f"()=>{{const A={K}.SCORE.ach;delete A.ace;delete A.guns;delete A.untouchable;}}")
+    await start55(pg, 'pilot')
+    await win55(pg)
+    await until(pg, "document.getElementById('arcOv').classList.contains('on')", 8)
+    await pg.wait_for_timeout(1500)
+    c = await pg.evaluate(CARD55)
+    print('  results_win: title', c['title'], '| lines tail', c['lines'][-160:])
+    await shot(pg, '55_results_win.png')
+    await report(pg, 'results_win')
+    await pg.close()
+
+
+async def s55_results_loss_easy(b, url):
+    pg = await new_page(b, url, 'f16', skill='rookie')
+    await pg.evaluate(f"()=>{{{K}.DF.test.noBrief=true;{K}.DF.test.noBanditFire=true;{K}.dfStart();}}")
+    await pg.wait_for_timeout(400); await fast(pg, 0.3)
+    await pg.evaluate(f"()=>{{{K}.dfHit();{K}.dfHit();{K}.dfHit();}}")
+    await fast(pg, 2.5)
+    await pg.wait_for_timeout(300)
+    r = await pg.evaluate(CARD55)
+    print('  results_loss_easy: title', r['title'])
+    await shot(pg, '55_results_loss_easy.png')
+    await report(pg, 'results_loss_easy')
+    await pg.close()
+
+
+async def s55_results_568(b, url):
+    pg = await new_page_lb(b, url, vp={'width': 568, 'height': 320})
+    await pg.evaluate(f"()=>{{const A={K}.SCORE.ach;delete A.ace;delete A.guns;delete A.untouchable;}}")
+    await start55(pg, 'pilot')
+    await win55(pg)
+    await until(pg, "document.getElementById('arcOv').classList.contains('on')", 8)
+    await pg.wait_for_timeout(1500)
+    r = await pg.evaluate("""()=>{const sheet=document.querySelector('#arcOv .sheet'),hub=document.getElementById('aHub').getBoundingClientRect(),
+      free=document.getElementById('aFree').getBoundingClientRect();
+      return {scrollH:sheet.scrollHeight,clientH:sheet.clientHeight,hubFits:hub.bottom<=innerHeight&&hub.top>=0,freeFits:free.bottom<=innerHeight&&free.top>=0}}""")
+    print('  results_568: layout', r)
+    await shot(pg, '55_results_568.png')
+    await report(pg, 'results_568')
+    await pg.close()
+
+
+async def s55_arcade_card(b, url):
+    scores = {'log': {'time': 0, 'landings': 0, 'streak': 0, 'bestStreak': 0},
+              'best': {'arc:dogfight:hard': {'pts': 2295, 'kills': 10, 'gunKills': 4, 'waves': 4, 'hits': 1, 'secs': 0,
+                                              'won': True, 'mode': 'hard', 'ac': 'F-16C Viper', 'stars': 3, 'clr': 0.2}},
+              'ach': {}}
+    pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuType': 'f16', 'kgeuScores': json.dumps(scores)})
+    await pg.evaluate(f"()=>{{{K}.openMenu();{K}.nav('sArc')}}"); await pg.wait_for_timeout(400)
+    t = await pg.evaluate('()=>document.querySelector(\'#arcCards [data-m="dogfight"]\').innerText')
+    print('  arcade_card: card text', t)
+    await shot(pg, '55_arcade_card.png')
+    await report(pg, 'arcade_card')
+    await pg.close()
+
+
+async def s55_boards(b, url):
+    pg = await new_page_lb(b, url)
+    await pg.evaluate(f"()=>{{{K}.openMenu();{K}.LB.lbOpen()}}"); await pg.wait_for_timeout(600)
+    await pg.evaluate("""()=>{const hs=[...document.querySelectorAll('#lbList h3')];
+      const h=hs.find(e=>e.textContent==='Red Flag Dogfight');if(h)h.scrollIntoView({block:'start'});}""")
+    await pg.wait_for_timeout(300)
+    await shot(pg, '55_boards.png')
+    await report(pg, 'boards')
+    await pg.close()
+
+
+async def s55_board_score_hard(b, url):
+    pg = await new_page_lb(b, url)
+    await pg.evaluate(f"()=>{{{K}.openMenu();{K}.LB.lbOpen('df:score:hard')}}"); await pg.wait_for_timeout(800)
+    r = await pg.evaluate("()=>({t:document.getElementById('lbTitle').textContent,n:document.querySelectorAll('#lbRowsIn .lbRow').length})")
+    print('  board_score_hard: state', r)
+    await shot(pg, '55_board_score_hard.png')
+    await report(pg, 'board_score_hard')
+    await pg.close()
+
+
+async def s55_daily_card(b, url):
+    pg = await new_page(b, url, 'f16', skill='pilot')
+    await pg.evaluate(f"()=>{{{K}.dailyKind('dogfight');{K}.openMenu();{K}.nav('sArc')}}"); await pg.wait_for_timeout(400)
+    t = await pg.evaluate('()=>document.querySelector(\'#arcCards .mcard[data-m="daily"]\').innerText')
+    print('  daily_card: card text', t)
+    await shot(pg, '55_daily_card.png')
+    await report(pg, 'daily_card')
+    await pg.close()
+
+
+GREY_BUILD = """(secs)=>{const K=window.__kgeu,T=K.touchIn,s=K.state();
+  s.vel.multiplyScalar(600/(s.ias*1.943844));T.active=true;s.throttle=s.power=1;
+  const e=new THREE.Euler(0,0,0,'YXZ');
+  for(let i=0;i<secs*20;i++){e.setFromQuaternion(s.quat,'YXZ');const bank=-e.z,want=Math.acos(Math.min(0.995,1/9));
+    T.ail=Math.max(-1,Math.min(1,(want-bank)*2));T.elev=1;
+    K.stepFrame(0.05,false,true);}
+  return {gv:K.DF.gv,g:s.gload};}"""
+GREY_HOLD = """(n)=>{const K=window.__kgeu,T=K.touchIn,s=K.state();
+  const e=new THREE.Euler(0,0,0,'YXZ');
+  for(let i=0;i<n;i++){e.setFromQuaternion(s.quat,'YXZ');const bank=-e.z,want=Math.acos(Math.min(0.995,1/9));
+    T.ail=Math.max(-1,Math.min(1,(want-bank)*2));T.elev=1;s.throttle=s.power=1;
+    K.stepFrame(1/60);}
+  T.active=false;return {gv:K.DF.gv,g:s.gload,t:document.getElementById('hG').textContent};}"""
+
+
+async def s55_grey(b, url):
+    pg = await new_page(b, url, 'f16', skill='pilot')
+    await dfstart_f16(pg)
+    r1 = await pg.evaluate(GREY_BUILD, 4.5)
+    r2 = await pg.evaluate(GREY_HOLD, 8)
+    print('  grey: build', r1, 'hold', r2)
+    path = os.path.join(OUT, '55_grey.png')
+    await pg.screenshot(path=path, timeout=120000)
+    print('  wrote', path)
+    await report(pg, 'grey')
+    await pg.close()
+
+
+async def s55_easy_fight(b, url):
+    pg = await new_page(b, url, 'f16', skill='rookie')
+    await pg.evaluate(f"()=>{{{K}.DF.test.noBrief=true;{K}.dfStart();}}")
+    await pg.wait_for_timeout(500); await fast(pg, 0.3)
+    await pg.evaluate(f"()=>{K}.DF.test.wave(2)")
+    await place(pg, 0, 1500, 0)      # ahead: our own seeker circle shows, bigger in Easy
+    await place(pg, 1, 1500, SIX)    # behind: the threat that launches
+    t = await wait_rwr(pg, 'launch')
+    print('  easy_fight: launch t', t)
+    await shot(pg, '55_easy_fight.png')
+    await report(pg, 'easy_fight')
+    await pg.close()
+
+
+async def s55_buttons_vp(b, url, vp, name):
+    pg = await new_page(b, url, 'f16', skill='pilot')
+    await dfstart_f16(pg)
+    await kill_wave(pg); await fast(pg, 5)   # -> wave 2
+    await kill_wave(pg); await fast(pg, 5)   # -> wave 3 (3 bandits)
+    await place(pg, 0, 1400, -0.35)
+    await place(pg, 1, 1900, 0.35)
+    await place(pg, 2, 1600, 2.6)
+    await fast(pg, 0.3)
+    await pg.set_viewport_size({'width': vp[0], 'height': vp[1]}); await pg.wait_for_timeout(400); await fast(pg, 0.1)
+    await shot(pg, name)
+    await report(pg, name)
+    await pg.close()
+
+
+async def s55_buttons_667(b, url):
+    await s55_buttons_vp(b, url, (667, 375), '55_buttons_667.png')
+
+
+async def s55_buttons_932(b, url):
+    await s55_buttons_vp(b, url, (932, 430), '55_buttons_932.png')
+
+
+SHOTS_55 = {
+    'results_win': s55_results_win,
+    'results_loss_easy': s55_results_loss_easy,
+    'results_568': s55_results_568,
+    'arcade_card': s55_arcade_card,
+    'boards': s55_boards,
+    'board_score_hard': s55_board_score_hard,
+    'daily_card': s55_daily_card,
+    'grey': s55_grey,
+    'easy_fight': s55_easy_fight,
+    'buttons_667': s55_buttons_667,
+    'buttons_932': s55_buttons_932,
+}
+
+
 async def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--set', choices=['51', '52', '53', '54b'], default='51')
+    ap.add_argument('--set', choices=['51', '52', '53', '54b', '55'], default='51')
     ap.add_argument('--only', default=None, help='comma-separated subset of 5.2/5.3 shot names')
     args = ap.parse_args()
 
@@ -571,7 +828,7 @@ async def main():
                 else:
                     print(f'  no console errors ({name})')
                 await pg.close()
-        else:
+        elif args.set == '54b':
             names = args.only.split(',') if args.only else list(SHOTS_54B.keys())
             for name in names:
                 name = name.strip()
@@ -587,6 +844,14 @@ async def main():
                 else:
                     print(f'  no console errors ({name})')
                 await pg.close()
+        else:
+            names = args.only.split(',') if args.only else list(SHOTS_55.keys())
+            for name in names:
+                name = name.strip()
+                fn = SHOTS_55.get(name)
+                if not fn:
+                    print('  unknown 5.5 shot:', name); continue
+                await fn(b, url)
         await b.close()
     srv.shutdown()
 

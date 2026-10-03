@@ -1932,7 +1932,7 @@ function step(st,dt,ev){
 }
 
 // ---------- autopilot: attitude-command inner loop, speed/path outer loops ----------
-const _qt=new Q4(),_qe=new Q4(),_eA=new THREE.Euler(0,0,0,'YXZ'),_eB=new THREE.Euler(0,0,0,'YXZ');
+const _qt=new Q4(),_qe=new Q4(),_dfV=new V3(),_eA=new THREE.Euler(0,0,0,'YXZ'),_eB=new THREE.Euler(0,0,0,'YXZ');
 const wrapPi=a=>Math.atan2(Math.sin(a),Math.cos(a));
 function apAtt(st,pitch,bankR,yawH){
   _eA.set(pitch,-yawH,-bankR,'YXZ');_qt.setFromEuler(_eA);
@@ -2090,9 +2090,12 @@ function easyFly(st,dt,ev){
   if(st.vel.y<vLim&&!ga){st.ezP=Math.min(0.45,st.ezP+(vLim-st.vel.y)/gsp*4*dt);
     if(AC.ezAoA&&cfg==='approach')st.ezAT=Math.min(AC.aStall-0.1,st.ezAT+(vLim-st.vel.y)/gsp*4*dt);}
   const p=st.ezP;
-  let bank=x*(st.bankMax||AC.ezBank)*clamp(agl/40,0.12,1);
+  // the dogfight in Easy (st.dfEz, dfTick): 80 degrees of bank, and the turn pulled for it below (up to about 6 g)
+  let bank=x*(st.dfEz?1.396:(st.bankMax||AC.ezBank))*clamp(agl/40,0.12,1);
   if(st.noProt&&st.stalled)bank+=(st.dropDir||1)*0.35;          // and one wing drops
   let yawC=trk;
+  // banked in the fight the nose is turned for it (below), not dragged back to the track
+  const dfW=st.dfEz&&!E?clamp((Math.abs(_eB.z)-0.15)/0.25,0,1):0;if(dfW>0)yawC=trk+wrapPi(hdg-trk)*dfW;
   if(Math.abs(x)<0.05&&E){
     if(Math.abs(c)<25)st.ezLI=clamp((st.ezLI||0)+c*dt*0.0003,-0.06,0.06);
     // Crab into the wind on final (the nose into the relative wind, the same wind step() blows, so
@@ -2110,6 +2113,11 @@ function easyFly(st,dt,ev){
     bank=clamp(apBank(trk,E.h-clamp(c*0.066/gsp,-0.8,0.8)-(st.ezLI||0),mb,gsp)+ff,-mb,mb);}
   else st.ezCK=0;
   apAtt(st,p,bank,yawC);
+  // the fight's coordinated turn: the jet turns about the vertical at the rate a level turn at this bank gives
+  // (g tan(bank) / V: about 5.8 g at 80 degrees), the wing's lift follows; eased off near the stall and over 6 g
+  if(dfW>0){const ph=-_eB.z,V=Math.max(60,st.vel.length()),lim2=AC.aStall-0.1,
+      k=dfW*clamp((lim2-st.alpha)/0.06,0,1)*clamp((6.3-st.gload)/0.5,0,1),om=-9.81*Math.tan(clamp(ph,-1.4,1.4))/V*k;
+    _qe.copy(st.quat).invert();st.apW.add(_dfV.set(0,om,0).applyQuaternion(_qe));}
   // switched into Easy mid flight: blend the assists in over 1.5 s from what the aircraft is
   // already doing, so a bank or a pitch the pilot was holding is eased out, never snapped
   if(st.ezBlend!==undefined&&st.ezBlend<1&&st.apW){st.ezBlend=Math.min(1,st.ezBlend+dt/1.5);const k=st.ezBlend*st.ezBlend*(3-2*st.ezBlend);
@@ -8629,7 +8637,7 @@ function logTime(dt){
 const DASH={on:false,t0:0,g:1};
 function dashUpdate(dt){
   if(AC.id!=='f16'||!running||paused||st.crashed)return;
-  if(!DASH.on&&!st.onGround&&st.base==='luke'&&st.agl>15){DASH.on=true;DASH.t0=st.time;DASH.g=1;if(LB)LB.runStart('mission:dash');}
+  if(!DASH.on&&!st.onGround&&st.base==='luke'&&st.agl>15&&!DF.live){DASH.on=true;DASH.t0=st.time;DASH.g=1;if(LB)LB.runStart('mission:dash');}
   if(DASH.on)DASH.g=Math.max(DASH.g,st.gload);
 }
 function dashLand(e){
@@ -8937,7 +8945,8 @@ function resShow(ov,brief){
   if(brief){RES.brief=ov;RES.briefAt=performance.now()+RES_BRIEF_MS;}else{if(RES.brief===ov)RES.brief=null;paused=true;}
   ov.classList.add('on');
 }
-function resOpen(ov,o,brief){resFill(ov,o);resShow(ov,brief);}
+// (the Worker may have answered before the card opened, the dogfight's comes 2 to 3 s after its run ends)
+function resOpen(ov,o,brief){resFill(ov,o);resShow(ov,brief);if(o.board&&LB&&LB.E.shown&&LB.E.shown.b===o.board)resBoard(LB.E.shown);}
 function resClose(ov){ov.classList.remove('on','brief');if(RES.brief===ov)RES.brief=null;}
 function resCloseAll(){[arcOv,gradeOv,missOv,landOv].forEach(resClose);RES.pend=null;}
 // the board line: "Sending" while the Worker answers, then the rank, a personal best or the top 10
@@ -8953,6 +8962,15 @@ function resBoard(o){
   else{big='#'+resNum(o.rank)+' of '+resNum(o.total)+(o.gain?'  +'+o.gain+' XP':'');if(o.top10&&o.rank<=10)em='TOP 10';else if(o.pb)em='PERSONAL BEST';}
   row.innerHTML='<span>Leaderboard</span><b></b>';row.lastChild.textContent=big;
   if(em){const e=document.createElement('em');e.textContent=em;row.lastChild.appendChild(e);}
+  // a dogfight's answer: one small line for personal bests on its kills, clear and guns boards, a line per achievement's
+  // rank XP (first time ever), and the rank up when the XP crossed one
+  box.querySelectorAll('.lbX').forEach(e=>e.remove());
+  const add=(l,v,cls)=>{const d=document.createElement('div');d.className='gl lbX'+(cls?' '+cls:'');d.innerHTML='<span></span><b></b>';d.firstChild.textContent=l;d.lastChild.textContent=v;box.appendChild(d);return d;};
+  if(o.df){const n={kills:'kills',clear:'clear time',guns:'gun kills'},pb=[];
+    for(const k in n){const x=o.df[k];if(x&&x.pb)pb.push(n[k]+(x.top10&&x.rank<=10?' (TOP 10)':' #'+resNum(x.rank)));}
+    if(pb.length)add('Personal best','Also: '+pb.join(', '),'lbPb');}
+  (o.ach||[]).forEach(a=>add('Achievement','+'+a.xp+' XP  '+(ACH[a.id]?ACH[a.id].name:String(a.id)).toUpperCase(),'lbAch'));
+  if(o.rankUp){const d=add('Rank up',o.rankUp.toUpperCase(),'lbRk');if(LB&&LB.rankSVG)d.lastChild.insertAdjacentHTML('afterbegin',LB.rankSVG(LB.rankByName(o.rankUp))+' ');}
 }
 // MAIN MENU on any card: the run is over, the flight's mode state goes with it
 function resMenu(ov){resClose(ov);if(ARC.on)arcStop();if(MISS.on)missReset();openMenu();}
@@ -8965,7 +8983,7 @@ $('mMenu').onclick=()=>resMenu(missOv);
 $('mRetry').onclick=()=>{resClose(missOv);start(MISS.kind==='drop'?'drop':'short');};
 $('aFree').onclick=()=>{resClose(arcOv);arcStop();dfStop();paused=false;};
 $('aHub').onclick=()=>resMenu(arcOv);
-$('aRetry').onclick=()=>{resClose(arcOv);if(RES.kind==='strike')start('range');else if(RES.kind==='df')dfStart();else arcStart(ARC.kind);};
+$('aRetry').onclick=()=>{resClose(arcOv);if(RES.kind==='strike')start('range');else if(RES.kind==='df')dfStart(DF.daily?{daily:1}:null);else arcStart(ARC.kind);};
 
 // ================= Drop zone guidance =================
 // So nobody has to guess where the drop zone is: its icon on both maps with the waypoint
@@ -10167,7 +10185,8 @@ const ARC={on:false,kind:'',t0:0,end:null,par:0,done:false,dist:0};
 // (the real range is farther, past Gila Bend). on: a run is being fought; live: the mode owns this flight
 // (on, or over and showing its card) until dfStop. waves: bandits per round, 90 s a round.
 const DF={on:false,live:false,done:false,built:false,C:{x:-28000,z:22000},R:12*1852,waves:[1,2,3,4],ROUND:90,
-  bandits:[],pool:[],wave:0,t:90,bank:[],kills:0,gunKills:0,hits:0,clearT:0,fightT:0,flares:30,won:false,out:0,gap:0,why:'',gv:0,ach:[],sc:null};
+  bandits:[],pool:[],wave:0,t:90,bank:[],kills:0,gunKills:0,hits:0,clearT:0,fightT:0,flares:30,won:false,out:0,gap:0,why:'',gv:0,ach:[],sc:null,
+  seed:null,daily:false,lb:''};   // seed: the run's dice (the daily's day, the same fight worldwide); daily: the Daily challenge; lb: its board
 // a world region has neither field: the same six ends by name, in Arizona's order, so the daily (same
 // worldwide) names the same runway on its card there; starting it switches to Arizona first
 const ARC_TARGETS=()=>REGION.az?RWY_ENDS.filter(e=>e.rwy.code==='KGEU'||e.rwy.code==='KLUF')
@@ -10190,9 +10209,15 @@ function dayRng(k){let s=(k*2654435761)>>>0;return ()=>{s=(s+0x6D2B79F5)>>>0;let
 // the same challenge for everyone on a given day: the region (one of four), aircraft, target, start, time of day and wind.
 // ARC.dailyRegion (tests only, __kgeu.dailyRegion): pins the region, the draw is still made so the rest stays today's.
 // The region is the first draw, so the rest keeps Arizona's structure; a world region's target is its home runway end.
+// kind: 'dogfight' on a dogfight day (dfDayOf), the Red Flag Dogfight in Arizona seeded from the day (the landing draws
+// are still made, so no other day changes); 'landing' otherwise, and whenever ARC.dailyRegion pins a region.
+// ARC.dailyKind (tests only, __kgeu.dailyKind) forces the kind.
 function dailySpec(){const r=dayRng(todayKey()),d0=DAILY_REGIONS[Math.floor(r()*DAILY_REGIONS.length)],region=ARC.dailyRegion&&REGIONS[ARC.dailyRegion]?ARC.dailyRegion:d0,T=region==='az'?ARC_TARGETS():[aptEnd(region)];
   const o={region:region,type:CAR[Math.floor(r()*CAR.length)],end:T[Math.floor(r()*T.length)],dist:6500+r()*4000,off:(r()*2-1)*1.3,alt:1800+r()*1600};
-  o.tod=['day','sunset','night'][Math.floor(r()*3)];o.wdir=10*(1+Math.floor(r()*36));o.wkt=2+Math.floor(r()*11);o.day=todayKey();return o;}
+  o.tod=['day','sunset','night'][Math.floor(r()*3)];o.wdir=10*(1+Math.floor(r()*36));o.wkt=2+Math.floor(r()*11);o.day=todayKey();
+  o.kind=ARC.dailyKind||(ARC.dailyRegion?'landing':dfDayOf(o.day)?'dogfight':'landing');return o;}
+// a dogfight day for the Daily challenge (the Worker has the same rule, boards.js dfDay): the UTC day number % 5 === 3
+const dfDayOf=k=>Math.floor(Date.UTC(Math.floor(k/10000),Math.floor(k/100)%100-1,k%100)/864e5)%5===3;
 function placeAir(x,z,aglFt,h,kt){
   const y=Math.max(0,groundHeight(x,z))+aglFt/M2FT+GEAR,V=kt/MS2KT/Math.sqrt(1.097*Math.exp(-y/9200)/1.225);
   st.pos.set(x,y,z);st.vel.set(Math.sin(h)*V,0,-Math.cos(h)*V);st.quat.setFromEuler(new THREE.Euler(0.02,-h,0,'YXZ'));st.w.set(0,0,0);
@@ -10202,6 +10227,7 @@ function placeAir(x,z,aglFt,h,kt){
 function arcStart(kind){
   if(kind==='apt'&&REGION.az)return;   // a world airport's challenge only flies in its region (aptStart switches)
   const D=kind==='daily'?dailySpec():null,reg=kind==='apt'?REGION.id:D?D.region:'az';
+  if(D&&D.kind==='dogfight'){dfStart({daily:1});return;}   // a dogfight day: the day's seeded fight over the Goldwater Range
   // the arcade is at Glendale and Luke, the daily wherever today's is: from elsewhere switch first, the run starts after the reload
   if(REGION.id!==reg){pickRegion(reg,{resume:{arc:kind,region:reg,type:savedType,tod:TOD.id}});return;}
   const g1=RWY_ENDS.find(e=>e.rwy.code==='KGEU'&&e.num==='1');
@@ -10332,18 +10358,8 @@ function dfWave(n){
     let x=st.pos.x+Math.sin(brg)*d,z=st.pos.z-Math.cos(brg)*d;
     const dc=Math.hypot(x-DF.C.x,z-DF.C.z),rm=DF.R*0.85;if(dc>rm){x=DF.C.x+(x-DF.C.x)*rm/dc;z=DF.C.z+(z-DF.C.z)*rm/dc;}   // inside the arena
     b.p.set(x,dfY(12000+dfR()*6000),z);b.hdg=Math.atan2(st.pos.x-x,-(st.pos.z-z));b.gam=0;b.bank=0;
-    b.spd=dfTAS(440*DF.cfg().spd,b.p.y);b.alive=true;b.fall=false;b.state='MERGE';b.hp=1;b.st=0;b.i=i;b.abOn=0;b.flN=0;b.flT=0;b.spk=0;b.rw=0;b.rwT=0;b.rwD=0;b.rwOut=0;b.cd=0;b.vr=0;b.vrB=0;b.vrN=0;b.six=0;b.lost=0;
+    b.spd=dfTAS(440*DF.cfg().spd,b.p.y);b.alive=true;b.fall=false;b.state='MERGE';b.hp=1;b.st=0;b.i=i;b.abOn=0;b.flN=0;b.flT=0;b.spk=0;b.rw=0;b.rwT=0;b.rwD=0;b.rwOut=0;b.cd=0;b.vr=0;b.vrB=0;b.vrN=0;b.six=0;
     b.g.visible=true;b.body.visible=true;if(b.can)b.can.visible=true;dfPose(b);DF.bandits.push(b);}
-}
-// Easy's next pass: a bandit lost behind us comes back 4 nm ahead (within 20 degrees of our nose, swung up to 57 more
-// toward the arena's middle when we are out past 6 nm), near our height, pointing at us, its radar off
-function dfAgain(b){
-  _dfE.setFromQuaternion(st.quat,'YXZ');const h=-_dfE.y,cb=Math.atan2(DF.C.x-st.pos.x,-(DF.C.z-st.pos.z)),far=Math.hypot(DF.C.x-st.pos.x,DF.C.z-st.pos.z)>DF.R/2;
-  const brg=h+(dfR()-0.5)*0.7+(far?clamp(wrapPi(cb-h),-1,1):0),d=4*1852;
-  let x=st.pos.x+Math.sin(brg)*d,z=st.pos.z-Math.cos(brg)*d;
-  const dc=Math.hypot(x-DF.C.x,z-DF.C.z),rm=DF.R*0.85;if(dc>rm){x=DF.C.x+(x-DF.C.x)*rm/dc;z=DF.C.z+(z-DF.C.z)*rm/dc;}
-  b.p.set(x,dfY(clamp(dfFt(st.pos.y)+(dfR()-0.5)*3000,9000,22000)),z);b.hdg=Math.atan2(st.pos.x-x,-(st.pos.z-z));b.gam=0;b.bank=0;
-  b.state='MERGE';b.st=0;b.lost=0;b.six=0;b.rw=0;b.rwT=0;dfPose(b);
 }
 function dfPose(b){
   b.v.set(Math.sin(b.hdg)*Math.cos(b.gam),Math.sin(b.gam),-Math.cos(b.hdg)*Math.cos(b.gam)).multiplyScalar(b.spd);
@@ -10362,11 +10378,10 @@ function dfFly(b,dt){
   const ata=fw.dot(los);                                               // > 0: the player is ahead of it
   const behind=ata<-0.55&&rng<1.5*1852;                                // the player sits on its tail inside 1.5 nm
   b.st+=dt;
-  // Easy: chasing us in our rear quarter inside 3 nm for c.six seconds, it breaks off and extends; out behind us past
-  // 2 nm for c.back seconds (out of sight), it comes back in front for another pass (dfAgain)
+  // Easy: chasing us in our rear quarter inside 3 nm for c.six seconds, it breaks off and extends (Easy turns at 80
+  // degrees of bank, so it comes round to a bandit behind it; nothing is moved)
   dfNose(_dfC);const rear=(_dfC.x*dx+_dfC.y*dy+_dfC.z*dz)/Math.max(1,rng)>0.3;
   b.six=rear&&rng<3*1852?(b.six||0)+dt:0;if(b.six>c.six&&b.state==='TURN'){b.state='EXTEND';b.st=0;b.six=0;}
-  b.lost=rear&&rng>2*1852?(b.lost||0)+dt:0;if(c.back&&b.lost>c.back&&!DF.msl.some(m=>m.on&&m.b===b)){dfAgain(b);return;}
   if(b.state==='MERGE'){if(rng<1852||ata<0.2)b.state='TURN',b.st=0;}
   else if(b.state==='TURN'){if(behind)b.state='EVADE',b.st=0;else if(b.st>c.turnT&&rng>c.extR*1852)b.state='EXTEND',b.st=0;}
   else if(b.state==='EVADE'){if(b.st>4&&!behind)b.state=dfR()<0.4?'EXTEND':'TURN',b.st=0;}
@@ -10430,9 +10445,11 @@ function dfFall(b,dt){
   if(b.p.y<=gy+2){b.fall=false;b.g.visible=false;
     explode(b.p.x,gy,b.p.z,{scale:1.1,smokeSec:25,debris:6,boomDelay:camera.position.distanceTo(b.p)/340});}
 }
-function dfStart(){
+// o.daily: the Daily challenge on a dogfight day (dailySpec().kind), seeded from the UTC day
+function dfStart(o){
+  const daily=!!(o&&o.daily);
   // the range is Arizona's: from a world region switch there first, the run starts after the reload
-  if(!REGION.az){pickRegion('az',{resume:{df:1,region:'az',type:'f16',tod:TOD.id}});return;}
+  if(!REGION.az){pickRegion('az',{resume:{df:1,daily:daily?1:0,region:'az',type:'f16',tod:TOD.id}});return;}
   if(!WORLD.ready){toast('Loading '+REGION.city+'…');return;}
   pickType('f16',1);start('runway','luke');
   // no haboob over the range: the day sky for this run, the saved choice comes back on the next start()
@@ -10444,7 +10461,8 @@ function dfStart(){
   st.gearDown=false;st.gearPos=0;st.flapIdx=0;trimSpawn(st,0);st.mode='dogfight';   // trimmed for level flight at 400 ktA.land=1;A.tko=1;
   Object.assign(DF,{on:true,live:true,done:false,wave:1,t:DF.ROUND,bank:[],kills:0,gunKills:0,hits:0,clearT:0,fightT:0,flares:DF_FLARES,won:false,out:0,gap:0,why:'',
     rwr:'none',flareSaves:0,dmg:0,inv:0,deckG:0,below:0,puT:0,wTxt:'',ej:false,ejWhy:'',eShots:0,breaks:0,smk:0,paOk:false,
-    tally:false,sixCallT:-99,altT:-99,ckRec:null,pic:null,gv:0,ach:[],sc:null});DF.pend.length=0;dfSeed(DF.test.seed);
+    tally:false,sixCallT:-99,altT:-99,ckRec:null,pic:null,gv:0,ach:[],sc:null,daily:daily,seed:daily?todayKey():null,lb:''});DF.pend.length=0;
+  dfSeed(DF.test.seed!=null?DF.test.seed:DF.seed);
   for(const b of DF.pool){b.alive=false;b.fall=false;b.g.visible=false;}
   // the air is the fight's: the tower and the chatter go quiet (vqAdd drops them), the subtitle moves to the bottom strip
   DF_QUIET=true;DF_GK=1;vqReset();atcT=0;atcEl.classList.remove('on');document.body.classList.remove('dfEj');
@@ -10467,7 +10485,9 @@ function dfGo(){
   paused=false;pauseOv.classList.remove('on');radioVolApply();dfFightOn();
 }
 // the first wave's calls: Sentry's "Range is hot. Fight's on." then the picture
-function dfFightOn(){dfCall('fightson');dfPicture(6);toast('Red Flag: fight\'s on. Wave 1, one bandit ahead');}
+// and the run's one token (LEADERBOARD.md): the score board of the mode flown, or the daily
+function dfFightOn(){dfCall('fightson');dfPicture(6);toast((DF.daily?'Daily challenge':'Red Flag')+': fight\'s on. Wave 1, one bandit ahead');
+  DF.lb=DF.daily?'daily':'df:score:'+runMode();if(LB)LB.runStart(DF.lb,{noGhost:1});}
 // a hit against us. kind 'msl': a missile's fuze (the burst, the shake, smoke, 2 s of invulnerability after);
 // 'deck': under the hard deck (the pip only); none: the test hook, counted at once. The third is the eject.
 function dfHit(kind,m){
@@ -10492,7 +10512,7 @@ function dfTick(dt){
   if(DF.subT>0){DF.subT-=dt;DF.subAge+=dt;if(DF.subT<=0)DFS.el.classList.remove('on');}
   const live=running&&!paused,c=DF.cfg(),fl=DF.on&&!DF.done&&!DF.ej&&!st.crashed;
   // the flight model's dogfight terms (step): the g limit (a hair under, so the overshoot stays under it), Hard's energy fight
-  st.gLim=fl?c.gLim-0.15:0;st.dfE=fl?c.eDrag:0;st.dfAB=fl?c.eAB:0;
+  st.gLim=fl?c.gLim-0.15:0;st.dfE=fl?c.eDrag:0;st.dfAB=fl?c.eAB:0;st.dfEz=fl&&c.ezTurn?1:0;   // dfEz: Easy's 80 degree fight turn (easyFly)
   if(live){
     // grey vision (Hard): over 7.5 g it closes in from the edges (4 s at 9 g to the full tunnel), held from 5 to 7.5 g,
     // gone in 2 s under 5 g; never in Easy. dfGrey draws it.
@@ -10558,26 +10578,34 @@ function dfEnd(why){
   const r=dfScore(),stars=dfStars(r.score),letter=dfGrade(r.score),better=dfRecord(r,stars);DF.sc=r;
   runLog('dogfight',{score:r.score,kills:r.kills,gunKills:r.gunKills,waves:r.waves,hits:r.hits,won:r.won,why:why,secs:r.secs,clearT:r.clearT,flareSaves:r.flareSaves,stars:stars,ach:DF.ach.slice()});
   missHud(null);
+  // the boards: one submission with the whole run (a run with no points and no kills is not sent). The daily's points
+  // are half the run's, up to 1,500; the Worker fans a df:score run out to the kills, clear and guns boards
+  const bonus=dfBonus(DF),dp=Math.min(1500,Math.round(r.score/2)),send=r.score>0||r.kills>0,lb=DF.daily?'daily':'df:score:'+r.mode;
+  if(DF.daily&&send)scRecord('arc:daily:'+todayKey(),{pts:dp,secs:r.secs,letter:letter,stars:stars,ac:AC.name,df:1});
+  if(LB&&DF.lb){if(send)LB.runEnd(DF.lb,DF.daily?dp:r.score,{secs:Math.round(DF.fightT*100)/100,df:{kills:r.kills,guns:r.gunKills,hits:r.hits,waves:r.waves,won:r.won,
+      clear:r.won?r.clearT:null,bank:bonus/DF_PTS.sec,flares:DF_FLARES-DF.flares,ach:DF.ach.slice()}});else LB.runCancel(DF.lb);}
   if(why==='crash')return;
-  const B=SCORE.best[dfKey(r.mode)],bonus=dfBonus(DF);
+  const B=SCORE.best[dfKey(r.mode)];
   const stats=[['Kills',r.kills+(r.gunKills?' ('+r.gunKills+' by gun)':'')],['Waves cleared',r.waves+'/'+DF.waves.length],['Hits taken',r.hits+' of 3'],['Time bonus','+'+resNum(bonus)]];
   if(r.won)stats.push(['Clear time',dfClock(r.clearT)]);
+  if(DF.daily)stats.push(['Daily points',resNum(dp)+' (half the score)']);
   stats.push(['Best',B?resNum(B.pts)+' pts, '+B.kills+' kills'+(B.clr!=null?', '+dfClock(B.clr):''):'none yet']);
   resArm(()=>{if(!running||!DF.live)return;RES.kind='df';
-    resOpen(arcOv,{letter:letter,title:'Red Flag Dogfight: '+DF_WHY[why]+(better?', new best':''),score:resNum(r.score)+' pts',sub:AC.name,stars:stars,stats:stats,board:''});},DF.won?3:2.2);   // time for the knock it off call
+    resOpen(arcOv,{letter:letter,title:(DF.daily?'Daily dogfight: ':'Red Flag Dogfight: ')+DF_WHY[why]+(better?', new best':''),score:resNum(r.score)+' pts',sub:AC.name,stars:stars,stats:stats,board:send&&DF.lb?lb:''});},DF.won?3:2.2);   // time for the knock it off call
 }
 // an achievement in the fight: listed for this run (DF.ach, every time it is earned) and granted (its first time, in the strip)
 function dfAch(id){if(DF.ach.indexOf(id)<0)DF.ach.push(id);achGrant(id);}
 // the mode is over: bandits hidden, the music back to the playlist
 function dfStop(){
   if(DF.brief)dfBriefHide();
+  if(DF.on&&!DF.done&&DF.lb&&LB)LB.runCancel(DF.lb);   // abandoned (main menu, restart): its token is dropped
   for(let i=radioQ.length-1;i>=0;i--)if(radioQ[i].df){radioQ[i].dead=true;radioQ.splice(i,1);}
   if(VQ.cur&&VQ.cur.line.df)vqCut(false);DF.pend.length=0;
   if(!DF.live&&!DF.on)return;DF.on=false;DF.live=false;DF.done=false;DF.gap=0;DF.out=0;
   for(const b of DF.pool){b.alive=false;b.fall=false;b.g.visible=false;}DF.bandits.length=0;
   if(DF.wBuilt)dfWReset();dfAudOff();
   // the air back to the tower, the clouds back, the damage and the warnings gone
-  st.gLim=0;st.dfE=0;st.dfAB=0;DF.gv=0;
+  st.gLim=0;st.dfE=0;st.dfAB=0;st.dfEz=0;DF.gv=0;
   DF_QUIET=false;DF_GK=1;DF.ej=false;DF.wTxt='';DF.rwr='none';DF.subT=0;DFS.el.classList.remove('on');document.body.classList.remove('dfEj');
   missEl.classList.remove('dfH1','dfH2','dfH3');DFH.hk=-1;if(CLOUD_MESH)CLOUD_MESH.visible=true;
   dfHudUpdate();
@@ -10599,13 +10627,13 @@ function dfStop(){
 // Modes (5.5): gLim: our own g limit (both modes); eDrag: the energy fight's bleed, m/s^2 per g^2 over 2 g below the
 // burner, eAB: the burner's push in a turn, m/s^2 (Hard only); gv: the grey vision near the limit (Hard only).
 // The bandits: turnT, extR: seconds in a turning fight before they extend (when past extR nm); six: seconds chasing in
-// our rear quarter before an Easy bandit breaks off; back: seconds lost behind us before it comes back in front (0 never);
-// spread: radians between a wave's bandits at the spawn; outT: seconds outside the arena before the run ends.
+// our rear quarter before an Easy bandit breaks off; spread: radians between a wave's bandits at the spawn; outT: seconds
+// outside the arena before the run ends; ezTurn: Easy's fight turn, 80 degrees of bank pulled up to about 6 g (easyFly).
 const DF_CFG={
   hard:{seek:6,lock:1.5,fox:6,decoy:0.3,decoyRear:0.1,flares:2,gunR:12,gunKill:0.35,spd:1,g:1,
-    rLock:3,rDel:[2,4],rCd:12,eMax:2,eG:25,flrGood:0.65,flrEarly:0.25,flrG:0.15,autoFlr:0,gLim:9,eDrag:0.13,eAB:6,gv:1,turnT:25,extR:2,six:99,back:0,spread:0.95,outT:10},
+    rLock:3,rDel:[2,4],rCd:12,eMax:2,eG:25,flrGood:0.65,flrEarly:0.25,flrG:0.15,autoFlr:0,gLim:9,eDrag:0.13,eAB:6,gv:1,turnT:25,extR:2,six:99,spread:0.95,outT:10},
   easy:{seek:11,lock:0.8,fox:10,decoy:0.1,decoyRear:0,flares:2,gunR:20,gunKill:0.2,spd:0.8,g:0.75,
-    rLock:5,rDel:[4,6],rCd:20,eMax:1,eG:18,flrGood:0.85,flrEarly:0.25,flrG:0.15,autoFlr:2,gLim:9,eDrag:0,eAB:0,gv:0,turnT:10,extR:1,six:6,back:8,spread:0.3,outT:20}};
+    rLock:5,rDel:[4,6],rCd:20,eMax:1,eG:18,flrGood:0.85,flrEarly:0.25,flrG:0.15,autoFlr:2,gLim:9,eDrag:0,eAB:0,gv:0,turnT:10,extR:1,six:6,spread:0.3,outT:20,ezTurn:1}};
 DF.cfg=()=>rookie()?DF_CFG.easy:DF_CFG.hard;
 // the run's dice: spawns, the bandits' choices and waits, every decoy roll. DF.test.seed (a number) makes each run the
 // same (dfStart seeds it); null is Math.random
@@ -10930,7 +10958,7 @@ function dfCall(id,arg,o){
   DF.calls.push(id);if(DF.calls.length>40)DF.calls.shift();
   if(v[0]==='c'){dfCock(clips&&clips[0],t);return;}
   const who=DF_WHO[v[0]];
-  vqAdd({who:who,kind:'df',text:t,clips:clips,df:1,sub:ez?t:who+': '+t},{df:1,pri:2,ttl:o.ttl||3,cut:!!o.cut,ok:()=>DF.live});
+  vqAdd({who:who,kind:'df',text:t,clips:clips,df:1,sub:ez?t:who+': '+t.replace(/^Sentry, /,'')},{df:1,pri:2,ttl:o.ttl||3,cut:!!o.cut,ok:()=>DF.live});
 }
 // the cockpit voice: dry, now; its record goes in VQ.log beside the radio lines (one voice at a time is checked there)
 function dfCock(id,t){
@@ -11879,6 +11907,10 @@ function fillCards(el,list){el.innerHTML='';list.forEach(o=>{if(o.head){const h=
 // GO from another region switches there and the run (and the day's one attempt) starts after the reload.
 // wide: the MISSIONS card, a full row, which also says it is the same worldwide
 function dailyCard(wide){const D=dailySpec(),DI=AC_INFO[D.type];let used=false;try{const d=JSON.parse(localStorage.getItem('kgeuDaily')||'{}');used=d.day===D.day&&!!d.used;}catch(e){}
+  const tail=(used?'Official attempt flown, practice only. ':wide?'Same worldwide. One official attempt. ':'One official attempt. ')+'Next in <i class="cd">'+dailyLeft()+'</i>';
+  // a dogfight day: the same seeded fight for everyone, in the mode flown, scored half its points
+  if(D.kind==='dogfight')return {id:'daily',lb:'daily',icon:'dogfight',ac:'Daily challenge',here:1,name:'Red Flag Dogfight',
+    desc:'Barry M. Goldwater Range, F-16. '+(rookie()?'Easy':'Hard')+' mode, half the score counts. '+tail,go:()=>arcStart('daily')};
   return {id:'daily',lb:'daily',ac:'Daily challenge',here:1,name:endApt(D.end)+', runway '+D.end.num,
     desc:DI[1]+', '+D.tod+', wind '+String(D.wdir).padStart(3,'0')+' at '+D.wkt+'. '+(used?'Official attempt flown, practice only. ':wide?'Same worldwide. One official attempt. ':'One official attempt. ')+'Next in <i class="cd">'+dailyLeft()+'</i>',go:()=>arcStart('daily')};}
 function dailyLeft(){const n=Date.now(),d=new Date(n),nx=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()+1),s=Math.max(0,Math.floor((nx-n)/1000));
@@ -11893,7 +11925,7 @@ function misList(){
 function arcList(){
   const D=dailySpec(),DI=AC_INFO[D.type];
   fillCards($('arcCards'),[
-    {id:'dogfight',ac:'Featured',name:'Red Flag Dogfight',desc:'Your F-16 against aggressor F-16s over the Goldwater Range.',cls:'feat',go:()=>dfStart()},
+    {id:'dogfight',lb:'df:score:'+(rookie()?'easy':'hard'),ac:'Featured',name:'Red Flag Dogfight',desc:'Your F-16 against aggressor F-16s over the Goldwater Range.',cls:'feat',go:()=>dfStart()},
     dailyCard(),
     {id:'landing',lb:'arc:landing',ac:AC_INFO[savedType][1],name:'Landing challenge',desc:'Start 5 miles out. Beat the clock to runway 1.',go:()=>arcStart('landing')},
     {id:'landing1',lb:'arc:landing1',ac:AC_INFO[savedType][1],name:'1 mile landing challenge',desc:'Lined up, 300 ft, 1 mile out. Beat the clock to runway 1.',go:()=>arcStart('landing1')},
@@ -14145,7 +14177,7 @@ function tick(t,skipRender){
 // it switched off, so nothing is fetched and no request can fail in their console.
 var LB=null;
 LB=(function(){
-const APP_VER='2026-10-02-world';          // keep version.json in step when shipping
+const APP_VER='2026-10-03-dogfight';          // keep version.json in step when shipping
   const ORIGINS=['https://rabahharchaoui-design.github.io','http://localhost:8765'];
   let over='';try{over=localStorage.getItem('kgeuLBUrl')||'';}catch(e){}
   const E={url:over||'https://pfs-scores.rabahharchaoui.workers.dev',enabled:!!over||ORIGINS.includes(location.origin),online:null,
@@ -14177,8 +14209,15 @@ const APP_VER='2026-10-02-world';          // keep version.json in step when shi
   // the world airports: the 5 mile landing challenge to each region's home runway (aptStart switches region when needed)
   APT_IDS.forEach(id=>board(aptBoard(id),{name:REGIONS[id].base+' landing',group:'World airports',ghost:1,go:()=>aptStart(id),
     how:'Points: 1,000 x par / your time (up to 1.5x), x the landing grade. Runway '+REGIONS[id].main}));
+  // the Red Flag Dogfight: Easy and Hard are separate boards (mode: the one mode it takes, no EASY/HARD chip on its rows).
+  // One run is one submission to df:score:<mode> with its stats; the Worker writes the kills, clear and guns rows from it.
+  ['hard','easy'].forEach(m=>{const M=m==='easy'?' (Easy)':' (Hard)';
+    board('df:score:'+m,{name:'Dogfight score'+M,group:'Red Flag Dogfight',mode:m,df:1,go:()=>dfStart(),how:'100 a kill, 200 by gun, 2 a second banked, 250 for the win, minus 75 a hit'});
+    board('df:kills:'+m,{name:'Dogfight kills'+M,group:'Red Flag Dogfight',mode:m,fmt:'n',unit:'kills',how:'Bandits shot down in one run, 0 to 10'});
+    board('df:clear:'+m,{name:'Dogfight clear time'+M,group:'Red Flag Dogfight',mode:m,dir:-1,fmt:'time',how:'Fastest time to clear all four waves (wave clocks only)'});
+    board('df:guns:'+m,{name:'Dogfight gun kills'+M,group:'Red Flag Dogfight',mode:m,fmt:'n',unit:'gun kills',how:'Bandits shot down with the gun in one run'});});
   const fmtS=(b,v)=>{const B=BOARDS[b];if(v==null)return '';if(B.fmt==='time'){const m=Math.floor(v/60),s=v-m*60;return m+':'+(s<10?'0':'')+s.toFixed(1);}
-    if(B.fmt==='m')return (Math.round(v*10)/10)+' m';return num(v)+' pts';};
+    if(B.fmt==='m')return (Math.round(v*10)/10)+' m';if(B.fmt==='n')return num(v)+' '+(B.unit||'');return num(v)+' pts';};
   const AC_SHORT={cessna:'C172',alpha:'Alpha',f16:'F-16',reaper:'MQ-9A',mq9b:'MQ-9B',c130:'C-130'};
 
   // ---- ranks from XP; the server keeps the XP, this only draws it
@@ -14203,8 +14242,8 @@ const APP_VER='2026-10-02-world';          // keep version.json in step when shi
       e=>{clearTimeout(t);E.online=false;throw e;});
   }
 
-  // ---- runs: a token at the start, the score at the end
-  function runStart(b){
+  // ---- runs: a token at the start, the score at the end. o.noGhost: no flight path (the daily on a dogfight day)
+  function runStart(b,o){
     if(!BOARDS[b]||!running)return null;
     const r={b:b,t0:st.time,mode:runMode(),st:st,tok:null,practice:false,tokP:null};
     E.runs[b]=r;
@@ -14212,18 +14251,21 @@ const APP_VER='2026-10-02-world';          // keep version.json in step when shi
     if(E.P&&E.enabled&&!r.practice)r.tokP=api('/token',Object.assign({board:b,mode:r.mode},auth())).then(j=>{
         if(j.practice){r.practice=true;dailyUsed();practiceNote(r);}else if(j.token){r.tok=j.token;r.tokAt=Date.now();}return r.tok;},()=>null);
     if(b==='daily'){ARC.practice=r.practice;if(r.practice)practiceNote(r);else if(E.P)dailyUsed();}
-    if(BOARDS[b].ghost)recStart(b);
+    if(BOARDS[b].ghost&&!(o&&o.noGhost))recStart(b);
     if(E.ghost&&E.ghost.b===b){E.ghost.t0=st.time;E.ghost.st=st;}
     return r;
   }
   function practiceNote(r){if(r.b!=='daily'||r.st!==st)return;ARC.practice=true;setTimeout(()=>{if(r.st===st)toast('Practice run. Today\'s official attempt is used, so this one is not ranked',4);},2600);}
   function dailyUsed(){save('kgeuDaily',{day:utcDay(),used:1});}
   function runCancel(b){delete E.runs[b];if(E.rec&&E.rec.b===b)E.rec=null;}
-  // score: the board's number. o.secs: the run time when the mode measures its own
+  // score: the board's number. o.secs: the run time when the mode measures its own; o.df: a dogfight's stats.
+  // A single mode board (the dogfight's) goes to its Easy sibling when the run went Easy (runMode); the Worker takes
+  // the Hard token there. runBoard(b): where a run started on b will be submitted.
+  const runBoard=b=>{const B=BOARDS[b],r=E.runs[b];if(!B||!B.mode||B.mode==='easy')return b;return r&&(r.mode==='easy'||runMode()==='easy')?b.replace(/:hard$/,':easy'):b;};
   function runEnd(b,score,o){
-    const r=E.runs[b];if(!r||r.st!==st)return;delete E.runs[b];
-    E.shown={b:b,wait:1};if(E.P&&E.enabled)resBoard(E.shown);
-    o=o||{};const secs=Math.max(0,o.secs!=null?o.secs:st.time-r.t0),B=BOARDS[b];
+    const r=E.runs[b];if(!r||r.st!==st)return;const fb=runBoard(b);delete E.runs[b];
+    E.shown={b:fb,wait:1};if(E.P&&E.enabled)resBoard(E.shown);
+    o=o||{};const secs=Math.max(0,o.secs!=null?o.secs:st.time-r.t0),B=BOARDS[b];b=fb;
     const mode=r.mode==='easy'||runMode()==='easy'?'easy':'hard';
     const pathP=B.ghost&&E.rec&&E.rec.b===b&&E.rec.st===st?recStop(secs):Promise.resolve(null);
     if(r.practice){showBadge({practice:1,b:b});return;}
@@ -14231,6 +14273,7 @@ const APP_VER='2026-10-02-world';          // keep version.json in step when shi
     const item={id:newKey().slice(0,10),board:b,mode:mode,score:B.fmt==='pts'?Math.round(score):Math.round(score*100)/100,secs:Math.round(secs*100)/100,
       ac:acType,wx:TOD.id+' '+Math.round(st.windBase||0)+'@'+Math.round(st.windKt||0),when:Date.now()};
     if(B.fmt==='time')item.score=item.secs;
+    if(o.df)item.df=o.df;
     E.last=item.id;
     Promise.all([r.tokP||Promise.resolve(null),pathP]).then(([tok,path])=>{
       if(r.practice){showBadge({practice:1,b:b});return;}
@@ -14255,7 +14298,8 @@ const APP_VER='2026-10-02-world';          // keep version.json in step when shi
       flushing=false;
       if(j._s>=500){if(live)showBadge({queued:1,b:it.board});return;}
       E.Q.shift();saveQ();
-      if(j.ok){E.P.xp=j.xp;saveP();ui();if(live)showBadge(Object.assign({b:it.board},j));else toast('Queued run sent: '+BOARDS[it.board].name+', #'+j.rank+' of '+num(j.total));}
+      if(j.ok){const r0=rankIdx(E.P.xp||0),r1=rankIdx(j.xp||0);if(r1>r0)j.rankUp=RANKS[r1][0];   // the rank display on the card
+        E.P.xp=j.xp;saveP();ui();if(live)showBadge(Object.assign({b:it.board},j));else toast('Queued run sent: '+BOARDS[it.board].name+', #'+j.rank+' of '+num(j.total));}
       else if(live)showBadge({rejected:j.reason||j.error||'refused',b:it.board});
       if(E.Q.length)setTimeout(flush,300);else topUpPool();
     },()=>{flushing=false;if(live)showBadge({queued:1,b:it.board});});
@@ -14273,7 +14317,7 @@ const APP_VER='2026-10-02-world';          // keep version.json in step when shi
     else if(o.notoken){big='UNRANKED';line='No connection when the run started';}
     else if(o.queued){big='SAVED';line='Sends when you are back online';}
     else if(o.rejected){big='UNRANKED';line='Not accepted: '+o.rejected;}
-    else{big='#'+num(o.rank);line='of '+num(o.total)+'  '+B.name+(o.gain?'  +'+o.gain+' XP':'');
+    else{big='#'+num(o.rank);line='of '+num(o.total)+'  '+B.name.replace('Dogfight score','Dogfight')+(o.gain?'  +'+o.gain+' XP':'');
       if(o.top10&&o.rank<=10){em='TOP 10';badgeEl.classList.add('top');}
       else if(o.pb){em='NEW PERSONAL BEST';badgeEl.classList.add('pb');}
       if(em){chime(o.rank<=10?2:1);hapPattern('pb');}}
@@ -14532,7 +14576,8 @@ const APP_VER='2026-10-02-world';          // keep version.json in step when shi
   const V={b:'daily',p:'today',seq:0,cache:{}};
   function lbOpen(b,m){['arcOv','missOv','gradeOv','landOv'].forEach(id=>{const e=$(id);if(e)e.classList.remove('on');});
     if(b&&BOARDS[b])V.b=b;if(curScr!=='sLb')nav('sLb');else lbRender();}
-  const lbMode=m=>m==='easy'?'<span class="modeTag easy">EASY</span>':m==='hard'?'<span class="modeTag hard">HARD</span>':'';
+  // the EASY/HARD chip on a row of a merged board; a single mode board (the dogfight's) carries none, its name says it
+  const lbMode=m=>BOARDS[V.b]&&BOARDS[V.b].mode?'':m==='easy'?'<span class="modeTag easy">EASY</span>':m==='hard'?'<span class="modeTag hard">HARD</span>':'';
   function lbList(){const el=$('lbList');let html='',grp='';
     ORDER.forEach(id=>{const B=BOARDS[id];if(B.group!==grp){grp=B.group;html+='<h3>'+esc(grp)+'</h3>';}
       html+='<button data-lbb="'+esc(id)+'" class="'+(id===V.b?'sel':'')+'">'+esc(B.name)+'</button>';});
@@ -14617,7 +14662,7 @@ const APP_VER='2026-10-02-world';          // keep version.json in step when shi
   function armFree(){E.armed=true;}
   return {E:E,BOARDS:BOARDS,ORDER:ORDER,board:board,runStart:runStart,runEnd:runEnd,runCancel:runCancel,frame:frame,reset:reset,armFree:armFree,
     boot:boot,csHold:()=>csHold,paintModel:paintModel,paintAll:paintAll,lbOpen:lbOpen,lbRender:lbRender,race:race,ui:ui,flush:flush,csOpen:csOpen,dice:dice,
-    fameDraw:fameDraw,fameFetch:fameFetch,fameApply:fameApply,fameApplyCity:fameApplyCity,ghostStart:ghostStart,decodePath:decodePath,rankSVG:rankSVG,utcDay:utcDay,fmtS:fmtS,showBadge:showBadge,ghostOff:ghostOff,
+    fameDraw:fameDraw,fameFetch:fameFetch,fameApply:fameApply,fameApplyCity:fameApplyCity,ghostStart:ghostStart,decodePath:decodePath,rankSVG:rankSVG,rankByName:rankByName,utcDay:utcDay,fmtS:fmtS,showBadge:showBadge,ghostOff:ghostOff,runBoard:runBoard,
     get P(){return E.P;}};
 })();
 
@@ -14646,7 +14691,7 @@ window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runM
   RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,ticker:()=>{const e=document.getElementById('tk'),c=document.getElementById('tkCtl');return {on:e.classList.contains('on'),paused:e.classList.contains('paused'),anim:getComputedStyle(document.getElementById('tkT')).animationName,scroll:e.classList.contains('scroll'),open:c.classList.contains('on'),text:e.querySelector('#tkT i').textContent,vis:e.offsetParent!==null&&getComputedStyle(e).display!=='none',ctlVis:c.offsetParent!==null};},tickerForce:n=>{TK.force=n||null;tkUI();},tickerOpen:()=>tkOpen(),tickerClose:()=>{TK.open=false;tkUI();},musicTick:musicTick,MUSIC:MUSIC,actx:()=>actx,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,VQ:VQ,vqLog:clear=>{const r=VQ.log.map(e=>Object.assign({},e));if(clear)VQ.log.length=0;return r;},vqAdd:(who,kind,text,clips,o)=>vqAdd(L(who,kind,text,clips),o),coach2:coach2,chatNow:()=>chatNow(),atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),bannerShow:(k,t)=>bannerShow(k,t),badgeHide:()=>badgeHide(),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
-  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day}},aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day,kind:d.kind}},dfDayOf:k=>dfDayOf(k),aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   // @OhRabah easter eggs (3.10): where each one is, whether its lights are on, and the tow banner
   eggs:()=>EGG.list.map(o=>{const p=o.getWorldPosition(new V3()),r={name:o.name,x:p.x,y:p.y,z:p.z,ry:o.rotation.y,lit:(o.name==='egg_billboard'||o.name==='egg_rooftop')&&EGG.lit,visible:o.visible};
     if(o.name==='egg_tow'){const b=EGG.tow.ban.getWorldPosition(new V3()),f=new V3(0,0,-1).applyQuaternion(o.quaternion);r.banner={x:b.x,y:b.y,z:b.z};r.fwd=[f.x,f.y,f.z];}return r;}),
@@ -14703,7 +14748,7 @@ window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runM
   starField.visible=false;starField.renderOrder=-1;scene.add(starField);
 })();
 (function(){let t='day';try{const v=localStorage.getItem('kgeuTOD');if(v&&TOD_SET[v])t=v;}catch(e){}setTOD(t);})();
-window.__kgeu.dailyRegion=id=>{ARC.dailyRegion=id||null;return dailySpec().region;};window.__kgeu.TFC=TFC;window.__kgeu.tfcList=tfcList;window.__kgeu.tfcSpawn=tfcSpawn;window.__kgeu.tfcClear=tfcClear;
+window.__kgeu.dailyRegion=id=>{ARC.dailyRegion=id||null;return dailySpec().region;};window.__kgeu.dailyKind=k=>{ARC.dailyKind=k==='dogfight'||k==='landing'?k:null;return dailySpec().kind;};window.__kgeu.TFC=TFC;window.__kgeu.tfcList=tfcList;window.__kgeu.tfcSpawn=tfcSpawn;window.__kgeu.tfcClear=tfcClear;
 window.__kgeu.TCAS={levels:tcasLevels,state:()=>({ta:TCAS.list.some(o=>tcasLvl(o)>=2),ra:!!TCAS.ra,sense:TCAS.ra?(TCAS.sense>0?'climb':'descend'):null,clear:TCAS.clear,inhibit:TCAS.inhibit,
   shown:TCAS.shown,on:TCAS.on,raT:TCAS.raT}),tcasConflict:tcasConflict,setTcas:setTcas,T:TCAS,tcasVoiceLog:TCAS.voiceLog};
 window.__kgeu.tcasConflict=tcasConflict;window.__kgeu.tcasVoiceLog=TCAS.voiceLog;
@@ -14721,7 +14766,7 @@ worldLoad();
   if(!r)return;
   const go=()=>{const sp=$('splash');if(!WORLD.ready||(sp&&!sp.classList.contains('done'))){if(!WORLD.err)setTimeout(go,200);return;}
     if(r.start){const S=r.start;if(S.skill&&S.skill!==SKILL)setSkill(S.skill);if(S.tod&&TOD_SET[S.tod])setTOD(S.tod);
-      if(S.df)dfStart();
+      if(S.df)dfStart(S.daily?{daily:1}:null);
       else if(S.arc){if(S.type&&TYPES[S.type])pickType(S.type);arcStart(S.arc);}
       else if(S.lesson)startLesson(S.lesson);
       else if(S.mode==='free'){if(S.type&&TYPES[S.type])pickType(S.type);if(S.base)pickBase(S.base);freeStart(S.pos);}   // the pause sheet's Apply

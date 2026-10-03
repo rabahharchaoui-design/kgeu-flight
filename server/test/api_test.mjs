@@ -16,9 +16,14 @@ const ok = (n, c, d = '') => { console.log((c ? '  ok   ' : '  FAIL ') + n + (d 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const key = () => randomBytes(24).toString('hex');
 const tag = () => 'T' + randomBytes(4).toString('hex').toUpperCase().slice(0, 7);   // test callsigns: T + 7 hex
+// local only: wrangler dev runs with DEV_DFDAY=1, so this header says whether the daily is a dogfight day ('0': a landing
+// day, whatever the real date; '1': a dogfight day). Live, the real UTC day decides (realDf).
+let dfHdr = '0';
+const realDf = Math.floor(Date.now() / 864e5) % 5 === 3;
 async function call(path, body, origin = ORIGIN) {
-  const r = await fetch(BASE + path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: origin }, body: JSON.stringify(body) }
-    : { headers: { Origin: origin } });
+  const hd = Object.assign({ Origin: origin }, LIVE ? {} : { 'x-pfs-dfday': dfHdr });
+  const r = await fetch(BASE + path, body ? { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, hd), body: JSON.stringify(body) }
+    : { headers: hd });
   let j = null; try { j = await r.json(); } catch (e) { }
   return { s: r.status, j: j || {}, h: r.headers };
 }
@@ -40,7 +45,7 @@ const line = (secs, v) => Array.from({ length: Math.round(secs * 5) + 1 }, (_, i
 async function startDev() {
   rmSync(here + '.wrangler/state', { recursive: true, force: true });
   execSync('npx wrangler d1 execute pfs-scores --local --file=schema.sql', { cwd: here, stdio: 'ignore' });
-  dev = spawn('npx', ['wrangler', 'dev', '--port', '8787', '--ip', '127.0.0.1'], { cwd: here, stdio: 'ignore', detached: true });
+  dev = spawn('npx', ['wrangler', 'dev', '--port', '8787', '--ip', '127.0.0.1', '--var', 'DEV_DFDAY:1'], { cwd: here, stdio: 'ignore', detached: true });
   for (let i = 0; i < 60; i++) { try { const r = await fetch(BASE + '/health'); if (r.ok) return; } catch (e) { } await sleep(500); }
   throw new Error('wrangler dev did not start');
 }
@@ -193,12 +198,15 @@ async function main() {
   const ba = await call('/board?b=apt:RJTT&p=all&cs=' + A);
   ok('apt:RJTT board lists it', ba.j.rows && ba.j.rows.length === 1 && ba.j.rows[0].cs === A && ba.j.rows[0].score === 1100 && ba.j.me && ba.j.me.r === 1, JSON.stringify(ba.j.rows));
   ok('apt:RJTT points too high for the time refused', (await call('/submit', Object.assign({ board: 'apt:RJTT', mode: 'hard', score: 1500, secs: 400, ac: 'cessna', when: Date.now(), token: (await call('/pool', Object.assign({ n: 1 }, me))).j.tokens[0], path: await encPath(line(400, 40)) }, me))).j.reason === 'points too high for a 400 s run');
+  const landDay = !(LIVE && realDf);
+  if (landDay) {
   const ds = await call('/submit', Object.assign({ board: 'daily', mode: 'hard', score: 800, secs: 90, ac: 'f16', wx: 'day', when: Date.now(), token: d1.token, path: await encPath(line(90, 100)) }, you));
   ok('official daily attempt accepted', ds.s === 200, JSON.stringify(ds.j));
   const yp = (await call('/pool', Object.assign({ n: 1 }, you))).j.tokens[0];
   ok('second daily score of the day refused', (await call('/submit', Object.assign({ board: 'daily', mode: 'hard', score: 900, secs: 90, ac: 'f16', when: Date.now(), token: yp, path: await encPath(line(90, 100)) }, you))).j.reason === 'second official daily attempt');
+  }
   const fm = await call('/fame');
-  ok('fame: today\'s daily #1 and the top 3 by XP', fm.j.daily && fm.j.daily.cs === B && fm.j.top.length >= 2, JSON.stringify(fm.j));
+  ok('fame: today\'s daily #1 and the top 3 by XP', (!landDay || (fm.j.daily && fm.j.daily.cs === B)) && fm.j.top.length >= 2, JSON.stringify(fm.j));
   ok('fame: the world airport champions (apt.RJTT, nobody yet at LFPG and SBRJ)', fm.j.apt && fm.j.apt.RJTT && fm.j.apt.RJTT.cs === A && fm.j.apt.RJTT.score === 1100 && fm.j.apt.RJTT.mode === 'hard'
     && 'LFPG' in fm.j.apt && 'SBRJ' in fm.j.apt && (LIVE || (fm.j.apt.LFPG === null && fm.j.apt.SBRJ === null)), JSON.stringify(fm.j.apt));
 
@@ -214,6 +222,75 @@ async function main() {
   const rp = await call('/rename', Object.assign({ to: 'SH1THEAD' }, me));
   ok('rename to a profane name refused', rp.s === 400 && rp.j.reason === 'profanity on rename: SH1THEAD', JSON.stringify(rp.j));
 
+  // ---- the Red Flag Dogfight: Easy and Hard boards, one submission a run fanned out, caps, achievement XP, the daily
+  sql(`DELETE FROM hits WHERE kind='submit' AND ts>=${T0}`);   // the 30 an hour per IP: this section is a fresh hour's worth
+  const DG = tag(), sd = await signup(DG), dg = { cs: DG, key: sd.key };
+  const E2 = tag(), se = await signup(E2), eg = { cs: E2, key: se.key };
+  const tH = await tokenFor(dg, 'df:score:hard'), tE = await tokenFor(dg, 'df:score:easy', 'easy');
+  dfHdr = '1'; const dd = await tokenFor(eg, 'daily'); dfHdr = '0';
+  const tWait = Date.now();
+  ok('dogfight tokens issued (df:score:hard, df:score:easy) and a daily one', !!tH.token && !!tE.token && !!dd.token, JSON.stringify([tH, tE, dd]).slice(0, 200));
+  const dp = (await call('/pool', Object.assign({ n: 5 }, dg))).j.tokens || [];
+  const dfs = (o, sc, secs, extra = {}) => Object.assign({ board: 'df:score:hard', mode: 'hard', score: sc, secs, ac: 'f16', wx: 'day 0@0', when: Date.now(), df: o }, extra, dg);
+  const win = { kills: 10, guns: 3, hits: 0, waves: 4, won: true, clear: 250.3, bank: 110, flares: 4, ach: ['ace', 'guns', 'untouchable', 'flaresave'] };
+  const xp0 = (await call('/me', dg)).j.xp;
+  const w1 = await call('/submit', dfs(win, 1770, 251, { token: dp[0] }));
+  ok('a legal Hard win accepted on df:score:hard, #1', w1.s === 200 && w1.j.ok && w1.j.board === 'df:score:hard' && w1.j.rank === 1, JSON.stringify(w1.j));
+  ok('the answer carries the fan out: kills, clear and guns ranks and personal bests', w1.j.df && w1.j.df.kills.rank === 1 && w1.j.df.kills.pb && w1.j.df.kills.score === 10
+    && w1.j.df.clear && w1.j.df.clear.score === 250.3 && w1.j.df.clear.pb && w1.j.df.guns && w1.j.df.guns.score === 3, JSON.stringify(w1.j.df));
+  const wantAch = 150 + 75 + 200 + 50, runXp = Math.round((10 + 40) * 1.25) + 15 + 25;
+  ok('achievements give their XP the first time (Ace 150, Guns Kill 75, Untouchable 200, Flare Save 50)', w1.j.ach && w1.j.ach.length === 4 && w1.j.achXp === wantAch
+    && w1.j.ach.find(a => a.id === 'ace').xp === 150 && w1.j.ach.find(a => a.id === 'untouchable').xp === 200, JSON.stringify(w1.j.ach));
+  ok('the run XP once (ref 1,500, Hard, PB, top 10), plus the achievements', w1.j.gain === runXp && w1.j.xp === xp0 + runXp + wantAch, JSON.stringify([w1.j.gain, w1.j.xp, xp0]));
+  const rows = sql(`SELECT board, score, token FROM scores WHERE callsign='${DG}' ORDER BY board`);
+  const jt = rows.find(r => r.board === 'df:score:hard').token;
+  ok('four rows: score, kills, clear, guns on the run token id plus :k :c :g', rows.length === 4 && JSON.stringify(rows.map(r => [r.board, r.score, r.token.replace(jt, 'J')]))
+    === JSON.stringify([['df:clear:hard', 250.3, 'J:c'], ['df:guns:hard', 3, 'J:g'], ['df:kills:hard', 10, 'J:k'], ['df:score:hard', 1770, 'J']]), JSON.stringify(rows));
+  ok('the same token twice is refused (dogfight)', (await call('/submit', dfs(win, 1770, 251, { token: dp[0] }))).j.reason === 'token already used');
+  const w2 = await call('/submit', dfs({ kills: 6, guns: 0, hits: 1, waves: 2, won: false, clear: null, bank: 40, flares: 2, ach: ['ace'] }, 600 + 80 - 75, 150, { token: dp[1] }));
+  ok('a second run: Ace again gives no XP, no clear or guns row, kills is no PB', w2.s === 200 && w2.j.ach.length === 0 && w2.j.achXp === 0 && w2.j.df.clear === null && w2.j.df.guns === null
+    && w2.j.df.kills.pb === false && w2.j.df.kills.best === 10, JSON.stringify(w2.j));
+  ok('the fan out boards list the run (df:kills:hard, df:clear:hard)', (await call('/board?b=df:kills:hard&p=all&cs=' + DG)).j.me.score === 10 && (await call('/board?b=df:clear:hard&p=all')).j.rows[0].score === 250.3);
+  const dbad = async (o, sc, secs, extra) => (await call('/submit', dfs(o, sc, secs, Object.assign({ token: dp[2] }, extra || {})))).j.reason || '';
+  const g = { kills: 2, guns: 0, hits: 0, waves: 1, won: false, clear: null, bank: 60, flares: 0, ach: [] };
+  ok('refused: wrong mode for the board', await dbad(g, 300, 60, { mode: 'easy' }) === 'wrong mode for this board');
+  ok('refused: guns over kills', await dbad(Object.assign({}, g, { guns: 3 }), 300, 60) === 'more gun kills (3) than kills (2)');
+  ok('refused: too fast for the kills', await dbad(Object.assign({}, g, { kills: 8, bank: 0 }), 300, 30) === '8 kills in 30.0 s, faster than one a 4 s');
+  ok('refused: score over the formula cap', await dbad(g, 400, 60) === 'dogfight score 400 over the 320 its stats allow');
+  ok('refused: a win with 9 kills', await dbad(Object.assign({}, win, { kills: 9 }), 1600, 251) === 'a win needs 10 kills, 4 waves and under 3 hits');
+  ok('refused: a clear time without a win', await dbad(Object.assign({}, g, { clear: 100 }), 300, 120) === 'clear time without a win');
+  ok('refused: not the F-16', await dbad(g, 300, 60, { ac: 'cessna' }) === 'dogfight flown in cessna, not the F-16');
+  ok('refused: an inconsistent achievement (Ace with 2 kills)', await dbad(Object.assign({}, g, { ach: ['ace'] }), 300, 60) === 'Ace claimed with 2 kills');
+  ok('refused: no stats', await dbad(undefined, 300, 60) === 'dogfight run without its stats');
+  ok('refused: a direct submission to a fan out board', (await dbad(g, 2, 60, { board: 'df:kills:hard' })).startsWith('the dogfight writes df:kills:hard'));
+  ok('refused: banked seconds the waves cannot hold', await dbad(Object.assign({}, g, { bank: 85 }), 250, 60) === 'banked 85 s, too many for 1 waves and 2 kills');
+  // real tokens: the wall time since the token must cover the shortest fight the stats allow
+  const tooSoon = await call('/submit', dfs({ kills: 3, guns: 0, hits: 0, waves: 1, won: false, clear: null, bank: 60, flares: 0, ach: [] }, 400, 60, { board: 'df:score:easy', mode: 'easy', token: tE.token }));
+  ok('refused: submitted too soon after its token', (tooSoon.j.reason || '').startsWith('submitted '), JSON.stringify(tooSoon.j));
+  await sleep(Math.max(0, 23500 - (Date.now() - tWait)));
+  const soon5 = await call('/submit', dfs({ kills: 5, guns: 0, hits: 0, waves: 2, won: false, clear: null, bank: 40, flares: 0, ach: [] }, 580, 60, { board: 'df:score:easy', mode: 'easy', token: tE.token }));
+  ok('refused: 5 kills submitted 23 s after the token (a 40 s fight at least)', (soon5.j.reason || '').endsWith('under the 40 s that fight needs'), JSON.stringify(soon5.j));
+  const e1 = await call('/submit', dfs({ kills: 2, guns: 1, hits: 0, waves: 1, won: false, clear: null, bank: 60, flares: 0, ach: ['guns'] }, 420, 40, { board: 'df:score:easy', mode: 'easy', token: tE.token }));
+  ok('an Easy run goes to df:score:easy (and its own kills and guns boards)', e1.s === 200 && e1.j.board === 'df:score:easy' && e1.j.mode === 'easy' && e1.j.rank === 1 && e1.j.df.guns.pb && e1.j.ach.length === 0, JSON.stringify(e1.j));
+  const ez = await call('/board?b=df:kills:easy&p=all&cs=' + DG);
+  ok('the Easy kills board has it, the Hard one is separate', ez.j.rows.length === 1 && ez.j.rows[0].score === 2 && ez.j.rows[0].mode === 'easy' && (await call('/board?b=df:kills:hard&p=all')).j.rows.every(r => r.mode === 'hard'), JSON.stringify(ez.j.rows));
+  const hEz = await call('/submit', dfs({ kills: 3, guns: 0, hits: 0, waves: 1, won: false, clear: null, bank: 60, flares: 0, ach: [] }, 420, 40, { board: 'df:score:easy', mode: 'easy', token: tH.token }));
+  ok('a run started Hard that went Easy goes to the Easy board on its Hard token', hEz.s === 200 && hEz.j.board === 'df:score:easy', JSON.stringify(hEz.j));
+  // the daily on a dogfight day (forced locally with the header): needs df, capped at half the formula (+2)
+  if (!LIVE) {
+    dfHdr = '1';
+    const dsub = (sc, o, extra = {}) => call('/submit', Object.assign({ board: 'daily', mode: 'hard', score: sc, secs: 40, ac: 'f16', wx: 'day', when: Date.now(), token: dd.token, df: o }, extra, eg));
+    const three = { kills: 3, guns: 0, hits: 0, waves: 1, won: false, clear: null, bank: 60, flares: 0, ach: [] };
+    ok('dogfight day: a daily without df refused', (await dsub(200, undefined)).j.reason === 'the daily is a dogfight today: its stats are missing');
+    ok('dogfight day: a daily over half the formula refused', (await dsub(300, three)).j.reason === 'dogfight score 600 over the 420 its stats allow');
+    const dok = await dsub(210, three);
+    ok('dogfight day: the daily accepted (no flight path), no fan out', dok.s === 200 && dok.j.board === 'daily' && !dok.j.df && Array.isArray(dok.j.ach), JSON.stringify(dok.j));
+    dfHdr = '0';
+    ok('a landing day: a daily carrying df refused', (await dsub(210, three, { token: 'x.y' })).j.reason === 'dogfight stats on a landing daily');
+  } else if (realDf) ok('live dogfight day: a daily without df refused', (await call('/submit', Object.assign({ board: 'daily', mode: 'hard', score: 200, secs: 40, ac: 'f16', when: Date.now(), token: 'x.y' }, eg))).j.reason === 'the daily is a dogfight today: its stats are missing');
+  else ok('live landing day: a daily carrying df refused', (await call('/submit', Object.assign({ board: 'daily', mode: 'hard', score: 200, secs: 40, ac: 'f16', when: Date.now(), token: 'x.y', df: { kills: 1 } }, eg))).j.reason === 'dogfight stats on a landing daily');
+  ok('flagged: the dogfight refusals are on record', ['wrong mode for this board', 'more gun kills (3) than kills (2)', 'clear time without a win'].every(r => sql(`SELECT reason FROM flagged WHERE created>=${T0} AND callsign='${DG}'`).some(x => x.reason === r)));
+
   // ---- rate limit: 30 submissions an hour per device
   if (!LIVE) {
   let last = null;
@@ -224,7 +301,7 @@ async function main() {
   // ---- every refusal is on record
   const fl = sql(`SELECT reason FROM flagged WHERE created>=${T0} AND callsign IN ('${A}','${B}','${C}','F4GG0T','OHRABAH')`);
   const reasons = fl.map(r => r.reason);
-  for (const want of ['no valid run token', 'token already used', 'score 101 outside 0 to 100', 'ghost path missing', 'second official daily attempt', 'profanity: F4GG0T', 'reserved callsign without the secret', 'profanity on rename: SH1THEAD'])
+  for (const want of ['no valid run token', 'token already used', 'score 101 outside 0 to 100', 'ghost path missing'].concat(landDay ? ['second official daily attempt'] : []).concat(['profanity: F4GG0T', 'reserved callsign without the secret', 'profanity on rename: SH1THEAD']))
     ok('flagged: ' + want, reasons.includes(want));
   ok('scores table has the callsign, mode, run time, aircraft, weather, token',
     sql(`SELECT * FROM scores WHERE callsign='${A}' AND board='lesson:stall' AND mode='hard'`).every(r => r.mode === 'hard' && r.secs === 3.5 && r.ac === 'cessna' && r.wx === 'day' && r.token));
@@ -232,7 +309,7 @@ async function main() {
 
   if (LIVE) {
     const ids = sql(`SELECT id FROM players WHERE callsign IN (${made.map(c => "'" + c + "'").join(',')})`).map(r => r.id).join(',') || '0';
-    sql(`DELETE FROM ghosts WHERE player_id IN (${ids}); DELETE FROM scores WHERE player_id IN (${ids}); DELETE FROM tokens WHERE player_id IN (${ids}); DELETE FROM players WHERE id IN (${ids}); DELETE FROM flagged WHERE created>=${T0} AND callsign IN (${made.concat(['F4GG0T', 'OHRABAH']).map(c => "'" + c + "'").join(',')}); DELETE FROM hits WHERE ts>=${T0}`);
+    sql(`DELETE FROM achs WHERE player_id IN (${ids}); DELETE FROM ghosts WHERE player_id IN (${ids}); DELETE FROM scores WHERE player_id IN (${ids}); DELETE FROM tokens WHERE player_id IN (${ids}); DELETE FROM players WHERE id IN (${ids}); DELETE FROM flagged WHERE created>=${T0} AND callsign IN (${made.concat(['F4GG0T', 'OHRABAH']).map(c => "'" + c + "'").join(',')}); DELETE FROM hits WHERE ts>=${T0}`);
     console.log('  cleaned up test players ' + made.join(' '));
   }
 }
