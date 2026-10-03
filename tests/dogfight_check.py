@@ -22,6 +22,7 @@ async def main():
         card = await pg.evaluate("()=>{const c=document.querySelector('#arcCards [data-m=dogfight]');return c&&{soon:!!c.querySelector('.soon'),stars:!!c.querySelector('.stars'),txt:c.innerText}}")
         ok('the Red Flag Dogfight card no longer says Coming soon', card and not card['soon'] and card['stars'] and 'Coming soon' not in card['txt'], card)
         await finger(pg, '#arcCards [data-m="dogfight"]'); await pg.wait_for_timeout(600)
+        await pg.evaluate(f"()=>{{{K}.DF.test.noBanditFire=true;}}")   # 5.3: the bandits' missiles stay off here (dogfight_defense_check)
         s = await pg.evaluate(f"""()=>{{const K={K},s=K.state(),D=K.DF;return {{on:D.on,menu:document.getElementById('menu').classList.contains('on'),type:s.type,ground:s.onGround,gear:s.gearDown,
           ft:(s.pos.y-1.5)*3.28084+1071,kt:s.ias*1.943844,dc:Math.hypot(s.pos.x-D.C.x,s.pos.z-D.C.z)/1852,n:D.bandits.length,wave:D.wave,t:D.t,
           hud:document.getElementById('missT').textContent,forced:K.music().forced}}}}""")

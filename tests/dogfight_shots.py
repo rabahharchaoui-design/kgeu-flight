@@ -9,8 +9,11 @@
 #   .venv/bin/python tests/dogfight_shots.py --set 51                 (5.1 shots, the original set)
 #   .venv/bin/python tests/dogfight_shots.py --set 52                 (5.2 shots, all of them)
 #   .venv/bin/python tests/dogfight_shots.py --set 52 --only gun,lock (a subset -- keeps one run under 100 s)
+#   .venv/bin/python tests/dogfight_shots.py --set 53                 (5.3 defense shots, all of them)
+#   .venv/bin/python tests/dogfight_shots.py --set 53 --only lock,launch (a subset)
 #
 # 5.2 shot names: buttons (also writes 52_buttons_568.png), search, lock, missile, gun, killcam
+# 5.3 shot names: lock, launch, launch_easy, flares, hit2, harddeck, eject, launch_568, high
 import asyncio, os, argparse
 from playwright.async_api import async_playwright
 from harness import serve, launch, page, finger, IPHONE_15
@@ -26,6 +29,8 @@ PLACE = """([i,d,off])=>{const K=window.__kgeu,s=K.state(),D=K.DF,b=D.bandits[i]
   const v=s.vel;b.hdg=Math.atan2(v.x,-v.z);b.gam=Math.asin(Math.max(-1,Math.min(1,v.y/v.length())));b.bank=0;b.spd=v.length();b.state='TURN';b.st=0;b.hp=1;
   b.v.set(Math.sin(b.hdg)*Math.cos(b.gam),Math.sin(b.gam),-Math.cos(b.hdg)*Math.cos(b.gam)).multiplyScalar(b.spd);return true;}"""
 GUNHOLD = "(on)=>{const g=document.getElementById('bGun');g.dispatchEvent(new PointerEvent(on?'pointerdown':'pointerup',{pointerId:77,bubbles:true,pointerType:'touch',isPrimary:false}));}"
+# feet (dogfight HUD altitude) -> world y metres, lifted from tests/dogfight_defense_check.py
+FTY = "(ft)=>(ft-1071)/3.28084+1.5"
 
 
 async def fast(pg, secs, dt=0.1):
@@ -76,8 +81,34 @@ async def dfstart_f16(pg):
     await fast(pg, 0.3)
 
 
-async def new_page(b, url, type_='cessna'):
-    return await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuType': type_})
+async def new_page(b, url, type_='cessna', vp=IPHONE_15, skill='pilot'):
+    return await page(b, url, vp=vp, storage={'kgeuOnboard': skill, 'kgeuTut': '1', 'kgeuType': type_})
+
+
+async def wait_rwr(pg, target, timeout=16.0):
+    """Fast-forward in 0.1 s ticks until DF.rwr reaches target ('search'/'lock'/'launch'), or give up.
+    #dfVig's amber/red edges are a CSS animation (dfVp, infinite alternate) driven by real wallclock
+    time, not sim time: the class is added the instant rwr flips, so a screenshot taken immediately
+    (as fast() leaves no real time between ticks) always lands on the animation's 'from' keyframe
+    (opacity .2) -- the pulse reads as basically invisible. A short real wait afterwards lets the
+    pulse move into its visible range before the caller screenshots."""
+    t = 0.0
+    while t < timeout:
+        await fast(pg, 0.1); t += 0.1
+        if await pg.evaluate(f"()=>{K}.DF.rwr") == target:
+            await pg.wait_for_timeout(250)
+            return t
+    return None
+
+
+async def wait_missile_gone(pg, timeout=10.0):
+    """Fast-forward until no live bandit missile remains (hit, miss or decoyed), or give up."""
+    t = 0.0
+    while t < timeout:
+        await fast(pg, 0.1); t += 0.1
+        if not await pg.evaluate(f"()=>{K}.DF.msl.some(m=>m.on&&m.foe)"):
+            return t
+    return None
 
 
 # ===================== 5.1 =====================
@@ -237,10 +268,128 @@ SHOTS_52 = {'buttons': shot52_buttons, 'search': shot52_search, 'lock': shot52_l
             'missile': shot52_missile, 'gun': shot52_gun, 'killcam': shot52_killcam}
 
 
+# ===================== 5.3 =====================
+# All of these place bandit 0 on our six (off=pi, "straight behind") so the missile/RWR arrow
+# reads as a 6 o'clock threat, matching tests/dogfight_defense_check.py's own PLACE usage.
+SIX = 3.14159
+
+
+async def shot53_lock(pg):
+    await dfstart_f16(pg)
+    await place(pg, 0, 1500, SIX)
+    t = await wait_rwr(pg, 'lock')
+    print('  lock: t', t)
+    await shot(pg, '53_lock.png')
+
+
+async def shot53_launch(pg):
+    await dfstart_f16(pg)
+    await place(pg, 0, 1500, SIX)
+    t = await wait_rwr(pg, 'launch')
+    print('  launch: t', t)
+    await shot(pg, '53_launch.png')
+
+
+async def shot53_launch_easy(pg):
+    # the page is already loaded with kgeuOnboard=rookie (new_page's skill=); dfStart reads SKILL at call time
+    await dfstart_f16(pg)
+    await place(pg, 0, 1500, SIX)
+    t = await wait_rwr(pg, 'launch')
+    print('  launch_easy: t', t)
+    await shot(pg, '53_launch_easy.png')
+
+
+async def shot53_launch_568(pg):
+    await dfstart_f16(pg)
+    await place(pg, 0, 1500, SIX)
+    t = await wait_rwr(pg, 'launch')
+    print('  launch_568: t', t)
+    await shot(pg, '53_launch_568.png')
+
+
+async def shot53_flares(pg):
+    await dfstart_f16(pg)
+    await place(pg, 0, 1500, SIX)
+    await wait_rwr(pg, 'launch')
+    await finger(pg, '#bFlr')
+    f = await pg.evaluate(f"()=>{K}.DF.flares")
+    print('  flares: count', f)
+    await shot(pg, '53_flares.png')
+
+
+async def shot53_hit2(pg):
+    await dfstart_f16(pg)
+    for _ in range(2):   # straight and level: each forced launch hits, per dogfight_defense_check.py
+        await place(pg, 0, 1500, SIX)
+        await pg.evaluate(f"()=>{K}.DF.test.launchAt()")
+        await wait_missile_gone(pg)
+        await fast(pg, 2.2)   # clear of the hit-flash cooldown before the next
+    h = await pg.evaluate(f"()=>{K}.DF.hits")
+    print('  hit2: hits', h)
+    await shot(pg, '53_hit2.png')
+
+
+async def shot53_harddeck(pg):
+    await dfstart_f16(pg)
+    await fast(pg, 3)   # clear of the "fight's on" intro line so it doesn't join the Pull up call in the strip
+    y = await pg.evaluate(FTY, 5700)
+    await pg.evaluate("([y])=>{const s=window.__kgeu.state();s.pos.y=y;s.vel.y=-12;}", [y])
+    await fast(pg, 0.3)
+    w = await pg.evaluate("()=>document.getElementById('warn').textContent")
+    print('  harddeck: warn', w)
+    await shot(pg, '53_harddeck.png')
+
+
+async def shot53_eject(pg):
+    await dfstart_f16(pg)
+    for _ in range(3):
+        await place(pg, 0, 1500, SIX)
+        await pg.evaluate(f"()=>{K}.DF.test.launchAt()")
+        await wait_missile_gone(pg)
+        await fast(pg, 2.2)
+    await fast(pg, 2.5)
+    await pg.wait_for_timeout(300)
+    r = await pg.evaluate(f"()=>({{ej:{K}.DF.ej,card:document.getElementById('arcOv').classList.contains('on'),title:document.getElementById('aTitle').textContent}})")
+    print('  eject: state', r)
+    await shot(pg, '53_eject.png')
+
+
+async def shot53_high(pg):
+    # The normal chase camera reads nothing but sky at 25,000 ft: level flight puts the true horizon
+    # at roughly the same screen row at any altitude, but terrain only streams in out to a radius tuned
+    # for low-altitude flight, so the ground this far below the sightline to that horizon is simply never
+    # built -- not a white patch or a torn edge, just empty fog-colored sky where ground should be. A
+    # freeCam a little above and behind, pitched down at the arena (as tests/dogfight_shots.py's own 5.1
+    # shots do for framing bandits), is the only way to actually see the ground and check it for glitches.
+    await dfstart_f16(pg)
+    y = await pg.evaluate(FTY, 25000)
+    await pg.evaluate("([y])=>{const s=window.__kgeu.state();s.pos.y=y;s.vel.y=0;}", [y])
+    await pg.evaluate(f"""()=>{{const K={K},s=K.state(),hdg=Math.atan2(s.vel.x,-s.vel.z);
+      const camP=[s.pos.x-Math.sin(hdg)*700,s.pos.y+400,s.pos.z+Math.cos(hdg)*700];
+      const camT=[s.pos.x+Math.sin(hdg)*1800,s.pos.y-1300,s.pos.z-Math.cos(hdg)*1800];
+      K.freeCam({{w:true,p:camP,t:camT,fov:55}});}}""")
+    await fast(pg, 0.5)
+    await shot(pg, '53_high.png')
+
+
+# name -> (shot fn, viewport override, skill override); None means the 5.3 default (f16, 844x390, pilot)
+SHOTS_53 = {
+    'lock': (shot53_lock, None, None),
+    'launch': (shot53_launch, None, None),
+    'launch_easy': (shot53_launch_easy, None, 'rookie'),
+    'flares': (shot53_flares, None, None),
+    'hit2': (shot53_hit2, None, None),
+    'harddeck': (shot53_harddeck, None, None),
+    'eject': (shot53_eject, None, None),
+    'launch_568': (shot53_launch_568, {'width': 568, 'height': 320}, None),
+    'high': (shot53_high, None, None),
+}
+
+
 async def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--set', choices=['51', '52'], default='51')
-    ap.add_argument('--only', default=None, help='comma-separated subset of 5.2 shot names')
+    ap.add_argument('--set', choices=['51', '52', '53'], default='51')
+    ap.add_argument('--only', default=None, help='comma-separated subset of 5.2/5.3 shot names')
     args = ap.parse_args()
 
     os.makedirs(OUT, exist_ok=True)
@@ -254,7 +403,7 @@ async def main():
                 print('  console errors:', pg.errs[:5])
             else:
                 print('  no console errors')
-        else:
+        elif args.set == '52':
             names = args.only.split(',') if args.only else list(SHOTS_52.keys())
             for name in names:
                 name = name.strip()
@@ -262,6 +411,21 @@ async def main():
                 if not fn:
                     print('  unknown 5.2 shot:', name); continue
                 pg = await new_page(b, url, 'f16')
+                await fn(pg)
+                if pg.errs:
+                    print(f'  console errors ({name}):', pg.errs[:5])
+                else:
+                    print(f'  no console errors ({name})')
+                await pg.close()
+        else:
+            names = args.only.split(',') if args.only else list(SHOTS_53.keys())
+            for name in names:
+                name = name.strip()
+                entry = SHOTS_53.get(name)
+                if not entry:
+                    print('  unknown 5.3 shot:', name); continue
+                fn, vp, skill = entry
+                pg = await new_page(b, url, 'f16', vp=vp or IPHONE_15, skill=skill or 'pilot')
                 await fn(pg)
                 if pg.errs:
                     print(f'  console errors ({name}):', pg.errs[:5])
