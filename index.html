@@ -155,9 +155,36 @@ body.touch #bFull{ display:none; }
    flex column, so whichever are up stack in that order and a taller one pushes the rest
    down instead of sliding under them. Its width is --topW (clear of the readouts, the stick
    and the badges); long lines wrap and then clamp, so nothing grows into the controls. */
-#topCol{ position:absolute; left:50%; top:calc(var(--padT) + var(--icon) + 8px); transform:translateX(-50%); width:var(--topW);
+#topCol{ position:absolute; left:max(50%, calc(var(--padL) + var(--map) + var(--hudW) + 16px + var(--topW) / 2)); top:calc(var(--padT) + var(--icon) + 8px); transform:translateX(-50%); width:var(--topW);
   display:flex; flex-direction:column; align-items:center; gap:6px; pointer-events:none; z-index:5; }
 #topCol > *{ max-width:100%; flex:none; }
+/* approach (phone3 item 4): below 1,500 ft above the ground or inside 3 nm of a runway (apprTick) no
+   text sits in the centre third. The column is a strip under the pause button, one line a message,
+   clamped above the top third's lower edge (what does not fit is cut, the least urgent last); the
+   lesson panel stays below the bottom third's upper edge (in portrait it joins the strip). */
+body.appr #topCol{ gap:3px; max-height:calc(var(--vvh) / 3 - var(--padT) - var(--icon) - 12px); overflow:hidden; }
+body.appr #topCol > *{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+body.appr #miss{ order:0; } body.appr #topCol > #lesson{ order:1; } body.appr #warn{ order:2; } body.appr #jumpLt{ order:3; } body.appr #atc{ order:4; } body.appr #toast{ order:5; }
+body.appr #miss b, body.appr #miss span{ -webkit-line-clamp:1; }
+body.appr #warn{ font-size:16px; padding:1px 10px; }
+body.appr #atc{ padding:2px 9px; }
+body.appr #atc .tx, body.appr #atc .plain{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:0; }
+body.appr #atc.hasPlain .tx{ display:none; }
+body.appr #toast, body.appr.touch #toast{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:14px; }
+body.appr #lesson{ max-height:calc(var(--vvh) / 3 - var(--saB) - 26px); overflow:hidden; }
+body.appr.touch #lesson{ max-height:calc(var(--vvh) / 3 - var(--saB) - 14px); }
+body.appr #lesI{ display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+/* compact: End beside the text instead of a row of its own */
+body.appr #lesson.on{ display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:10px; row-gap:2px; align-items:center; }
+body.appr #lesson .lesTop{ display:contents; }
+body.appr #lesT{ grid-column:1; grid-row:1; } body.appr #lesQuit{ grid-column:2; grid-row:1 / span 3; }
+body.appr #lesI{ grid-column:1; grid-row:2; } body.appr #lesM{ grid-column:1; grid-row:3; }
+body.appr #lesM{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#topCol > #lesson{ position:static; transform:none; max-width:100%; width:100%; white-space:normal; }
+/* the mission card: in full for 3 s when it comes up, then a chip, its title on one line */
+#miss.chip{ padding:2px 10px; border-width:1.5px; gap:0; }
+#miss.chip span{ display:none; }
+#miss.chip b{ font-size:13px; -webkit-line-clamp:1; }
 #warn{ font-size:24px; text-align:center; font-weight:800; letter-spacing:.06em; color:#fff; background:var(--warn); border-radius:6px; padding:2px 16px; display:none; line-height:1.15; }
 body.touch #warn{ font-size:20px; padding:2px 12px; }
 #warn.on{ display:block; animation:blink .5s steps(2) infinite; }
@@ -189,6 +216,9 @@ body.dock2 #uiroot > #tcas{ right:calc(var(--padR) + var(--col) + 10px + 128px +
 #hVs.raClimb, #hVs.raDesc{ color:#7dffa6; }
 #uiroot > #tcasRA{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:none; flex-direction:column; align-items:center; gap:2px; pointer-events:none; z-index:5; }
 #uiroot > #tcasRA.on{ display:flex; animation:tcasP .8s ease-in-out infinite alternate; }
+/* on approach the centre third stays clear: the arrow and its word sit just left of it */
+body.appr #uiroot > #tcasRA{ left:calc(var(--vvw) / 3 - 6px); transform:translate(-100%,-50%); }
+body.appr #tcasRA svg{ width:56px; height:56px; } body.appr #tcasRA b{ font-size:17px; }
 #tcasRA svg{ width:80px; height:80px; filter:drop-shadow(0 2px 6px rgba(0,0,0,.6)); }
 #tcasRA.dn svg{ transform:rotate(180deg); }
 #tcasRA b{ font:800 22px var(--font); letter-spacing:.06em; color:#2ee66b; text-shadow:0 0 4px #000, 0 2px 6px rgba(0,0,0,.8); }
@@ -1053,6 +1083,8 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   body.lookOn.touch #badges{ top:calc(var(--padT) + var(--icon) * 2 + 88px); right:var(--padR); }
   #topCol{ left:var(--padL); right:calc(var(--padR) + min(280px, 36vw) + 8px); width:auto; transform:none;
     top:calc(var(--padT) + max(var(--map), var(--hudH)) + 8px); }
+  body.appr #topCol{ max-height:calc(var(--vvh) / 3 - var(--padT) - max(var(--map), var(--hudH)) - 12px); }
+  body.appr #hDest{ max-width:calc(33vw - var(--padL) - 4px); }
   #thrCol, #uiroot > #dock, #stickZone, #hDest{ top:var(--ctlTop); }
   body.hasDest #stickZone{ top:calc(var(--ctlTop) + 54px); }
   #uiroot > #tcas, body.dock2 #uiroot > #tcas{ right:var(--padR); bottom:calc(var(--vvh) - var(--ctlTop) + 8px); }
@@ -8244,14 +8276,34 @@ const sideEl=$('sideToast');
 // nothing of theirs goes to the centre of the screen. kind: what changed, for the haptics.
 function sideCfg(t,sub,kind){
   sideEl.textContent=t;if(sub){const s=document.createElement('small');s.textContent=sub;sideEl.appendChild(s);}
+  sideEl.style.maxWidth='';
   const thr=$('thr'),dock=$('dock'),ui=$('uiroot').getBoundingClientRect(),tr=thr.getBoundingClientRect(),dr=dock.getBoundingClientRect();
-  const h=sideEl.offsetHeight,w=sideEl.offsetWidth,sz=$('stickZone').getBoundingClientRect();
-  // left of the dock when it shows (else of the throttle), a third of the way down the throttle: level with
-  // CLIMB and above, clear of the lesson panel at the bottom. If that spot is the stick zone it goes above the controls.
-  let edge=(dr.width?dr.left:tr.left)-10,top=tr.top+tr.height*0.33-h/2;
-  if(sz.width&&edge-w<sz.right&&top+h>sz.top&&top<sz.bottom){const le=$('lesson'),lr=le.classList.contains('on')?le.getBoundingClientRect():null;
-    edge=tr.right;top=Math.min(tr.top,dr.width?dr.top:tr.top,lr&&lr.height?lr.top:1e9)-8-h;}
-  sideEl.style.right=Math.round(ui.right-edge)+'px';
+  const W3=ui.left+ui.width/3,W23=ui.left+ui.width*2/3,H3=ui.top+ui.height/3,H23=ui.top+ui.height*2/3;
+  // what it may not cover: the controls, the stick zone, the ticker, the badges, the look pad, the lesson
+  // panel, the centre column; nor the centre third of the screen (phone3 item 4)
+  const block=[];for(const e of document.querySelectorAll('#dock button,#thr,#stickZone,#tk.on,#tkCtl.on,#badges .badge.on,#lookPad,#lesson.on,#topCol > .on,#hDest,#tcas.on,#dfW')){
+    const r=e.getBoundingClientRect();if(r.width&&r.height&&getComputedStyle(e).display!=='none')block.push(r);}
+  const lr=$('lesson').classList.contains('on')?$('lesson').getBoundingClientRect():null;
+  // the edge of the buttons actually beside a band of the screen (the dock's box has gaps)
+  const btnEdge=(y0,y1)=>{let e=tr.left-10;for(const b of dock.querySelectorAll('button')){const r=b.getBoundingClientRect();if(r.width&&r.bottom>y0&&r.top<y1)e=Math.min(e,r.left-10);}return e;};
+  const fits=(edge,top,mw)=>{sideEl.style.maxWidth=mw?Math.floor(mw)+'px':'';const w=sideEl.offsetWidth,h=sideEl.offsetHeight;if(typeof top==='function')top=top(h);const x0=edge-w,y1=top+h;
+    if(x0<ui.left+4||top<ui.top+2||y1>ui.bottom-2)return false;
+    if(x0<W23&&edge>W3&&y1>H3&&top<H23)return false;
+    for(const r of block)if(x0<r.right&&edge>r.left&&y1>r.top&&top<r.bottom)return false;return true;};
+  const h0=sideEl.offsetHeight,mid=tr.top+tr.height*0.33-h0/2,low=H23+4;
+  // left of the dock (else of the throttle), a third of the way down the throttle: level with CLIMB and above;
+  // then the bottom third beside the dock (narrower beside the lesson panel); then squeezed between the centre
+  // third and the buttons; then above the controls
+  const C=[[(dr.width?dr.left:tr.left)-10,mid,0],[btnEdge(mid,mid+h0),mid,0],[btnEdge(low,low+h0),low,0]];
+  if(lr&&lr.height){const e=btnEdge(low,low+h0);C.push([e,low,e-lr.right-8]);}
+  {const e=btnEdge(mid,mid+h0*2);C.push([e,mid,e-W23]);}
+  const tc=$('tcas'),tcr=tc&&tc.classList.contains('on')?tc.getBoundingClientRect():null;
+  const above=h=>Math.min(tr.top,dr.width?dr.top:tr.top,lr&&lr.height&&lr.top>H3?lr.top:1e9,tcr&&tcr.height&&tcr.right>W23?tcr.top:1e9)-8-h;
+  C.push([tr.right,above,0],[tr.right,above,tr.right-W23]);
+  let pick=null;for(const c of C){if(c[2]&&c[2]<60)continue;if(fits(c[0],c[1],c[2])){pick=c;break;}}
+  if(!pick){pick=C[0];sideEl.style.maxWidth='';}
+  const top=typeof pick[1]==='function'?pick[1](sideEl.offsetHeight):pick[1];
+  sideEl.style.right=Math.round(ui.right-pick[0])+'px';
   sideEl.style.top=Math.round(top-ui.top)+'px';
   sideEl.classList.add('on');cfgT=2;sideEl.dataset.kind=kind||'';
   if(kind)hapCfg(kind);
@@ -8799,6 +8851,22 @@ const missEl=document.getElementById('miss'),missT=document.getElementById('miss
 function missHud(title,sub,warn){
   if(!title){missEl.classList.remove('on');return;}
   setTxt(missT,title);setTxt(missS,sub||'');missEl.classList.toggle('warn',!!warn);missEl.classList.toggle('on',true);
+}
+// ---- approach: nothing in the centre third (phone3 item 4) ----
+// body.appr below 1,500 ft above the ground or inside 3 nm of any runway end (the CSS turns the centre
+// column into a one line strip under the pause button and keeps the lesson panel low); a mission card
+// is in full for its first 3 s (sim time), then a chip. The dogfight has its own HUD and is left out.
+const APPR={on:false,missOn:false,missT0:0,home:null};
+function apprTick(){
+  const on=!!(running&&st&&!st.crashed&&!DF.live&&(st.agl*M2FT<1500||RWY_ENDS.some(e=>Math.abs(st.pos.x-e.x)<5556&&Math.abs(st.pos.z-e.z)<5556&&Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<5556)));
+  if(on!==APPR.on){APPR.on=on;document.body.classList.toggle('appr',on);}
+  const mOn=missEl.classList.contains('on');
+  if(mOn&&!APPR.missOn)APPR.missT0=st?st.time:0;APPR.missOn=mOn;
+  const chip=mOn&&!DF.live&&!!st&&st.time-APPR.missT0>=3;if(chip!==missEl.classList.contains('chip'))missEl.classList.toggle('chip',chip);
+  // portrait: the lesson panel joins the strip at the top (below the controls' top edge is the centre third)
+  const L=document.getElementById('lesson'),T=document.getElementById('topCol');if(!APPR.home)APPR.home={p:L.parentNode,n:L.nextSibling};
+  const want=on&&innerHeight>innerWidth;
+  if(want&&L.parentNode!==T)T.insertBefore(L,T.firstChild);else if(!want&&L.parentNode===T)APPR.home.p.insertBefore(L,APPR.home.n);
 }
 function missReset(){
   if(MISS.pallet){scene.remove(MISS.pallet.g);MISS.pallet=null;}
@@ -11346,7 +11414,7 @@ function start(mode,base){
   if(PHOTO.on){PHOTO.on=false;$('photoOv').classList.remove('on');}
   document.body.classList.remove('menuOn','pauseOn','crashOn','photoOn','mapOn');if(window.stickReset)stickReset();
   MUSIC.forced=null;   // a mode with its own song (the Red Flag Dogfight: MUSIC.forced='dogfight.m4a') sets it after start()
-  RES.kind='';RES.freeT0=0;RES.segDone=false;tfcReset();
+  RES.kind='';RES.freeT0=0;RES.segDone=false;tfcReset();APPR.missOn=false;missEl.classList.remove('chip');
   if(mode==='range')strikeStart();
   if(mode==='drop'||mode==='short')missStart(mode==='drop'?'drop':'short');
   if(mode==='drop')dzStart();
@@ -14130,7 +14198,7 @@ function tick(t,skipRender){
     if(ev.type==='liftoff') clusters.forEach(c=>{if(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)<1500){c.cheer=4;}});
   }
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.classList.remove('on');}
-  missUpdate(dt);dzUpdate(dt);if(running&&!paused)arcTick();dfTick(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);if(LB)LB.frame();
+  missUpdate(dt);dzUpdate(dt);if(running&&!paused)arcTick();apprTick();dfTick(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);if(LB)LB.frame();
   {const show=!rookie()&&camMode===1&&(AC.id==='cessna'||AC.id==='alpha')&&running&&!st.crashed;
    if(spCan){spCan.classList.toggle('on',show);if(show)drawSixPack();}}
   radioUpdate(dt);cfgUpdate(dt);resTick(dt);
@@ -14737,7 +14805,8 @@ const APP_VER='2026-10-03-dogfight';          // keep version.json in step when 
     get P(){return E.P;}};
 })();
 
-window.__kgeu={landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
+window.__kgeu={appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
+    const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
   lights:()=>({KGEU:AL.KGEU.count(),KLUF:AL.KLUF.count(),uLights:AL_MAT.uniforms.uLights.value,
     layers:AL_LAYERS.map(L=>({name:L.pts&&L.pts.name,visible:!!(L.pts&&L.pts.visible),inScene:!!(L.pts&&L.pts.parent)})),

@@ -12,15 +12,18 @@ SIDE = """()=>{const e=document.getElementById('sideToast'),r=e.getBoundingClien
   const cs=getComputedStyle(e);return {on:e.classList.contains('on'),text:e.textContent,op:+cs.opacity,x:r.x,y:r.y,w:r.width,h:r.height,
     cx:r.x+r.width/2,cy:r.y+r.height/2,thr:[t.x,t.y,t.width,t.height],dock:[d.x,d.y,d.width,d.height],W:innerWidth,H:innerHeight,
     centre:Math.abs(r.x+r.width/2-innerWidth/2)<innerWidth*0.2&&Math.abs(r.y+r.height/2-innerHeight/2)<innerHeight*0.2,
-    bigcfg:!!document.getElementById('bigcfg')}}"""
+    bigcfg:!!document.getElementById('bigcfg'),
+    btns:[...document.querySelectorAll('#dock button')].map(b=>b.getBoundingClientRect()).filter(q=>q.width).map(q=>[q.x,q.y,q.width,q.height])}}"""
 def beside(s):
     # right of the screen centre, clear of the throttle and the dock, level with the throttle
     right_of_centre = s['cx'] > s['W'] * 0.55
     clear_thr = s['x'] + s['w'] <= s['thr'][0] + 0.5
-    clear_dock = s['dock'][2] == 0 or s['x'] + s['w'] <= s['dock'][0] + 0.5
+    # phone3: clear of every dock button (it may sit in the dock's empty corner beside them), and out of the centre third
+    clear_dock = all(s['x'] + s['w'] <= b[0] + 0.5 or s['x'] >= b[0] + b[2] - 0.5 or s['y'] + s['h'] <= b[1] + 0.5 or s['y'] >= b[1] + b[3] - 0.5 for b in s['btns'])
+    clear_mid = s['x'] >= s['W'] * 2 / 3 - 0.5 or s['y'] + s['h'] <= s['H'] / 3 + 0.5 or s['y'] >= s['H'] * 2 / 3 - 0.5
     level = s['thr'][1] <= s['cy'] <= s['thr'][1] + s['thr'][3]
     on_screen = s['x'] >= 0 and s['y'] >= 0 and s['x'] + s['w'] <= s['W'] and s['y'] + s['h'] <= s['H']
-    return right_of_centre and clear_thr and clear_dock and level and on_screen
+    return right_of_centre and clear_thr and clear_dock and clear_mid and level and on_screen
 
 async def main():
     os.makedirs(SHOTS, exist_ok=True)
