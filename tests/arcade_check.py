@@ -42,7 +42,7 @@ async def main():
         res = await pg.evaluate("()=>({on:document.getElementById('arcOv').classList.contains('on'),stars:document.getElementById('aStars').textContent.length,title:document.getElementById('aTitle').textContent,lines:document.getElementById('aLines').innerText,letter:document.getElementById('aLetter').textContent,score:document.getElementById('aScore').textContent,btns:[...document.querySelectorAll('#arcOv .rBtns button')].map(b=>b.textContent),paused:window.__kgeu.paused()})")
         ok('the aircraft has stopped and the results card is up with the stats', res['on'] and res['stars'] == 3 and 'Time' in res['lines'] and 'Touchdown' in res['lines'], res)
         ok('it scores points, with a letter grade and a score line', 'points' in res['title'] and res['letter'] in 'ABCDF' and 'pts' in res['score'], (res['title'], res['letter'], res['score']))
-        ok('CONTINUE and MAIN MENU, and the card pauses the challenge', res['btns'] == ['CONTINUE', 'MAIN MENU'] and res['paused'], res['btns'])
+        ok('CONTINUE and MAIN MENU, and the card pauses the challenge', res['btns'] == ['RETRY LANDING CHALLENGE', 'CONTINUE IN FREE FLIGHT', 'MAIN MENU'] and res['paused'], res['btns'])
         best = await pg.evaluate(f"()=>{K}.SCORE.best['arc:landing']")
         ok('best is saved to the records', best and best['pts'] > 0, best)
         await finger(pg, '#aHub'); await pg.wait_for_timeout(400)

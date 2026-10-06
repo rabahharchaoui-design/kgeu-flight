@@ -5,8 +5,8 @@
 #    records, strike best, mode) is still there, byte for byte, and still shows in the menus
 #  - the callsign card comes up on the first launch of the new version (no Easy/Hard funnel
 #    again), and once a callsign is picked it stays gone on the next launch
-#  - the app name, icons and start_url in manifest.json did not change; there is no service
-#    worker holding an old copy, and version.json is served for the reload check
+#  - the app name, icons and start_url in manifest.json did not change; the one service worker is
+#    this build's (phone3: offline mode), and version.json is served for the reload check
 # Needs a prescores worktree: git worktree add /tmp/pre prescores (made here if missing).
 # Run: .venv/bin/python tests/upgrade_check.py
 import asyncio, os, sys, json, subprocess, shutil, tempfile, threading, functools, http.server, socketserver, signal
@@ -103,7 +103,10 @@ async def main():
             ok('next launch: callsign kept, no card', vis == {'cs': False, 'P': 'MESQUITE'}, vis)
             after2 = await pg.evaluate("()=>Object.fromEntries(Object.keys(localStorage).map(k=>[k,localStorage.getItem(k)]))")
             ok('old data still intact after the callsign', all(after2.get(k) == before[k] for k in before if k != 'kgeuScores') and json.loads(after2['kgeuScores'])['best'] == json.loads(before['kgeuScores'])['best'])
-            ok('no service worker holds an old copy', await pg.evaluate("()=>navigator.serviceWorker?navigator.serviceWorker.getRegistrations().then(r=>r.length===0):true"))
+            # phone3 item 8: there is a service worker now (offline mode); it must be this build's (sw.js?v=APP_VER), so it holds no old copy
+            sw = await pg.evaluate("""async()=>{if(!navigator.serviceWorker)return null;await navigator.serviceWorker.ready;const r=await navigator.serviceWorker.getRegistrations();
+              const v=document.documentElement.innerHTML.match(/APP_VER='([^']+)'/)[1];return {n:r.length,url:r.map(x=>(x.active||x.waiting||x.installing).scriptURL),v:v}}""")
+            ok('the only service worker is this build\'s (no old copy)', sw and sw['n'] == 1 and sw['url'][0].endswith('sw.js?v=' + sw['v']), sw)
             v = await pg.evaluate("()=>fetch('version.json',{cache:'no-store'}).then(r=>r.json())")
             ok('version.json served and matches the build', v.get('v') == await pg.evaluate("()=>document.documentElement.innerHTML.match(/APP_VER='([^']+)'/)[1]"), v)
             ok('no page errors', not pg.errs, pg.errs[:3])

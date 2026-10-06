@@ -62,6 +62,10 @@ html,body{ margin:0; height:100%; overflow:hidden; background:var(--page); color
 #uiroot{ position:fixed; left:var(--vvl); top:var(--vvt); width:var(--vvw); height:var(--vvh); pointer-events:none; overflow:hidden; }
 #uiroot > *{ pointer-events:auto; }
 #warn,#atc,#toast,#sideToast,#sensorHud{ pointer-events:none; }
+/* haptics (phone3 item 6): a transparent label for the hidden switch over every tapped control; the real tap on it is the tick */
+.hapL{ position:absolute; inset:0; z-index:3; display:block; margin:0; padding:0; border-radius:inherit; background:transparent; cursor:inherit; -webkit-tap-highlight-color:transparent; }
+.hapRel{ position:relative; }
+body.hapOff .hapL{ display:none; }
 
 .card{ background:var(--glass); border:1px solid rgba(255,255,255,.08); border-radius:10px; padding:8px 12px; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
 button{ font:600 15px var(--font); color:var(--ink); background:var(--glass); border:1px solid rgba(255,255,255,.14); border-radius:8px; padding:7px 12px; cursor:pointer; touch-action:manipulation; }
@@ -155,9 +159,36 @@ body.touch #bFull{ display:none; }
    flex column, so whichever are up stack in that order and a taller one pushes the rest
    down instead of sliding under them. Its width is --topW (clear of the readouts, the stick
    and the badges); long lines wrap and then clamp, so nothing grows into the controls. */
-#topCol{ position:absolute; left:50%; top:calc(var(--padT) + var(--icon) + 8px); transform:translateX(-50%); width:var(--topW);
+#topCol{ position:absolute; left:max(50%, calc(var(--padL) + var(--map) + var(--hudW) + 16px + var(--topW) / 2)); top:calc(var(--padT) + var(--icon) + 8px); transform:translateX(-50%); width:var(--topW);
   display:flex; flex-direction:column; align-items:center; gap:6px; pointer-events:none; z-index:5; }
 #topCol > *{ max-width:100%; flex:none; }
+/* approach (phone3 item 4): below 1,500 ft above the ground or inside 3 nm of a runway (apprTick) no
+   text sits in the centre third. The column is a strip under the pause button, one line a message,
+   clamped above the top third's lower edge (what does not fit is cut, the least urgent last); the
+   lesson panel stays below the bottom third's upper edge (in portrait it joins the strip). */
+body.appr #topCol{ gap:3px; max-height:calc(var(--vvh) / 3 - var(--padT) - var(--icon) - 12px); overflow:hidden; }
+body.appr #topCol > *{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+body.appr #miss{ order:0; } body.appr #topCol > #lesson{ order:1; } body.appr #warn{ order:2; } body.appr #jumpLt{ order:3; } body.appr #atc{ order:4; } body.appr #toast{ order:5; }
+body.appr #miss b, body.appr #miss span{ -webkit-line-clamp:1; }
+body.appr #warn{ font-size:16px; padding:1px 10px; }
+body.appr #atc{ padding:2px 9px; }
+body.appr #atc .tx, body.appr #atc .plain{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:0; }
+body.appr #atc.hasPlain .tx{ display:none; }
+body.appr #toast, body.appr.touch #toast{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:14px; }
+body.appr #lesson{ max-height:calc(var(--vvh) / 3 - var(--saB) - 26px); overflow:hidden; }
+body.appr.touch #lesson{ max-height:calc(var(--vvh) / 3 - var(--saB) - 14px); }
+body.appr #lesI{ display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+/* compact: End beside the text instead of a row of its own */
+body.appr #lesson.on{ display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:10px; row-gap:2px; align-items:center; }
+body.appr #lesson .lesTop{ display:contents; }
+body.appr #lesT{ grid-column:1; grid-row:1; } body.appr #lesQuit{ grid-column:2; grid-row:1 / span 3; }
+body.appr #lesI{ grid-column:1; grid-row:2; } body.appr #lesM{ grid-column:1; grid-row:3; }
+body.appr #lesM{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#topCol > #lesson{ position:static; transform:none; max-width:100%; width:100%; white-space:normal; }
+/* the mission card: in full for 3 s when it comes up, then a chip, its title on one line */
+#miss.chip{ padding:2px 10px; border-width:1.5px; gap:0; }
+#miss.chip span{ display:none; }
+#miss.chip b{ font-size:13px; -webkit-line-clamp:1; }
 #warn{ font-size:24px; text-align:center; font-weight:800; letter-spacing:.06em; color:#fff; background:var(--warn); border-radius:6px; padding:2px 16px; display:none; line-height:1.15; }
 body.touch #warn{ font-size:20px; padding:2px 12px; }
 #warn.on{ display:block; animation:blink .5s steps(2) infinite; }
@@ -189,6 +220,9 @@ body.dock2 #uiroot > #tcas{ right:calc(var(--padR) + var(--col) + 10px + 128px +
 #hVs.raClimb, #hVs.raDesc{ color:#7dffa6; }
 #uiroot > #tcasRA{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:none; flex-direction:column; align-items:center; gap:2px; pointer-events:none; z-index:5; }
 #uiroot > #tcasRA.on{ display:flex; animation:tcasP .8s ease-in-out infinite alternate; }
+/* on approach the centre third stays clear: the arrow and its word sit just left of it */
+body.appr #uiroot > #tcasRA{ left:calc(var(--vvw) / 3 - 6px); transform:translate(-100%,-50%); }
+body.appr #tcasRA svg{ width:56px; height:56px; } body.appr #tcasRA b{ font-size:17px; }
 #tcasRA svg{ width:80px; height:80px; filter:drop-shadow(0 2px 6px rgba(0,0,0,.6)); }
 #tcasRA.dn svg{ transform:rotate(180deg); }
 #tcasRA b{ font:800 22px var(--font); letter-spacing:.06em; color:#2ee66b; text-shadow:0 0 4px #000, 0 2px 6px rgba(0,0,0,.8); }
@@ -476,35 +510,54 @@ body.lookOn:not(.touch) #badges{ top:calc(var(--padT) + var(--icon) + 80px); }
 .primary.big{ font-size:20px; padding:10px 24px; background:var(--rust); color:#fff4e0; }
 .gLetter.gA,.gLetter.gB{ color:#4cd97b; } .gLetter.gC{ color:var(--caution); } .gLetter.gD,.gLetter.gF{ color:var(--warn); }
 /* ---------- the results card: one look for every run end (landing, challenge, lesson, mission, strike) ---------- */
-.overlay.res .sheet{ max-width:600px; padding:14px 18px 10px; background:rgba(18,13,9,.94); }
+.overlay.res .sheet{ max-width:600px; padding:14px 18px 10px; background:rgba(18,13,9,.94);
+  display:flex; flex-direction:column; max-height:calc(var(--vvh) - max(12px, var(--padT)) - var(--padB) - 4px); }
+.overlay.res .sheet > *{ flex:none; }
+/* a long answer (a dogfight's personal bests, achievements and rank up) scrolls inside; RETRY and the rest stay on screen */
+.overlay.res .sheet > .rLines{ flex:0 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+.overlay.res .rLines.more{ -webkit-mask-image:linear-gradient(#000 calc(100% - 22px), transparent); mask-image:linear-gradient(#000 calc(100% - 22px), transparent); }
 .overlay.res.on .sheet{ animation:resIn .34s cubic-bezier(.2,.8,.2,1) both; }
 @keyframes resIn{ from{ transform:translateY(28px); opacity:0; } to{ transform:none; opacity:1; } }
 @media (prefers-reduced-motion: reduce){ .overlay.res.on .sheet{ animation:none; } }
 .rHead{ display:flex; align-items:center; gap:14px; margin:0 0 6px; }
 .rHead .gLetter{ font-size:58px; min-width:44px; text-align:center; flex:none; }
-.rT{ min-width:0; flex:1; }
+.rT{ min-width:0; flex:1; display:flex; flex-wrap:wrap; align-items:center; column-gap:10px; }
+.rT > .sub, .rT > .rScore{ flex:1 0 100%; }
 .rT .sub{ margin:0; font-size:16px; line-height:1.25; }
 .rScore{ margin:2px 0 0; font-size:26px; font-weight:900; line-height:1.05; color:var(--ink); font-variant-numeric:tabular-nums; }
 .rScore small{ font-size:14px; font-weight:700; color:var(--soft); margin-left:6px; }
 .rScore:empty{ display:none; }
 .aStars{ margin:2px 0 0; font-size:22px; line-height:1; color:var(--orange); letter-spacing:3px; } .aStars u{ text-decoration:none; color:rgba(246,193,119,.22); } .aStars:empty{ display:none; }
+.rTip{ margin:0 0 6px; padding:5px 10px; border-radius:9px; background:rgba(246,193,119,.1); border-left:3px solid var(--orange); font-size:14px; font-weight:700; line-height:1.25; color:var(--sand); }
+.rTip.good{ border-left-color:#4cd97b; } .rTip:empty{ display:none; }
 .rLines{ margin:0 0 10px; font-size:14px; line-height:1.4; display:grid; grid-template-columns:1fr 1fr; gap:0 18px; }
 .rLines .gl{ padding:3px 0; gap:10px; min-width:0; } .rLines .gl b{ overflow:hidden; text-overflow:ellipsis; }
+.rLines .lbLine b, .rLines .lbX b{ white-space:normal; overflow:visible; text-overflow:clip; text-align:right; }   /* ranks and bests wrap, never cut */
 .rLines .lbLine{ grid-column:1 / -1; border-bottom:none; margin-top:2px; } .rLines .lbLine b{ color:#F6C177; }
 .rLines .lbLine em{ font-style:normal; font-weight:900; margin-left:8px; color:#4cd97b; letter-spacing:.06em; }
 .rLines .lbLine.wait b{ color:var(--soft); font-weight:500; }
 .rLines .ok,.rLines .no{ grid-column:1 / -1; }
 .rLines .ok::before{ content:'\2713  '; color:#4cd97b; font-weight:800; } .rLines .no::before{ content:'\2717  '; color:var(--warn); font-weight:800; }
-.rBtns{ gap:10px; flex-wrap:nowrap; } .rBtns button{ flex:1 1 0; min-height:48px; min-width:0; white-space:nowrap; }
-.rBtns .primary.big{ font-size:19px; letter-spacing:.06em; padding:8px 12px; }
-.rBtns .menuB{ font-size:16px; font-weight:800; letter-spacing:.04em; background:rgba(255,255,255,.08); }
+.rBtns{ gap:10px; flex-wrap:nowrap; align-items:stretch; } .rBtns button{ flex:1 1 0; min-height:48px; min-width:0; line-height:1.1; white-space:normal; overflow-wrap:anywhere;
+  transition:transform .12s cubic-bezier(.23,1,.32,1); }
+.rBtns button:active{ transform:scale(.97); }
+/* RETRY <the run> leads, CONTINUE IN FREE FLIGHT next, MAIN MENU last and quietest */
+.rBtns .primary.big{ flex:1.45 1 0; font-size:17px; letter-spacing:.04em; padding:6px 10px; }
+.rBtns .rCont{ flex:1.25 1 0; font-size:14px; font-weight:800; letter-spacing:.03em; padding:6px 8px; background:rgba(246,193,119,.14); color:var(--sand); border:1.5px solid rgba(246,193,119,.35); }
+.rBtns .menuB{ flex:.85 1 0; font-size:14px; font-weight:800; letter-spacing:.04em; padding:6px 8px; background:rgba(255,255,255,.08); }
+/* the aircraft flown and the callsign, so a screenshot of the card proves what flew */
+.rWho{ margin:3px 0 0; display:flex; align-items:center; gap:8px; min-width:0; font-size:13px; line-height:1.2; }
+.acTag{ flex:none; display:inline-flex; align-items:center; gap:5px; padding:2px 8px 2px 5px; border-radius:7px; background:rgba(246,193,119,.14); border:1px solid rgba(246,193,119,.3); color:var(--sand); font-weight:800; letter-spacing:.04em; white-space:nowrap; }
+.acI{ width:22px; height:17px; flex:none; display:block; } .acI *{ fill:currentColor; }
+.rCs{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:800; letter-spacing:.08em; color:var(--soft); }
+@media (max-width:520px){ .rBtns{ flex-wrap:wrap; } .rBtns .primary.big{ flex:1 1 100%; } .rLines{ grid-template-columns:minmax(0,1fr); } }
 .rLinks{ display:flex; gap:0 12px; flex-wrap:wrap; justify-content:center; margin-top:2px; }
 .rLinks button{ background:none; border:none; min-height:44px; padding:4px 10px; font-size:15px; font-weight:700; color:#F6C177; text-decoration:underline; text-underline-offset:3px; }
 .rLinks button[hidden]{ display:none; }
 /* free flight and the dash: the card is brief, sits over the scene without pausing, and the stick and throttle beside it still work */
 .overlay.res.brief{ background:transparent; pointer-events:none; }
 .overlay.res.brief .sheet{ pointer-events:auto; max-width:470px; box-shadow:0 8px 30px rgba(0,0,0,.45); }
-@media (max-height:360px){ .overlay.res .sheet{ padding:8px 14px 6px; } .rHead{ margin-bottom:2px; } .rHead .gLetter{ font-size:44px; } .rLines{ font-size:13px; margin-bottom:4px; } .rLines .gl{ padding:1px 0; } .rBtns button{ min-height:44px; } .rLinks button{ font-size:14px; padding:2px 8px; } }
+@media (max-height:360px){ .rTip{ font-size:13px; padding:3px 8px; margin-bottom:3px; } .overlay.res .sheet{ padding:8px 14px 6px; } .rHead{ margin-bottom:2px; } .rHead .gLetter{ font-size:44px; } .rLines{ font-size:13px; margin-bottom:4px; } .rLines .gl{ padding:1px 0; } .rBtns button{ min-height:44px; } .rLinks button{ font-size:14px; padding:2px 8px; } }
 #sixpack{ position:fixed; left:calc(50% + 20px); bottom:calc(var(--saB) + 4px);
   transform:translateX(-50%); width:300px; height:200px; display:none; z-index:3;
   pointer-events:none; filter:drop-shadow(0 2px 6px rgba(0,0,0,.55)); }
@@ -596,6 +649,21 @@ body.touch #lesson{ max-width:calc(28vw - 8px); font-size:13px; padding:6px 10px
 body.touch #lesQuit{ min-height:44px; min-width:52px; }
 body.touch #lesM{ font-size:12px; }
 /* crash: a one line reason at the top, then a compact card at the bottom (3.9) */
+/* WASTED (phone3 item 7): slow motion, the picture to black and white under a vignette, then the word,
+   then the crash card. Only opacity, transform and the canvas filter move. Tap anywhere skips it. */
+#gl{ transition:filter .9s cubic-bezier(.23,1,.32,1); }
+body.wastedOn #gl{ filter:grayscale(1) contrast(1.12) brightness(.9); }
+#wasted{ position:absolute; inset:0; z-index:9; display:none; pointer-events:auto; touch-action:none; }
+body.wastedOn #wasted{ display:block; }
+body.wastedOn #map, body.wastedOn #topCol, body.wastedOn #crashTop, body.wastedOn #tk, body.wastedOn #badges{ opacity:0; transition:opacity .4s; }
+#wasted .wVig{ position:absolute; inset:0; opacity:0; transition:opacity .9s ease-out; background:radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0) 38%, rgba(0,0,0,.55) 78%, rgba(0,0,0,.85) 100%); }
+body.wastedOn #wasted .wVig{ opacity:1; }
+#wasted .wTxt{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) scale(1.18); opacity:0; white-space:nowrap;
+  font:800 clamp(64px, 17vmin, 132px)/1 'Saira Condensed', 'Arial Narrow', Impact, sans-serif; letter-spacing:.04em; color:#d4121c;
+  -webkit-text-stroke:clamp(3px, .9vmin, 6px) #160303; paint-order:stroke fill; text-shadow:0 6px 18px rgba(0,0,0,.65), 0 2px 3px rgba(0,0,0,.7);
+  transition:transform .26s cubic-bezier(.23,1,.32,1), opacity .18s ease-out; }
+#wasted.txt .wTxt{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+@media (prefers-reduced-motion: reduce){ #wasted .wTxt{ transition:opacity .2s; transform:translate(-50%,-50%); } }
 #crashTop{ position:absolute; left:50%; top:calc(var(--padT) + 4px); transform:translateX(-50%); width:max-content; max-width:min(440px, calc(100% - 2 * (var(--padL) + var(--map) + 14px)));
   font-size:15px; font-weight:600; line-height:1.25; text-align:center; color:#ffe2d2; text-shadow:0 1px 3px rgba(0,0,0,.8); padding:4px 12px; border-radius:8px;
   background:rgba(26,16,9,.45); opacity:0; transition:opacity .25s; pointer-events:none; }
@@ -643,7 +711,7 @@ label.sens b{ color:var(--ink); min-width:74px; }
 .mh{ display:flex; align-items:center; gap:10px; min-height:44px; flex:none; }
 .mh h2{ margin:0; font-size:24px; font-weight:800; letter-spacing:.01em; flex:1; }
 .mh .steps{ font-size:14px; font-weight:700; color:var(--brown); }
-#menu .back{ width:44px; height:44px; padding:0; display:grid; place-items:center; }
+#menu .back{ width:44px; min-width:44px; flex:none; height:44px; padding:0; display:grid; place-items:center; }
 #menu .back svg{ width:22px; height:22px; }
 /* home */
 #sHome{ align-items:center; justify-content:center; }
@@ -663,6 +731,10 @@ label.sens b{ color:var(--ink); min-width:74px; }
 #menu .corner{ position:absolute; top:var(--padT); width:48px; height:48px; padding:0; display:grid; place-items:center; background:rgba(42,22,8,.12); color:var(--night); }
 #menu .corner svg{ width:24px; height:24px; }
 .corner.tl{ left:var(--padL); } .corner.tr{ right:var(--padR); }
+/* no connection: a small chip beside Settings (the game still flies; board runs wait in the queue) */
+.offChip{ position:absolute; top:calc(var(--padT) + 10px); right:calc(var(--padR) + 60px); display:inline-flex; align-items:center; gap:5px; height:28px; padding:0 10px 0 8px; border-radius:14px;
+  background:rgba(42,22,8,.82); color:var(--sand); font:800 12px/1 var(--font); letter-spacing:.08em; text-transform:uppercase; pointer-events:none; }
+.offChip[hidden]{ display:none; } .offChip svg{ width:15px; height:15px; }
 /* fly: one screen. The carousel window is drawn by the game renderer through a transparent hole. */
 #sFly{ gap:6px; }
 .carx{ position:relative; flex:1; min-height:0; display:flex; flex-direction:column; }
@@ -758,7 +830,7 @@ label.sens b{ color:var(--ink); min-width:74px; }
 #pauseOv .frows .chip b{ font-size:clamp(10px,1.7vw,15px); }
 #pauseOv .frow:not(.starts) .grp.g2{ flex:2.2 1 0; } #pauseOv .frow:not(.starts) .grp.g4{ flex:3.8 1 0; }
 /* 568 wide: the chips inside one group sit 8 px apart (one segmented control); everything else keeps 12 */
-@media (max-width:620px) and (orientation:landscape){ #pauseOv{ padding-left:8px; padding-right:8px; } #pauseOv .frows .chip b, .acRow .chip b{ letter-spacing:-.01em; } .acRow, #pauseOv .grp, #pauseOv .gchips, .pzQ{ gap:8px; } .pzBody{ gap:10px; } .pzL{ flex:0 0 218px; } .pzL,.pzR{ padding:8px; } #pauseOv .qs i .lg{ display:none; } #pauseOv .qs i .sm{ display:inline; } }
+@media (max-width:620px) and (orientation:landscape){ #pauseOv{ padding-left:8px; padding-right:8px; } #pauseOv .frows .chip b, .acRow .chip b{ letter-spacing:-.01em; } .acRow, #pauseOv .grp, #pauseOv .gchips, .pzQ{ gap:8px; } .pzBody{ gap:10px; } .pzL{ flex:0 0 218px; } .pzL,.pzR{ padding:8px; } #pauseOv .qs i .lg{ display:none; } #pauseOv .pzQ .qs i .sm{ display:inline; } }
 #pauseOv .qs i .sm{ display:none; }
 /* cards: missions, school, arcade. Sized to their content, two or three to a row. */
 .cards{ flex:1; min-height:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(min(196px,30vw),1fr)); grid-auto-rows:min-content; align-content:center; gap:8px; }
@@ -949,6 +1021,8 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 .rk{ display:inline-block; width:1.25em; height:1.25em; vertical-align:-.25em; flex:none; }
 .creator{ display:inline-block; margin-left:6px; padding:0 6px; border-radius:6px; background:linear-gradient(180deg,#ffe28a,#d4a017); color:#3a2500; font:800 11px/1.6 var(--font); letter-spacing:.08em; vertical-align:2px; box-shadow:0 0 0 1px #8a6400 inset; }
 .csTag{ display:inline-flex; align-items:center; gap:6px; font-weight:800; font-size:16px; color:var(--night); white-space:nowrap; }
+/* the boards' header: my callsign gives way (ellipsis) before it pushes off the screen */
+#sLb .mh h2{ flex:none; } #lbCs{ min-width:0; flex:0 1 auto; margin-left:auto; } #lbCs > span{ min-width:0; overflow:hidden; text-overflow:ellipsis; } #lbCs svg{ flex:none; }
 .csTag i{ font-style:normal; font-size:12px; color:var(--brown); font-weight:700; }
 #flyCs{ flex:none; }
 /* trophy on cards and lesson rows */
@@ -968,7 +1042,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 .lbList h3{ margin:6px 4px 0; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--brown); }
 #menu .lbList button{ text-align:left; min-height:44px; padding:0 12px; font-size:16px; font-weight:800; background:rgba(42,22,8,.1); color:var(--night); flex:none; }
 #menu .lbList button.sel{ background:var(--night); color:var(--sand); }
-.lbMain{ flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; background:var(--night); color:var(--sand); border-radius:14px; padding:8px 10px; }
+.lbMain{ flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; gap:6px; background:var(--night); color:var(--sand); border-radius:14px; padding:8px 10px; }
 .lbHead{ display:flex; align-items:center; gap:8px; flex:none; }
 .lbHead b{ flex:1; min-width:0; font-size:19px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .lbTabs{ display:flex; gap:4px; flex:none; }
@@ -982,12 +1056,17 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 .lbRow .c span{ overflow:hidden; text-overflow:ellipsis; }
 .lbRow .s{ flex:none; font-weight:900; font-variant-numeric:tabular-nums; }
 .lbRow .modeTag{ flex:none; margin:0 -4px 0 0; white-space:nowrap; padding:1px 5px; border-radius:5px; font-size:10px; line-height:1.3; letter-spacing:.06em; vertical-align:0; }
-.lbRow .a{ flex:none; width:4.2em; font-size:13px; color:#d9b98c; text-align:right; }
+.lbRow .a{ flex:none; width:5.6em; font-size:13px; color:#d9b98c; display:flex; align-items:center; justify-content:flex-end; gap:4px; white-space:nowrap; }
+.lbRow .a b{ font-weight:800; } .lbRow .a .acI{ width:18px; height:14px; }
 .lbRow.me{ background:var(--sand); color:var(--night); border-radius:10px; border:none; }
 .lbRow.me .n,.lbRow.me.top1 .n{ color:var(--rust); } .lbRow.me .a{ color:var(--brown); }
 .lbRow.top1 .n{ color:#ffd257; }
 /* narrow boards (SE landscape, any portrait): tighter rows so the callsign keeps room beside the EASY/HARD chip */
-@media (max-width:700px){ .lbRow{ gap:6px; padding:0 6px; font-size:16px; } .lbRow .n{ width:auto; min-width:1.4em; } .lbRow .a{ width:3.4em; font-size:12px; } }
+/* a narrow phone: the CREATOR badge is a gold star, my row drops its "of N" (the header has the total);
+   a tap on a row reads it out in full */
+@media (max-width:700px){ .lbRow .creator{ font-size:0; padding:0; width:18px; height:18px; line-height:18px; text-align:center; flex:none; margin-left:2px; vertical-align:0; }
+  .lbRow .creator::before{ content:'\2605'; font-size:12px; letter-spacing:0; } .lbRow.me .c i{ display:none; } }
+@media (max-width:700px){ .lbRow{ gap:6px; padding:0 6px; font-size:16px; } .lbRow .n{ width:auto; min-width:1.4em; } .lbRow .a{ width:4.9em; font-size:12px; } }
 /* portrait: the board list becomes one scrolling line above the board, which gets the full width */
 @media (orientation:portrait){
   #menu .modeCards{ flex-direction:column; gap:8px; }
@@ -1040,6 +1119,8 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   body.lookOn.touch #badges{ top:calc(var(--padT) + var(--icon) * 2 + 88px); right:var(--padR); }
   #topCol{ left:var(--padL); right:calc(var(--padR) + min(280px, 36vw) + 8px); width:auto; transform:none;
     top:calc(var(--padT) + max(var(--map), var(--hudH)) + 8px); }
+  body.appr #topCol{ max-height:calc(var(--vvh) / 3 - var(--padT) - max(var(--map), var(--hudH)) - 12px); }
+  body.appr #hDest{ max-width:calc(33vw - var(--padL) - 4px); }
   #thrCol, #uiroot > #dock, #stickZone, #hDest{ top:var(--ctlTop); }
   body.hasDest #stickZone{ top:calc(var(--ctlTop) + 54px); }
   #uiroot > #tcas, body.dock2 #uiroot > #tcas{ right:var(--padR); bottom:calc(var(--vvh) - var(--ctlTop) + 8px); }
@@ -1149,6 +1230,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   <!-- crash: the reason as one line at the top, then after 3 s a small card at the bottom
        that leaves the fireball in view -->
   <div id="crashTop" aria-live="assertive"></div>
+  <div id="wasted" aria-hidden="true"><div class="wVig"></div><b class="wTxt">WASTED</b></div>
   <div id="crash" role="dialog" aria-label="Crashed"><div class="ccTxt"><b>CRASHED</b><span id="crashWhy"></span></div><div class="ccBtns"><button class="primary" id="cRetry">RETRY</button><button id="cMenu">MENU</button></div></div>
   <div id="sideToast" role="status" aria-live="polite"></div>
   <canvas id="tcas" width="220" height="220" aria-hidden="true"></canvas>
@@ -1188,6 +1270,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
     <path d="M0 175 C200 145 380 160 560 170 S850 140 1000 150 L1000 300 L0 300Z" fill="#A8592A"/>
     <path d="M0 240 C220 215 430 230 640 225 S900 205 1000 215 L1000 300 L0 300Z" fill="#6B3517"/></svg>
   <button class="corner tl" id="hRec" aria-label="Records"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2.5h6V4M8.5 10h7M8.5 14h7M8.5 18h4"/></svg></button>
+  <span id="hOff" class="offChip" role="status" hidden><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M2 8.5a15 15 0 0 1 20 0M5.5 12.5a10 10 0 0 1 13 0M9 16.4a5 5 0 0 1 6 0"/><circle cx="12" cy="20" r="1.2" fill="currentColor"/><path d="M3 3l18 18"/></svg>Offline</span>
   <button class="corner tr" id="hSet" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></button>
   <div class="homeC">
    <h1 class="title">Pocket Flight Sim</h1>
@@ -1372,8 +1455,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 <div class="overlay res" id="arcOv" role="dialog" aria-label="Results"><div class="sheet">
   <div class="rHead"><p class="gLetter" id="aLetter">A</p><div class="rT"><p class="sub" id="aTitle"></p><p class="rScore" id="aScore"></p><p class="aStars" id="aStars"></p></div></div>
   <div class="rLines" id="aLines"></div>
-  <div class="row rBtns"><button class="primary big" id="aFree">CONTINUE</button><button class="menuB" id="aHub">MAIN MENU</button></div>
-  <div class="rLinks"><button id="aRetry">Try again</button></div>
+  <div class="row rBtns"><button class="primary big rRetry" id="aRetry">RETRY</button><button class="rCont" id="aFree">CONTINUE IN FREE FLIGHT</button><button class="menuB" id="aHub">MAIN MENU</button></div>
 </div></div>
 <div class="overlay" id="dfBrief" role="dialog" aria-label="Red Flag Dogfight briefing"><div class="sheet">
   <h3>RED FLAG DOGFIGHT<span class="modeTag" id="dfbMode"></span></h3>
@@ -1386,14 +1468,14 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 <div class="overlay res" id="gradeOv" role="dialog" aria-label="Lesson results"><div class="sheet">
   <div class="rHead"><p class="gLetter" id="gLetter">A</p><div class="rT"><p class="sub" id="gTitle"></p><p class="rScore" id="gScore"></p></div></div>
   <div class="rLines" id="gLines"></div>
-  <div class="row rBtns"><button class="primary big" id="gFree">CONTINUE</button><button class="menuB" id="gSchool">MAIN MENU</button></div>
-  <div class="rLinks"><button id="gNext">Next lesson</button><button id="gRetry">Try again</button></div>
+  <div class="row rBtns"><button class="primary big rRetry" id="gRetry">RETRY</button><button class="rCont" id="gFree">CONTINUE IN FREE FLIGHT</button><button class="menuB" id="gSchool">MAIN MENU</button></div>
+  <div class="rLinks"><button id="gNext">Next lesson</button></div>
 </div></div>
 <div class="overlay res" id="landOv" role="dialog" aria-label="Landing results"><div class="sheet">
   <div class="rHead"><p class="gLetter" id="lLetter">A</p><div class="rT"><p class="sub" id="lTitle"></p><p class="rScore" id="lScore"></p></div></div>
   <div class="rLines" id="lLines"></div>
-  <div class="row rBtns"><button class="primary big" id="lKeep">CONTINUE</button><button class="menuB" id="lMenu">MAIN MENU</button></div>
-  <div class="rLinks"><button id="lAgain">Fly again</button><button id="lRec">Records</button></div>
+  <div class="row rBtns"><button class="primary big rRetry" id="lAgain">RETRY</button><button class="rCont" id="lKeep">CONTINUE IN FREE FLIGHT</button><button class="menuB" id="lMenu">MAIN MENU</button></div>
+  <div class="rLinks"><button id="lRec">Records</button></div>
 </div></div>
 <div class="overlay" id="recOv"><div class="sheet">
   <p class="reg">Records</p>
@@ -1403,8 +1485,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 <div class="overlay res" id="missOv" role="dialog" aria-label="Mission results"><div class="sheet">
   <div class="rHead"><p class="gLetter" id="mLetter">A</p><div class="rT"><p class="sub" id="mTitle"></p><p class="rScore" id="mScore"></p></div></div>
   <div class="rLines" id="mLines"></div>
-  <div class="row rBtns"><button class="primary big" id="mFree">CONTINUE</button><button class="menuB" id="mMenu">MAIN MENU</button></div>
-  <div class="rLinks"><button id="mRetry">Try again</button></div>
+  <div class="row rBtns"><button class="primary big rRetry" id="mRetry">RETRY</button><button class="rCont" id="mFree">CONTINUE IN FREE FLIGHT</button><button class="menuB" id="mMenu">MAIN MENU</button></div>
 </div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -8233,14 +8314,34 @@ const sideEl=$('sideToast');
 // nothing of theirs goes to the centre of the screen. kind: what changed, for the haptics.
 function sideCfg(t,sub,kind){
   sideEl.textContent=t;if(sub){const s=document.createElement('small');s.textContent=sub;sideEl.appendChild(s);}
+  sideEl.style.maxWidth='';
   const thr=$('thr'),dock=$('dock'),ui=$('uiroot').getBoundingClientRect(),tr=thr.getBoundingClientRect(),dr=dock.getBoundingClientRect();
-  const h=sideEl.offsetHeight,w=sideEl.offsetWidth,sz=$('stickZone').getBoundingClientRect();
-  // left of the dock when it shows (else of the throttle), a third of the way down the throttle: level with
-  // CLIMB and above, clear of the lesson panel at the bottom. If that spot is the stick zone it goes above the controls.
-  let edge=(dr.width?dr.left:tr.left)-10,top=tr.top+tr.height*0.33-h/2;
-  if(sz.width&&edge-w<sz.right&&top+h>sz.top&&top<sz.bottom){const le=$('lesson'),lr=le.classList.contains('on')?le.getBoundingClientRect():null;
-    edge=tr.right;top=Math.min(tr.top,dr.width?dr.top:tr.top,lr&&lr.height?lr.top:1e9)-8-h;}
-  sideEl.style.right=Math.round(ui.right-edge)+'px';
+  const W3=ui.left+ui.width/3,W23=ui.left+ui.width*2/3,H3=ui.top+ui.height/3,H23=ui.top+ui.height*2/3;
+  // what it may not cover: the controls, the stick zone, the ticker, the badges, the look pad, the lesson
+  // panel, the centre column; nor the centre third of the screen (phone3 item 4)
+  const block=[];for(const e of document.querySelectorAll('#dock button,#thr,#stickZone,#tk.on,#tkCtl.on,#badges .badge.on,#lookPad,#lesson.on,#topCol > .on,#hDest,#tcas.on,#dfW')){
+    const r=e.getBoundingClientRect();if(r.width&&r.height&&getComputedStyle(e).display!=='none')block.push(r);}
+  const lr=$('lesson').classList.contains('on')?$('lesson').getBoundingClientRect():null;
+  // the edge of the buttons actually beside a band of the screen (the dock's box has gaps)
+  const btnEdge=(y0,y1)=>{let e=tr.left-10;for(const b of dock.querySelectorAll('button')){const r=b.getBoundingClientRect();if(r.width&&r.bottom>y0&&r.top<y1)e=Math.min(e,r.left-10);}return e;};
+  const fits=(edge,top,mw)=>{sideEl.style.maxWidth=mw?Math.floor(mw)+'px':'';const w=sideEl.offsetWidth,h=sideEl.offsetHeight;if(typeof top==='function')top=top(h);const x0=edge-w,y1=top+h;
+    if(x0<ui.left+4||top<ui.top+2||y1>ui.bottom-2)return false;
+    if(x0<W23&&edge>W3&&y1>H3&&top<H23)return false;
+    for(const r of block)if(x0<r.right&&edge>r.left&&y1>r.top&&top<r.bottom)return false;return true;};
+  const h0=sideEl.offsetHeight,mid=tr.top+tr.height*0.33-h0/2,low=H23+4;
+  // left of the dock (else of the throttle), a third of the way down the throttle: level with CLIMB and above;
+  // then the bottom third beside the dock (narrower beside the lesson panel); then squeezed between the centre
+  // third and the buttons; then above the controls
+  const C=[[(dr.width?dr.left:tr.left)-10,mid,0],[btnEdge(mid,mid+h0),mid,0],[btnEdge(low,low+h0),low,0]];
+  if(lr&&lr.height){const e=btnEdge(low,low+h0);C.push([e,low,e-lr.right-8]);}
+  {const e=btnEdge(mid,mid+h0*2);C.push([e,mid,e-W23]);}
+  const tc=$('tcas'),tcr=tc&&tc.classList.contains('on')?tc.getBoundingClientRect():null;
+  const above=h=>Math.min(tr.top,dr.width?dr.top:tr.top,lr&&lr.height&&lr.top>H3?lr.top:1e9,tcr&&tcr.height&&tcr.right>W23?tcr.top:1e9)-8-h;
+  C.push([tr.right,above,0],[tr.right,above,tr.right-W23]);
+  let pick=null;for(const c of C){if(c[2]&&c[2]<60)continue;if(fits(c[0],c[1],c[2])){pick=c;break;}}
+  if(!pick){pick=C[0];sideEl.style.maxWidth='';}
+  const top=typeof pick[1]==='function'?pick[1](sideEl.offsetHeight):pick[1];
+  sideEl.style.right=Math.round(ui.right-pick[0])+'px';
   sideEl.style.top=Math.round(top-ui.top)+'px';
   sideEl.classList.add('on');cfgT=2;sideEl.dataset.kind=kind||'';
   if(kind)hapCfg(kind);
@@ -8440,19 +8541,35 @@ function updateControls(dt){
   st.brake=!!keys[' ']||touchIn.brake||!!touchIn.padBrake;
 }
 // ---------- visual viewport: keep the whole UI inside what is actually visible ----------
+// iOS home screen apps (phone3 item 5): coming back from the home screen, or rotating while away,
+// iOS can report a transitional visual viewport (an offset top, a short or zero height) and then send
+// no further event, which left the UI pushed down, the controls in a zero sized box and the canvas
+// stretched. So the visual viewport is only trusted when it is zoomed (pinch) and sane; otherwise the
+// layout viewport (innerWidth/innerHeight) rules, and the page is scrolled back to the top.
 function layoutViewport(){
-  const v=window.visualViewport,r=document.documentElement.style;
-  const w=v?v.width:window.innerWidth, h=v?v.height:window.innerHeight;
-  r.setProperty('--vvl',(v?v.offsetLeft:0)+'px');
-  r.setProperty('--vvt',(v?v.offsetTop:0)+'px');
+  const v=window.visualViewport,r=document.documentElement.style,iw=window.innerWidth,ih=window.innerHeight;
+  const zoomed=!!(v&&v.scale>1.01),sane=!!(v&&v.width>iw*0.5&&v.height>ih*0.5);
+  const w=zoomed&&sane?v.width:iw,h=zoomed&&sane?v.height:ih;
+  if(!zoomed&&(window.scrollX||window.scrollY))window.scrollTo(0,0);
+  r.setProperty('--vvl',(zoomed&&sane?v.offsetLeft:0)+'px');
+  r.setProperty('--vvt',(zoomed&&sane?v.offsetTop:0)+'px');
   r.setProperty('--vvw',w+'px');
   r.setProperty('--vvh',h+'px');
+  VP.w=iw;VP.h=ih;
 }
+const VP={w:0,h:0,t:[]};
+// everything that depends on the screen's size, at once: the CSS viewport, the canvas and the camera, the controls.
+// iOS settles its sizes late, so it runs again a few times after each trigger.
+function relayout(){layoutViewport();if(typeof resize==='function'&&window.__glReady)resize();if(window.layoutCtl)layoutCtl(true);}
+function relayoutSoon(){relayout();VP.t.forEach(clearTimeout);VP.t=[60,250,600,1200].map(ms=>setTimeout(relayout,ms));}
 if(window.visualViewport){
   visualViewport.addEventListener('resize',layoutViewport);
   visualViewport.addEventListener('scroll',layoutViewport);
 }
-window.addEventListener('orientationchange',()=>setTimeout(layoutViewport,120));
+window.addEventListener('orientationchange',relayoutSoon);
+window.addEventListener('pageshow',relayoutSoon);
+window.addEventListener('focus',relayoutSoon);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)relayoutSoon();});
 layoutViewport();
 // The centre column under pause (#topCol) is sized from where the readouts end. They only
 // change size when a value gains a digit or the skill changes the labels, so a
@@ -8567,6 +8684,34 @@ function gradeLanding(e){
                  ['Off centreline',fix.off.toFixed(1)+' m',Math.round(sOff)],
                  ['From the aim point',Math.round(Math.abs(fix.along))+' m '+(fix.along<0?'short':'long'),Math.round(sAim)],
                  ['Airspeed',Math.round(kt)+' kt vs '+Math.round(tgt),Math.round(sSpd)]]};
+}
+
+// ---- the coaching tip under the grade: one line that fixes the worst stat, in that aircraft's own numbers
+// (its approach speed AC.vapp, the 3 degree path's sink at that speed, its flare). A grade A gets a compliment.
+const TIP_AC={
+  cessna:{n:'Cessna',flare:'flare to hold it off',long:'pull the power to idle over the fence',ok:'Butter. Checkride standard.'},
+  alpha:{n:'Alpha',flare:'hold it off, it floats',long:'pull the power early, it floats a long way',ok:'Lovely. That glider wing loves you.'},
+  reaper:{n:'MQ-9A',flare:'power off, small flare',long:'start down sooner, that long wing floats',ok:'Smooth. The sensor crew never felt it.'},
+  mq9b:{n:'MQ-9B',flare:'power off, small flare',long:'start down sooner, that long wing floats',ok:'Smooth. The sensor crew never felt it.'},
+  c130:{n:'C-130',flare:'power back at 50 ft, small flare',long:'plan it early, it takes a long time to slow',ok:'Textbook Herc arrival.'},
+  f16:{n:'F-16',flare:'shallow flare, nose high',long:'cross the threshold at 50 ft, not higher',ok:'Viper driver. Textbook.'}};
+function landTip(g,clean){
+  const T=TIP_AC[AC.id]||TIP_AC.cessna;if(!g)return '';
+  if(g.letter==='A')return T.n+': '+T.ok;
+  if(clean&&g.parts.every(p=>p[2]>=90))return T.n+': clean landing. '+clean;
+  const v=Math.round(g.tgt/5)*5,lo=v-5,hi=v+5,sink=Math.round(v*101.27*Math.tan(GS)/50)*50;
+  const worst=g.parts.map((p,i)=>[p[2],i]).sort((a,b)=>a[0]-b[0])[0][1];
+  if(worst===0)return T.n+': about '+sink+' fpm down final, '+T.flare+', under 150 fpm at touchdown';
+  if(worst===1)return T.n+': line up by 1 mile, rudder to keep the nose on the centreline'+(g.xw>=8?', upwind wing down':'');
+  if(worst===2)return T.n+': '+(g.along<0?'landed short, keep the PAPI two white, two red':T.long+', aim at the white blocks');
+  return T.n+': fly final at '+lo+' to '+hi+' kt, you were '+Math.round(Math.abs(g.kt-g.tgt))+' kt '+(g.kt>g.tgt?'fast':'slow');
+}
+// the missions: the short field landing's touchdown and stop, the airdrop's release
+function missTip(r,letter){
+  if(letter==='A')return r.kind==='drop'?'C-130: right on the smoke. Loadmaster is happy.':'C-130: assault landing, done right.';
+  if(r.kind==='drop')return 'C-130: run in at 140 kt and 1,000 ft into the wind, drop the moment the light goes green';
+  if(!(r.tdFt>=0&&r.tdFt<=500))return 'C-130: cross the threshold at 130 kt and 50 ft, touch down in the first 500 ft';
+  return 'C-130: brakes on the moment all the wheels are down, power to idle';
 }
 
 // ---- records. Each aircraft is ranked on the thing that matters to it. ----
@@ -8687,7 +8832,7 @@ function onLanding(e){
   const dashL=dash?(dash.secs<=150?'A':dash.secs<=180?'B':dash.secs<=210?'C':dash.secs<=240?'D':'F'):null;
   resFill(landOv,{letter:dash?dashL:g.letter,title:(dash?'Luke to Glendale dash, ':seg?(st.spawn==='final1'?'1 mile final segment, ':'3 mile final segment, '):free?'Free flight landing, ':'Landing, ')+g.where+
     (g.xw>=10?'  ('+Math.round(g.xw)+' kt crosswind)':''),score:dash?fmtT(dash.secs):g.pts+' pts',sub:dash?g.letter+' landing, '+g.pts+' pts':g.line,
-    lines:rows.join(''),board:dash?'mission:dash':free?'free:landing':''});
+    lines:rows.join(''),board:dash?'mission:dash':free?'free:landing':'',retry:dash?'LUKE DASH':'',tip:dash&&dashL!=='A'?'F-16: full afterburner to 1,000 ft, then fly it level and straight to Glendale':landTip(Object.assign({},g,{letter:dash?dashL:g.letter}))});
   if(free||dash)resArm(()=>{if(!landOv.classList.contains('on')&&!menu.classList.contains('on')&&!pauseOv.classList.contains('on'))resShow(landOv,!seg);},20,true);
   // the full breakdown also goes to Records; the flight carries on through the rollout
   SCORE.recent=(SCORE.recent||[]);SCORE.recent.unshift({ac:AC.name,letter:g.letter,pts:g.pts,where:g.where,line:g.line,mode:runMode(),
@@ -8760,6 +8905,22 @@ const missEl=document.getElementById('miss'),missT=document.getElementById('miss
 function missHud(title,sub,warn){
   if(!title){missEl.classList.remove('on');return;}
   setTxt(missT,title);setTxt(missS,sub||'');missEl.classList.toggle('warn',!!warn);missEl.classList.toggle('on',true);
+}
+// ---- approach: nothing in the centre third (phone3 item 4) ----
+// body.appr below 1,500 ft above the ground or inside 3 nm of any runway end (the CSS turns the centre
+// column into a one line strip under the pause button and keeps the lesson panel low); a mission card
+// is in full for its first 3 s (sim time), then a chip. The dogfight has its own HUD and is left out.
+const APPR={on:false,missOn:false,missT0:0,home:null};
+function apprTick(){
+  const on=!!(running&&st&&!st.crashed&&!DF.live&&(st.agl*M2FT<1500||RWY_ENDS.some(e=>Math.abs(st.pos.x-e.x)<5556&&Math.abs(st.pos.z-e.z)<5556&&Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<5556)));
+  if(on!==APPR.on){APPR.on=on;document.body.classList.toggle('appr',on);}
+  const mOn=missEl.classList.contains('on');
+  if(mOn&&!APPR.missOn)APPR.missT0=st?st.time:0;APPR.missOn=mOn;
+  const chip=mOn&&!DF.live&&!!st&&st.time-APPR.missT0>=3;if(chip!==missEl.classList.contains('chip'))missEl.classList.toggle('chip',chip);
+  // portrait: the lesson panel joins the strip at the top (below the controls' top edge is the centre third)
+  const L=document.getElementById('lesson'),T=document.getElementById('topCol');if(!APPR.home)APPR.home={p:L.parentNode,n:L.nextSibling};
+  const want=on&&innerHeight>innerWidth;
+  if(want&&L.parentNode!==T)T.insertBefore(L,T.firstChild);else if(!want&&L.parentNode===T)APPR.home.p.insertBefore(L,APPR.home.n);
 }
 function missReset(){
   if(MISS.pallet){scene.remove(MISS.pallet.g);MISS.pallet=null;}
@@ -8896,7 +9057,7 @@ function missScore(r){
   if(LB){if(r.kind==='drop')LB.runEnd('arc:drop',Math.round(r.dist*10)/10);else LB.runEnd('mission:short',r.pts);}
   missHud(null);
   resOpen(missOv,{letter:letter,title:(r.kind==='drop'?'Airdrop: ':'Short field landing: ')+title,score:r.kind==='drop'?Math.round(r.dist)+' m':resNum(r.pts)+' pts',
-    sub:r.kind==='drop'?'from the centre':'of 1,000',stats:lines,board:r.kind==='drop'?'arc:drop':'mission:short'});
+    sub:r.kind==='drop'?'from the centre':'of 1,000',stats:lines,board:r.kind==='drop'?'arc:drop':'mission:short',tip:missTip(r,letter)});
   logMission(r,letter);
 }
 
@@ -8938,9 +9099,17 @@ function resFill(ov,o){
   const box=ov.querySelector('.rLines');
   box.innerHTML=o.lines!=null?o.lines:(o.stats||[]).map(l=>'<div class="gl"><span>'+resEsc(l[0])+'</span><b>'+resEsc(l[1])+'</b></div>').join('');
   ov.dataset.lb=o.board||'';
+  let who=ov.querySelector('.rWho');if(!who){who=document.createElement('p');who.className='rWho';ov.querySelector('.rT').appendChild(who);}
+  const cs=LB&&LB.E&&LB.E.P&&LB.E.P.cs;who.innerHTML=acTag(AC.id)+(cs?'<span class="rCs"></span>':'');if(cs)who.lastChild.textContent=cs;
+  const rb=ov.querySelector('.rRetry');if(rb)rb.textContent='RETRY '+(o.retry||runName());
+  let tip=ov.querySelector('.rTip');if(!tip){tip=document.createElement('p');tip.className='rTip';ov.querySelector('.rHead').after(tip);}
+  tip.textContent=o.tip||'';tip.classList.toggle('good',o.letter==='A');
   if(o.board&&LB&&LB.E.shown&&LB.E.shown.b===o.board)resBoard(LB.E.shown);
 }
+function resMore(box){box.classList.toggle('more',box.scrollHeight>box.clientHeight+2&&box.scrollTop+box.clientHeight<box.scrollHeight-2);}
+document.querySelectorAll('.overlay.res .rLines').forEach(b=>b.addEventListener('scroll',()=>resMore(b),{passive:true}));
 function resShow(ov,brief){
+  requestAnimationFrame(()=>resMore(ov.querySelector('.rLines')));
   ov.classList.toggle('brief',!!brief);
   if(brief){RES.brief=ov;RES.briefAt=performance.now()+RES_BRIEF_MS;}else{if(RES.brief===ov)RES.brief=null;paused=true;}
   ov.classList.add('on');
@@ -8976,14 +9145,14 @@ function resBoard(o){
 function resMenu(ov){resClose(ov);if(ARC.on)arcStop();if(MISS.on)missReset();openMenu();}
 $('lKeep').onclick=()=>{resClose(landOv);paused=false;};
 $('lMenu').onclick=()=>resMenu(landOv);
-$('lAgain').onclick=()=>{resClose(landOv);start(st.mode==='final'?(st.spawn||'final'):'runway');};
+$('lAgain').onclick=()=>{resClose(landOv);runRestart();};
 $('lRec').onclick=()=>{resClose(landOv);recOpen();};
 $('mFree').onclick=()=>{resClose(missOv);missReset();paused=false;};
 $('mMenu').onclick=()=>resMenu(missOv);
-$('mRetry').onclick=()=>{resClose(missOv);start(MISS.kind==='drop'?'drop':'short');};
+$('mRetry').onclick=()=>{resClose(missOv);runRestart();};
 $('aFree').onclick=()=>{resClose(arcOv);arcStop();dfStop();paused=false;};
 $('aHub').onclick=()=>resMenu(arcOv);
-$('aRetry').onclick=()=>{resClose(arcOv);if(RES.kind==='strike')start('range');else if(RES.kind==='df')dfStart(DF.daily?{daily:1}:null);else arcStart(ARC.kind);};
+$('aRetry').onclick=()=>{resClose(arcOv);runRestart();};
 
 // ================= Drop zone guidance =================
 // So nobody has to guess where the drop zone is: its icon on both maps with the waypoint
@@ -9317,8 +9486,10 @@ function tapBtn(el,fn,onDown){let pid=null;
     fn(e);});
   el.addEventListener('pointercancel',e=>{if(e.pointerId===pid)pid=null;});
   el.addEventListener('lostpointercapture',e=>{if(e.pointerId===pid)pid=null;});
-  // the tap is handled on pointerup, so stop the late click landing on whatever opens under it
-  el.addEventListener('touchend',e=>{if(e.cancelable)e.preventDefault();},{passive:false});
+  // the tap is handled on pointerup, so stop the late click landing on whatever opens under it. A tap
+  // on the haptic overlay (hapL) needs its click to tick: that one goes through, and for a moment any
+  // other click is swallowed (hapShield) so it cannot land on what just opened under the finger
+  el.addEventListener('touchend',e=>{if(e.target&&e.target.classList&&e.target.classList.contains('hapL')){HAP.shieldTo=performance.now()+600;return;}if(e.cancelable)e.preventDefault();},{passive:false});
   el.addEventListener('click',e=>{if(e.detail===0)fn(e);});
 }
 // F-16 flaps are automatic for everyone: the trailing edge flaps follow the gear handle
@@ -9365,9 +9536,9 @@ function sensorView(){if(!running||st.crashed||!hasBall())return;
       bGear:P&&!!AC.retract&&!sv&&!df,flapGrp:P&&AC.id!=='f16'&&!sv,bBrake:isTouch&&!sv&&!df};
     const H=dockH||(dockH=dock.clientHeight);
     const key=Object.keys(show).map(k=>show[k]?1:0).join('')+'|'+H;
-    if(key===lkey)return;
+    if(key===lkey)return true;
     ORDER.forEach(el=>el.hidden=!show[el.id]);
-    if(!H)return;                                   // not on screen yet: deal them out once it is
+    if(!H)return false;                             // not on screen yet: the frame loop deals them out once it is
     lkey=key;
     // fill column A from the bottom up; whatever does not fit goes to column B, same order
     const vis=ORDER.filter(el=>show[el.id]);let h=0,cut=vis.length;
@@ -9375,6 +9546,7 @@ function sensorView(){if(!running||st.crashed||!hasBall())return;
     ORDER.forEach(el=>{if(!show[el.id]&&el.parentNode!==A)A.appendChild(el);});
     vis.forEach((el,i)=>(i<cut?B:A).appendChild(el));
     B.hidden=cut===0;document.body.classList.toggle('dock2',!B.hidden);   // the TCAS panel steps left of a second column
+    return true;
   };
   let key='';
   window.iconsUI=()=>{
@@ -10246,6 +10418,7 @@ function arcStart(kind){
   if(sp.gs){st.vel.y=-Math.hypot(st.vel.x,st.vel.z)*Math.tan(GS);st.throttle=st.power=AC.finalThr;st.trim=AC.finalTrim;
     if(easy){st.flapIdx=AC.landFlap;st.gearDown=true;st.gearPos=1;}else st.flapIdx=AC.finalFlap;
     trimSpawn(st,-GS);}
+  RUNSTART={k:'arc',kind:kind};
   Object.assign(ARC,{on:true,kind:kind,t0:st.time,end:e,done:false,dist:sp.dist,par:Math.round((sp.dist+2500)/(AC.vapp*1.3)+25),practice:false});
   if(LB)LB.runStart(arcBoard(kind));
   DEST=e;document.body.classList.add('hasDest');destUI(true);
@@ -10283,7 +10456,7 @@ function arcResult(g,secs,right){
   const lb=arcBoard(ARC.kind);
   if(LB){if(pts>0)LB.runEnd(lb,pts,{secs:secs});else LB.runCancel(lb);}
   missHud(null);RES.kind='arc';
-  resOpen(arcOv,{letter:cl,title:name+': '+why,score:resNum(pts)+' pts',sub:AC.name,stars:stars,stats:stats,board:pts>0?lb:''});
+  resOpen(arcOv,{letter:cl,title:name+': '+why,score:resNum(pts)+' pts',stars:stars,stats:stats,board:pts>0?lb:'',tip:!right||!g?'Land on '+arcApt(ARC.end)+' runway '+ARC.end.num+': follow the arrow on the HUD':landTip(Object.assign({},g,{letter:cl}),'Cut the corners and keep the speed up to beat par')});
 }
 function arcStop(){if(ARC.on&&DEST===ARC.end){DEST=null;document.body.classList.remove('hasDest');destUI(true);}ARC.on=false;ARC.done=false;}
 function arcScore(id){
@@ -10451,7 +10624,7 @@ function dfStart(o){
   // the range is Arizona's: from a world region switch there first, the run starts after the reload
   if(!REGION.az){pickRegion('az',{resume:{df:1,daily:daily?1:0,region:'az',type:'f16',tod:TOD.id}});return;}
   if(!WORLD.ready){toast('Loading '+REGION.city+'…');return;}
-  pickType('f16',1);start('runway','luke');
+  pickType('f16',1);start('runway','luke');RUNSTART={k:'df',daily:daily};
   // no haboob over the range: the day sky for this run, the saved choice comes back on the next start()
   if(TOD.id==='haboob'){const p=TOD.id;setTOD('day');try{localStorage.setItem('kgeuTOD',p);}catch(e){}ARC.prevTod=p;hbSync(true);}
   dfBuild();
@@ -10591,7 +10764,7 @@ function dfEnd(why){
   if(DF.daily)stats.push(['Daily points',resNum(dp)+' (half the score)']);
   stats.push(['Best',B?resNum(B.pts)+' pts, '+B.kills+' kills'+(B.clr!=null?', '+dfClock(B.clr):''):'none yet']);
   resArm(()=>{if(!running||!DF.live)return;RES.kind='df';
-    resOpen(arcOv,{letter:letter,title:(DF.daily?'Daily dogfight: ':'Red Flag Dogfight: ')+DF_WHY[why]+(better?', new best':''),score:resNum(r.score)+' pts',sub:AC.name,stars:stars,stats:stats,board:send&&DF.lb?lb:''});},DF.won?3:2.2);   // time for the knock it off call
+    resOpen(arcOv,{letter:letter,title:(DF.daily?'Daily dogfight: ':'Red Flag Dogfight: ')+DF_WHY[why]+(better?', new best':''),score:resNum(r.score)+' pts',stars:stars,stats:stats,board:send&&DF.lb?lb:''});},DF.won?3:2.2);   // time for the knock it off call
 }
 // an achievement in the fight: listed for this run (DF.ach, every time it is earned) and granted (its first time, in the strip)
 function dfAch(id){if(DF.ach.indexOf(id)<0)DF.ach.push(id);achGrant(id);}
@@ -11263,6 +11436,25 @@ function photoSave(){
 $('pPhoto').onclick=photoOpen;$('phX').onclick=photoClose;$('phSave').onclick=photoSave;
 // ---------- menus ----------
 const menu=document.getElementById('menu'),crashEl=document.getElementById('crash'),crashTopEl=document.getElementById('crashTop');
+// How the run on screen was started, so every Restart (pause sheet), RETRY (crash card) and Try again
+// (results cards) flies exactly the same start: a free flight / segment / mission start keeps its spawn
+// (final1 is not final), base and aircraft; an arcade game, lesson or dogfight goes back through its own
+// starter (arcStart, startLesson, dfStart), which sets its own position. Each starter stamps it after start().
+let RUNSTART={k:'free',mode:'runway',base:null,type:null};
+// the run's name on the results card's RETRY button: RETRY 1 MI FINAL, RETRY SHORT FIELD LANDING
+const RUN_NAMES={runway:'RUNWAY START',ramp:'RAMP START',final:'3 MI FINAL',final1:'1 MI FINAL',short:'SHORT FIELD LANDING',drop:'AIRDROP',range:'STRIKE RANGE',
+  landing:'LANDING CHALLENGE',landing1:'1 MI FINAL',daily:'DAILY CHALLENGE',first:'FIRST FLIGHT',steep:'STEEP TURNS',slow:'SLOW FLIGHT',stall:'STALL',engine:'ENGINE FAILURE',pattern:'PATTERN'};
+function runName(){const R=RUNSTART;
+  if(R.k==='arc')return R.kind==='apt'?String(REGION.base||'AIRPORT').toUpperCase()+' LANDING':RUN_NAMES[R.kind]||'CHALLENGE';
+  if(R.k==='les')return RUN_NAMES[R.id]||'LESSON';
+  if(R.k==='df')return R.daily?'DAILY DOGFIGHT':'DOGFIGHT';
+  return RUN_NAMES[R.mode]||'FLIGHT';}
+function runRestart(){const R=RUNSTART;
+  if(R.k==='arc'){arcStart(R.kind);return;}
+  if(R.k==='les'){startLesson(R.id);return;}
+  if(R.k==='df'){dfStart(R.daily?{daily:1}:null);return;}
+  if(R.type&&R.type!==acType)pickType(R.type,1);
+  start(R.mode||'runway',R.base||undefined);}
 function start(mode,base){
   // missions, the strike and the Luke dash are Arizona's for now: from a world region they switch back
   if(!REGION.az&&(mode==='range'||mode==='drop'||mode==='short'||base==='luke')){pickRegion('az',{resume:{mode:mode,base:base,type:acType,tod:TOD.id}});return;}
@@ -11271,7 +11463,7 @@ function start(mode,base){
   initAudio();
   if(ARC.prevTod){const p=ARC.prevTod;ARC.prevTod=null;setTOD(p);}
   setType(acType);useModel(acType);sizeShadow();vqReset();radioHush();radioFadeTok++;radioVolApply();chatT=9;atcT=0;TK.paused=false;
-  const spawn=mode;if(mode==='final1')mode='final';
+  const spawn=mode;if(mode==='final1')mode='final';RUNSTART={k:'free',mode:spawn,base:base||SPAWN_BASE,type:acType};
   st=createState(mode,base||SPAWN_BASE,spawn==='final1'?1852:0);st.type=acType;st.spawn=spawn;
   // 1 mile final: Easy is already configured to land (gear down, landing flaps); Hard is set up the way the
   // 3 mile final is, gear down and approach flaps, and the last stage of flap is the pilot's
@@ -11282,13 +11474,13 @@ function start(mode,base){
   if(PHOTO.on){PHOTO.on=false;$('photoOv').classList.remove('on');}
   document.body.classList.remove('menuOn','pauseOn','crashOn','photoOn','mapOn');if(window.stickReset)stickReset();
   MUSIC.forced=null;   // a mode with its own song (the Red Flag Dogfight: MUSIC.forced='dogfight.m4a') sets it after start()
-  RES.kind='';RES.freeT0=0;RES.segDone=false;tfcReset();
+  RES.kind='';RES.freeT0=0;RES.segDone=false;tfcReset();APPR.missOn=false;missEl.classList.remove('chip');
   if(mode==='range')strikeStart();
   if(mode==='drop'||mode==='short')missStart(mode==='drop'?'drop':'short');
   if(mode==='drop')dzStart();
   hbSync(true);
   if(LB){LB.reset();if(mode==='range'||mode==='drop'||mode==='short')LB.runStart(mode==='range'?'arc:strike':mode==='drop'?'arc:drop':'mission:short');}
-  layoutCtl(true);
+  layoutViewport();VP.ctl=layoutCtl(true);   // the controls are dealt on this frame, in Easy and in Hard
 }
 // One sweep for everything a flight put on screen: the result sheets, the mission card, the drop
 // zone (hint, chip, chevron, jump lights, smoke, panels, run in line, gates and its route), the
@@ -11326,7 +11518,7 @@ $('pResume').onclick=()=>{paused=false;pauseOv.classList.remove('on');initAudio(
 var PZ0=null;
 function pzChanged(){return !!PZ_LOC||!!PZ0&&(PZ0.t!==savedType||PZ0.b!==SPAWN_BASE||PZ0.p!==SPAWN_POS);}
 function pzApplyUI(){const b=$('pApply');if(b)b.textContent=pzChanged()?'Apply':'Restart';}
-function pzRestart(){if(DF.live){dfStart();return;}start(st.mode==='final'||st.mode==='ramp'?(st.spawn||st.mode):(MISS.on?MISS.kind:STRIKE.active?'range':'runway'));}
+function pzRestart(){runRestart();}
 $('pMenu').onclick=()=>openMenu();
 function freeStart(mode){pickType(savedType);pickPos(mode||SPAWN_POS);start(SPAWN_POS);}
 function landDetails(){if(!running||st.crashed||menu.classList.contains('on'))return;badgeHide();resShow(landOv,false);}
@@ -11339,7 +11531,7 @@ document.getElementById('recReset').onclick=e=>{
   scReset();resetArmed=0;e.target.textContent='Reset all records';e.target.classList.remove('arm');
   toast('All records and achievements erased');};
 // the crash card: RETRY flies the same start again (runway, ramp, final or mission, same base)
-function crashRetry(){if(CRASH.mode==='dogfight'){dfStart();return;}start(CRASH.mode||'runway',CRASH.base);}
+function crashRetry(){runRestart();}
 tapBtn($('cRetry'),crashRetry);
 tapBtn($('cMenu'),()=>{crashEl.classList.remove('on');crashTopEl.classList.remove('on');openMenu();});
 document.getElementById('bFull').onclick=()=>{const d=document.documentElement;if(document.fullscreenElement){document.exitFullscreen&&document.exitFullscreen();return;}
@@ -11366,13 +11558,20 @@ try{muted=localStorage.getItem('kgeuMuted')==='1';}catch(e){}
 function setMuted(v){muted=!!v;if(muted&&window.speechSynthesis)speechSynthesis.cancel();try{localStorage.setItem('kgeuMuted',muted?'1':'0');}catch(e){}soundUI();}
 document.querySelectorAll('.oSound').forEach(b=>b.onclick=()=>{initAudio();setMuted(!muted);});
 // ================= haptics =================
-// One small module: hapPattern(name) and hapTick(strength). iOS Safari has no navigator.vibrate;
-// since iOS 18 an <input type="checkbox" switch> gives the native switch tick when its label is
-// clicked, so a hidden switch and label stand in for it (HAP.sup 'switch'). Everywhere else
-// navigator.vibrate (HAP.sup 'vibrate'), or nothing at all ('none'). Every pattern is a few ticks
-// with spacing: the intensity comes from the click count and the spacing. Never per frame: a 40 ms
-// floor between clicks, a cooldown per kind, at most 24 clicks in flight. Fails silently.
-const HAP={on:true,sup:'none',sw:null,lab:null,lastAt:0,pend:0,cool:Object.create(null),log:[],plan:[],abWas:0,thrZ:-1};
+// One small module: hapPattern(name) and hapTick(strength). iOS Safari has no navigator.vibrate.
+// What ticks on an iPhone (phone3 item 6, checked against iOS releases up to 26.5): toggling an
+// <input type="checkbox" switch> (iOS 17.4+) plays the native switch tick. Since iOS 26.5 only a REAL
+// tap that lands on the switch or its <label> ticks; label.click() from script is an untrusted click
+// and ticks no more (18.4 to 26.4 it still ticked within about 1 s of a tap, 18.0 to 18.3 always).
+// So (1) every control a finger taps carries a transparent <label for="hapSw"> over it (hapArm): the
+// tap itself is the tick, on every iOS with the switch. (2) Events with no tap under them (crash,
+// touchdown, impact, launch, stall, throttle detents while dragging, since a drag is never a click)
+// still go through the scripted label.click() path: it ticks on older iOS and inside the gesture
+// window, and does nothing on 26.5+. Android and others: navigator.vibrate (HAP.sup 'vibrate').
+// Every pattern is a few ticks with spacing: the intensity comes from the click count and the
+// spacing. Never per frame: a 40 ms floor between clicks, a cooldown per kind, at most 24 clicks in
+// flight. Fails silently. The Haptics setting hides the overlays (body.hapOff) and mutes the rest.
+const HAP={on:true,sup:'none',sw:null,lab:null,lastAt:0,pend:0,cool:Object.create(null),log:[],plan:[],abWas:0,thrZ:-1,directAt:-1e9,taps:0,downL:null,shieldTo:0};
 const HAP_MS={l:12,m:30,h:70};                                   // vibrate: one tick's length
 const HAP_CLICKS={l:1,m:2,h:3};                                  // the switch: clicks per tick, 40 ms apart
 const HAP_PAT={
@@ -11396,11 +11595,37 @@ function hapInit(){
       if('switch' in i){i.id='hapSw';i.tabIndex=-1;i.setAttribute('aria-hidden','true');
         const l=document.createElement('label');l.htmlFor='hapSw';l.setAttribute('aria-hidden','true');
         const w=document.createElement('div');w.id='hapWrap';w.setAttribute('aria-hidden','true');
-        w.style.cssText='position:fixed;left:-300px;top:-300px;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;';
+        // inside the viewport (a focused offscreen switch could scroll the page), invisible, untouchable
+        w.style.cssText='position:fixed;left:0;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;';
         w.appendChild(i);w.appendChild(l);document.body.appendChild(w);HAP.sw=i;HAP.lab=l;HAP.sup='switch';}}
   }catch(e){HAP.sup='none';}
   hapUI();
+  if(HAP.sup==='switch'){hapArmAll();
+    // menus, cards and sheets are rebuilt as they open: arm what they add (never the HUD, which changes every frame)
+    // (a control whose text is rewritten, e.g. Restart / Apply, loses its label: put it back)
+    try{const mo=new MutationObserver(ms=>{const seen=new Set();for(const m of ms){
+        const t=m.target.nodeType===1&&m.target.closest?m.target.closest(HAP_SEL):null;if(t&&!seen.has(t)){seen.add(t);hapArm(t);}
+        for(const n of m.addedNodes)if(n.nodeType===1&&!n.classList.contains('hapL')&&!seen.has(n)){seen.add(n);hapArmAll(n);}}});
+      ['menu','pauseOv','arcOv','gradeOv','landOv','missOv','recOv','crash','funnel','csOv','tkCtl','tk','dfBrief','photoOv','mapOv'].forEach(id=>{const e=document.getElementById(id);if(e)mo.observe(e,{childList:true,subtree:true});});}catch(e){}
+    // a real tap on an overlay: the native tick has played, so the scripted tick for the same tap is skipped
+    document.addEventListener('click',e=>{const t=e.target,L=t&&t.classList&&t.classList.contains('hapL');
+      // hapShield: after a tapBtn tap on an overlay only that overlay's click (and the switch it forwards to) gets through
+      if(performance.now()<HAP.shieldTo&&t!==HAP.downL&&t!==HAP.sw){e.preventDefault();e.stopPropagation();return;}
+      if(L&&e.isTrusted){HAP.directAt=performance.now();HAP.taps++;if(t===HAP.downL)HAP.shieldTo=0;}},true);
+  }
 }
+// the controls a finger taps: flight buttons, weapons, pause, the throttle's detent labels, every menu, sheet and card button
+const HAP_SEL='#dock button,#dfW button,#bPause,#thr .det,#menu button,#menu .mcard,#menu .lrow,#pauseOv button,.overlay button,#crash button,#funnel button,#csOv button,#tkCtl button,#tk,#hDest';
+function hapArm(el){
+  if(!el||el.querySelector(':scope > .hapL'))return;
+  if(getComputedStyle(el).position==='static')el.classList.add('hapRel');
+  const l=document.createElement('label');l.className='hapL';l.htmlFor='hapSw';l.setAttribute('aria-hidden','true');
+  // the tap that started on this overlay keeps its click (tapBtn cancels the late click otherwise)
+  // the finger is on the switch's label: its tick is coming with the click (which may land a frame after the action)
+  l.addEventListener('pointerdown',()=>{HAP.downL=l;if(HAP.on)HAP.directAt=performance.now();},true);
+  el.appendChild(l);
+}
+function hapArmAll(root){try{(root||document).querySelectorAll(HAP_SEL).forEach(hapArm);if(root&&root.matches&&root.matches(HAP_SEL))hapArm(root);}catch(e){}}
 function hapClick(){HAP.pend=Math.max(0,HAP.pend-1);try{if(HAP.sup==='switch'&&HAP.lab)HAP.lab.click();}catch(e){}}
 // strength 'l' | 'm' | 'h' at a delay (ms) from now; the switch gets 1 to 3 clicks, vibrate one pulse
 function hapTick(strength,delay){
@@ -11419,6 +11644,8 @@ function hapPattern(name){
   const now=performance.now(),cd=HAP_COOL[name]||0;
   if(cd&&HAP.cool[name]&&now-HAP.cool[name]<cd)return false;HAP.cool[name]=now;
   HAP.log.push({n:name,t:Math.round(now)});if(HAP.log.length>80)HAP.log.shift();
+  // the finger's own tap on an overlay was this pattern's first tick
+  if(HAP.sup==='switch'&&now-HAP.directAt<300){pat.slice(1).forEach(([d,st])=>hapTick(st,d));return true;}
   try{
     if(HAP.sup==='vibrate'){const arr=[];for(let i=0;i<pat.length;i++){const on=HAP_MS[pat[i][1]];arr.push(on);if(i+1<pat.length)arr.push(Math.max(10,pat[i+1][0]-pat[i][0]-on));}
       navigator.vibrate(arr);return true;}
@@ -11428,7 +11655,7 @@ function hapPattern(name){
 }
 // what changed beside the throttle (sideCfg kinds)
 function hapCfg(kind){if(kind==='flap'||kind==='gear')hapPattern('detent');else if(kind==='ap')hapPattern('ap');else if(kind==='trim')hapPattern('trim');}
-function hapUI(){document.querySelectorAll('.oHap').forEach(b=>{if(b.classList.contains('qs'))b.querySelector('b').textContent=HAP.on?'On':'Off';else b.textContent='Haptics: '+(HAP.on?'On':'Off');b.classList.toggle('on',HAP.on);});}
+function hapUI(){document.body.classList.toggle('hapOff',!HAP.on);document.querySelectorAll('.oHap').forEach(b=>{if(b.classList.contains('qs'))b.querySelector('b').textContent=HAP.on?'On':'Off';else b.textContent='Haptics: '+(HAP.on?'On':'Off');b.classList.toggle('on',HAP.on);});}
 function setHaptics(v){HAP.on=!!v;try{localStorage.setItem('kgeuHaptics',HAP.on?'1':'0');}catch(e){}hapUI();if(HAP.on)hapPattern('ap');}
 document.querySelectorAll('.oHap').forEach(b=>b.onclick=()=>setHaptics(!HAP.on));
 document.querySelectorAll('.oTcas').forEach(b=>b.onclick=()=>setTcas(!TCAS.on));tcasUI();
@@ -11436,6 +11663,8 @@ document.querySelectorAll('.oTcas').forEach(b=>b.onclick=()=>setTcas(!TCAS.on));
 document.addEventListener('pointerdown',e=>{const b=e.target&&e.target.closest?e.target.closest('button'):null;
   if(b&&b.closest('#menu,#pauseOv,.overlay,#crash,#funnel,#csOv,#tkCtl'))hapPattern('button');},true);
 hapInit();
+function offUI(){const e=$('hOff');if(e)e.hidden=navigator.onLine!==false;}
+addEventListener('online',offUI);addEventListener('offline',offUI);offUI();
 $('pSens').onclick=()=>setStickSens((TOUCH.sens+1)%STICK_SENS.length);
 $('oMusic').onclick=()=>{initAudio();TK.paused=false;setMusicOn(!MUSIC.on);};
 $('oMfree').onclick=()=>{initAudio();setMusicFree(!MUSIC.free);};
@@ -11515,7 +11744,7 @@ function startLesson(id){
   const S=SCH[acType];gradeOv.classList.remove('on');
   start(id==='pattern'||id==='first'?'runway':'final','kgeu');A.land=1;
   lesEl.classList.toggle('tut',id==='first');$('lesQuit').textContent=id==='first'?'Skip':'End';
-  LES.on=id;LES.t=0;LES.ph=0;LES.d={};LES.name=LESSONS.find(l=>l.id===id).name;if(LB)LB.runStart('lesson:'+id);lesT.textContent=id==='first'?'Lesson 1: First flight':'Flight school: '+LES.name;lesEl.classList.add('on');
+  RUNSTART={k:'les',id:id};LES.on=id;LES.t=0;LES.ph=0;LES.d={};LES.name=LESSONS.find(l=>l.id===id).name;if(LB)LB.runStart('lesson:'+id);lesT.textContent=id==='first'?'Lesson 1: First flight':'Flight school: '+LES.name;lesEl.classList.add('on');
   st.ezManFlap=id!=='pattern'&&id!=='engine'&&id!=='first'?1:0;
   if(id==='first'){st.easy=true;st.noPF=true;coach2('Your first flight. Follow the arrows. It takes about a minute.');return;}
   if(id==='steep'){airStart(7000,2500,3500,360,S.turn,0,S.thrTurn);st.bankMax=0.95;
@@ -11858,6 +12087,11 @@ const SIL={
   f16:'<path fill="#F6C177" d="M0-16 L2.6-4 L14 6 L14 8.5 L2.6 6 L3.4 11 L7.5 14 L7.5 16 L0 14.5 L-7.5 16 L-7.5 14 L-3.4 11 L-2.6 6 L-14 8.5 L-14 6 L-2.6-4Z"/>',
   cessna:'<g fill="#F6C177"><rect x="-18" y="-6" width="36" height="4.5" rx="1.6"/><rect x="-2.2" y="-13" width="4.4" height="25" rx="2.2"/><rect x="-7" y="10" width="14" height="3.2" rx="1.4"/><rect x="-4" y="-14.5" width="8" height="1.6" rx=".8" fill="#D98A3D"/></g>',
   mq9:'<g fill="#F6C177"><rect x="-22" y="-3" width="44" height="2.8" rx="1.3"/><rect x="-2" y="-12" width="4" height="24" rx="2"/><path d="M0 10 L-7 16 L-6 17 L0 13 L6 17 L7 16Z"/></g>'};
+// the aircraft as a chip: its silhouette and its short name (results card, leaderboard rows)
+const AC_TAG={cessna:'C172',alpha:'Alpha',f16:'F-16C',reaper:'MQ-9A',mq9b:'MQ-9B',c130:'C-130H'};
+const AC_SIL={cessna:'cessna',alpha:'cessna',f16:'f16',reaper:'mq9',mq9b:'mq9',c130:'c130'};
+const acIcon=t=>SIL[AC_SIL[t]]?'<svg class="acI" viewBox="-23 -18 46 36" aria-hidden="true">'+SIL[AC_SIL[t]]+'</svg>':'';
+const acTag=t=>AC_TAG[t]?'<span class="acTag">'+acIcon(t)+'<b>'+AC_TAG[t]+'</b></span>':'';
 const ICO_PARTS={
   chute:'<g><path d="M-9 0 A9 8 0 0 1 9 0 Z" fill="#D98A3D"/><path d="M-9 0 L-1.5 11 M9 0 L1.5 11 M0 0 L0 11" stroke="#F6C177" stroke-width=".9"/><rect x="-3" y="11" width="6" height="5" rx="1" fill="#A8592A" stroke="#F6C177" stroke-width=".8"/></g>',
   watch:'<g><circle r="8" fill="none" stroke="#D98A3D" stroke-width="2.2"/><rect x="-1.6" y="-12" width="3.2" height="3" rx="1" fill="#D98A3D"/><path d="M0 0 L0-5.2 M0 0 L3.6 2" stroke="#F6C177" stroke-width="1.8" stroke-linecap="round"/></g>',
@@ -13500,11 +13734,34 @@ function wreckUpdate(dt){
 }
 // the tick's crash path: records, the tower call, the fireball, the pieces, the wreck camera
 function onCrash(){
-  resCloseAll();hapPattern('crash');
+  resCloseAll();hapPattern('crash');const les=!!LES.on;
   if(LES.on){const k=(acType==='alpha'?'alpha':'cessna')+':'+LES.on;if(!schoolBest[k]){schoolBest[k]='F';try{localStorage.setItem('kgeuSchool',JSON.stringify(schoolBest));}catch(e){}}lesEnd();}
-  crashBegin();
+  crashBegin();if(!les)wastedStart();
   say(REGION.az?'Glendale Tower 121.0':BASES[BASE0].twr,'Crash, crash, crash. Emergency vehicles are rolling.',['t_crash']);
 }
+// ---- WASTED: about 0.25x for 2.5 s while the picture goes black and white and the explosion plays out,
+// then the word for 1.5 s, then the crash card. Real time drives it (a long frame still counts), so it
+// takes the same 4 s at 60 fps and in the 3 fps test harness. Not in Flight School lessons. Tap skips.
+const WST={on:false,t:0,txt:false,skips:0,off:false},WST_SLOW=2.5,WST_HOLD=1.5,WST_SCALE=0.25;
+const wastedEl=$('wasted');
+function wastedStart(){if(WST.off)return;WST.on=true;WST.t=0;WST.txt=false;wastedEl.classList.remove('txt');document.body.classList.add('wastedOn');}
+// the frame's time scale: called with the real frame time from tick()
+function wastedSlow(d,rdt){
+  if(!WST.on)return d;
+  WST.t+=Math.min(rdt,0.5);
+  if(!WST.txt&&WST.t>=WST_SLOW){WST.txt=true;wastedEl.classList.add('txt');hapPattern('crash');}
+  if(WST.t>=WST_SLOW+WST_HOLD){wastedEnd(true);return d;}
+  // ease back to full speed over the last 0.4 s of the slow part, so the fire does not jump
+  const k=WST.t<WST_SLOW-0.4?WST_SCALE:WST.t<WST_SLOW?lerp(WST_SCALE,1,(WST.t-(WST_SLOW-0.4))/0.4):1;
+  return d*k;
+}
+function wastedEnd(card){
+  if(!WST.on&&!document.body.classList.contains('wastedOn'))return;
+  WST.on=false;wastedEl.classList.remove('txt');document.body.classList.remove('wastedOn');
+  if(card&&CRASH.on&&!CRASH.card)crashCardShow();
+}
+function crashCardShow(){CRASH.card=true;crashEl.classList.add('on');crashTopEl.classList.remove('on');}
+wastedEl.addEventListener('pointerdown',e=>{e.preventDefault();if(WST.on){WST.skips++;wastedEnd(true);}});
 function crashBegin(){
   const P=CRASH_FX[AC.id]||CRASH_FX.cessna,C=CRASH;
   wreckClear();
@@ -13541,7 +13798,7 @@ function crashTick(dt){
     if(C.stage<P.stages.length){explode(x,y,z,{scale:g[2],smokeSec:30,debris:4,glow:false,baseFade:0.14,boomDelay:camera.position.distanceTo(_wt.set(x,y,z))/340});fxLast=C.main;}
     else fxMini(x,y,z,g[2]);
     C.fireballs++;}
-  if(!C.card&&t>=C.cardAt){C.card=true;crashEl.classList.add('on');crashTopEl.classList.remove('on');}
+  if(!C.card&&t>=C.cardAt&&!WST.on)crashCardShow();   // WASTED holds the card until it is done
   if(C.shake>0)C.shake=Math.max(0,C.shake-dt);
 }
 // after impact the camera stops riding the airframe and settles about 3.5 airframe lengths off
@@ -13566,6 +13823,7 @@ function crashCam(dt){
 function wreckClear(){for(const p of WRK){p.life=0;p.g.visible=false;p.fl.visible=false;}}
 // a new flight: the wreck, its fire and smoke go, the card goes
 function crashClear(){
+  wastedEnd(false);
   crashEl.classList.remove('on');crashTopEl.classList.remove('on');document.body.classList.remove('crashOn');
   if(!CRASH.on)return;
   CRASH.on=CRASH.cam=CRASH.card=false;wreckClear();fxClear();fireClear();debrisClear();
@@ -14014,8 +14272,8 @@ function sensorAP(){
   toast('AUTOPILOT ENGAGED',2);
 }
 // ---------- main loop ----------
-function resize(){const w=window.innerWidth,h=window.innerHeight;renderer.setSize(w,h,false);glcH=glc.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();sizeMap();fmSize();FM.prepT=0;if(FM.on){lblUI();fmDraw();}}
-window.addEventListener('resize',resize);resize();
+function resize(){const w=window.innerWidth,h=window.innerHeight;VP.w=w;VP.h=h;renderer.setSize(w,h,false);glcH=glc.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();sizeMap();fmSize();FM.prepT=0;if(FM.on){lblUI();fmDraw();}}
+window.addEventListener('resize',()=>{resize();relayoutSoon();});window.__glReady=1;resize();
 const hudSens=$('sensorHud');let sensOn=false;const hIas=$('hIas'),hAlt=$('hAlt'),hWindT=$('hWindT'),hWindA=$('hWindA'),hAp=$('hAp'),bAuto=$('bAuto'),bAutoT=$('bAutoT'),warnEl=$('warn'),hVs=$('hVs'),hHdg=$('hHdg');
 const APN={to:'AUTO T/O',hold:'ALT HOLD',land:'AUTOLAND',orbit:'ORBIT'},APP={climb:'CLIMB',nav:'NAV',loc:'FINAL',orb:'DESCEND'};
 const _cf=new V3(),_cu=new V3(),_co=new V3(),_ct=new V3(),_eu=new THREE.Euler(0,0,0,'YXZ');
@@ -14032,9 +14290,12 @@ function frame(t){
   if(!loopHeld)tick(t);
 }
 function tick(t,skipRender){
+  // a size change iOS sent no event for, and flight controls that could not be dealt yet (phone3 item 5)
+  if(window.innerWidth!==VP.w||window.innerHeight!==VP.h)relayout();
+  if(running&&!VP.ctl)VP.ctl=layoutCtl(true);
   // never negative: a released test hold can leave last a hair ahead of the next rAF stamp,
   // and a negative step walks the traffic paths below 0
-  const rdt=Math.max(0,(t-last)/1000),dt=dfSlow(Math.min(0.1,rdt));last=t;const ts=t/1000;   // dfSlow: the dogfight kill cam's quarter speed
+  const rdt=Math.max(0,(t-last)/1000),dt=wastedSlow(dfSlow(Math.min(0.1,rdt)),rdt);last=t;const ts=t/1000;   // dfSlow: the dogfight kill cam's quarter speed
   // a long gap (stutter): snap the camera; dt is capped at 0.1 s so at most 12 substeps run (hidden tab pauses via visibilitychange)
   const gap=rdt>0.25;if(gap)snapCamera=true;
   sensorMode=camMode===2&&hasBall()&&!st.onGround&&!!st.ap&&running&&!paused&&!st.crashed;
@@ -14061,7 +14322,7 @@ function tick(t,skipRender){
     if(ev.type==='liftoff') clusters.forEach(c=>{if(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)<1500){c.cheer=4;}});
   }
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.classList.remove('on');}
-  missUpdate(dt);dzUpdate(dt);if(running&&!paused)arcTick();dfTick(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);if(LB)LB.frame();
+  missUpdate(dt);dzUpdate(dt);if(running&&!paused)arcTick();apprTick();dfTick(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);if(LB)LB.frame();
   {const show=!rookie()&&camMode===1&&(AC.id==='cessna'||AC.id==='alpha')&&running&&!st.crashed;
    if(spCan){spCan.classList.toggle('on',show);if(show)drawSixPack();}}
   radioUpdate(dt);cfgUpdate(dt);resTick(dt);
@@ -14177,7 +14438,7 @@ function tick(t,skipRender){
 // it switched off, so nothing is fetched and no request can fail in their console.
 var LB=null;
 LB=(function(){
-const APP_VER='2026-10-03-dogfight';          // keep version.json in step when shipping
+const APP_VER='2026-10-06-phone3';          // keep version.json in step when shipping
   const ORIGINS=['https://rabahharchaoui-design.github.io','http://localhost:8765'];
   let over='';try{over=localStorage.getItem('kgeuLBUrl')||'';}catch(e){}
   const E={url:over||'https://pfs-scores.rabahharchaoui.workers.dev',enabled:!!over||ORIGINS.includes(location.origin),online:null,
@@ -14219,6 +14480,8 @@ const APP_VER='2026-10-03-dogfight';          // keep version.json in step when 
   const fmtS=(b,v)=>{const B=BOARDS[b];if(v==null)return '';if(B.fmt==='time'){const m=Math.floor(v/60),s=v-m*60;return m+':'+(s<10?'0':'')+s.toFixed(1);}
     if(B.fmt==='m')return (Math.round(v*10)/10)+' m';if(B.fmt==='n')return num(v)+' '+(B.unit||'');return num(v)+' pts';};
   const AC_SHORT={cessna:'C172',alpha:'Alpha',f16:'F-16',reaper:'MQ-9A',mq9b:'MQ-9B',c130:'C-130'};
+  // the aircraft on a board row: the silhouette and the short name, the same chip as the results card
+  const lbAc=t=>AC_TAG[t]?acIcon(t)+'<b>'+AC_TAG[t]+'</b>':'';
 
   // ---- ranks from XP; the server keeps the XP, this only draws it
   const RANKS=[['Nugget',0],['Wingman',300],['Flight Lead',1200],['Instructor Pilot',3500],['Weapons School',8000],['Top Gun',16000]];
@@ -14590,13 +14853,15 @@ const APP_VER='2026-10-03-dogfight';          // keep version.json in step when 
     $('lbCs').innerHTML=E.P?csTag(E.P.cs,rankIdx(E.P.xp||0),E.P.creator):'';
     lbFetch(false);
   }
+  // a tap on a row reads it out in full (a 12 letter callsign is cut on a narrow phone; nothing hovers on a phone)
+  ['lbRowsIn','lbMe'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('click',ev=>{const r=ev.target.closest('.lbRow[data-full]');if(r)toast(r.dataset.full,3);});});
   function lbRows(j){
     const inn=$('lbRowsIn'),me=$('lbMe'),B=BOARDS[V.b];
     if(!j){inn.innerHTML='<div class="lbMsg"><b>Offline</b>Leaderboards need a connection. Runs you fly now are saved and sent when you are back online.</div>';me.innerHTML='';$('lbTotal').textContent='';return;}
-    const mine=E.P?E.P.cs:'';
-    inn.innerHTML=j.rows.length?j.rows.map(r=>'<div class="lbRow'+(r.cs===mine?' me':'')+(r.r===1?' top1':'')+'"><span class="n">'+r.r+'</span><span class="c">'+csTag(r.cs,rankByName(r.rank),r.creator)+'</span>'+lbMode(r.mode)+'<span class="s">'+esc(fmtS(V.b,r.score))+'</span><span class="a">'+esc(AC_SHORT[r.ac]||'')+'</span></div>').join('')
+    const mine=E.P?E.P.cs:'',myRow=j.rows.find(r=>r.cs===mine),myAc=j.me&&(j.me.ac||myRow&&myRow.ac);
+    inn.innerHTML=j.rows.length?j.rows.map(r=>'<div class="lbRow'+(r.cs===mine?' me':'')+(r.r===1?' top1':'')+'" data-full="'+esc(r.cs+'  ·  #'+num(r.r)+'  ·  '+fmtS(V.b,r.score)+'  ·  '+(AC_TAG[r.ac]||'')+'  ·  '+(r.mode==='easy'?'Easy':'Hard'))+'"><span class="n">'+num(r.r)+'</span><span class="c">'+csTag(r.cs,rankByName(r.rank),r.creator)+'</span>'+lbMode(r.mode)+'<span class="s">'+esc(fmtS(V.b,r.score))+'</span><span class="a">'+lbAc(r.ac)+'</span></div>').join('')
       :'<div class="lbMsg"><b>No scores yet</b>'+(V.p==='today'?'Nobody has flown this one today. ':'')+'Be the first on the board.</div>';
-    me.innerHTML=j.me?'<div class="lbRow me"><span class="n">#'+num(j.me.r)+'</span><span class="c">'+csTag(j.me.cs,rankByName(j.me.rank),j.me.creator,'of '+num(j.total))+'</span>'+lbMode(j.me.mode)+'<span class="s">'+esc(fmtS(V.b,j.me.score))+'</span><span class="a">YOU</span></div>'
+    me.innerHTML=j.me?'<div class="lbRow me" data-full="'+esc(j.me.cs+'  ·  #'+num(j.me.r)+' of '+num(j.total)+'  ·  '+fmtS(V.b,j.me.score))+'"><span class="n">#'+num(j.me.r)+'</span><span class="c">'+csTag(j.me.cs,rankByName(j.me.rank),j.me.creator,'of '+num(j.total))+'</span>'+lbMode(j.me.mode)+'<span class="s">'+esc(fmtS(V.b,j.me.score))+'</span><span class="a">'+(myAc&&AC_TAG[myAc]?lbAc(myAc):'YOU')+'</span></div>'
       :E.P?'<div class="lbRow me"><span class="n">&ndash;</span><span class="c">'+csTag(E.P.cs,rankIdx(E.P.xp||0),E.P.creator,'no score '+(V.p==='today'?'today':V.p==='week'?'this week':'yet'))+'</span><span class="s"></span><span class="a">YOU</span></div>'
       :'<div class="lbRow me"><span class="c"><span>Pick a callsign in Settings to get on the boards</span></span></div>';
     $('lbTotal').textContent=num(j.total)+' pilot'+(j.total===1?'':'s');
@@ -14635,12 +14900,17 @@ const APP_VER='2026-10-03-dogfight';          // keep version.json in step when 
 
   // ---- start up: see if the Worker answers; ask for a callsign after the splash if there is none
   function boot(){
+    window.__kgeu.APP_VER=APP_VER;
     fameBuild();ui();paintAll();
     // no service worker, so the page itself checks it is the newest build: version.json is
     // fetched past every cache and a stale copy reloads once, before any flight starts
     if(location.origin===ORIGINS[0])fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(r=>r.json()).then(j=>{
       if(!j||!j.v||j.v===APP_VER||running)return;let k='';try{k=sessionStorage.getItem('kgeuVer')||'';sessionStorage.setItem('kgeuVer',j.v);}catch(e){}
       if(k!==j.v)location.reload();}).catch(()=>{});
+    // offline (phone3 item 8): the service worker, on the real origins (and ?sw=1 for the offline test); a new
+    // APP_VER is a new worker URL, so each version installs, takes over and keeps its own cache
+    if('serviceWorker' in navigator&&(ORIGINS.indexOf(location.origin)>=0||/[?&]sw=1\b/.test(location.search)))
+      navigator.serviceWorker.register('sw.js?v='+encodeURIComponent(APP_VER)).catch(()=>{});
     if(!E.enabled)return;
     api('/health',null,7000).then(()=>{
       if(!E.P){const wait=()=>{const s=$('splash');if(s&&!s.classList.contains('done')){setTimeout(wait,150);return;}if(!E.P)csOpen('pick','launch');else csRelease();};wait();}
@@ -14666,7 +14936,8 @@ const APP_VER='2026-10-03-dogfight';          // keep version.json in step when 
     get P(){return E.P;}};
 })();
 
-window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
+window.__kgeu={resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
+    const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
   lights:()=>({KGEU:AL.KGEU.count(),KLUF:AL.KLUF.count(),uLights:AL_MAT.uniforms.uLights.value,
     layers:AL_LAYERS.map(L=>({name:L.pts&&L.pts.name,visible:!!(L.pts&&L.pts.visible),inScene:!!(L.pts&&L.pts.parent)})),

@@ -39,6 +39,9 @@ async def page(b, url, vp=IPHONE_SE, storage=None, touch=True):
     if storage is not None:
         await ctx.add_init_script('(()=>{if(sessionStorage.getItem("__seeded"))return;sessionStorage.setItem("__seeded","1");localStorage.clear();'
             + ''.join(f'localStorage.setItem({k!r},{v!r});' for k, v in storage.items()) + '})()')
+    if os.environ.get('PFS_SWITCH'):   # stand in iOS's <input switch>: the haptic labels go over every control (phone3 item 6)
+        await ctx.add_init_script("Object.defineProperty(Navigator.prototype,'vibrate',{configurable:true,value:undefined});"
+            "Object.defineProperty(HTMLInputElement.prototype,'switch',{configurable:true,get(){return this.hasAttribute('switch');},set(v){}});")
     await pg.goto(url)
     await pg.wait_for_function('()=>window.__kgeu', timeout=30000)
     await splash_gone(pg)
