@@ -1,6 +1,6 @@
 # Phone2 item 1: the post run results card. Every run end (free flight landing, challenge,
 # lesson, mission, strike) gets one card: letter grade, score, key stats, the board line, and
-# two buttons, CONTINUE and MAIN MENU. It slides in once the aircraft has stopped (or when the
+# three buttons (phone3 item 2): RETRY <the run>, CONTINUE IN FREE FLIGHT, MAIN MENU, and the aircraft flown. It slides in once the aircraft has stopped (or when the
 # run ends in the air). Free flight: brief, never pauses, goes on its own, the stick and
 # throttle beside it still work; a touch and go shows no card. Fits 844x390 and 568x320 and
 # portrait 390x844 with 44 px targets. Screenshots: overnight-screenshots/phone2/item1/.
@@ -14,6 +14,7 @@ SHOTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'overnigh
 CARD = """(id)=>{const o=document.getElementById(id),q=s=>o.querySelector(s);return {on:o.classList.contains('on'),brief:o.classList.contains('brief'),
   letter:q('.gLetter').textContent,title:q('.sub').textContent,score:q('.rScore').textContent,lines:q('.rLines').innerText,
   btns:[...o.querySelectorAll('.rBtns button')].map(b=>b.textContent),links:[...o.querySelectorAll('.rLinks button')].filter(b=>!b.hidden).map(b=>b.textContent),
+  who:(q('.rWho')||{}).textContent||'',ico:!!(q('.rWho .acI')),
   paused:window.__kgeu.paused(),running:window.__kgeu.running()}}"""
 FIT = """(sel)=>{const s=document.querySelector(sel);const W=innerWidth,H=innerHeight;const bad=[];
   s.querySelectorAll('button').forEach(e=>{const r=e.getBoundingClientRect();if(!r.width||e.hidden)return;
@@ -62,8 +63,9 @@ async def main():
         ok('letter grade, score and title', c['letter'] in 'ABCDF' and 'pts' in c['score'] and 'Free flight landing' in c['title'], (c['letter'], c['score'], c['title']))
         for k in ('Sink rate', 'Airspeed', 'centreline', 'aim point', 'Flight time'):
             ok('stat: ' + k, k in c['lines'], c['lines'].replace('\n', ' | ')[:160])
-        ok('CONTINUE and MAIN MENU', c['btns'] == ['CONTINUE', 'MAIN MENU'], c['btns'])
-        ok('Fly again and Records as links', c['links'] == ['Fly again', 'Records'], c['links'])
+        ok('RETRY <run>, CONTINUE IN FREE FLIGHT, MAIN MENU', c['btns'] == ['RETRY 3 MI FINAL', 'CONTINUE IN FREE FLIGHT', 'MAIN MENU'], c['btns'])
+        ok('Records as a link', c['links'] == ['Records'], c['links'])
+        ok('the aircraft flown on the card: silhouette and C172', c['ico'] and 'C172' in c['who'], c['who'])
         bad = await pg.evaluate(FIT, '#landOv')
         ok('fits 844x390 with 44 px targets', not bad, bad)
         await pg.screenshot(path=f'{SHOTS}/free_landing_844x390.png')
@@ -122,7 +124,8 @@ async def main():
         c = await pg.evaluate(CARD, 'arcOv')
         ok('challenge: results card, paused', c['on'] and not c['brief'] and c['paused'], c)
         ok('challenge: letter, score, time and touchdown stats', c['letter'] in 'ABCDF' and 'pts' in c['score'] and 'Time' in c['lines'] and 'Touchdown' in c['lines'] and 'Centreline' in c['lines'], c['lines'].replace('\n', ' | ')[:200])
-        ok('challenge: CONTINUE, MAIN MENU and Try again', c['btns'] == ['CONTINUE', 'MAIN MENU'] and c['links'] == ['Try again'], (c['btns'], c['links']))
+        ok('challenge: RETRY 1 MI FINAL, CONTINUE IN FREE FLIGHT, MAIN MENU', c['btns'] == ['RETRY 1 MI FINAL', 'CONTINUE IN FREE FLIGHT', 'MAIN MENU'] and c['links'] == [], (c['btns'], c['links']))
+        ok('challenge: the aircraft on the card', c['ico'] and c['who'].strip() != '', c['who'])
         bad = await pg.evaluate(FIT, '#arcOv')
         ok('challenge card fits 844x390', not bad, bad)
         await pg.screenshot(path=f'{SHOTS}/challenge_844x390.png')
@@ -139,7 +142,7 @@ async def main():
         if not c['on']:   # the stall lesson needs the pilot (school_check flies lesson 1 to its card): open the card the way grade() does
             await pg.evaluate(f"()=>{K}.resOpen(document.getElementById('gradeOv'),{{letter:'B',title:'Flight school: Power off stall',score:'84 of 100',lines:'<div class=ok>Held the heading</div><div class=no>Lost 400 ft</div>',board:'lesson:stall'}})")
             await pg.wait_for_timeout(300); c = await pg.evaluate(CARD, 'gradeOv')
-        ok('lesson: the same card, paused', c['on'] and c['paused'] and c['btns'] == ['CONTINUE', 'MAIN MENU'], c)
+        ok('lesson: the same card, paused', c['on'] and c['paused'] and c['btns'] == ['RETRY STALL', 'CONTINUE IN FREE FLIGHT', 'MAIN MENU'], c)
         bad = await pg.evaluate(FIT, '#gradeOv')
         ok('lesson card fits 844x390', not bad, bad)
         await pg.screenshot(path=f'{SHOTS}/lesson_844x390.png')
@@ -151,7 +154,7 @@ async def main():
         await pg.evaluate(f"()=>{{const K={K},s=K.state();s.pos.x=K.DROPZ.x+260;s.pos.z=K.DROPZ.z;}}"); await pg.wait_for_timeout(500)
         await pg.evaluate(f"()=>{K}.missDrop()"); await pg.evaluate(f"()=>{K}.missTick(4000,1/60)"); await pg.wait_for_timeout(500)
         c = await pg.evaluate(CARD, 'missOv')
-        ok('airdrop: the results card with distance, paused', c['on'] and c['paused'] and ' m' in c['score'] and 'Distance' in c['lines'] and c['btns'] == ['CONTINUE', 'MAIN MENU'], c)
+        ok('airdrop: the results card with distance, paused', c['on'] and c['paused'] and ' m' in c['score'] and 'Distance' in c['lines'] and c['btns'] == ['RETRY AIRDROP', 'CONTINUE IN FREE FLIGHT', 'MAIN MENU'] and 'C-130H' in c['who'], c)
         bad = await pg.evaluate(FIT, '#missOv')
         ok('mission card fits 844x390', not bad, bad)
         await pg.screenshot(path=f'{SHOTS}/airdrop_844x390.png')

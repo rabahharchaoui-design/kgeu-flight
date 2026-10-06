@@ -495,9 +495,19 @@ body.lookOn:not(.touch) #badges{ top:calc(var(--padT) + var(--icon) + 80px); }
 .rLines .lbLine.wait b{ color:var(--soft); font-weight:500; }
 .rLines .ok,.rLines .no{ grid-column:1 / -1; }
 .rLines .ok::before{ content:'\2713  '; color:#4cd97b; font-weight:800; } .rLines .no::before{ content:'\2717  '; color:var(--warn); font-weight:800; }
-.rBtns{ gap:10px; flex-wrap:nowrap; } .rBtns button{ flex:1 1 0; min-height:48px; min-width:0; white-space:nowrap; }
-.rBtns .primary.big{ font-size:19px; letter-spacing:.06em; padding:8px 12px; }
-.rBtns .menuB{ font-size:16px; font-weight:800; letter-spacing:.04em; background:rgba(255,255,255,.08); }
+.rBtns{ gap:10px; flex-wrap:nowrap; align-items:stretch; } .rBtns button{ flex:1 1 0; min-height:48px; min-width:0; line-height:1.1; white-space:normal; overflow-wrap:anywhere;
+  transition:transform .12s cubic-bezier(.23,1,.32,1); }
+.rBtns button:active{ transform:scale(.97); }
+/* RETRY <the run> leads, CONTINUE IN FREE FLIGHT next, MAIN MENU last and quietest */
+.rBtns .primary.big{ flex:1.45 1 0; font-size:17px; letter-spacing:.04em; padding:6px 10px; }
+.rBtns .rCont{ flex:1.25 1 0; font-size:14px; font-weight:800; letter-spacing:.03em; padding:6px 8px; background:rgba(246,193,119,.14); color:var(--sand); border:1.5px solid rgba(246,193,119,.35); }
+.rBtns .menuB{ flex:.85 1 0; font-size:14px; font-weight:800; letter-spacing:.04em; padding:6px 8px; background:rgba(255,255,255,.08); }
+/* the aircraft flown and the callsign, so a screenshot of the card proves what flew */
+.rWho{ margin:3px 0 0; display:flex; align-items:center; gap:8px; min-width:0; font-size:13px; line-height:1.2; }
+.acTag{ flex:none; display:inline-flex; align-items:center; gap:5px; padding:2px 8px 2px 5px; border-radius:7px; background:rgba(246,193,119,.14); border:1px solid rgba(246,193,119,.3); color:var(--sand); font-weight:800; letter-spacing:.04em; white-space:nowrap; }
+.acI{ width:22px; height:17px; flex:none; display:block; } .acI *{ fill:currentColor; }
+.rCs{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:800; letter-spacing:.08em; color:var(--soft); }
+@media (max-width:520px){ .rBtns{ flex-wrap:wrap; } .rBtns .primary.big{ flex:1 1 100%; } }
 .rLinks{ display:flex; gap:0 12px; flex-wrap:wrap; justify-content:center; margin-top:2px; }
 .rLinks button{ background:none; border:none; min-height:44px; padding:4px 10px; font-size:15px; font-weight:700; color:#F6C177; text-decoration:underline; text-underline-offset:3px; }
 .rLinks button[hidden]{ display:none; }
@@ -982,12 +992,13 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 .lbRow .c span{ overflow:hidden; text-overflow:ellipsis; }
 .lbRow .s{ flex:none; font-weight:900; font-variant-numeric:tabular-nums; }
 .lbRow .modeTag{ flex:none; margin:0 -4px 0 0; white-space:nowrap; padding:1px 5px; border-radius:5px; font-size:10px; line-height:1.3; letter-spacing:.06em; vertical-align:0; }
-.lbRow .a{ flex:none; width:4.2em; font-size:13px; color:#d9b98c; text-align:right; }
+.lbRow .a{ flex:none; width:5.6em; font-size:13px; color:#d9b98c; display:flex; align-items:center; justify-content:flex-end; gap:4px; white-space:nowrap; }
+.lbRow .a b{ font-weight:800; } .lbRow .a .acI{ width:18px; height:14px; }
 .lbRow.me{ background:var(--sand); color:var(--night); border-radius:10px; border:none; }
 .lbRow.me .n,.lbRow.me.top1 .n{ color:var(--rust); } .lbRow.me .a{ color:var(--brown); }
 .lbRow.top1 .n{ color:#ffd257; }
 /* narrow boards (SE landscape, any portrait): tighter rows so the callsign keeps room beside the EASY/HARD chip */
-@media (max-width:700px){ .lbRow{ gap:6px; padding:0 6px; font-size:16px; } .lbRow .n{ width:auto; min-width:1.4em; } .lbRow .a{ width:3.4em; font-size:12px; } }
+@media (max-width:700px){ .lbRow{ gap:6px; padding:0 6px; font-size:16px; } .lbRow .n{ width:auto; min-width:1.4em; } .lbRow .a{ width:4.9em; font-size:12px; } }
 /* portrait: the board list becomes one scrolling line above the board, which gets the full width */
 @media (orientation:portrait){
   #menu .modeCards{ flex-direction:column; gap:8px; }
@@ -1372,8 +1383,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 <div class="overlay res" id="arcOv" role="dialog" aria-label="Results"><div class="sheet">
   <div class="rHead"><p class="gLetter" id="aLetter">A</p><div class="rT"><p class="sub" id="aTitle"></p><p class="rScore" id="aScore"></p><p class="aStars" id="aStars"></p></div></div>
   <div class="rLines" id="aLines"></div>
-  <div class="row rBtns"><button class="primary big" id="aFree">CONTINUE</button><button class="menuB" id="aHub">MAIN MENU</button></div>
-  <div class="rLinks"><button id="aRetry">Try again</button></div>
+  <div class="row rBtns"><button class="primary big rRetry" id="aRetry">RETRY</button><button class="rCont" id="aFree">CONTINUE IN FREE FLIGHT</button><button class="menuB" id="aHub">MAIN MENU</button></div>
 </div></div>
 <div class="overlay" id="dfBrief" role="dialog" aria-label="Red Flag Dogfight briefing"><div class="sheet">
   <h3>RED FLAG DOGFIGHT<span class="modeTag" id="dfbMode"></span></h3>
@@ -1386,14 +1396,14 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 <div class="overlay res" id="gradeOv" role="dialog" aria-label="Lesson results"><div class="sheet">
   <div class="rHead"><p class="gLetter" id="gLetter">A</p><div class="rT"><p class="sub" id="gTitle"></p><p class="rScore" id="gScore"></p></div></div>
   <div class="rLines" id="gLines"></div>
-  <div class="row rBtns"><button class="primary big" id="gFree">CONTINUE</button><button class="menuB" id="gSchool">MAIN MENU</button></div>
-  <div class="rLinks"><button id="gNext">Next lesson</button><button id="gRetry">Try again</button></div>
+  <div class="row rBtns"><button class="primary big rRetry" id="gRetry">RETRY</button><button class="rCont" id="gFree">CONTINUE IN FREE FLIGHT</button><button class="menuB" id="gSchool">MAIN MENU</button></div>
+  <div class="rLinks"><button id="gNext">Next lesson</button></div>
 </div></div>
 <div class="overlay res" id="landOv" role="dialog" aria-label="Landing results"><div class="sheet">
   <div class="rHead"><p class="gLetter" id="lLetter">A</p><div class="rT"><p class="sub" id="lTitle"></p><p class="rScore" id="lScore"></p></div></div>
   <div class="rLines" id="lLines"></div>
-  <div class="row rBtns"><button class="primary big" id="lKeep">CONTINUE</button><button class="menuB" id="lMenu">MAIN MENU</button></div>
-  <div class="rLinks"><button id="lAgain">Fly again</button><button id="lRec">Records</button></div>
+  <div class="row rBtns"><button class="primary big rRetry" id="lAgain">RETRY</button><button class="rCont" id="lKeep">CONTINUE IN FREE FLIGHT</button><button class="menuB" id="lMenu">MAIN MENU</button></div>
+  <div class="rLinks"><button id="lRec">Records</button></div>
 </div></div>
 <div class="overlay" id="recOv"><div class="sheet">
   <p class="reg">Records</p>
@@ -1403,8 +1413,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 <div class="overlay res" id="missOv" role="dialog" aria-label="Mission results"><div class="sheet">
   <div class="rHead"><p class="gLetter" id="mLetter">A</p><div class="rT"><p class="sub" id="mTitle"></p><p class="rScore" id="mScore"></p></div></div>
   <div class="rLines" id="mLines"></div>
-  <div class="row rBtns"><button class="primary big" id="mFree">CONTINUE</button><button class="menuB" id="mMenu">MAIN MENU</button></div>
-  <div class="rLinks"><button id="mRetry">Try again</button></div>
+  <div class="row rBtns"><button class="primary big rRetry" id="mRetry">RETRY</button><button class="rCont" id="mFree">CONTINUE IN FREE FLIGHT</button><button class="menuB" id="mMenu">MAIN MENU</button></div>
 </div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -8687,7 +8696,7 @@ function onLanding(e){
   const dashL=dash?(dash.secs<=150?'A':dash.secs<=180?'B':dash.secs<=210?'C':dash.secs<=240?'D':'F'):null;
   resFill(landOv,{letter:dash?dashL:g.letter,title:(dash?'Luke to Glendale dash, ':seg?(st.spawn==='final1'?'1 mile final segment, ':'3 mile final segment, '):free?'Free flight landing, ':'Landing, ')+g.where+
     (g.xw>=10?'  ('+Math.round(g.xw)+' kt crosswind)':''),score:dash?fmtT(dash.secs):g.pts+' pts',sub:dash?g.letter+' landing, '+g.pts+' pts':g.line,
-    lines:rows.join(''),board:dash?'mission:dash':free?'free:landing':''});
+    lines:rows.join(''),board:dash?'mission:dash':free?'free:landing':'',retry:dash?'LUKE DASH':''});
   if(free||dash)resArm(()=>{if(!landOv.classList.contains('on')&&!menu.classList.contains('on')&&!pauseOv.classList.contains('on'))resShow(landOv,!seg);},20,true);
   // the full breakdown also goes to Records; the flight carries on through the rollout
   SCORE.recent=(SCORE.recent||[]);SCORE.recent.unshift({ac:AC.name,letter:g.letter,pts:g.pts,where:g.where,line:g.line,mode:runMode(),
@@ -8938,6 +8947,9 @@ function resFill(ov,o){
   const box=ov.querySelector('.rLines');
   box.innerHTML=o.lines!=null?o.lines:(o.stats||[]).map(l=>'<div class="gl"><span>'+resEsc(l[0])+'</span><b>'+resEsc(l[1])+'</b></div>').join('');
   ov.dataset.lb=o.board||'';
+  let who=ov.querySelector('.rWho');if(!who){who=document.createElement('p');who.className='rWho';ov.querySelector('.rT').appendChild(who);}
+  const cs=LB&&LB.E&&LB.E.P&&LB.E.P.cs;who.innerHTML=acTag(AC.id)+(cs?'<span class="rCs"></span>':'');if(cs)who.lastChild.textContent=cs;
+  const rb=ov.querySelector('.rRetry');if(rb)rb.textContent='RETRY '+(o.retry||runName());
   if(o.board&&LB&&LB.E.shown&&LB.E.shown.b===o.board)resBoard(LB.E.shown);
 }
 function resShow(ov,brief){
@@ -10284,7 +10296,7 @@ function arcResult(g,secs,right){
   const lb=arcBoard(ARC.kind);
   if(LB){if(pts>0)LB.runEnd(lb,pts,{secs:secs});else LB.runCancel(lb);}
   missHud(null);RES.kind='arc';
-  resOpen(arcOv,{letter:cl,title:name+': '+why,score:resNum(pts)+' pts',sub:AC.name,stars:stars,stats:stats,board:pts>0?lb:''});
+  resOpen(arcOv,{letter:cl,title:name+': '+why,score:resNum(pts)+' pts',stars:stars,stats:stats,board:pts>0?lb:''});
 }
 function arcStop(){if(ARC.on&&DEST===ARC.end){DEST=null;document.body.classList.remove('hasDest');destUI(true);}ARC.on=false;ARC.done=false;}
 function arcScore(id){
@@ -10592,7 +10604,7 @@ function dfEnd(why){
   if(DF.daily)stats.push(['Daily points',resNum(dp)+' (half the score)']);
   stats.push(['Best',B?resNum(B.pts)+' pts, '+B.kills+' kills'+(B.clr!=null?', '+dfClock(B.clr):''):'none yet']);
   resArm(()=>{if(!running||!DF.live)return;RES.kind='df';
-    resOpen(arcOv,{letter:letter,title:(DF.daily?'Daily dogfight: ':'Red Flag Dogfight: ')+DF_WHY[why]+(better?', new best':''),score:resNum(r.score)+' pts',sub:AC.name,stars:stars,stats:stats,board:send&&DF.lb?lb:''});},DF.won?3:2.2);   // time for the knock it off call
+    resOpen(arcOv,{letter:letter,title:(DF.daily?'Daily dogfight: ':'Red Flag Dogfight: ')+DF_WHY[why]+(better?', new best':''),score:resNum(r.score)+' pts',stars:stars,stats:stats,board:send&&DF.lb?lb:''});},DF.won?3:2.2);   // time for the knock it off call
 }
 // an achievement in the fight: listed for this run (DF.ach, every time it is earned) and granted (its first time, in the strip)
 function dfAch(id){if(DF.ach.indexOf(id)<0)DF.ach.push(id);achGrant(id);}
@@ -11269,6 +11281,14 @@ const menu=document.getElementById('menu'),crashEl=document.getElementById('cras
 // (final1 is not final), base and aircraft; an arcade game, lesson or dogfight goes back through its own
 // starter (arcStart, startLesson, dfStart), which sets its own position. Each starter stamps it after start().
 let RUNSTART={k:'free',mode:'runway',base:null,type:null};
+// the run's name on the results card's RETRY button: RETRY 1 MI FINAL, RETRY SHORT FIELD LANDING
+const RUN_NAMES={runway:'RUNWAY START',ramp:'RAMP START',final:'3 MI FINAL',final1:'1 MI FINAL',short:'SHORT FIELD LANDING',drop:'AIRDROP',range:'STRIKE RANGE',
+  landing:'LANDING CHALLENGE',landing1:'1 MI FINAL',daily:'DAILY CHALLENGE',first:'FIRST FLIGHT',steep:'STEEP TURNS',slow:'SLOW FLIGHT',stall:'STALL',engine:'ENGINE FAILURE',pattern:'PATTERN'};
+function runName(){const R=RUNSTART;
+  if(R.k==='arc')return R.kind==='apt'?String(REGION.base||'AIRPORT').toUpperCase()+' LANDING':RUN_NAMES[R.kind]||'CHALLENGE';
+  if(R.k==='les')return RUN_NAMES[R.id]||'LESSON';
+  if(R.k==='df')return R.daily?'DAILY DOGFIGHT':'DOGFIGHT';
+  return RUN_NAMES[R.mode]||'FLIGHT';}
 function runRestart(){const R=RUNSTART;
   if(R.k==='arc'){arcStart(R.kind);return;}
   if(R.k==='les'){startLesson(R.id);return;}
@@ -11870,6 +11890,11 @@ const SIL={
   f16:'<path fill="#F6C177" d="M0-16 L2.6-4 L14 6 L14 8.5 L2.6 6 L3.4 11 L7.5 14 L7.5 16 L0 14.5 L-7.5 16 L-7.5 14 L-3.4 11 L-2.6 6 L-14 8.5 L-14 6 L-2.6-4Z"/>',
   cessna:'<g fill="#F6C177"><rect x="-18" y="-6" width="36" height="4.5" rx="1.6"/><rect x="-2.2" y="-13" width="4.4" height="25" rx="2.2"/><rect x="-7" y="10" width="14" height="3.2" rx="1.4"/><rect x="-4" y="-14.5" width="8" height="1.6" rx=".8" fill="#D98A3D"/></g>',
   mq9:'<g fill="#F6C177"><rect x="-22" y="-3" width="44" height="2.8" rx="1.3"/><rect x="-2" y="-12" width="4" height="24" rx="2"/><path d="M0 10 L-7 16 L-6 17 L0 13 L6 17 L7 16Z"/></g>'};
+// the aircraft as a chip: its silhouette and its short name (results card, leaderboard rows)
+const AC_TAG={cessna:'C172',alpha:'Alpha',f16:'F-16C',reaper:'MQ-9A',mq9b:'MQ-9B',c130:'C-130H'};
+const AC_SIL={cessna:'cessna',alpha:'cessna',f16:'f16',reaper:'mq9',mq9b:'mq9',c130:'c130'};
+const acIcon=t=>SIL[AC_SIL[t]]?'<svg class="acI" viewBox="-23 -18 46 36" aria-hidden="true">'+SIL[AC_SIL[t]]+'</svg>':'';
+const acTag=t=>AC_TAG[t]?'<span class="acTag">'+acIcon(t)+'<b>'+AC_TAG[t]+'</b></span>':'';
 const ICO_PARTS={
   chute:'<g><path d="M-9 0 A9 8 0 0 1 9 0 Z" fill="#D98A3D"/><path d="M-9 0 L-1.5 11 M9 0 L1.5 11 M0 0 L0 11" stroke="#F6C177" stroke-width=".9"/><rect x="-3" y="11" width="6" height="5" rx="1" fill="#A8592A" stroke="#F6C177" stroke-width=".8"/></g>',
   watch:'<g><circle r="8" fill="none" stroke="#D98A3D" stroke-width="2.2"/><rect x="-1.6" y="-12" width="3.2" height="3" rx="1" fill="#D98A3D"/><path d="M0 0 L0-5.2 M0 0 L3.6 2" stroke="#F6C177" stroke-width="1.8" stroke-linecap="round"/></g>',
@@ -14231,6 +14256,8 @@ const APP_VER='2026-10-03-dogfight';          // keep version.json in step when 
   const fmtS=(b,v)=>{const B=BOARDS[b];if(v==null)return '';if(B.fmt==='time'){const m=Math.floor(v/60),s=v-m*60;return m+':'+(s<10?'0':'')+s.toFixed(1);}
     if(B.fmt==='m')return (Math.round(v*10)/10)+' m';if(B.fmt==='n')return num(v)+' '+(B.unit||'');return num(v)+' pts';};
   const AC_SHORT={cessna:'C172',alpha:'Alpha',f16:'F-16',reaper:'MQ-9A',mq9b:'MQ-9B',c130:'C-130'};
+  // the aircraft on a board row: the silhouette and the short name, the same chip as the results card
+  const lbAc=t=>AC_TAG[t]?acIcon(t)+'<b>'+AC_TAG[t]+'</b>':'';
 
   // ---- ranks from XP; the server keeps the XP, this only draws it
   const RANKS=[['Nugget',0],['Wingman',300],['Flight Lead',1200],['Instructor Pilot',3500],['Weapons School',8000],['Top Gun',16000]];
@@ -14605,10 +14632,10 @@ const APP_VER='2026-10-03-dogfight';          // keep version.json in step when 
   function lbRows(j){
     const inn=$('lbRowsIn'),me=$('lbMe'),B=BOARDS[V.b];
     if(!j){inn.innerHTML='<div class="lbMsg"><b>Offline</b>Leaderboards need a connection. Runs you fly now are saved and sent when you are back online.</div>';me.innerHTML='';$('lbTotal').textContent='';return;}
-    const mine=E.P?E.P.cs:'';
-    inn.innerHTML=j.rows.length?j.rows.map(r=>'<div class="lbRow'+(r.cs===mine?' me':'')+(r.r===1?' top1':'')+'"><span class="n">'+r.r+'</span><span class="c">'+csTag(r.cs,rankByName(r.rank),r.creator)+'</span>'+lbMode(r.mode)+'<span class="s">'+esc(fmtS(V.b,r.score))+'</span><span class="a">'+esc(AC_SHORT[r.ac]||'')+'</span></div>').join('')
+    const mine=E.P?E.P.cs:'',myRow=j.rows.find(r=>r.cs===mine),myAc=j.me&&(j.me.ac||myRow&&myRow.ac);
+    inn.innerHTML=j.rows.length?j.rows.map(r=>'<div class="lbRow'+(r.cs===mine?' me':'')+(r.r===1?' top1':'')+'"><span class="n">'+r.r+'</span><span class="c">'+csTag(r.cs,rankByName(r.rank),r.creator)+'</span>'+lbMode(r.mode)+'<span class="s">'+esc(fmtS(V.b,r.score))+'</span><span class="a">'+lbAc(r.ac)+'</span></div>').join('')
       :'<div class="lbMsg"><b>No scores yet</b>'+(V.p==='today'?'Nobody has flown this one today. ':'')+'Be the first on the board.</div>';
-    me.innerHTML=j.me?'<div class="lbRow me"><span class="n">#'+num(j.me.r)+'</span><span class="c">'+csTag(j.me.cs,rankByName(j.me.rank),j.me.creator,'of '+num(j.total))+'</span>'+lbMode(j.me.mode)+'<span class="s">'+esc(fmtS(V.b,j.me.score))+'</span><span class="a">YOU</span></div>'
+    me.innerHTML=j.me?'<div class="lbRow me"><span class="n">#'+num(j.me.r)+'</span><span class="c">'+csTag(j.me.cs,rankByName(j.me.rank),j.me.creator,'of '+num(j.total))+'</span>'+lbMode(j.me.mode)+'<span class="s">'+esc(fmtS(V.b,j.me.score))+'</span><span class="a">'+(myAc&&AC_TAG[myAc]?lbAc(myAc):'YOU')+'</span></div>'
       :E.P?'<div class="lbRow me"><span class="n">&ndash;</span><span class="c">'+csTag(E.P.cs,rankIdx(E.P.xp||0),E.P.creator,'no score '+(V.p==='today'?'today':V.p==='week'?'this week':'yet'))+'</span><span class="s"></span><span class="a">YOU</span></div>'
       :'<div class="lbRow me"><span class="c"><span>Pick a callsign in Settings to get on the boards</span></span></div>';
     $('lbTotal').textContent=num(j.total)+' pilot'+(j.total===1?'':'s');
