@@ -1860,6 +1860,17 @@ const TYPES={
     // outside Arizona (4.6b): the same without the field; flySub adds the region's runway and elevation
     sub2:'Pocket Air Boeing 737-800, N737PA. 174 seats, two CFM56s, blended winglets. Heavy and deliberate: plan every turn and every descent a long way ahead.',
     tips:'Manual: flaps 5, full power, rotate at 145 kt, gear up. Approach at 145 kt with flaps 30, about 750 fpm down final, a small flare at 30 ft.'},
+  // A320 published: MLW 64.5 t (60 t here), CFM56-5B4 2 x 120 kN, Vref full about 135 kt, VMO 350, conf 1+F, 2, FULL
+  a320:{id:'a320',name:'Airbus A320',title:'N320PA',mass:60000,S:122.6,Tstatic:240000,Pmax:1e9,eta:1,CL0:0.25,CLa:5.0,aStall:0.27,CD0:0.022,k:0.045,span:35.8,len:37.57,gear:3.6,
+    spool:4.0,pf:0,retract:1,wave:0,tipRoll:0.16,tipMsg:'Wingtip strike. Keep the wings level onto the runway.',gndPitch:0.12,trimBase:0.04,trimK:0.12,
+    flaps:[{deg:0,cl:0,cd:0},{deg:10,cl:0.30,cd:0.012},{deg:15,cl:0.55,cd:0.03},{deg:35,cl:0.95,cd:0.085}],toFlap:1,landFlap:3,finalFlap:2,finalThr:0.45,finalPitch:0.05,finalTrim:0.6,vr:140*KT,vy:250*KT,vcruise:280*KT,vapp:135*KT,patAlt:457,climbVS:12,descMax:10,
+    maxBank:0.52,ipD:9000,fafD:5500,slowD:4000,decel:0.5,ezG:0.2,ezGR:0.08,ezBank:0.45,thrC:0.55,flareH:9,flareK:0.22,tdSink:0.7,tdPitch:0.06,rotP:0.14,rotRate:0.045,apRate:[0.12,0.15,0.3],vne:350,vfe:177,snd:'fan',cam1:[-0.5,1.08,-13.5],cam1Name:'Flight deck',chase:[14,76],
+    minRwy:2400,athr:1,fd:1,heavy:1,
+    cs:'Pocket 320',csS:'Pocket 320',say:'Pocket three two zero',sayS:'Pocket three two zero',
+    sub:'Pocket Air Airbus A320, N320PA, at Phoenix Sky Harbor. 180 seats, two CFM56s, sharklets, fly by wire. Heavy and deliberate: plan every turn and every descent a long way ahead. Runway 7L is 11,489 ft, field elevation 1,135.',
+    // outside Arizona (4.6b): the same without the field; flySub adds the region's runway and elevation
+    sub2:'Pocket Air Airbus A320, N320PA. 180 seats, two CFM56s, sharklets, fly by wire. Heavy and deliberate: plan every turn and every descent a long way ahead.',
+    tips:'Manual: flaps 10, full power, rotate at 140 kt, gear up. Approach at 135 kt with full flap, about 700 fpm down final, a small flare at 30 ft.'},
   f16:{id:'f16',name:'F-16C Viper',title:'89-2032',mass:11000,S:27.87,Tstatic:95000,Pmax:1e9,eta:1,CL0:0.05,CLa:3.5,aStall:0.42,CD0:0.022,k:0.12,span:9.96,len:15,gear:1.72,
     spool:2.2,pf:0,retract:1,wave:0.06,tipRoll:0.35,tipMsg:'Wingtip strike. Level the wings before touchdown.',gndPitch:0.2,trimBase:0.08,trimK:0.18,
     flaps:[{deg:0,cl:0,cd:0},{deg:20,cl:0.55,cd:0.04}],toFlap:1,landFlap:1,finalFlap:1,finalThr:0.18,finalPitch:0.19,finalTrim:0.9,vr:145*KT,vy:300*KT,vcruise:300*KT,vapp:155*KT,patAlt:457,climbVS:22,descMax:12,
@@ -2564,6 +2575,7 @@ PROP_KIND.archer={n:2,R:0.965,r0:0.10,cR:0.075,cM:0.16,cT:0.09,bR:0.95,bT:0.30,i
 // turbofans: the fan face spins in the inlet and blurs with power
 PROP_KIND.a10={n:28,R:0.60,r0:0.11,cR:0.1,cM:0.1,cT:0.1,bR:0.3,bT:0.3,idle:18,max:70,base:'#2a2d30',rough:0.6,metal:0.5,bands:[],rings:[]};
 PROP_KIND.b737={n:24,R:0.80,r0:0.14,cR:0.1,cM:0.1,cT:0.1,bR:0.3,bT:0.3,idle:14,max:60,base:'#2a2d30',rough:0.6,metal:0.5,bands:[],rings:[]};
+PROP_KIND.a320={n:36,R:0.85,r0:0.15,cR:0.1,cM:0.1,cT:0.1,bR:0.3,bT:0.3,idle:14,max:60,base:'#2a2d30',rough:0.6,metal:0.5,bands:[],rings:[]};
 // n twisted blades about +Z, blade 0 along +X; chord in the disc plane, pitch about the blade axis
 function propBladeGeo(K){
   const R=K.R,r0=K.r0,E=0.002,col=new THREE.Color(),base=new THREE.Color(K.base);
@@ -5146,7 +5158,10 @@ function buildLinerHD(S,opt){
       V.text(x,S.model,n*1.9,WY-0.55,Y,0.22,'600 #px Arial,Helvetica,sans-serif','rgba(20,40,60,0.75)',right,2.4);
       // the fin: teal, the sand @OhRabah mark small near the top, a sand bar along the rudder foot
       const F=S.fin;
-      V.fill(x,[[F.rLE-0.2,F.y0-0.2],[F.tLE,S.finTop+0.3],[F.tTE+0.3,S.finTop+0.3],[F.rTE+0.3,F.y0-0.2]],Y,LINER_TEAL);
+      // the fin's teal starts at the fuselage crown, so none of it lands on the fuselage side
+      const tp=s=>secAt(Math.min(s,L))[1]+0.03;
+      V.fill(x,[[F.rLE-0.2,tp(F.rLE-0.2)],[F.tLE,S.finTop+0.3],[F.tTE+0.3,S.finTop+0.3],[F.rTE+0.3,tp(F.rTE+0.3)]],Y,LINER_TEAL);
+      V.fill(x,[[F.rLE-0.2,tp(F.rLE-0.2)],[F.rLE-0.2,F.y0-0.3],[F.rTE+0.3,F.y0-0.3],[F.rTE+0.3,tp(F.rTE+0.3)]],Y,WH);
       V.text(x,'@OhRabah',(F.tLE+F.tTE)/2+F.logoDs,S.finTop-F.logoDy,Y,F.logoH,'800 #px Arial,Helvetica,sans-serif',LINER_SAND,right,F.logoW);
       V.line(x,[[F.rLE+0.6,F.y0+0.35],[F.rTE-0.4,F.y0+0.35]],Y,0.12,LINER_SAND);
     },
@@ -5300,9 +5315,24 @@ const LINER_SPECS={
     fin:{y0:1.5,rLE:29.8,rTE:36.8,tLE:35.2,tTE:37.9,dorsal:[[27.2,0.16,0.05],[28.4,0.18,0.5],[29.6,0.2,1.2]],logoDs:0.1,logoDy:1.6,logoH:0.42,logoW:2.2},finTop:8.9,
     tail:{half:7.17,rootLE:34.2,rootC:4.0,tipC:1.6,sweep:30*Math.PI/180,dih:7*Math.PI/180,y:0.95},
     gear2:{noseS:5.6,noseR:0.34,mains:[{x:2.86,s:20.9,R:0.56,top:-1.3}]},
-    deck:[0.62,1.32],eye:[-0.5,1.0,3.9],antennas:[[8.0,0.3,1],[24.0,0.28,1],[10.0,0.12,-1],[30.0,0.1,-1]]}
+    deck:[0.62,1.32],eye:[-0.5,1.0,3.9],antennas:[[8.0,0.3,1],[24.0,0.28,1],[10.0,0.12,-1],[30.0,0.1,-1]]},
+  // Airbus A320 with sharklets: 37.6 m long, 35.8 m span, 11.8 m high, 3.95 m cabin, the blunter nose
+  a320:{name:'A320',full:'Airbus A320',reg:'N320PA',model:'A320',len:37.57,span:35.8,height:11.76,cg:17.3,gear:3.6,halfW:1.98,halfH:1.98,nose:3.3,tailUp:6,K:100,
+    fus:[[0.0,0.16,-0.35,-0.65,2.0],[0.6,0.72,-0.05,-1.02,2.0],[1.5,1.28,0.32,-1.36,2.0],[2.6,1.62,0.72,-1.62,2.0],[3.3,1.74,1.18,-1.72,2.05],[3.9,1.84,1.55,-1.80,2.05],[5.2,1.94,1.90,-1.92,2.1],[6.4,1.98,1.98,-1.98,2.1],
+      [27.0,1.98,1.98,-1.98,2.1],[29.5,1.88,1.92,-1.55,2.1],[32.0,1.62,1.78,-0.95,2.1],[34.0,1.28,1.60,-0.35,2.1],[36.0,0.80,1.38,0.30,2.1],[37.2,0.35,1.18,0.70,2.0],[37.57,0.12,1.08,0.85,2.0]],
+    belt:1.25,winY:0.55,win0:6.4,win1:27.8,winStep:0.53,
+    doors:[[5.2,'B'],[29.3,'B'],[16.6,'B',0.6,1.0,-0.2],[17.6,'B',0.6,1.0,-0.2],[8.6,'C',1.5,1.25,-1.8],[25.4,'C',1.5,1.25,-1.8]],
+    titleS:11.0,titleY:1.1,titleH:0.95,regS:31.5,regY:0.6,regH:0.42,
+    wing:{rootLE:13.4,rootC:7.0,kink:5.75,kinkC:4.3,tipC:1.45,sweep:25*Math.PI/180,dih:5.5*Math.PI/180,y:-1.25,tipIn:0.6,tip:{h:2.4,cant:0.42,tipC:0.5,rake:0.3,blend:0}},
+    fairing:[[11.5,1.5,0.4,-1.8],[13.5,2.4,1.6,-2.0],[17.0,2.7,2.0,-2.1],[21.0,2.6,1.8,-2.05],[24.0,1.7,0.8,-1.9]],
+    engines:[{x:5.75,drop:1.3,R:1.12,s:11.4,len:4.4,core:1.3,flat:0.92,blades:36}],
+    fin:{y0:1.6,rLE:28.2,rTE:34.6,tLE:33.2,tTE:35.6,dorsal:[[25.8,0.16,0.05],[27.0,0.18,0.5],[28.0,0.2,1.2]],logoDs:0.1,logoDy:1.6,logoH:0.42,logoW:2.2},finTop:8.2,
+    tail:{half:6.2,rootLE:32.4,rootC:3.9,tipC:1.3,sweep:28*Math.PI/180,dih:6*Math.PI/180,y:0.95},
+    gear2:{noseS:5.1,noseR:0.36,mains:[{x:3.8,s:19.6,R:0.58,top:-1.35}]},
+    deck:[0.72,1.42],eye:[-0.5,1.08,3.8],antennas:[[7.5,0.3,1],[22.5,0.28,1],[9.5,0.12,-1],[28.0,0.1,-1]]}
 };
 function buildB737HD(opt){return buildLinerHD(LINER_SPECS.b737,opt);}
+function buildA320HD(opt){return buildLinerHD(LINER_SPECS.a320,opt);}
 // =========================================================================
 //  Piper PA-28-181 Archer II, N8128P
 //  7.32 m long, 10.67 m span, 2.22 m to the fin top. Low semi-tapered wing
@@ -5525,7 +5555,7 @@ function buildArcherHD(opt){
   const meta={name:'Piper PA-28-181 Archer II',sub:'Piper',spec:{len:L,span:SPAN,height:2.22},ground:GND};
   return {g:g,gear:gear,prop:prop,ab:null,weapons:null,pylons:null,meta:meta};
 }
-return {buildF16HD:buildF16HD,buildMQ9HD:buildMQ9HD,buildC130HD:buildC130HD,buildMQ9BHD:buildMQ9BHD,buildC172HD:buildC172HD,buildAlphaHD:buildAlphaHD,buildArcherHD:buildArcherHD,buildA10HD:buildA10HD,buildB737HD:buildB737HD,MAT:MAT,TEX:TEX,AERO:AERO};
+return {buildF16HD:buildF16HD,buildMQ9HD:buildMQ9HD,buildC130HD:buildC130HD,buildMQ9BHD:buildMQ9BHD,buildC172HD:buildC172HD,buildAlphaHD:buildAlphaHD,buildArcherHD:buildArcherHD,buildA10HD:buildA10HD,buildB737HD:buildB737HD,buildA320HD:buildA320HD,MAT:MAT,TEX:TEX,AERO:AERO};
 }
 function init(){
 const glc=document.getElementById('gl');let glcH=0;const _euH=new THREE.Euler(0,0,0,'YXZ');   // canvas CSS height, kept by resize() (no layout read per frame); HUD heading scratch
@@ -6058,6 +6088,10 @@ const AC_LIGHTS={
   // wing roots, the taxi light on the nose leg
   b737:[acNav(-17.6,0.9,4.3),acNav(17.6,0.9,4.3),acStrobe(-17.6,0.9,4.6),acStrobe(17.6,0.9,4.6),acAft(0,1.1,21.2),
     acBeacon(0,1.92,-6.0),acBeacon(0,-1.92,-4.0),acLand(-2.3,-1.05,-3.6),acLand(2.3,-1.05,-3.6),acTaxi(0,-2.9,-12.6,{on:'gear'})],
+  // A320: nav and strobes at the sharklet roots, white on the tail cone, beacons top and belly, landing lights at the
+  // wing roots, the taxi light on the nose leg
+  a320:[acNav(-17.6,0.5,4.3),acNav(17.6,0.5,4.3),acStrobe(-17.6,0.5,4.6),acStrobe(17.6,0.5,4.6),acAft(0,1.1,20.0),
+    acBeacon(0,2.02,-5.5),acBeacon(0,-2.02,-3.5),acLand(-2.4,-1.1,-3.0),acLand(2.4,-1.1,-3.0),acTaxi(0,-3.1,-12.2,{on:'gear'})],
   // MQ-9A: nav + strobe at each tip, white aft on the tail cone, red beacon aft of the SATCOM
   // bulge, a dim taxi lamp on the nose gear on the ground only
   reaper:[acNav(-10.12,0.97,-0.8),acNav(10.12,0.97,-0.8),acStrobe(-10.12,0.97,-0.45),acStrobe(10.12,0.97,-0.45),
@@ -6650,7 +6684,7 @@ const HD=(function(){try{return makeHD();}catch(e){console.warn('HD airframes un
 function hdModel(which){
   if(!HD)return null;
   const gr=(TYPES[which]||TYPES.reaper).gear||1.5;
-  let m;try{m=which==='f16'?HD.buildF16HD({gold:true,gear:gr}):which==='c130'?HD.buildC130HD({gear:gr}):which==='mq9b'?HD.buildMQ9BHD({gear:gr}):which==='cessna'?HD.buildC172HD({gear:gr}):which==='alpha'?HD.buildAlphaHD({gear:gr}):which==='archer'?HD.buildArcherHD({gear:gr}):which==='a10'?HD.buildA10HD({gear:gr}):which==='b737'?HD.buildB737HD({gear:gr}):HD.buildMQ9HD({gear:gr});}catch(e){console.warn(e);return null;}
+  let m;try{m=which==='f16'?HD.buildF16HD({gold:true,gear:gr}):which==='c130'?HD.buildC130HD({gear:gr}):which==='mq9b'?HD.buildMQ9BHD({gear:gr}):which==='cessna'?HD.buildC172HD({gear:gr}):which==='alpha'?HD.buildAlphaHD({gear:gr}):which==='archer'?HD.buildArcherHD({gear:gr}):which==='a10'?HD.buildA10HD({gear:gr}):which==='b737'?HD.buildB737HD({gear:gr}):which==='a320'?HD.buildA320HD({gear:gr}):HD.buildMQ9HD({gear:gr});}catch(e){console.warn(e);return null;}
   const out={g:m.g,gear:m.gear,canopy:m.canopy||null,pylons:m.pylons||null,hd:true};
   // the world is lit by a hemisphere and a sun already: keep the sky reflection to a sheen
   m.g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false;
@@ -7089,6 +7123,7 @@ function getModel(id){
   if(id==='f16')m=hdModel('f16')||buildF16();
   else if(id==='a10')m=hdModel('a10')||buildF16();
   else if(id==='b737')m=hdModel('b737')||buildAirliner(0);
+  else if(id==='a320')m=hdModel('a320')||buildAirliner(1);
   else if(id==='cessna'){m=hdModel('cessna');if(!m){const c=buildPlane({reg:'N8401L',stripe:0x1d3557,accent:0xd4a017,full:true}),w=new THREE.Group();scene.remove(c.g);c.g.position.y=-0.15;w.add(c.g);scene.add(w);m={g:w,prop:c.prop,disc:c.disc};}}
   else if(id==='alpha')m=hdModel('alpha')||buildAlpha();
   else if(id==='archer'){m=hdModel('archer');if(!m){const c=buildPlane({reg:'N8128P',stripe:0x1f4e9c,accent:0x6f9fe0,full:true}),w=new THREE.Group();scene.remove(c.g);c.g.position.y=-0.15;w.add(c.g);scene.add(w);m={g:w,prop:c.prop,disc:c.disc,gear:null};}}
@@ -7152,7 +7187,7 @@ function warmObj(root){
     renderer.setRenderTarget(WARM.rt);renderer.render(scene,WARM.cam);renderer.setRenderTarget(null);root.visible=v;}catch(e){renderer.setRenderTarget(null);}
 }
 WARM.rt=new THREE.WebGLRenderTarget(4,4);WARM.cam=new THREE.PerspectiveCamera(50,1,0.5,400);const _warmOff=new THREE.Vector3();
-const WARM_STEPS=['reaper','mq9b','f16','cessna','alpha','c130','archer','a10','b737'].map(id=>()=>warmObj(getModel(id).g))
+const WARM_STEPS=['reaper','mq9b','f16','cessna','alpha','c130','archer','a10','b737','a320'].map(id=>()=>warmObj(getModel(id).g))
   .concat([()=>{if(!DZ.built)dzBuild();warmObj(DZ.g);},()=>fxWarmLayer(),()=>fxWarmDebris(),()=>fxWarmDecals(),()=>{if(actx)boomBufs();}]);
 function warmTick(){
   if(WARM.done)return;
@@ -9413,6 +9448,7 @@ const TIP_AC={
   c130:{n:'C-130',flare:'power back at 50 ft, small flare',long:'plan it early, it takes a long time to slow',ok:'Textbook Herc arrival.'},
   a10:{n:'A-10',flare:'small flare, nose a little up',long:'power back over the fence, it takes a while to slow',ok:'Hawg driver. Nicely done.'},
   b737:{n:'737',flare:'idle at 30 ft, a small flare',long:'idle at the threshold, it carries a lot of energy',ok:'Smooth. The cabin never felt it.'},
+  a320:{n:'A320',flare:'idle at 30 ft, a small flare',long:'idle at the threshold, it carries a lot of energy',ok:'Smooth. The cabin never felt it.'},
   f16:{n:'F-16',flare:'shallow flare, nose high',long:'cross the threshold at 50 ft, not higher',ok:'Viper driver. Textbook.'}};
 function landTip(g,clean){
   const T=TIP_AC[AC.id]||TIP_AC.cessna;if(!g)return '';
@@ -9440,6 +9476,7 @@ const REC={
   alpha: {title:'Landing grade',cmp:(a,b)=>a.pts>b.pts,fmt:r=>r.letter+'  '+r.pts+' pts, '+r.fpm+' fpm'},
   archer:{title:'Landing grade',cmp:(a,b)=>a.pts>b.pts,fmt:r=>r.letter+'  '+r.pts+' pts, '+r.fpm+' fpm'},
   b737:  {title:'Landing grade',cmp:(a,b)=>a.pts>b.pts,fmt:r=>r.letter+'  '+r.pts+' pts, '+r.fpm+' fpm'},
+  a320:  {title:'Landing grade',cmp:(a,b)=>a.pts>b.pts,fmt:r=>r.letter+'  '+r.pts+' pts, '+r.fpm+' fpm'},
   c130:  {title:'Missions',     cmp:()=>false,fmt:r=>''},
   f16:   {title:'Luke to Glendale',cmp:(a,b)=>a.secs<b.secs,fmt:r=>fmtT(r.secs)+',  '+r.g.toFixed(1)+' G'},
   reaper:{title:'Loiter and strike',cmp:(a,b)=>a.pts>b.pts,fmt:r=>r.pts+' pts, '+r.hits+'/4, '+r.avg+' m'},
@@ -9581,6 +9618,7 @@ const REC_ROWS=[
   ['alpha','Pipistrel Alpha','alpha','Best landing',r=>r.letter+'   '+r.pts+' pts,  '+r.fpm+' fpm'],
   ['archer','Piper Archer II','archer','Best landing',r=>r.letter+'   '+r.pts+' pts,  '+r.fpm+' fpm'],
   ['b737','Boeing 737-800','b737','Best landing',r=>r.letter+'   '+r.pts+' pts,  '+r.fpm+' fpm'],
+  ['a320','Airbus A320','a320','Best landing',r=>r.letter+'   '+r.pts+' pts,  '+r.fpm+' fpm'],
   ['f16','F-16C Viper','f16','Luke to Glendale',r=>fmtT(r.secs)+',  '+r.g.toFixed(1)+' G peak'],
   ['mq9b','MQ-9B SkyGuardian','mq9b','Best landing',r=>r.letter+'   '+r.pts+' pts,  '+r.fpm+' fpm'],
   ['reaper','MQ-9A Reaper','reaper','Loiter and strike',r=>r.pts+' pts,  '+r.hits+'/4 hits,  '+r.avg+' m,  '+r.tot+' s on target'],
@@ -10880,8 +10918,8 @@ function say(who,text,clips,o){o=o||{};
 const L=(who,kind,text,clips)=>({who,kind,text,clips});
 
 // ---- clip helpers ----
-const CSC ={cessna:'cs_skyhawk',  alpha:'cs_pipistrel',  reaper:'cs_reaper',  f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian',  archer:'cs_archer',  a10:'cs_hawg',b737:'cs_pocket737'};
-const CSCS={cessna:'cs_skyhawk_s',alpha:'cs_pipistrel_s',reaper:'cs_reaper_s',f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian_s',archer:'cs_archer_s',a10:'cs_hawg',b737:'cs_pocket737'};
+const CSC ={cessna:'cs_skyhawk',  alpha:'cs_pipistrel',  reaper:'cs_reaper',  f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian',  archer:'cs_archer',  a10:'cs_hawg',b737:'cs_pocket737',a320:'cs_pocket320'};
+const CSCS={cessna:'cs_skyhawk_s',alpha:'cs_pipistrel_s',reaper:'cs_reaper_s',f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian_s',archer:'cs_archer_s',a10:'cs_hawg',b737:'cs_pocket737',a320:'cs_pocket320'};
 const csT =()=>'t_'+(CSC[AC.id] ||'cs_skyhawk');
 const csTs=()=>'t_'+(CSCS[AC.id]||'cs_skyhawk_s');
 const csP =()=>'p_'+(CSC[AC.id] ||'cs_skyhawk');
@@ -12792,7 +12830,7 @@ $('pLb').onclick=()=>{pauseGo('sLb');if(LB)LB.lbOpen();};
 $('storyX').onclick=()=>$('storyOv').classList.remove('on');
 
 // ---- the aircraft, friendliest first ----
-const CAR=['cessna','archer','alpha','f16','a10','reaper','mq9b','c130','b737'];
+const CAR=['cessna','archer','alpha','f16','a10','reaper','mq9b','c130','b737','a320'];
 // the daily challenge draws its aircraft from the six the seed always had: a new type in CAR would
 // change every past and future daily for everyone (and the Worker checks the day's runs against it)
 const DAILY_TYPES=['cessna','alpha','f16','reaper','mq9b','c130'];
@@ -12805,7 +12843,8 @@ const AC_INFO={
   reaper:['MQ-9A Reaper','MQ-9A Reaper','A long winged drone that circles for hours and strikes from above.'],
   mq9b:['MQ-9B SkyGuardian','MQ-9B SkyGuardian','The bigger, longer winged Reaper built to fly over cities.'],
   c130:['C-130H Hercules','C-130 Hercules','A four engine cargo hauler that lands on dirt strips.'],
-  b737:['Boeing 737-800','Pocket Air 737','The Pocket Air 737. 174 seats, heavy and deliberate, long runways only.']};
+  b737:['Boeing 737-800','Pocket Air 737','The Pocket Air 737. 174 seats, heavy and deliberate, long runways only.'],
+  a320:['Airbus A320','Pocket Air A320','The Pocket Air A320. Sharklets, fly by wire, long runways only.']};
 // the aircraft's story text: Arizona's names Glendale (or Luke); a world region's names its own airport,
 // home runway and elevation from REGION, then the tip every flight shares
 function flySub(t){const T=TYPES[t]||TYPES.cessna;if(REGION.az||!T.sub2)return T.sub;
@@ -12843,7 +12882,7 @@ function Carousel(root){
 const CARM=Carousel($('carMain'));
 // the pause sheet picks the aircraft with a chip row (the showroom carousel stays on the FLY screen)
 const CARP={pos:0,idx:0,sync:()=>{document.querySelectorAll('#pAc .pick').forEach(b=>b.classList.toggle('sel',b.dataset.t===savedType));CARP.idx=CARP.pos=Math.max(0,CAR.indexOf(savedType));}};
-(function(){const row=$('pAc');if(!row)return;const SHORT={cessna:'C172',archer:'PA-28',alpha:'Alpha',f16:'F-16',a10:'A-10',reaper:'MQ-9A',mq9b:'MQ-9B',c130:'C-130',b737:'737'};
+(function(){const row=$('pAc');if(!row)return;const SHORT={cessna:'C172',archer:'PA-28',alpha:'Alpha',f16:'F-16',a10:'A-10',reaper:'MQ-9A',mq9b:'MQ-9B',c130:'C-130',b737:'737',a320:'A320'};
   CAR.forEach(t=>{const b=document.createElement('button');b.className='pick chip';b.dataset.t=t;b.setAttribute('role','radio');b.setAttribute('aria-label',AC_INFO[t][0]);
     b.innerHTML='<b></b>';b.firstChild.textContent=SHORT[t]||AC_INFO[t][1];b.onclick=()=>{pickType(t);CARP.sync();};row.appendChild(b);});})();
 
@@ -12904,8 +12943,8 @@ const SIL={
   lowwing:'<g fill="#F6C177"><path d="M-17 -1 L-2.4 -4 L2.4 -4 L17 -1 L17 3.2 L2.4 2.2 L-2.4 2.2 L-17 3.2Z"/><rect x="-2.2" y="-13" width="4.4" height="25" rx="2.2"/><rect x="-6.5" y="9.5" width="13" height="3" rx="1.4"/><rect x="-4" y="-14.5" width="8" height="1.6" rx=".8" fill="#D98A3D"/></g>',
   mq9:'<g fill="#F6C177"><rect x="-22" y="-3" width="44" height="2.8" rx="1.3"/><rect x="-2" y="-12" width="4" height="24" rx="2"/><path d="M0 10 L-7 16 L-6 17 L0 13 L6 17 L7 16Z"/></g>'};
 // the aircraft as a chip: its silhouette and its short name (results card, leaderboard rows)
-const AC_TAG={cessna:'C172',archer:'PA-28',alpha:'Alpha',f16:'F-16C',a10:'A-10C',reaper:'MQ-9A',mq9b:'MQ-9B',c130:'C-130H',b737:'737'};
-const AC_SIL={cessna:'cessna',archer:'lowwing',alpha:'cessna',f16:'f16',a10:'a10',reaper:'mq9',mq9b:'mq9',c130:'c130',b737:'liner'};
+const AC_TAG={cessna:'C172',archer:'PA-28',alpha:'Alpha',f16:'F-16C',a10:'A-10C',reaper:'MQ-9A',mq9b:'MQ-9B',c130:'C-130H',b737:'737',a320:'A320'};
+const AC_SIL={cessna:'cessna',archer:'lowwing',alpha:'cessna',f16:'f16',a10:'a10',reaper:'mq9',mq9b:'mq9',c130:'c130',b737:'liner',a320:'liner'};
 const acIcon=t=>SIL[AC_SIL[t]]?'<svg class="acI" viewBox="-23 -18 46 36" aria-hidden="true">'+SIL[AC_SIL[t]]+'</svg>':'';
 const acTag=t=>AC_TAG[t]?'<span class="acTag">'+acIcon(t)+'<b>'+AC_TAG[t]+'</b></span>':'';
 const ICO_PARTS={
@@ -14463,6 +14502,8 @@ const CRASH_FX={
   c130:  {scale:2.6,sec:3,deb:20,fire:90,smoke:90,r:2.0,col:0x8d949b,parts:'c130',look:6,
           stages:[[0.75,-0.3,1.4],[1.55,0.33,1.5],[2.4,-0.46,1.6]]},
   b737:  {scale:2.7,sec:3,deb:20,fire:90,smoke:90,r:1.9,col:0xe6e8ea,parts:'c130',look:6,
+          stages:[[0.8,-0.32,1.5],[1.6,0.32,1.5]]},
+  a320:  {scale:2.7,sec:3,deb:20,fire:90,smoke:90,r:2.0,col:0xe6e8ea,parts:'c130',look:6,
           stages:[[0.8,-0.32,1.5],[1.6,0.32,1.5]]}
 };
 // wreck pieces: 12 pooled groups (a body, a cylinder or a box, plus up to 6 box parts: wing,
