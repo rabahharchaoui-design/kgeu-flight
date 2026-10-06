@@ -62,6 +62,10 @@ html,body{ margin:0; height:100%; overflow:hidden; background:var(--page); color
 #uiroot{ position:fixed; left:var(--vvl); top:var(--vvt); width:var(--vvw); height:var(--vvh); pointer-events:none; overflow:hidden; }
 #uiroot > *{ pointer-events:auto; }
 #warn,#atc,#toast,#sideToast,#sensorHud{ pointer-events:none; }
+/* haptics (phone3 item 6): a transparent label for the hidden switch over every tapped control; the real tap on it is the tick */
+.hapL{ position:absolute; inset:0; z-index:3; display:block; margin:0; padding:0; border-radius:inherit; background:transparent; cursor:inherit; -webkit-tap-highlight-color:transparent; }
+.hapRel{ position:relative; }
+body.hapOff .hapL{ display:none; }
 
 .card{ background:var(--glass); border:1px solid rgba(255,255,255,.08); border-radius:10px; padding:8px 12px; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
 button{ font:600 15px var(--font); color:var(--ink); background:var(--glass); border:1px solid rgba(255,255,255,.14); border-radius:8px; padding:7px 12px; cursor:pointer; touch-action:manipulation; }
@@ -9445,8 +9449,10 @@ function tapBtn(el,fn,onDown){let pid=null;
     fn(e);});
   el.addEventListener('pointercancel',e=>{if(e.pointerId===pid)pid=null;});
   el.addEventListener('lostpointercapture',e=>{if(e.pointerId===pid)pid=null;});
-  // the tap is handled on pointerup, so stop the late click landing on whatever opens under it
-  el.addEventListener('touchend',e=>{if(e.cancelable)e.preventDefault();},{passive:false});
+  // the tap is handled on pointerup, so stop the late click landing on whatever opens under it. A tap
+  // on the haptic overlay (hapL) needs its click to tick: that one goes through, and for a moment any
+  // other click is swallowed (hapShield) so it cannot land on what just opened under the finger
+  el.addEventListener('touchend',e=>{if(e.target&&e.target.classList&&e.target.classList.contains('hapL')){HAP.shieldTo=performance.now()+600;return;}if(e.cancelable)e.preventDefault();},{passive:false});
   el.addEventListener('click',e=>{if(e.detail===0)fn(e);});
 }
 // F-16 flaps are automatic for everyone: the trailing edge flaps follow the gear handle
@@ -11515,13 +11521,20 @@ try{muted=localStorage.getItem('kgeuMuted')==='1';}catch(e){}
 function setMuted(v){muted=!!v;if(muted&&window.speechSynthesis)speechSynthesis.cancel();try{localStorage.setItem('kgeuMuted',muted?'1':'0');}catch(e){}soundUI();}
 document.querySelectorAll('.oSound').forEach(b=>b.onclick=()=>{initAudio();setMuted(!muted);});
 // ================= haptics =================
-// One small module: hapPattern(name) and hapTick(strength). iOS Safari has no navigator.vibrate;
-// since iOS 18 an <input type="checkbox" switch> gives the native switch tick when its label is
-// clicked, so a hidden switch and label stand in for it (HAP.sup 'switch'). Everywhere else
-// navigator.vibrate (HAP.sup 'vibrate'), or nothing at all ('none'). Every pattern is a few ticks
-// with spacing: the intensity comes from the click count and the spacing. Never per frame: a 40 ms
-// floor between clicks, a cooldown per kind, at most 24 clicks in flight. Fails silently.
-const HAP={on:true,sup:'none',sw:null,lab:null,lastAt:0,pend:0,cool:Object.create(null),log:[],plan:[],abWas:0,thrZ:-1};
+// One small module: hapPattern(name) and hapTick(strength). iOS Safari has no navigator.vibrate.
+// What ticks on an iPhone (phone3 item 6, checked against iOS releases up to 26.5): toggling an
+// <input type="checkbox" switch> (iOS 17.4+) plays the native switch tick. Since iOS 26.5 only a REAL
+// tap that lands on the switch or its <label> ticks; label.click() from script is an untrusted click
+// and ticks no more (18.4 to 26.4 it still ticked within about 1 s of a tap, 18.0 to 18.3 always).
+// So (1) every control a finger taps carries a transparent <label for="hapSw"> over it (hapArm): the
+// tap itself is the tick, on every iOS with the switch. (2) Events with no tap under them (crash,
+// touchdown, impact, launch, stall, throttle detents while dragging, since a drag is never a click)
+// still go through the scripted label.click() path: it ticks on older iOS and inside the gesture
+// window, and does nothing on 26.5+. Android and others: navigator.vibrate (HAP.sup 'vibrate').
+// Every pattern is a few ticks with spacing: the intensity comes from the click count and the
+// spacing. Never per frame: a 40 ms floor between clicks, a cooldown per kind, at most 24 clicks in
+// flight. Fails silently. The Haptics setting hides the overlays (body.hapOff) and mutes the rest.
+const HAP={on:true,sup:'none',sw:null,lab:null,lastAt:0,pend:0,cool:Object.create(null),log:[],plan:[],abWas:0,thrZ:-1,directAt:-1e9,taps:0,downL:null,shieldTo:0};
 const HAP_MS={l:12,m:30,h:70};                                   // vibrate: one tick's length
 const HAP_CLICKS={l:1,m:2,h:3};                                  // the switch: clicks per tick, 40 ms apart
 const HAP_PAT={
@@ -11545,11 +11558,37 @@ function hapInit(){
       if('switch' in i){i.id='hapSw';i.tabIndex=-1;i.setAttribute('aria-hidden','true');
         const l=document.createElement('label');l.htmlFor='hapSw';l.setAttribute('aria-hidden','true');
         const w=document.createElement('div');w.id='hapWrap';w.setAttribute('aria-hidden','true');
-        w.style.cssText='position:fixed;left:-300px;top:-300px;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;';
+        // inside the viewport (a focused offscreen switch could scroll the page), invisible, untouchable
+        w.style.cssText='position:fixed;left:0;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;';
         w.appendChild(i);w.appendChild(l);document.body.appendChild(w);HAP.sw=i;HAP.lab=l;HAP.sup='switch';}}
   }catch(e){HAP.sup='none';}
   hapUI();
+  if(HAP.sup==='switch'){hapArmAll();
+    // menus, cards and sheets are rebuilt as they open: arm what they add (never the HUD, which changes every frame)
+    // (a control whose text is rewritten, e.g. Restart / Apply, loses its label: put it back)
+    try{const mo=new MutationObserver(ms=>{const seen=new Set();for(const m of ms){
+        const t=m.target.nodeType===1&&m.target.closest?m.target.closest(HAP_SEL):null;if(t&&!seen.has(t)){seen.add(t);hapArm(t);}
+        for(const n of m.addedNodes)if(n.nodeType===1&&!n.classList.contains('hapL')&&!seen.has(n)){seen.add(n);hapArmAll(n);}}});
+      ['menu','pauseOv','arcOv','gradeOv','landOv','missOv','recOv','crash','funnel','csOv','tkCtl','tk','dfBrief','photoOv','mapOv'].forEach(id=>{const e=document.getElementById(id);if(e)mo.observe(e,{childList:true,subtree:true});});}catch(e){}
+    // a real tap on an overlay: the native tick has played, so the scripted tick for the same tap is skipped
+    document.addEventListener('click',e=>{const t=e.target,L=t&&t.classList&&t.classList.contains('hapL');
+      // hapShield: after a tapBtn tap on an overlay only that overlay's click (and the switch it forwards to) gets through
+      if(performance.now()<HAP.shieldTo&&t!==HAP.downL&&t!==HAP.sw){e.preventDefault();e.stopPropagation();return;}
+      if(L&&e.isTrusted){HAP.directAt=performance.now();HAP.taps++;if(t===HAP.downL)HAP.shieldTo=0;}},true);
+  }
 }
+// the controls a finger taps: flight buttons, weapons, pause, the throttle's detent labels, every menu, sheet and card button
+const HAP_SEL='#dock button,#dfW button,#bPause,#thr .det,#menu button,#menu .mcard,#menu .lrow,#pauseOv button,.overlay button,#crash button,#funnel button,#csOv button,#tkCtl button,#tk,#hDest';
+function hapArm(el){
+  if(!el||el.querySelector(':scope > .hapL'))return;
+  if(getComputedStyle(el).position==='static')el.classList.add('hapRel');
+  const l=document.createElement('label');l.className='hapL';l.htmlFor='hapSw';l.setAttribute('aria-hidden','true');
+  // the tap that started on this overlay keeps its click (tapBtn cancels the late click otherwise)
+  // the finger is on the switch's label: its tick is coming with the click (which may land a frame after the action)
+  l.addEventListener('pointerdown',()=>{HAP.downL=l;if(HAP.on)HAP.directAt=performance.now();},true);
+  el.appendChild(l);
+}
+function hapArmAll(root){try{(root||document).querySelectorAll(HAP_SEL).forEach(hapArm);if(root&&root.matches&&root.matches(HAP_SEL))hapArm(root);}catch(e){}}
 function hapClick(){HAP.pend=Math.max(0,HAP.pend-1);try{if(HAP.sup==='switch'&&HAP.lab)HAP.lab.click();}catch(e){}}
 // strength 'l' | 'm' | 'h' at a delay (ms) from now; the switch gets 1 to 3 clicks, vibrate one pulse
 function hapTick(strength,delay){
@@ -11568,6 +11607,8 @@ function hapPattern(name){
   const now=performance.now(),cd=HAP_COOL[name]||0;
   if(cd&&HAP.cool[name]&&now-HAP.cool[name]<cd)return false;HAP.cool[name]=now;
   HAP.log.push({n:name,t:Math.round(now)});if(HAP.log.length>80)HAP.log.shift();
+  // the finger's own tap on an overlay was this pattern's first tick
+  if(HAP.sup==='switch'&&now-HAP.directAt<300){pat.slice(1).forEach(([d,st])=>hapTick(st,d));return true;}
   try{
     if(HAP.sup==='vibrate'){const arr=[];for(let i=0;i<pat.length;i++){const on=HAP_MS[pat[i][1]];arr.push(on);if(i+1<pat.length)arr.push(Math.max(10,pat[i+1][0]-pat[i][0]-on));}
       navigator.vibrate(arr);return true;}
@@ -11577,7 +11618,7 @@ function hapPattern(name){
 }
 // what changed beside the throttle (sideCfg kinds)
 function hapCfg(kind){if(kind==='flap'||kind==='gear')hapPattern('detent');else if(kind==='ap')hapPattern('ap');else if(kind==='trim')hapPattern('trim');}
-function hapUI(){document.querySelectorAll('.oHap').forEach(b=>{if(b.classList.contains('qs'))b.querySelector('b').textContent=HAP.on?'On':'Off';else b.textContent='Haptics: '+(HAP.on?'On':'Off');b.classList.toggle('on',HAP.on);});}
+function hapUI(){document.body.classList.toggle('hapOff',!HAP.on);document.querySelectorAll('.oHap').forEach(b=>{if(b.classList.contains('qs'))b.querySelector('b').textContent=HAP.on?'On':'Off';else b.textContent='Haptics: '+(HAP.on?'On':'Off');b.classList.toggle('on',HAP.on);});}
 function setHaptics(v){HAP.on=!!v;try{localStorage.setItem('kgeuHaptics',HAP.on?'1':'0');}catch(e){}hapUI();if(HAP.on)hapPattern('ap');}
 document.querySelectorAll('.oHap').forEach(b=>b.onclick=()=>setHaptics(!HAP.on));
 document.querySelectorAll('.oTcas').forEach(b=>b.onclick=()=>setTcas(!TCAS.on));tcasUI();
