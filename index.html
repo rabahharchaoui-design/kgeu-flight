@@ -8503,19 +8503,35 @@ function updateControls(dt){
   st.brake=!!keys[' ']||touchIn.brake||!!touchIn.padBrake;
 }
 // ---------- visual viewport: keep the whole UI inside what is actually visible ----------
+// iOS home screen apps (phone3 item 5): coming back from the home screen, or rotating while away,
+// iOS can report a transitional visual viewport (an offset top, a short or zero height) and then send
+// no further event, which left the UI pushed down, the controls in a zero sized box and the canvas
+// stretched. So the visual viewport is only trusted when it is zoomed (pinch) and sane; otherwise the
+// layout viewport (innerWidth/innerHeight) rules, and the page is scrolled back to the top.
 function layoutViewport(){
-  const v=window.visualViewport,r=document.documentElement.style;
-  const w=v?v.width:window.innerWidth, h=v?v.height:window.innerHeight;
-  r.setProperty('--vvl',(v?v.offsetLeft:0)+'px');
-  r.setProperty('--vvt',(v?v.offsetTop:0)+'px');
+  const v=window.visualViewport,r=document.documentElement.style,iw=window.innerWidth,ih=window.innerHeight;
+  const zoomed=!!(v&&v.scale>1.01),sane=!!(v&&v.width>iw*0.5&&v.height>ih*0.5);
+  const w=zoomed&&sane?v.width:iw,h=zoomed&&sane?v.height:ih;
+  if(!zoomed&&(window.scrollX||window.scrollY))window.scrollTo(0,0);
+  r.setProperty('--vvl',(zoomed&&sane?v.offsetLeft:0)+'px');
+  r.setProperty('--vvt',(zoomed&&sane?v.offsetTop:0)+'px');
   r.setProperty('--vvw',w+'px');
   r.setProperty('--vvh',h+'px');
+  VP.w=iw;VP.h=ih;
 }
+const VP={w:0,h:0,t:[]};
+// everything that depends on the screen's size, at once: the CSS viewport, the canvas and the camera, the controls.
+// iOS settles its sizes late, so it runs again a few times after each trigger.
+function relayout(){layoutViewport();if(typeof resize==='function'&&window.__glReady)resize();if(window.layoutCtl)layoutCtl(true);}
+function relayoutSoon(){relayout();VP.t.forEach(clearTimeout);VP.t=[60,250,600,1200].map(ms=>setTimeout(relayout,ms));}
 if(window.visualViewport){
   visualViewport.addEventListener('resize',layoutViewport);
   visualViewport.addEventListener('scroll',layoutViewport);
 }
-window.addEventListener('orientationchange',()=>setTimeout(layoutViewport,120));
+window.addEventListener('orientationchange',relayoutSoon);
+window.addEventListener('pageshow',relayoutSoon);
+window.addEventListener('focus',relayoutSoon);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)relayoutSoon();});
 layoutViewport();
 // The centre column under pause (#topCol) is sized from where the readouts end. They only
 // change size when a value gains a digit or the skill changes the labels, so a
@@ -9477,9 +9493,9 @@ function sensorView(){if(!running||st.crashed||!hasBall())return;
       bGear:P&&!!AC.retract&&!sv&&!df,flapGrp:P&&AC.id!=='f16'&&!sv,bBrake:isTouch&&!sv&&!df};
     const H=dockH||(dockH=dock.clientHeight);
     const key=Object.keys(show).map(k=>show[k]?1:0).join('')+'|'+H;
-    if(key===lkey)return;
+    if(key===lkey)return true;
     ORDER.forEach(el=>el.hidden=!show[el.id]);
-    if(!H)return;                                   // not on screen yet: deal them out once it is
+    if(!H)return false;                             // not on screen yet: the frame loop deals them out once it is
     lkey=key;
     // fill column A from the bottom up; whatever does not fit goes to column B, same order
     const vis=ORDER.filter(el=>show[el.id]);let h=0,cut=vis.length;
@@ -9487,6 +9503,7 @@ function sensorView(){if(!running||st.crashed||!hasBall())return;
     ORDER.forEach(el=>{if(!show[el.id]&&el.parentNode!==A)A.appendChild(el);});
     vis.forEach((el,i)=>(i<cut?B:A).appendChild(el));
     B.hidden=cut===0;document.body.classList.toggle('dock2',!B.hidden);   // the TCAS panel steps left of a second column
+    return true;
   };
   let key='';
   window.iconsUI=()=>{
@@ -11420,7 +11437,7 @@ function start(mode,base){
   if(mode==='drop')dzStart();
   hbSync(true);
   if(LB){LB.reset();if(mode==='range'||mode==='drop'||mode==='short')LB.runStart(mode==='range'?'arc:strike':mode==='drop'?'arc:drop':'mission:short');}
-  layoutCtl(true);
+  layoutViewport();VP.ctl=layoutCtl(true);   // the controls are dealt on this frame, in Easy and in Hard
 }
 // One sweep for everything a flight put on screen: the result sheets, the mission card, the drop
 // zone (hint, chip, chevron, jump lights, smoke, panels, run in line, gates and its route), the
@@ -14151,8 +14168,8 @@ function sensorAP(){
   toast('AUTOPILOT ENGAGED',2);
 }
 // ---------- main loop ----------
-function resize(){const w=window.innerWidth,h=window.innerHeight;renderer.setSize(w,h,false);glcH=glc.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();sizeMap();fmSize();FM.prepT=0;if(FM.on){lblUI();fmDraw();}}
-window.addEventListener('resize',resize);resize();
+function resize(){const w=window.innerWidth,h=window.innerHeight;VP.w=w;VP.h=h;renderer.setSize(w,h,false);glcH=glc.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();sizeMap();fmSize();FM.prepT=0;if(FM.on){lblUI();fmDraw();}}
+window.addEventListener('resize',()=>{resize();relayoutSoon();});window.__glReady=1;resize();
 const hudSens=$('sensorHud');let sensOn=false;const hIas=$('hIas'),hAlt=$('hAlt'),hWindT=$('hWindT'),hWindA=$('hWindA'),hAp=$('hAp'),bAuto=$('bAuto'),bAutoT=$('bAutoT'),warnEl=$('warn'),hVs=$('hVs'),hHdg=$('hHdg');
 const APN={to:'AUTO T/O',hold:'ALT HOLD',land:'AUTOLAND',orbit:'ORBIT'},APP={climb:'CLIMB',nav:'NAV',loc:'FINAL',orb:'DESCEND'};
 const _cf=new V3(),_cu=new V3(),_co=new V3(),_ct=new V3(),_eu=new THREE.Euler(0,0,0,'YXZ');
@@ -14169,6 +14186,9 @@ function frame(t){
   if(!loopHeld)tick(t);
 }
 function tick(t,skipRender){
+  // a size change iOS sent no event for, and flight controls that could not be dealt yet (phone3 item 5)
+  if(window.innerWidth!==VP.w||window.innerHeight!==VP.h)relayout();
+  if(running&&!VP.ctl)VP.ctl=layoutCtl(true);
   // never negative: a released test hold can leave last a hair ahead of the next rAF stamp,
   // and a negative step walks the traffic paths below 0
   const rdt=Math.max(0,(t-last)/1000),dt=dfSlow(Math.min(0.1,rdt));last=t;const ts=t/1000;   // dfSlow: the dogfight kill cam's quarter speed
