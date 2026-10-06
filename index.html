@@ -642,6 +642,21 @@ body.touch #lesson{ max-width:calc(28vw - 8px); font-size:13px; padding:6px 10px
 body.touch #lesQuit{ min-height:44px; min-width:52px; }
 body.touch #lesM{ font-size:12px; }
 /* crash: a one line reason at the top, then a compact card at the bottom (3.9) */
+/* WASTED (phone3 item 7): slow motion, the picture to black and white under a vignette, then the word,
+   then the crash card. Only opacity, transform and the canvas filter move. Tap anywhere skips it. */
+#gl{ transition:filter .9s cubic-bezier(.23,1,.32,1); }
+body.wastedOn #gl{ filter:grayscale(1) contrast(1.12) brightness(.9); }
+#wasted{ position:absolute; inset:0; z-index:9; display:none; pointer-events:auto; touch-action:none; }
+body.wastedOn #wasted{ display:block; }
+body.wastedOn #map, body.wastedOn #topCol, body.wastedOn #crashTop, body.wastedOn #tk, body.wastedOn #badges{ opacity:0; transition:opacity .4s; }
+#wasted .wVig{ position:absolute; inset:0; opacity:0; transition:opacity .9s ease-out; background:radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0) 38%, rgba(0,0,0,.55) 78%, rgba(0,0,0,.85) 100%); }
+body.wastedOn #wasted .wVig{ opacity:1; }
+#wasted .wTxt{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) scale(1.18); opacity:0; white-space:nowrap;
+  font:800 clamp(64px, 17vmin, 132px)/1 'Saira Condensed', 'Arial Narrow', Impact, sans-serif; letter-spacing:.04em; color:#d4121c;
+  -webkit-text-stroke:clamp(3px, .9vmin, 6px) #160303; paint-order:stroke fill; text-shadow:0 6px 18px rgba(0,0,0,.65), 0 2px 3px rgba(0,0,0,.7);
+  transition:transform .26s cubic-bezier(.23,1,.32,1), opacity .18s ease-out; }
+#wasted.txt .wTxt{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+@media (prefers-reduced-motion: reduce){ #wasted .wTxt{ transition:opacity .2s; transform:translate(-50%,-50%); } }
 #crashTop{ position:absolute; left:50%; top:calc(var(--padT) + 4px); transform:translateX(-50%); width:max-content; max-width:min(440px, calc(100% - 2 * (var(--padL) + var(--map) + 14px)));
   font-size:15px; font-weight:600; line-height:1.25; text-align:center; color:#ffe2d2; text-shadow:0 1px 3px rgba(0,0,0,.8); padding:4px 12px; border-radius:8px;
   background:rgba(26,16,9,.45); opacity:0; transition:opacity .25s; pointer-events:none; }
@@ -1198,6 +1213,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   <!-- crash: the reason as one line at the top, then after 3 s a small card at the bottom
        that leaves the fireball in view -->
   <div id="crashTop" aria-live="assertive"></div>
+  <div id="wasted" aria-hidden="true"><div class="wVig"></div><b class="wTxt">WASTED</b></div>
   <div id="crash" role="dialog" aria-label="Crashed"><div class="ccTxt"><b>CRASHED</b><span id="crashWhy"></span></div><div class="ccBtns"><button class="primary" id="cRetry">RETRY</button><button id="cMenu">MENU</button></div></div>
   <div id="sideToast" role="status" aria-live="polite"></div>
   <canvas id="tcas" width="220" height="220" aria-hidden="true"></canvas>
@@ -13695,11 +13711,34 @@ function wreckUpdate(dt){
 }
 // the tick's crash path: records, the tower call, the fireball, the pieces, the wreck camera
 function onCrash(){
-  resCloseAll();hapPattern('crash');
+  resCloseAll();hapPattern('crash');const les=!!LES.on;
   if(LES.on){const k=(acType==='alpha'?'alpha':'cessna')+':'+LES.on;if(!schoolBest[k]){schoolBest[k]='F';try{localStorage.setItem('kgeuSchool',JSON.stringify(schoolBest));}catch(e){}}lesEnd();}
-  crashBegin();
+  crashBegin();if(!les)wastedStart();
   say(REGION.az?'Glendale Tower 121.0':BASES[BASE0].twr,'Crash, crash, crash. Emergency vehicles are rolling.',['t_crash']);
 }
+// ---- WASTED: about 0.25x for 2.5 s while the picture goes black and white and the explosion plays out,
+// then the word for 1.5 s, then the crash card. Real time drives it (a long frame still counts), so it
+// takes the same 4 s at 60 fps and in the 3 fps test harness. Not in Flight School lessons. Tap skips.
+const WST={on:false,t:0,txt:false,skips:0,off:false},WST_SLOW=2.5,WST_HOLD=1.5,WST_SCALE=0.25;
+const wastedEl=$('wasted');
+function wastedStart(){if(WST.off)return;WST.on=true;WST.t=0;WST.txt=false;wastedEl.classList.remove('txt');document.body.classList.add('wastedOn');}
+// the frame's time scale: called with the real frame time from tick()
+function wastedSlow(d,rdt){
+  if(!WST.on)return d;
+  WST.t+=Math.min(rdt,0.5);
+  if(!WST.txt&&WST.t>=WST_SLOW){WST.txt=true;wastedEl.classList.add('txt');hapPattern('crash');}
+  if(WST.t>=WST_SLOW+WST_HOLD){wastedEnd(true);return d;}
+  // ease back to full speed over the last 0.4 s of the slow part, so the fire does not jump
+  const k=WST.t<WST_SLOW-0.4?WST_SCALE:WST.t<WST_SLOW?lerp(WST_SCALE,1,(WST.t-(WST_SLOW-0.4))/0.4):1;
+  return d*k;
+}
+function wastedEnd(card){
+  if(!WST.on&&!document.body.classList.contains('wastedOn'))return;
+  WST.on=false;wastedEl.classList.remove('txt');document.body.classList.remove('wastedOn');
+  if(card&&CRASH.on&&!CRASH.card)crashCardShow();
+}
+function crashCardShow(){CRASH.card=true;crashEl.classList.add('on');crashTopEl.classList.remove('on');}
+wastedEl.addEventListener('pointerdown',e=>{e.preventDefault();if(WST.on){WST.skips++;wastedEnd(true);}});
 function crashBegin(){
   const P=CRASH_FX[AC.id]||CRASH_FX.cessna,C=CRASH;
   wreckClear();
@@ -13736,7 +13775,7 @@ function crashTick(dt){
     if(C.stage<P.stages.length){explode(x,y,z,{scale:g[2],smokeSec:30,debris:4,glow:false,baseFade:0.14,boomDelay:camera.position.distanceTo(_wt.set(x,y,z))/340});fxLast=C.main;}
     else fxMini(x,y,z,g[2]);
     C.fireballs++;}
-  if(!C.card&&t>=C.cardAt){C.card=true;crashEl.classList.add('on');crashTopEl.classList.remove('on');}
+  if(!C.card&&t>=C.cardAt&&!WST.on)crashCardShow();   // WASTED holds the card until it is done
   if(C.shake>0)C.shake=Math.max(0,C.shake-dt);
 }
 // after impact the camera stops riding the airframe and settles about 3.5 airframe lengths off
@@ -13761,6 +13800,7 @@ function crashCam(dt){
 function wreckClear(){for(const p of WRK){p.life=0;p.g.visible=false;p.fl.visible=false;}}
 // a new flight: the wreck, its fire and smoke go, the card goes
 function crashClear(){
+  wastedEnd(false);
   crashEl.classList.remove('on');crashTopEl.classList.remove('on');document.body.classList.remove('crashOn');
   if(!CRASH.on)return;
   CRASH.on=CRASH.cam=CRASH.card=false;wreckClear();fxClear();fireClear();debrisClear();
@@ -14232,7 +14272,7 @@ function tick(t,skipRender){
   if(running&&!VP.ctl)VP.ctl=layoutCtl(true);
   // never negative: a released test hold can leave last a hair ahead of the next rAF stamp,
   // and a negative step walks the traffic paths below 0
-  const rdt=Math.max(0,(t-last)/1000),dt=dfSlow(Math.min(0.1,rdt));last=t;const ts=t/1000;   // dfSlow: the dogfight kill cam's quarter speed
+  const rdt=Math.max(0,(t-last)/1000),dt=wastedSlow(dfSlow(Math.min(0.1,rdt)),rdt);last=t;const ts=t/1000;   // dfSlow: the dogfight kill cam's quarter speed
   // a long gap (stutter): snap the camera; dt is capped at 0.1 s so at most 12 substeps run (hidden tab pauses via visibilitychange)
   const gap=rdt>0.25;if(gap)snapCamera=true;
   sensorMode=camMode===2&&hasBall()&&!st.onGround&&!!st.ap&&running&&!paused&&!st.crashed;
@@ -14866,7 +14906,7 @@ const APP_VER='2026-10-03-dogfight';          // keep version.json in step when 
     get P(){return E.P;}};
 })();
 
-window.__kgeu={appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
+window.__kgeu={WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
   lights:()=>({KGEU:AL.KGEU.count(),KLUF:AL.KLUF.count(),uLights:AL_MAT.uniforms.uLights.value,

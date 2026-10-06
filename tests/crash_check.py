@@ -61,6 +61,7 @@ async def main():
         b = await launch(p)
         pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'})
         await pg.evaluate(f"()=>{{{K}.setSkill('pilot');{K}.setTOD('day');{K}.setRadioOn&&{K}.setRadioOn(false);}}")
+        await pg.evaluate(f"()=>{{{K}.WST.off=true;}}")   # the explosion in sim time; WASTED (phone3 item 7) has its own wasted_check
         for i, t in enumerate(TYPES):
             if t == 'c130': await pg.evaluate(f"()=>{K}.setSkill('rookie')")   # both skills get the same card
             await pg.evaluate(f"()=>{{{K}.pick('{t}');{K}.pickBase('kgeu');{K}.start('runway');}}")
