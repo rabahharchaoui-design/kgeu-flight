@@ -510,13 +510,19 @@ body.lookOn:not(.touch) #badges{ top:calc(var(--padT) + var(--icon) + 80px); }
 .primary.big{ font-size:20px; padding:10px 24px; background:var(--rust); color:#fff4e0; }
 .gLetter.gA,.gLetter.gB{ color:#4cd97b; } .gLetter.gC{ color:var(--caution); } .gLetter.gD,.gLetter.gF{ color:var(--warn); }
 /* ---------- the results card: one look for every run end (landing, challenge, lesson, mission, strike) ---------- */
-.overlay.res .sheet{ max-width:600px; padding:14px 18px 10px; background:rgba(18,13,9,.94); }
+.overlay.res .sheet{ max-width:600px; padding:14px 18px 10px; background:rgba(18,13,9,.94);
+  display:flex; flex-direction:column; max-height:calc(var(--vvh) - max(12px, var(--padT)) - var(--padB) - 4px); }
+.overlay.res .sheet > *{ flex:none; }
+/* a long answer (a dogfight's personal bests, achievements and rank up) scrolls inside; RETRY and the rest stay on screen */
+.overlay.res .sheet > .rLines{ flex:0 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+.overlay.res .rLines.more{ -webkit-mask-image:linear-gradient(#000 calc(100% - 22px), transparent); mask-image:linear-gradient(#000 calc(100% - 22px), transparent); }
 .overlay.res.on .sheet{ animation:resIn .34s cubic-bezier(.2,.8,.2,1) both; }
 @keyframes resIn{ from{ transform:translateY(28px); opacity:0; } to{ transform:none; opacity:1; } }
 @media (prefers-reduced-motion: reduce){ .overlay.res.on .sheet{ animation:none; } }
 .rHead{ display:flex; align-items:center; gap:14px; margin:0 0 6px; }
 .rHead .gLetter{ font-size:58px; min-width:44px; text-align:center; flex:none; }
-.rT{ min-width:0; flex:1; }
+.rT{ min-width:0; flex:1; display:flex; flex-wrap:wrap; align-items:center; column-gap:10px; }
+.rT > .sub, .rT > .rScore{ flex:1 0 100%; }
 .rT .sub{ margin:0; font-size:16px; line-height:1.25; }
 .rScore{ margin:2px 0 0; font-size:26px; font-weight:900; line-height:1.05; color:var(--ink); font-variant-numeric:tabular-nums; }
 .rScore small{ font-size:14px; font-weight:700; color:var(--soft); margin-left:6px; }
@@ -526,6 +532,7 @@ body.lookOn:not(.touch) #badges{ top:calc(var(--padT) + var(--icon) + 80px); }
 .rTip.good{ border-left-color:#4cd97b; } .rTip:empty{ display:none; }
 .rLines{ margin:0 0 10px; font-size:14px; line-height:1.4; display:grid; grid-template-columns:1fr 1fr; gap:0 18px; }
 .rLines .gl{ padding:3px 0; gap:10px; min-width:0; } .rLines .gl b{ overflow:hidden; text-overflow:ellipsis; }
+.rLines .lbLine b, .rLines .lbX b{ white-space:normal; overflow:visible; text-overflow:clip; text-align:right; }   /* ranks and bests wrap, never cut */
 .rLines .lbLine{ grid-column:1 / -1; border-bottom:none; margin-top:2px; } .rLines .lbLine b{ color:#F6C177; }
 .rLines .lbLine em{ font-style:normal; font-weight:900; margin-left:8px; color:#4cd97b; letter-spacing:.06em; }
 .rLines .lbLine.wait b{ color:var(--soft); font-weight:500; }
@@ -543,7 +550,7 @@ body.lookOn:not(.touch) #badges{ top:calc(var(--padT) + var(--icon) + 80px); }
 .acTag{ flex:none; display:inline-flex; align-items:center; gap:5px; padding:2px 8px 2px 5px; border-radius:7px; background:rgba(246,193,119,.14); border:1px solid rgba(246,193,119,.3); color:var(--sand); font-weight:800; letter-spacing:.04em; white-space:nowrap; }
 .acI{ width:22px; height:17px; flex:none; display:block; } .acI *{ fill:currentColor; }
 .rCs{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:800; letter-spacing:.08em; color:var(--soft); }
-@media (max-width:520px){ .rBtns{ flex-wrap:wrap; } .rBtns .primary.big{ flex:1 1 100%; } }
+@media (max-width:520px){ .rBtns{ flex-wrap:wrap; } .rBtns .primary.big{ flex:1 1 100%; } .rLines{ grid-template-columns:minmax(0,1fr); } }
 .rLinks{ display:flex; gap:0 12px; flex-wrap:wrap; justify-content:center; margin-top:2px; }
 .rLinks button{ background:none; border:none; min-height:44px; padding:4px 10px; font-size:15px; font-weight:700; color:#F6C177; text-decoration:underline; text-underline-offset:3px; }
 .rLinks button[hidden]{ display:none; }
@@ -704,7 +711,7 @@ label.sens b{ color:var(--ink); min-width:74px; }
 .mh{ display:flex; align-items:center; gap:10px; min-height:44px; flex:none; }
 .mh h2{ margin:0; font-size:24px; font-weight:800; letter-spacing:.01em; flex:1; }
 .mh .steps{ font-size:14px; font-weight:700; color:var(--brown); }
-#menu .back{ width:44px; height:44px; padding:0; display:grid; place-items:center; }
+#menu .back{ width:44px; min-width:44px; flex:none; height:44px; padding:0; display:grid; place-items:center; }
 #menu .back svg{ width:22px; height:22px; }
 /* home */
 #sHome{ align-items:center; justify-content:center; }
@@ -823,7 +830,7 @@ label.sens b{ color:var(--ink); min-width:74px; }
 #pauseOv .frows .chip b{ font-size:clamp(10px,1.7vw,15px); }
 #pauseOv .frow:not(.starts) .grp.g2{ flex:2.2 1 0; } #pauseOv .frow:not(.starts) .grp.g4{ flex:3.8 1 0; }
 /* 568 wide: the chips inside one group sit 8 px apart (one segmented control); everything else keeps 12 */
-@media (max-width:620px) and (orientation:landscape){ #pauseOv{ padding-left:8px; padding-right:8px; } #pauseOv .frows .chip b, .acRow .chip b{ letter-spacing:-.01em; } .acRow, #pauseOv .grp, #pauseOv .gchips, .pzQ{ gap:8px; } .pzBody{ gap:10px; } .pzL{ flex:0 0 218px; } .pzL,.pzR{ padding:8px; } #pauseOv .qs i .lg{ display:none; } #pauseOv .qs i .sm{ display:inline; } }
+@media (max-width:620px) and (orientation:landscape){ #pauseOv{ padding-left:8px; padding-right:8px; } #pauseOv .frows .chip b, .acRow .chip b{ letter-spacing:-.01em; } .acRow, #pauseOv .grp, #pauseOv .gchips, .pzQ{ gap:8px; } .pzBody{ gap:10px; } .pzL{ flex:0 0 218px; } .pzL,.pzR{ padding:8px; } #pauseOv .qs i .lg{ display:none; } #pauseOv .pzQ .qs i .sm{ display:inline; } }
 #pauseOv .qs i .sm{ display:none; }
 /* cards: missions, school, arcade. Sized to their content, two or three to a row. */
 .cards{ flex:1; min-height:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(min(196px,30vw),1fr)); grid-auto-rows:min-content; align-content:center; gap:8px; }
@@ -1014,6 +1021,8 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 .rk{ display:inline-block; width:1.25em; height:1.25em; vertical-align:-.25em; flex:none; }
 .creator{ display:inline-block; margin-left:6px; padding:0 6px; border-radius:6px; background:linear-gradient(180deg,#ffe28a,#d4a017); color:#3a2500; font:800 11px/1.6 var(--font); letter-spacing:.08em; vertical-align:2px; box-shadow:0 0 0 1px #8a6400 inset; }
 .csTag{ display:inline-flex; align-items:center; gap:6px; font-weight:800; font-size:16px; color:var(--night); white-space:nowrap; }
+/* the boards' header: my callsign gives way (ellipsis) before it pushes off the screen */
+#sLb .mh h2{ flex:none; } #lbCs{ min-width:0; flex:0 1 auto; margin-left:auto; } #lbCs > span{ min-width:0; overflow:hidden; text-overflow:ellipsis; } #lbCs svg{ flex:none; }
 .csTag i{ font-style:normal; font-size:12px; color:var(--brown); font-weight:700; }
 #flyCs{ flex:none; }
 /* trophy on cards and lesson rows */
@@ -1033,7 +1042,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 .lbList h3{ margin:6px 4px 0; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--brown); }
 #menu .lbList button{ text-align:left; min-height:44px; padding:0 12px; font-size:16px; font-weight:800; background:rgba(42,22,8,.1); color:var(--night); flex:none; }
 #menu .lbList button.sel{ background:var(--night); color:var(--sand); }
-.lbMain{ flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; background:var(--night); color:var(--sand); border-radius:14px; padding:8px 10px; }
+.lbMain{ flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; gap:6px; background:var(--night); color:var(--sand); border-radius:14px; padding:8px 10px; }
 .lbHead{ display:flex; align-items:center; gap:8px; flex:none; }
 .lbHead b{ flex:1; min-width:0; font-size:19px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .lbTabs{ display:flex; gap:4px; flex:none; }
@@ -1053,6 +1062,10 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 .lbRow.me .n,.lbRow.me.top1 .n{ color:var(--rust); } .lbRow.me .a{ color:var(--brown); }
 .lbRow.top1 .n{ color:#ffd257; }
 /* narrow boards (SE landscape, any portrait): tighter rows so the callsign keeps room beside the EASY/HARD chip */
+/* a narrow phone: the CREATOR badge is a gold star, my row drops its "of N" (the header has the total);
+   a tap on a row reads it out in full */
+@media (max-width:700px){ .lbRow .creator{ font-size:0; padding:0; width:18px; height:18px; line-height:18px; text-align:center; flex:none; margin-left:2px; vertical-align:0; }
+  .lbRow .creator::before{ content:'\2605'; font-size:12px; letter-spacing:0; } .lbRow.me .c i{ display:none; } }
 @media (max-width:700px){ .lbRow{ gap:6px; padding:0 6px; font-size:16px; } .lbRow .n{ width:auto; min-width:1.4em; } .lbRow .a{ width:4.9em; font-size:12px; } }
 /* portrait: the board list becomes one scrolling line above the board, which gets the full width */
 @media (orientation:portrait){
@@ -9093,7 +9106,10 @@ function resFill(ov,o){
   tip.textContent=o.tip||'';tip.classList.toggle('good',o.letter==='A');
   if(o.board&&LB&&LB.E.shown&&LB.E.shown.b===o.board)resBoard(LB.E.shown);
 }
+function resMore(box){box.classList.toggle('more',box.scrollHeight>box.clientHeight+2&&box.scrollTop+box.clientHeight<box.scrollHeight-2);}
+document.querySelectorAll('.overlay.res .rLines').forEach(b=>b.addEventListener('scroll',()=>resMore(b),{passive:true}));
 function resShow(ov,brief){
+  requestAnimationFrame(()=>resMore(ov.querySelector('.rLines')));
   ov.classList.toggle('brief',!!brief);
   if(brief){RES.brief=ov;RES.briefAt=performance.now()+RES_BRIEF_MS;}else{if(RES.brief===ov)RES.brief=null;paused=true;}
   ov.classList.add('on');
@@ -14837,13 +14853,15 @@ const APP_VER='2026-10-03-dogfight';          // keep version.json in step when 
     $('lbCs').innerHTML=E.P?csTag(E.P.cs,rankIdx(E.P.xp||0),E.P.creator):'';
     lbFetch(false);
   }
+  // a tap on a row reads it out in full (a 12 letter callsign is cut on a narrow phone; nothing hovers on a phone)
+  ['lbRowsIn','lbMe'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('click',ev=>{const r=ev.target.closest('.lbRow[data-full]');if(r)toast(r.dataset.full,3);});});
   function lbRows(j){
     const inn=$('lbRowsIn'),me=$('lbMe'),B=BOARDS[V.b];
     if(!j){inn.innerHTML='<div class="lbMsg"><b>Offline</b>Leaderboards need a connection. Runs you fly now are saved and sent when you are back online.</div>';me.innerHTML='';$('lbTotal').textContent='';return;}
     const mine=E.P?E.P.cs:'',myRow=j.rows.find(r=>r.cs===mine),myAc=j.me&&(j.me.ac||myRow&&myRow.ac);
-    inn.innerHTML=j.rows.length?j.rows.map(r=>'<div class="lbRow'+(r.cs===mine?' me':'')+(r.r===1?' top1':'')+'"><span class="n">'+r.r+'</span><span class="c">'+csTag(r.cs,rankByName(r.rank),r.creator)+'</span>'+lbMode(r.mode)+'<span class="s">'+esc(fmtS(V.b,r.score))+'</span><span class="a">'+lbAc(r.ac)+'</span></div>').join('')
+    inn.innerHTML=j.rows.length?j.rows.map(r=>'<div class="lbRow'+(r.cs===mine?' me':'')+(r.r===1?' top1':'')+'" data-full="'+esc(r.cs+'  ·  #'+num(r.r)+'  ·  '+fmtS(V.b,r.score)+'  ·  '+(AC_TAG[r.ac]||'')+'  ·  '+(r.mode==='easy'?'Easy':'Hard'))+'"><span class="n">'+num(r.r)+'</span><span class="c">'+csTag(r.cs,rankByName(r.rank),r.creator)+'</span>'+lbMode(r.mode)+'<span class="s">'+esc(fmtS(V.b,r.score))+'</span><span class="a">'+lbAc(r.ac)+'</span></div>').join('')
       :'<div class="lbMsg"><b>No scores yet</b>'+(V.p==='today'?'Nobody has flown this one today. ':'')+'Be the first on the board.</div>';
-    me.innerHTML=j.me?'<div class="lbRow me"><span class="n">#'+num(j.me.r)+'</span><span class="c">'+csTag(j.me.cs,rankByName(j.me.rank),j.me.creator,'of '+num(j.total))+'</span>'+lbMode(j.me.mode)+'<span class="s">'+esc(fmtS(V.b,j.me.score))+'</span><span class="a">'+(myAc&&AC_TAG[myAc]?lbAc(myAc):'YOU')+'</span></div>'
+    me.innerHTML=j.me?'<div class="lbRow me" data-full="'+esc(j.me.cs+'  ·  #'+num(j.me.r)+' of '+num(j.total)+'  ·  '+fmtS(V.b,j.me.score))+'"><span class="n">#'+num(j.me.r)+'</span><span class="c">'+csTag(j.me.cs,rankByName(j.me.rank),j.me.creator,'of '+num(j.total))+'</span>'+lbMode(j.me.mode)+'<span class="s">'+esc(fmtS(V.b,j.me.score))+'</span><span class="a">'+(myAc&&AC_TAG[myAc]?lbAc(myAc):'YOU')+'</span></div>'
       :E.P?'<div class="lbRow me"><span class="n">&ndash;</span><span class="c">'+csTag(E.P.cs,rankIdx(E.P.xp||0),E.P.creator,'no score '+(V.p==='today'?'today':V.p==='week'?'this week':'yet'))+'</span><span class="s"></span><span class="a">YOU</span></div>'
       :'<div class="lbRow me"><span class="c"><span>Pick a callsign in Settings to get on the boards</span></span></div>';
     $('lbTotal').textContent=num(j.total)+' pilot'+(j.total===1?'':'s');
@@ -14918,7 +14936,7 @@ const APP_VER='2026-10-03-dogfight';          // keep version.json in step when 
     get P(){return E.P;}};
 })();
 
-window.__kgeu={WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
+window.__kgeu={resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
   lights:()=>({KGEU:AL.KGEU.count(),KLUF:AL.KLUF.count(),uLights:AL_MAT.uniforms.uLights.value,
