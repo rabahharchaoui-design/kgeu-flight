@@ -488,6 +488,8 @@ body.lookOn:not(.touch) #badges{ top:calc(var(--padT) + var(--icon) + 80px); }
 .rScore small{ font-size:14px; font-weight:700; color:var(--soft); margin-left:6px; }
 .rScore:empty{ display:none; }
 .aStars{ margin:2px 0 0; font-size:22px; line-height:1; color:var(--orange); letter-spacing:3px; } .aStars u{ text-decoration:none; color:rgba(246,193,119,.22); } .aStars:empty{ display:none; }
+.rTip{ margin:0 0 6px; padding:5px 10px; border-radius:9px; background:rgba(246,193,119,.1); border-left:3px solid var(--orange); font-size:14px; font-weight:700; line-height:1.25; color:var(--sand); }
+.rTip.good{ border-left-color:#4cd97b; } .rTip:empty{ display:none; }
 .rLines{ margin:0 0 10px; font-size:14px; line-height:1.4; display:grid; grid-template-columns:1fr 1fr; gap:0 18px; }
 .rLines .gl{ padding:3px 0; gap:10px; min-width:0; } .rLines .gl b{ overflow:hidden; text-overflow:ellipsis; }
 .rLines .lbLine{ grid-column:1 / -1; border-bottom:none; margin-top:2px; } .rLines .lbLine b{ color:#F6C177; }
@@ -514,7 +516,7 @@ body.lookOn:not(.touch) #badges{ top:calc(var(--padT) + var(--icon) + 80px); }
 /* free flight and the dash: the card is brief, sits over the scene without pausing, and the stick and throttle beside it still work */
 .overlay.res.brief{ background:transparent; pointer-events:none; }
 .overlay.res.brief .sheet{ pointer-events:auto; max-width:470px; box-shadow:0 8px 30px rgba(0,0,0,.45); }
-@media (max-height:360px){ .overlay.res .sheet{ padding:8px 14px 6px; } .rHead{ margin-bottom:2px; } .rHead .gLetter{ font-size:44px; } .rLines{ font-size:13px; margin-bottom:4px; } .rLines .gl{ padding:1px 0; } .rBtns button{ min-height:44px; } .rLinks button{ font-size:14px; padding:2px 8px; } }
+@media (max-height:360px){ .rTip{ font-size:13px; padding:3px 8px; margin-bottom:3px; } .overlay.res .sheet{ padding:8px 14px 6px; } .rHead{ margin-bottom:2px; } .rHead .gLetter{ font-size:44px; } .rLines{ font-size:13px; margin-bottom:4px; } .rLines .gl{ padding:1px 0; } .rBtns button{ min-height:44px; } .rLinks button{ font-size:14px; padding:2px 8px; } }
 #sixpack{ position:fixed; left:calc(50% + 20px); bottom:calc(var(--saB) + 4px);
   transform:translateX(-50%); width:300px; height:200px; display:none; z-index:3;
   pointer-events:none; filter:drop-shadow(0 2px 6px rgba(0,0,0,.55)); }
@@ -8578,6 +8580,34 @@ function gradeLanding(e){
                  ['Airspeed',Math.round(kt)+' kt vs '+Math.round(tgt),Math.round(sSpd)]]};
 }
 
+// ---- the coaching tip under the grade: one line that fixes the worst stat, in that aircraft's own numbers
+// (its approach speed AC.vapp, the 3 degree path's sink at that speed, its flare). A grade A gets a compliment.
+const TIP_AC={
+  cessna:{n:'Cessna',flare:'flare to hold it off',long:'pull the power to idle over the fence',ok:'Butter. Checkride standard.'},
+  alpha:{n:'Alpha',flare:'hold it off, it floats',long:'pull the power early, it floats a long way',ok:'Lovely. That glider wing loves you.'},
+  reaper:{n:'MQ-9A',flare:'power off, small flare',long:'start down sooner, that long wing floats',ok:'Smooth. The sensor crew never felt it.'},
+  mq9b:{n:'MQ-9B',flare:'power off, small flare',long:'start down sooner, that long wing floats',ok:'Smooth. The sensor crew never felt it.'},
+  c130:{n:'C-130',flare:'power back at 50 ft, small flare',long:'plan it early, it takes a long time to slow',ok:'Textbook Herc arrival.'},
+  f16:{n:'F-16',flare:'shallow flare, nose high',long:'cross the threshold at 50 ft, not higher',ok:'Viper driver. Textbook.'}};
+function landTip(g,clean){
+  const T=TIP_AC[AC.id]||TIP_AC.cessna;if(!g)return '';
+  if(g.letter==='A')return T.n+': '+T.ok;
+  if(clean&&g.parts.every(p=>p[2]>=90))return T.n+': clean landing. '+clean;
+  const v=Math.round(g.tgt/5)*5,lo=v-5,hi=v+5,sink=Math.round(v*101.27*Math.tan(GS)/50)*50;
+  const worst=g.parts.map((p,i)=>[p[2],i]).sort((a,b)=>a[0]-b[0])[0][1];
+  if(worst===0)return T.n+': about '+sink+' fpm down final, '+T.flare+', under 150 fpm at touchdown';
+  if(worst===1)return T.n+': line up by 1 mile, rudder to keep the nose on the centreline'+(g.xw>=8?', upwind wing down':'');
+  if(worst===2)return T.n+': '+(g.along<0?'landed short, keep the PAPI two white, two red':T.long+', aim at the white blocks');
+  return T.n+': fly final at '+lo+' to '+hi+' kt, you were '+Math.round(Math.abs(g.kt-g.tgt))+' kt '+(g.kt>g.tgt?'fast':'slow');
+}
+// the missions: the short field landing's touchdown and stop, the airdrop's release
+function missTip(r,letter){
+  if(letter==='A')return r.kind==='drop'?'C-130: right on the smoke. Loadmaster is happy.':'C-130: assault landing, done right.';
+  if(r.kind==='drop')return 'C-130: run in at 140 kt and 1,000 ft into the wind, drop the moment the light goes green';
+  if(!(r.tdFt>=0&&r.tdFt<=500))return 'C-130: cross the threshold at 130 kt and 50 ft, touch down in the first 500 ft';
+  return 'C-130: brakes on the moment all the wheels are down, power to idle';
+}
+
 // ---- records. Each aircraft is ranked on the thing that matters to it. ----
 // cmp returns true when a is better than b.
 const REC={
@@ -8696,7 +8726,7 @@ function onLanding(e){
   const dashL=dash?(dash.secs<=150?'A':dash.secs<=180?'B':dash.secs<=210?'C':dash.secs<=240?'D':'F'):null;
   resFill(landOv,{letter:dash?dashL:g.letter,title:(dash?'Luke to Glendale dash, ':seg?(st.spawn==='final1'?'1 mile final segment, ':'3 mile final segment, '):free?'Free flight landing, ':'Landing, ')+g.where+
     (g.xw>=10?'  ('+Math.round(g.xw)+' kt crosswind)':''),score:dash?fmtT(dash.secs):g.pts+' pts',sub:dash?g.letter+' landing, '+g.pts+' pts':g.line,
-    lines:rows.join(''),board:dash?'mission:dash':free?'free:landing':'',retry:dash?'LUKE DASH':''});
+    lines:rows.join(''),board:dash?'mission:dash':free?'free:landing':'',retry:dash?'LUKE DASH':'',tip:dash&&dashL!=='A'?'F-16: full afterburner to 1,000 ft, then fly it level and straight to Glendale':landTip(Object.assign({},g,{letter:dash?dashL:g.letter}))});
   if(free||dash)resArm(()=>{if(!landOv.classList.contains('on')&&!menu.classList.contains('on')&&!pauseOv.classList.contains('on'))resShow(landOv,!seg);},20,true);
   // the full breakdown also goes to Records; the flight carries on through the rollout
   SCORE.recent=(SCORE.recent||[]);SCORE.recent.unshift({ac:AC.name,letter:g.letter,pts:g.pts,where:g.where,line:g.line,mode:runMode(),
@@ -8905,7 +8935,7 @@ function missScore(r){
   if(LB){if(r.kind==='drop')LB.runEnd('arc:drop',Math.round(r.dist*10)/10);else LB.runEnd('mission:short',r.pts);}
   missHud(null);
   resOpen(missOv,{letter:letter,title:(r.kind==='drop'?'Airdrop: ':'Short field landing: ')+title,score:r.kind==='drop'?Math.round(r.dist)+' m':resNum(r.pts)+' pts',
-    sub:r.kind==='drop'?'from the centre':'of 1,000',stats:lines,board:r.kind==='drop'?'arc:drop':'mission:short'});
+    sub:r.kind==='drop'?'from the centre':'of 1,000',stats:lines,board:r.kind==='drop'?'arc:drop':'mission:short',tip:missTip(r,letter)});
   logMission(r,letter);
 }
 
@@ -8950,6 +8980,8 @@ function resFill(ov,o){
   let who=ov.querySelector('.rWho');if(!who){who=document.createElement('p');who.className='rWho';ov.querySelector('.rT').appendChild(who);}
   const cs=LB&&LB.E&&LB.E.P&&LB.E.P.cs;who.innerHTML=acTag(AC.id)+(cs?'<span class="rCs"></span>':'');if(cs)who.lastChild.textContent=cs;
   const rb=ov.querySelector('.rRetry');if(rb)rb.textContent='RETRY '+(o.retry||runName());
+  let tip=ov.querySelector('.rTip');if(!tip){tip=document.createElement('p');tip.className='rTip';ov.querySelector('.rHead').after(tip);}
+  tip.textContent=o.tip||'';tip.classList.toggle('good',o.letter==='A');
   if(o.board&&LB&&LB.E.shown&&LB.E.shown.b===o.board)resBoard(LB.E.shown);
 }
 function resShow(ov,brief){
@@ -10296,7 +10328,7 @@ function arcResult(g,secs,right){
   const lb=arcBoard(ARC.kind);
   if(LB){if(pts>0)LB.runEnd(lb,pts,{secs:secs});else LB.runCancel(lb);}
   missHud(null);RES.kind='arc';
-  resOpen(arcOv,{letter:cl,title:name+': '+why,score:resNum(pts)+' pts',stars:stars,stats:stats,board:pts>0?lb:''});
+  resOpen(arcOv,{letter:cl,title:name+': '+why,score:resNum(pts)+' pts',stars:stars,stats:stats,board:pts>0?lb:'',tip:!right||!g?'Land on '+arcApt(ARC.end)+' runway '+ARC.end.num+': follow the arrow on the HUD':landTip(Object.assign({},g,{letter:cl}),'Cut the corners and keep the speed up to beat par')});
 }
 function arcStop(){if(ARC.on&&DEST===ARC.end){DEST=null;document.body.classList.remove('hasDest');destUI(true);}ARC.on=false;ARC.done=false;}
 function arcScore(id){
@@ -14705,7 +14737,7 @@ const APP_VER='2026-10-03-dogfight';          // keep version.json in step when 
     get P(){return E.P;}};
 })();
 
-window.__kgeu={runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
+window.__kgeu={landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
   lights:()=>({KGEU:AL.KGEU.count(),KLUF:AL.KLUF.count(),uLights:AL_MAT.uniforms.uLights.value,
     layers:AL_LAYERS.map(L=>({name:L.pts&&L.pts.name,visible:!!(L.pts&&L.pts.visible),inScene:!!(L.pts&&L.pts.parent)})),
