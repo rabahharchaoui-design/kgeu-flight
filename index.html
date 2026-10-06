@@ -724,6 +724,10 @@ label.sens b{ color:var(--ink); min-width:74px; }
 #menu .corner{ position:absolute; top:var(--padT); width:48px; height:48px; padding:0; display:grid; place-items:center; background:rgba(42,22,8,.12); color:var(--night); }
 #menu .corner svg{ width:24px; height:24px; }
 .corner.tl{ left:var(--padL); } .corner.tr{ right:var(--padR); }
+/* no connection: a small chip beside Settings (the game still flies; board runs wait in the queue) */
+.offChip{ position:absolute; top:calc(var(--padT) + 10px); right:calc(var(--padR) + 60px); display:inline-flex; align-items:center; gap:5px; height:28px; padding:0 10px 0 8px; border-radius:14px;
+  background:rgba(42,22,8,.82); color:var(--sand); font:800 12px/1 var(--font); letter-spacing:.08em; text-transform:uppercase; pointer-events:none; }
+.offChip[hidden]{ display:none; } .offChip svg{ width:15px; height:15px; }
 /* fly: one screen. The carousel window is drawn by the game renderer through a transparent hole. */
 #sFly{ gap:6px; }
 .carx{ position:relative; flex:1; min-height:0; display:flex; flex-direction:column; }
@@ -1253,6 +1257,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
     <path d="M0 175 C200 145 380 160 560 170 S850 140 1000 150 L1000 300 L0 300Z" fill="#A8592A"/>
     <path d="M0 240 C220 215 430 230 640 225 S900 205 1000 215 L1000 300 L0 300Z" fill="#6B3517"/></svg>
   <button class="corner tl" id="hRec" aria-label="Records"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2.5h6V4M8.5 10h7M8.5 14h7M8.5 18h4"/></svg></button>
+  <span id="hOff" class="offChip" role="status" hidden><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M2 8.5a15 15 0 0 1 20 0M5.5 12.5a10 10 0 0 1 13 0M9 16.4a5 5 0 0 1 6 0"/><circle cx="12" cy="20" r="1.2" fill="currentColor"/><path d="M3 3l18 18"/></svg>Offline</span>
   <button class="corner tr" id="hSet" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></button>
   <div class="homeC">
    <h1 class="title">Pocket Flight Sim</h1>
@@ -11642,6 +11647,8 @@ document.querySelectorAll('.oTcas').forEach(b=>b.onclick=()=>setTcas(!TCAS.on));
 document.addEventListener('pointerdown',e=>{const b=e.target&&e.target.closest?e.target.closest('button'):null;
   if(b&&b.closest('#menu,#pauseOv,.overlay,#crash,#funnel,#csOv,#tkCtl'))hapPattern('button');},true);
 hapInit();
+function offUI(){const e=$('hOff');if(e)e.hidden=navigator.onLine!==false;}
+addEventListener('online',offUI);addEventListener('offline',offUI);offUI();
 $('pSens').onclick=()=>setStickSens((TOUCH.sens+1)%STICK_SENS.length);
 $('oMusic').onclick=()=>{initAudio();TK.paused=false;setMusicOn(!MUSIC.on);};
 $('oMfree').onclick=()=>{initAudio();setMusicFree(!MUSIC.free);};
@@ -14875,12 +14882,17 @@ const APP_VER='2026-10-03-dogfight';          // keep version.json in step when 
 
   // ---- start up: see if the Worker answers; ask for a callsign after the splash if there is none
   function boot(){
+    window.__kgeu.APP_VER=APP_VER;
     fameBuild();ui();paintAll();
     // no service worker, so the page itself checks it is the newest build: version.json is
     // fetched past every cache and a stale copy reloads once, before any flight starts
     if(location.origin===ORIGINS[0])fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(r=>r.json()).then(j=>{
       if(!j||!j.v||j.v===APP_VER||running)return;let k='';try{k=sessionStorage.getItem('kgeuVer')||'';sessionStorage.setItem('kgeuVer',j.v);}catch(e){}
       if(k!==j.v)location.reload();}).catch(()=>{});
+    // offline (phone3 item 8): the service worker, on the real origins (and ?sw=1 for the offline test); a new
+    // APP_VER is a new worker URL, so each version installs, takes over and keeps its own cache
+    if('serviceWorker' in navigator&&(ORIGINS.indexOf(location.origin)>=0||/[?&]sw=1\b/.test(location.search)))
+      navigator.serviceWorker.register('sw.js?v='+encodeURIComponent(APP_VER)).catch(()=>{});
     if(!E.enabled)return;
     api('/health',null,7000).then(()=>{
       if(!E.P){const wait=()=>{const s=$('splash');if(s&&!s.classList.contains('done')){setTimeout(wait,150);return;}if(!E.P)csOpen('pick','launch');else csRelease();};wait();}
