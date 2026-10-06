@@ -71,6 +71,7 @@ BOTH = {
     'cs_hawg':          'Hawg one',
     'cs_pocket737':     'Pocket seven three seven',
     'cs_pocket320':     'Pocket three two zero',
+    'cs_pocket747':     'Pocket seven four seven',
 }
 
 # ---- controller only ----
