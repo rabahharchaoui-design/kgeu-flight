@@ -8976,14 +8976,14 @@ function resBoard(o){
 function resMenu(ov){resClose(ov);if(ARC.on)arcStop();if(MISS.on)missReset();openMenu();}
 $('lKeep').onclick=()=>{resClose(landOv);paused=false;};
 $('lMenu').onclick=()=>resMenu(landOv);
-$('lAgain').onclick=()=>{resClose(landOv);start(st.mode==='final'?(st.spawn||'final'):'runway');};
+$('lAgain').onclick=()=>{resClose(landOv);runRestart();};
 $('lRec').onclick=()=>{resClose(landOv);recOpen();};
 $('mFree').onclick=()=>{resClose(missOv);missReset();paused=false;};
 $('mMenu').onclick=()=>resMenu(missOv);
-$('mRetry').onclick=()=>{resClose(missOv);start(MISS.kind==='drop'?'drop':'short');};
+$('mRetry').onclick=()=>{resClose(missOv);runRestart();};
 $('aFree').onclick=()=>{resClose(arcOv);arcStop();dfStop();paused=false;};
 $('aHub').onclick=()=>resMenu(arcOv);
-$('aRetry').onclick=()=>{resClose(arcOv);if(RES.kind==='strike')start('range');else if(RES.kind==='df')dfStart(DF.daily?{daily:1}:null);else arcStart(ARC.kind);};
+$('aRetry').onclick=()=>{resClose(arcOv);runRestart();};
 
 // ================= Drop zone guidance =================
 // So nobody has to guess where the drop zone is: its icon on both maps with the waypoint
@@ -10246,6 +10246,7 @@ function arcStart(kind){
   if(sp.gs){st.vel.y=-Math.hypot(st.vel.x,st.vel.z)*Math.tan(GS);st.throttle=st.power=AC.finalThr;st.trim=AC.finalTrim;
     if(easy){st.flapIdx=AC.landFlap;st.gearDown=true;st.gearPos=1;}else st.flapIdx=AC.finalFlap;
     trimSpawn(st,-GS);}
+  RUNSTART={k:'arc',kind:kind};
   Object.assign(ARC,{on:true,kind:kind,t0:st.time,end:e,done:false,dist:sp.dist,par:Math.round((sp.dist+2500)/(AC.vapp*1.3)+25),practice:false});
   if(LB)LB.runStart(arcBoard(kind));
   DEST=e;document.body.classList.add('hasDest');destUI(true);
@@ -10451,7 +10452,7 @@ function dfStart(o){
   // the range is Arizona's: from a world region switch there first, the run starts after the reload
   if(!REGION.az){pickRegion('az',{resume:{df:1,daily:daily?1:0,region:'az',type:'f16',tod:TOD.id}});return;}
   if(!WORLD.ready){toast('Loading '+REGION.city+'…');return;}
-  pickType('f16',1);start('runway','luke');
+  pickType('f16',1);start('runway','luke');RUNSTART={k:'df',daily:daily};
   // no haboob over the range: the day sky for this run, the saved choice comes back on the next start()
   if(TOD.id==='haboob'){const p=TOD.id;setTOD('day');try{localStorage.setItem('kgeuTOD',p);}catch(e){}ARC.prevTod=p;hbSync(true);}
   dfBuild();
@@ -11263,6 +11264,17 @@ function photoSave(){
 $('pPhoto').onclick=photoOpen;$('phX').onclick=photoClose;$('phSave').onclick=photoSave;
 // ---------- menus ----------
 const menu=document.getElementById('menu'),crashEl=document.getElementById('crash'),crashTopEl=document.getElementById('crashTop');
+// How the run on screen was started, so every Restart (pause sheet), RETRY (crash card) and Try again
+// (results cards) flies exactly the same start: a free flight / segment / mission start keeps its spawn
+// (final1 is not final), base and aircraft; an arcade game, lesson or dogfight goes back through its own
+// starter (arcStart, startLesson, dfStart), which sets its own position. Each starter stamps it after start().
+let RUNSTART={k:'free',mode:'runway',base:null,type:null};
+function runRestart(){const R=RUNSTART;
+  if(R.k==='arc'){arcStart(R.kind);return;}
+  if(R.k==='les'){startLesson(R.id);return;}
+  if(R.k==='df'){dfStart(R.daily?{daily:1}:null);return;}
+  if(R.type&&R.type!==acType)pickType(R.type,1);
+  start(R.mode||'runway',R.base||undefined);}
 function start(mode,base){
   // missions, the strike and the Luke dash are Arizona's for now: from a world region they switch back
   if(!REGION.az&&(mode==='range'||mode==='drop'||mode==='short'||base==='luke')){pickRegion('az',{resume:{mode:mode,base:base,type:acType,tod:TOD.id}});return;}
@@ -11271,7 +11283,7 @@ function start(mode,base){
   initAudio();
   if(ARC.prevTod){const p=ARC.prevTod;ARC.prevTod=null;setTOD(p);}
   setType(acType);useModel(acType);sizeShadow();vqReset();radioHush();radioFadeTok++;radioVolApply();chatT=9;atcT=0;TK.paused=false;
-  const spawn=mode;if(mode==='final1')mode='final';
+  const spawn=mode;if(mode==='final1')mode='final';RUNSTART={k:'free',mode:spawn,base:base||SPAWN_BASE,type:acType};
   st=createState(mode,base||SPAWN_BASE,spawn==='final1'?1852:0);st.type=acType;st.spawn=spawn;
   // 1 mile final: Easy is already configured to land (gear down, landing flaps); Hard is set up the way the
   // 3 mile final is, gear down and approach flaps, and the last stage of flap is the pilot's
@@ -11326,7 +11338,7 @@ $('pResume').onclick=()=>{paused=false;pauseOv.classList.remove('on');initAudio(
 var PZ0=null;
 function pzChanged(){return !!PZ_LOC||!!PZ0&&(PZ0.t!==savedType||PZ0.b!==SPAWN_BASE||PZ0.p!==SPAWN_POS);}
 function pzApplyUI(){const b=$('pApply');if(b)b.textContent=pzChanged()?'Apply':'Restart';}
-function pzRestart(){if(DF.live){dfStart();return;}start(st.mode==='final'||st.mode==='ramp'?(st.spawn||st.mode):(MISS.on?MISS.kind:STRIKE.active?'range':'runway'));}
+function pzRestart(){runRestart();}
 $('pMenu').onclick=()=>openMenu();
 function freeStart(mode){pickType(savedType);pickPos(mode||SPAWN_POS);start(SPAWN_POS);}
 function landDetails(){if(!running||st.crashed||menu.classList.contains('on'))return;badgeHide();resShow(landOv,false);}
@@ -11339,7 +11351,7 @@ document.getElementById('recReset').onclick=e=>{
   scReset();resetArmed=0;e.target.textContent='Reset all records';e.target.classList.remove('arm');
   toast('All records and achievements erased');};
 // the crash card: RETRY flies the same start again (runway, ramp, final or mission, same base)
-function crashRetry(){if(CRASH.mode==='dogfight'){dfStart();return;}start(CRASH.mode||'runway',CRASH.base);}
+function crashRetry(){runRestart();}
 tapBtn($('cRetry'),crashRetry);
 tapBtn($('cMenu'),()=>{crashEl.classList.remove('on');crashTopEl.classList.remove('on');openMenu();});
 document.getElementById('bFull').onclick=()=>{const d=document.documentElement;if(document.fullscreenElement){document.exitFullscreen&&document.exitFullscreen();return;}
@@ -11515,7 +11527,7 @@ function startLesson(id){
   const S=SCH[acType];gradeOv.classList.remove('on');
   start(id==='pattern'||id==='first'?'runway':'final','kgeu');A.land=1;
   lesEl.classList.toggle('tut',id==='first');$('lesQuit').textContent=id==='first'?'Skip':'End';
-  LES.on=id;LES.t=0;LES.ph=0;LES.d={};LES.name=LESSONS.find(l=>l.id===id).name;if(LB)LB.runStart('lesson:'+id);lesT.textContent=id==='first'?'Lesson 1: First flight':'Flight school: '+LES.name;lesEl.classList.add('on');
+  RUNSTART={k:'les',id:id};LES.on=id;LES.t=0;LES.ph=0;LES.d={};LES.name=LESSONS.find(l=>l.id===id).name;if(LB)LB.runStart('lesson:'+id);lesT.textContent=id==='first'?'Lesson 1: First flight':'Flight school: '+LES.name;lesEl.classList.add('on');
   st.ezManFlap=id!=='pattern'&&id!=='engine'&&id!=='first'?1:0;
   if(id==='first'){st.easy=true;st.noPF=true;coach2('Your first flight. Follow the arrows. It takes about a minute.');return;}
   if(id==='steep'){airStart(7000,2500,3500,360,S.turn,0,S.thrTurn);st.bankMax=0.95;
@@ -14666,7 +14678,7 @@ const APP_VER='2026-10-03-dogfight';          // keep version.json in step when 
     get P(){return E.P;}};
 })();
 
-window.__kgeu={MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
+window.__kgeu={runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
   lights:()=>({KGEU:AL.KGEU.count(),KLUF:AL.KLUF.count(),uLights:AL_MAT.uniforms.uLights.value,
     layers:AL_LAYERS.map(L=>({name:L.pts&&L.pts.name,visible:!!(L.pts&&L.pts.visible),inScene:!!(L.pts&&L.pts.parent)})),
