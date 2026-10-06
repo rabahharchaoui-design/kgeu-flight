@@ -7,9 +7,9 @@ from harness import serve, launch, page, Checks, IPHONE_15
 ok = Checks()
 SHOTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'overnight-screenshots', 'props')
 K = 'window.__kgeu'
-BLADES = {'cessna': 2, 'alpha': 2, 'reaper': 3, 'mq9b': 3, 'c130': 4}
+BLADES = {'cessna': 2, 'archer': 2, 'alpha': 2, 'reaper': 3, 'mq9b': 3, 'c130': 4}
 # prop hub in the aircraft frame (x, y, z; nose is -z) and a camera offset from it
-HUB = {'cessna': ([0, -0.13, -3.2], 3.2), 'alpha': ([0, -0.52, -2.82], 2.8), 'reaper': ([0, 0.13, 5.9], 3.8),
+HUB = {'cessna': ([0, -0.13, -3.2], 3.2), 'archer': ([0, 0.0, -2.42], 3.0), 'alpha': ([0, -0.52, -2.82], 2.8), 'reaper': ([0, 0.13, 5.9], 3.8),
        'mq9b': ([0, 0.14, 6.2], 3.8), 'c130': ([-4.85, 1.6, -11.2], 7.5)}
 SHOT = '--noshots' not in sys.argv
 

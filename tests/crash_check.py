@@ -14,9 +14,9 @@ ok = Checks()
 SHOTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'overnight-screenshots', 'crash')
 SHOT = '--noshots' not in sys.argv
 K = 'window.__kgeu'
-TYPES = ['cessna', 'alpha', 'reaper', 'mq9b', 'f16', 'c130']
-SCALE = {'cessna': 0.8, 'alpha': 0.8, 'reaper': 0.9, 'mq9b': 0.9, 'f16': 1.6, 'c130': 2.6}
-SEC = {'cessna': 0, 'alpha': 0, 'reaper': 1, 'mq9b': 1, 'f16': 2, 'c130': 3}
+TYPES = ['cessna', 'archer', 'alpha', 'reaper', 'mq9b', 'f16', 'c130']
+SCALE = {'cessna': 0.8, 'archer': 0.8, 'alpha': 0.8, 'reaper': 0.9, 'mq9b': 0.9, 'f16': 1.6, 'c130': 2.6}
+SEC = {'cessna': 0, 'archer': 0, 'alpha': 0, 'reaper': 1, 'mq9b': 1, 'f16': 2, 'c130': 3}
 
 async def step(pg, secs, dt=1/30, render=False):
     await pg.evaluate("([n,dt,r])=>{const K=window.__kgeu;for(let i=0;i<n;i++)K.stepFrame(dt,false,true);if(r)K.stepFrame(1/60);}",

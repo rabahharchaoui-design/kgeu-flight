@@ -10,7 +10,7 @@ from playwright.async_api import async_playwright
 from harness import serve, launch, page, Checks, IPHONE_15
 ok = Checks()
 
-TYPES = ['cessna', 'alpha', 'reaper', 'mq9b', 'f16', 'c130']
+TYPES = ['cessna', 'archer', 'alpha', 'reaper', 'mq9b', 'f16', 'c130']
 if sys.argv[1:]: TYPES = sys.argv[1:]
 SPEEDS = [(2, 2.0, 8), (5, 2.5, 15), (15, 2.5, 20)]    # kt, seconds held, minimum heading change in degrees
 MODES = [('Hard', 'pilot'), ('Easy', 'rookie')]

@@ -63,6 +63,9 @@ BOTH = {
     'cs_skyguardian_s': 'Sky Guardian zero tango charlie',
     'cs_pipistrel':     'Pipistrel five zero two alpha tango',
     'cs_pipistrel_s':   'Pipistrel two alpha tango',
+    # planes2: the Archer
+    'cs_archer':        'Archer eight one two eight papa',
+    'cs_archer_s':      'Archer two eight papa',
 }
 
 # ---- controller only ----
