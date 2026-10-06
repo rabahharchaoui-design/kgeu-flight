@@ -19,7 +19,7 @@ THREE = open('node_modules/three/build/three.min.js').read()
 SRV, URL = serve(os.path.abspath('.'))
 args = [a for a in sys.argv[1:] if not a.startswith('--')]
 OUT = os.path.abspath(args[0] if args else 'overnight-screenshots/models')
-TYPES = args[1:] or ['c130', 'mq9b', 'f16', 'reaper', 'cessna', 'alpha', 'archer', 'a10']
+TYPES = args[1:] or ['c130', 'mq9b', 'f16', 'reaper', 'cessna', 'alpha', 'archer', 'a10', 'b737']
 BIG = '--big' in sys.argv
 VIEW = {'width': 1200, 'height': 700} if BIG else {'width': 844, 'height': 390}
 
@@ -28,7 +28,7 @@ VIEW = {'width': 1200, 'height': 700} if BIG else {'width': 844, 'height': 390}
 REFS = {
     'c130': ['refs/IMG_2834.WEBP', 'refs/IMG_2832.WEBP', 'refs/IMG_2836.WEBP', 'refs/IMG_2835.WEBP'],
     'mq9b': ['refs/mq9b'], 'f16': ['refs/ref_f16.jpg'], 'reaper': ['refs/mq9a'],
-    'cessna': ['refs/cessna172'], 'alpha': ['refs/pipistrel'], 'archer': ['refs/archer'], 'a10': ['refs/a10'],
+    'cessna': ['refs/cessna172'], 'alpha': ['refs/pipistrel'], 'archer': ['refs/archer'], 'a10': ['refs/a10'], 'b737': ['refs/b737'],
 }
 def ref_files(t):
     out = []

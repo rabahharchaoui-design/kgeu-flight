@@ -8,8 +8,8 @@ from playwright.async_api import async_playwright
 from harness import serve, launch, page, Checks, IPHONE_15
 ok = Checks()
 K = 'window.__kgeu'
-VAPP = {'cessna': 65, 'archer': 66, 'alpha': 55, 'reaper': 100, 'mq9b': 100, 'c130': 130, 'f16': 155, 'a10': 135}
-NAME = {'cessna': 'Cessna', 'archer': 'Archer', 'alpha': 'Alpha', 'reaper': 'MQ-9A', 'mq9b': 'MQ-9B', 'c130': 'C-130', 'f16': 'F-16', 'a10': 'A-10'}
+VAPP = {'cessna': 65, 'archer': 66, 'alpha': 55, 'reaper': 100, 'mq9b': 100, 'c130': 130, 'f16': 155, 'a10': 135, 'b737': 145}
+NAME = {'cessna': 'Cessna', 'archer': 'Archer', 'alpha': 'Alpha', 'reaper': 'MQ-9A', 'mq9b': 'MQ-9B', 'c130': 'C-130', 'f16': 'F-16', 'a10': 'A-10', 'b737': '737'}
 
 def g(letter, sink, off, aim, spd, kt, tgt, along=120, xw=0):
     return {'letter': letter, 'kt': kt, 'tgt': tgt, 'along': along, 'xw': xw,

@@ -14,7 +14,7 @@ ok = Checks()
 SHOTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'overnight-screenshots', 'phone0929', 'item13')
 K = 'window.__kgeu'
 ARGS = [a for a in sys.argv[1:] if not a.startswith('--')]
-TYPES = ARGS or ['cessna', 'archer', 'alpha', 'reaper', 'mq9b', 'f16', 'a10', 'c130']
+TYPES = ARGS or ['cessna', 'archer', 'alpha', 'reaper', 'mq9b', 'f16', 'a10', 'c130', 'b737']
 SHOT = '--noshots' not in sys.argv
 FLOWS = '--noflows' not in sys.argv   # the takeoff and autoland sweep (slow: about 5 min)
 TYRE_TOL = 0.05          # tyre bottoms within 5 cm of the surface
@@ -105,7 +105,7 @@ async def main():
         for t in TYPES:
             print('--', t)
             await pg.evaluate("()=>window.__kgeu.stepFrame(0,true)")
-            await ev(f"{K}.pick('{t}');{K}.pickBase('kgeu');{K}.start('runway')"); await pg.wait_for_timeout(1200)
+            await ev(f"{K}.pick('{t}');{K}.pickBase({K}.baseOK('{t}','kgeu')?'kgeu':'phx');{K}.start('runway')"); await pg.wait_for_timeout(1200)
             await ev(f"const s={K}.state();s.throttle=0;s.brake=true;")
             await step(120)
             await ev(f"const s={K}.state();s.throttle=0;s.power=0;s.brake=true;")

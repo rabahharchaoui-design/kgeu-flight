@@ -363,6 +363,10 @@ body.dfOn #uiroot > #dfW{ display:block; }
 #dfW button.dim{ opacity:.38; }
 body.dfOn #uiroot > #dock{ right:calc(var(--padR) + var(--col) + 12px + 84px + 12px + 6px); bottom:calc(var(--padB) + 72px + 12px); }
 body.dfOn #uiroot > #tcas, body.crashOn #dfW, body.crashOn #dfHud{ display:none !important; }
+/* Easy's flight director for the airliners (planes2 item 3): a small canvas in the centre, no text */
+#uiroot > #fd{ position:absolute; left:50%; top:50%; width:220px; height:160px; margin:-80px 0 0 -110px; display:none; pointer-events:none; }
+body.fdOn #uiroot > #fd{ display:block; }
+.pick.chip.off{ opacity:.38; }
 /* the A-10 on the strike range (planes2 item 2): the GUN button alone, the dock steps left of it */
 body.hogOn #uiroot > #dfW{ display:block; } body.hogOn #bFox, body.hogOn #bFlr{ display:none; }
 body.hogOn #uiroot > #dock{ right:calc(var(--padR) + var(--col) + 12px + 72px + 12px + 6px); }
@@ -1238,6 +1242,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   <!-- Red Flag Dogfight: the weapons, the target boxes, edge arrows, seeker,
        pipper and the incoming missile arrow, and the one subtitle line in the bottom strip -->
   <div id="dfW"><button id="bFox" aria-label="Fox 2, fire a heat missile"><b>FOX 2</b><i id="bFoxN">x6</i></button><button id="bGun" aria-label="Gun, hold to fire"><b>GUN</b><i id="bGunN">510</i></button><button id="bFlr" aria-label="Flares"><b>FLARES</b><i id="bFlrN">30</i></button></div>
+  <canvas id="fd" aria-hidden="true"></canvas>
   <div id="dfHud" aria-hidden="true"><div class="dfSeek"><b></b></div><div class="dfPip"><b></b><i></i></div><div class="dfMw"><b></b><span></span></div></div>
   <div id="dfSub" role="status" aria-live="polite"></div>
   <div id="lookPad" role="slider" aria-label="Free look, drag to swing the camera"><svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13c2-3.2 4.3-4.8 7-4.8s5 1.6 7 4.8c-2 3.2-4.3 4.8-7 4.8S8 16.2 6 13z"/><circle cx="13" cy="13" r="2" fill="currentColor"/><path d="M13 1.5v3M11.5 3l1.5-1.5L14.5 3M13 24.5v-3M11.5 23l1.5 1.5 1.5-1.5M1.5 13h3M3 11.5L1.5 13 3 14.5M24.5 13h-3M23 11.5l1.5 1.5-1.5 1.5"/></svg><i>LOOK</i></div>
@@ -1743,8 +1748,17 @@ const BASES=!REGION.az?{[REGION.id]:{id:REGION.id,name:REGION.base,rwy:REGION.ma
   luke:{id:'luke',name:'Luke AFB',rwy:'03L',hdg:42.6,twr:'Luke Tower 133.45',gnd:'Luke Ground 121.8',twrClip:'luke_tower',gndClip:'luke_ground',rwyClip:'rwy_03l',
         runway:[()=>lkX(-1498,-152.5),()=>lkZ(-1498,-152.5)],
         ramp:[()=>lkX(-300,430),()=>lkZ(-300,430)],rampHdg:312.6,
-        fin:d=>[lkX(-1210-d,-152.5),lkZ(-1210-d,-152.5)]}
+        fin:d=>[lkX(-1210-d,-152.5),lkZ(-1210-d,-152.5)]},
+  // planes2: Sky Harbor for the airliners. Runway 7L is 11,489 ft; the frame is shX/shZ (u along 092, v right)
+  phx:{id:'phx',name:'Sky Harbor',rwy:'7L',hdg:92,twr:'Phoenix Tower 120.9',gnd:'Phoenix Ground 132.55',twrClip:'phoenix_tower',gndClip:'phoenix_ground',rwyClip:'rwy_07l',
+        runway:[()=>shX(-1739,-300),()=>shZ(-1739,-300)],
+        ramp:[()=>shX(-130,95),()=>shZ(-130,95)],rampHdg:2,
+        fin:d=>[shX(-1451-d,-300),shZ(-1451-d,-300)]}
 };
+// the longest runway of a base, metres: the long runway rule for the airliners (TYPES.minRwy)
+const BASE_RWY={kgeu:RWY_LEN,luke:3052,phx:3502};
+function rwyLenOf(b){if(BASE_RWY[b])return BASE_RWY[b];const R=REGIONS[b];if(R&&R.rw){const r=R.rw.find(r=>r[0]===R.main||r[1]===R.main);return r?r[2]:1e9;}return 1e9;}
+function baseOK(t,b){const T=TYPES[t];return !T||!T.minRwy||rwyLenOf(b)>=T.minRwy;}
 // ---------- every runway in the game, and both of its ends ----------
 // hdg is the direction you land in, radians clockwise from north. x,z is the landing threshold.
 const RUNWAYS=(function(){
@@ -1834,6 +1848,18 @@ const TYPES={
     // outside Arizona (4.6b): the same without the field; flySub adds the region's runway and elevation
     sub2:'A-10C Thunderbolt II 80-0217, a DM tail from Davis-Monthan in Tucson. The 30 mm gun in the nose, two TF34s up on the tail, a straight 57 ft wing. Slow, stable and built to take a hit.',
     tips:'Manual: flaps 7, full power, rotate at 125 kt, gear up. It is slow to accelerate and slow to stop. Land at 135 kt with flaps 20, a little nose up.'},
+  // airliners (planes2): minRwy gates the bases (metres of runway), athr and fd are Easy's autothrottle and flight
+  // director, heavy marks the slow, deliberate response (apRate, ezGR, ezBank, decel, spool)
+  b737:{id:'b737',name:'Boeing 737-800',title:'N737PA',mass:65000,S:124.6,Tstatic:234000,Pmax:1e9,eta:1,CL0:0.25,CLa:5.0,aStall:0.27,CD0:0.022,k:0.045,span:35.79,len:39.5,gear:3.45,
+    spool:4.0,pf:0,retract:1,wave:0,tipRoll:0.16,tipMsg:'Wingtip strike. That 118 ft wing is low, keep it level onto the runway.',gndPitch:0.12,trimBase:0.04,trimK:0.12,
+    flaps:[{deg:0,cl:0,cd:0},{deg:5,cl:0.30,cd:0.01},{deg:15,cl:0.60,cd:0.03},{deg:30,cl:0.95,cd:0.08}],toFlap:1,landFlap:3,finalFlap:2,finalThr:0.45,finalPitch:0.04,finalTrim:0.6,vr:145*KT,vy:250*KT,vcruise:280*KT,vapp:145*KT,patAlt:457,climbVS:12,descMax:10,
+    maxBank:0.52,ipD:9000,fafD:5500,slowD:4000,decel:0.5,ezG:0.2,ezGR:0.08,ezBank:0.45,thrC:0.55,flareH:9,flareK:0.22,tdSink:0.7,tdPitch:0.05,rotP:0.14,rotRate:0.045,apRate:[0.12,0.15,0.3],vne:340,vfe:175,snd:'fan',cam1:[-0.5,1.0,-14.3],cam1Name:'Flight deck',chase:[14,78],
+    minRwy:2400,athr:1,fd:1,heavy:1,
+    cs:'Pocket 737',csS:'Pocket 737',say:'Pocket seven three seven',sayS:'Pocket seven three seven',
+    sub:'Pocket Air Boeing 737-800, N737PA, at Phoenix Sky Harbor. 174 seats, two CFM56s, blended winglets. Heavy and deliberate: plan every turn and every descent a long way ahead. Runway 7L is 11,489 ft, field elevation 1,135.',
+    // outside Arizona (4.6b): the same without the field; flySub adds the region's runway and elevation
+    sub2:'Pocket Air Boeing 737-800, N737PA. 174 seats, two CFM56s, blended winglets. Heavy and deliberate: plan every turn and every descent a long way ahead.',
+    tips:'Manual: flaps 5, full power, rotate at 145 kt, gear up. Approach at 145 kt with flaps 30, about 750 fpm down final, a small flare at 30 ft.'},
   f16:{id:'f16',name:'F-16C Viper',title:'89-2032',mass:11000,S:27.87,Tstatic:95000,Pmax:1e9,eta:1,CL0:0.05,CLa:3.5,aStall:0.42,CD0:0.022,k:0.12,span:9.96,len:15,gear:1.72,
     spool:2.2,pf:0,retract:1,wave:0.06,tipRoll:0.35,tipMsg:'Wingtip strike. Level the wings before touchdown.',gndPitch:0.2,trimBase:0.08,trimK:0.18,
     flaps:[{deg:0,cl:0,cd:0},{deg:20,cl:0.55,cd:0.04}],toFlap:1,landFlap:1,finalFlap:1,finalThr:0.18,finalPitch:0.19,finalTrim:0.9,vr:145*KT,vy:300*KT,vcruise:300*KT,vapp:155*KT,patAlt:457,climbVS:22,descMax:12,
@@ -2066,8 +2092,14 @@ function apPitch(st,vs,dt,gm){
 }
 function apSpeed(st,vc,dt){const e=vc-st.ias;st.apTI=clamp(st.apTI+e*0.02*dt,0,1);st.throttle=clamp(st.apTI+e*0.08,0,1);}
 function apBank(trk,cmd,max,V){return clamp(wrapPi(cmd-trk)*1.6*clamp((V||50)/50,1,2.5),-max,max);}
-function apGround(st,hdg,v,pitchCmd,rate){
-  const hc=RH-clamp(v*0.08,-0.15,0.15);if(!st.apW)st.apW=new V3();
+// the base's own runway frame for the ground roll (planes2): u from the runway start along the takeoff direction, v right,
+// h the heading. Glendale's is the world frame; Luke and Sky Harbor have their own (lukeUV, shUV)
+function homeRwy(base,x,z){
+  if(base==='luke'){const K=lukeUV(x,z);return [K[0]+1510.5,K[1]+152.5,LUKE.h];}
+  if(base==='phx'){const K=shUV(x,z);return [K[0]+1751,K[1]+300,SKY_HARBOR.h];}
+  return [toU(x,z),toV(x,z),RH];}
+function apGround(st,hdg,v,pitchCmd,rate,rh){
+  const hc=(rh===undefined?RH:rh)-clamp(v*0.08,-0.15,0.15);if(!st.apW)st.apW=new V3();
   st.apW.set(clamp((pitchCmd-_eB.x)*2,-0.12,rate),-clamp(wrapPi(hc-hdg)*1.5,-0.25,0.25),0);
 }
 // Easy: the runway end we are lined up with, any airport runway, either direction (not the assault
@@ -2137,6 +2169,11 @@ function easyFly(st,dt,ev){
   else if(prev==='climb'){if(agl>260||st.ias>AC.vy*1.08)cfg='clean';}
   else if(st.airTime<3&&st.vel.y>0.5)cfg='climb';
   if(cfg!==prev){st.ezCfg=cfg;if(cfg==='approach')st.ezV=Math.max(AC.vapp,Math.min(st.ezV,AC.vapp*1.1));else if(cfg==='climb')st.ezV=AC.vy;}
+  // the airliners' autothrottle (planes2): holds the phase's speed (Vy climbing, 250 kt clean, Vapp on the approach);
+  // apOffThr hands it to the pilot on a throttle input, and it comes back with the next phase
+  if(AC.athr){const vt=cfg==='approach'?AC.vapp:cfg==='climb'?AC.vy:Math.min(AC.vcruise,250*KT);
+    if(st.ezATm===undefined||cfg!==prev){if(st.ezATm!==0&&ev)ev.push({type:'ap',msg:'A/THR holding '+Math.round(vt*MS2KT)+' kt'});st.ezATm=0;}
+    st.ezATt=vt;}
   if(AC.retract){
     const wantDown=cfg==='approach'||(agl<40&&st.vel.y<-0.5);
     if(wantDown&&!st.gearDown){st.gearDown=true;ev&&ev.push({type:'ap',msg:'Gear down'});}
@@ -2173,6 +2210,7 @@ function easyFly(st,dt,ev){
     if(st.ezFl){vs=-(AC.tdSink+agl*AC.flareK);if(!st.ezIdle){st.ezIdle=1;st.ezIdleDone=1;ev&&ev.push({type:'ap',msg:'Auto idle'});}}
     else vs=-gsp*Math.tan(GS)+clamp((hT-agl)*0.25,-3,3);
     if(st.ezIdle||st.ezFl)st.throttle=0;else apSpeed(st,AC.vapp,dt);
+    if(AC.athr)st.ezATm=2;   // the approach assist has the throttle
     let pc=apPitch(st,vs,dt,st.ezFl?4:1);
     // never below the touchdown attitude, or for an aircraft that comes down final nose low, never
     // below 3.4 degrees nose down (the nose wheel touches first at 5.7). A C-130 on flaps 100 flies
@@ -2197,6 +2235,7 @@ function easyFly(st,dt,ev){
     const vL=-(AC.tdSink+agl*AC.flareK);
     if(agl>12&&st.vel.y>vL*1.6){const e=(st.ias-st.ezV)/st.ezV;st.ezP=clamp(st.ezP+(0.12*e+2*st.ezDV/st.ezV)*dt,-0.35,0.45);}
     else st.ezV=Math.max(vMin,Math.min(st.ezV,st.ias));}      // in the flare: hold the attitude and let the speed bleed
+  if(AC.athr&&!ga&&st.ezATm!==1&&!st.ezIdle){if(st.ezATm===2)st.ezATm=0;apSpeed(st,st.ezATt,dt);}
   const lim=AC.aStall-0.08;                                          // stall protection
   if(!st.noProt&&!ga&&st.alpha>lim){st.ezP=Math.min(st.ezP,pitch-(st.alpha-lim)*2.5);st.ezV=Math.max(st.ezV,st.ias+2);}
   if(st.noProt&&st.stalled&&st.elev>-0.2)st.ezP-=0.25*dt;       // training: a real stall breaks, the nose falls
@@ -2229,6 +2268,7 @@ function easyFly(st,dt,ev){
     const mb=Math.max(0.3*clamp(agl/40,0.2,1),k*0.5*AC.tipRoll);
     bank=clamp(apBank(trk,E.h-clamp(c*0.066/gsp,-0.8,0.8)-(st.ezLI||0),mb,gsp)+ff,-mb,mb);}
   else st.ezCK=0;
+  st.ezBC=bank;   // the flight director reads the bank the assist wants
   apAtt(st,p,bank,yawC);
   // the fight's coordinated turn: the jet turns about the vertical at the rate a level turn at this bank gives
   // (g tan(bank) / V: about 5.8 g at 80 degrees), the wing's lift follows; eased off near the stall and over 6 g
@@ -2293,14 +2333,15 @@ function autopilot(st,dt,ev){
   ap.t+=dt;_eB.setFromQuaternion(st.quat,'YXZ');
   const hdg=-_eB.y,u=toU(st.pos.x,st.pos.z),v=toV(st.pos.x,st.pos.z),gsp=Math.hypot(st.vel.x,st.vel.z),trk=gsp>3?Math.atan2(st.vel.x,-st.vel.z):hdg,y=st.pos.y-GEAR;
   if(ap.mode==='to'){
-    if(st.onGround){st.brake=false;st.throttle=1;st.flapIdx=AC.toFlap;apGround(st,hdg,v,st.ias>=AC.vr?AC.rotP:0,AC.rotRate);return;}
+    const HF=homeRwy(st.base,st.pos.x,st.pos.z);
+    if(st.onGround){st.brake=false;st.throttle=1;st.flapIdx=AC.toFlap;apGround(st,hdg,HF[1],st.ias>=AC.vr?AC.rotP:0,AC.rotRate,HF[2]);return;}
     if(ap.phase==='roll'){ap.phase='climb';ev&&ev.push({type:'ap',msg:'Positive rate'});}
     if(AC.retract&&st.gearDown&&st.agl>12&&st.vel.y>0.5){st.gearDown=false;ev&&ev.push({type:'ap',msg:'Gear up'});}
     if(st.agl>90&&st.flapIdx){st.flapIdx=0;ev&&ev.push({type:'ap',msg:'Flaps up'});}
     let vs;
     if(y<AC.patAlt-40){vs=AC.climbVS*clamp((st.ias-AC.vr*0.97)/(AC.vy-AC.vr*0.97),0.2,1);apSpeed(st,AC.vy,dt);}
-    else{ap.mode='hold';ap.y=AC.patAlt;ap.trk=RH;ap.v=AC.vcruise;ev&&ev.push({type:'ap',msg:'Level '+Math.round(AC.patAlt*M2FT+FIELD_FT).toLocaleString('en-US')+' ft. Autopilot holding, touch the stick to take it'});return;}
-    apAtt(st,apPitch(st,vs,dt),apBank(trk,RH,0.3),trk);return;
+    else{ap.mode='hold';ap.y=AC.patAlt;ap.trk=HF[2];ap.v=AC.vcruise;ev&&ev.push({type:'ap',msg:'Level '+Math.round(AC.patAlt*M2FT+FIELD_FT).toLocaleString('en-US')+' ft. Autopilot holding, touch the stick to take it'});return;}
+    apAtt(st,apPitch(st,vs,dt),apBank(trk,HF[2],0.3),trk);return;
   }
   if(ap.mode==='hold'){
     apSpeed(st,ap.v,dt);
@@ -2522,6 +2563,7 @@ PROP_KIND.archer={n:2,R:0.965,r0:0.10,cR:0.075,cM:0.16,cT:0.09,bR:0.95,bT:0.30,i
   rings:[[0.895,'rgba(31,78,156,0.35)',0.05],[0.965,'rgba(240,240,236,0.38)',0.08]]};
 // turbofans: the fan face spins in the inlet and blurs with power
 PROP_KIND.a10={n:28,R:0.60,r0:0.11,cR:0.1,cM:0.1,cT:0.1,bR:0.3,bT:0.3,idle:18,max:70,base:'#2a2d30',rough:0.6,metal:0.5,bands:[],rings:[]};
+PROP_KIND.b737={n:24,R:0.80,r0:0.14,cR:0.1,cM:0.1,cT:0.1,bR:0.3,bT:0.3,idle:14,max:60,base:'#2a2d30',rough:0.6,metal:0.5,bands:[],rings:[]};
 // n twisted blades about +Z, blade 0 along +X; chord in the disc plane, pitch about the blade axis
 function propBladeGeo(K){
   const R=K.R,r0=K.r0,E=0.002,col=new THREE.Color(),base=new THREE.Color(K.base);
@@ -5055,6 +5097,213 @@ function buildA10HD(opt){
   return {g:g,gear:gear,props:props,discs:discs,ab:null,weapons:weapons,pylons:pylons,canopy:canopy,meta:meta};
 }
 // =========================================================================
+//  Pocket Air airliners (planes2 items 3 to 5): one builder, a spec a type.
+//  Lofted fuselage with the livery baked on by station and ring angle (cabin
+//  windows, doors, the cheat line, titles, registration), a swept wing with
+//  dihedral and the type's wingtip (blended winglet, sharklet, canted 747
+//  winglet), engines on pylons with a fan face that turns in the inlet, the
+//  swept fin and tailplane, bogie gear. Stations s aft of the nose, z = s - CG,
+//  y = 0 on the fuselage centreline, wheels at y = -opt.gear.
+//  Fictional airline: Pocket Air, white with a teal belt and a teal fin that
+//  carries a small @OhRabah mark. No real airline name or logo anywhere.
+// =========================================================================
+const LINER_TEAL='#0f6e8c',LINER_SAND='#F6C177',LINER_GREY='#b4babf';
+function buildLinerHD(S,opt){
+  opt=opt||{};
+  const L=S.len,SPAN=S.span,CG=S.cg,Z=s=>s-CG,GND=-(opt.gear||S.gear),P=MAT.P,WH='#f4f5f4';
+  const g=new THREE.Group();g.name=S.name;
+  const gear=new THREE.Group();gear.name='gear';g.add(gear);
+  const C_W=new THREE.Color(WH),C_U=new THREE.Color('#e2e4e3'),C_G=new THREE.Color(LINER_GREY),C_T=new THREE.Color(LINER_TEAL);
+  const paintW=new THREE.MeshStandardMaterial({map:MAT.skinA,vertexColors:true,metalness:0.08,roughness:0.42});
+  function white(geo,fn){const n=geo.attributes.normal;let i=0;
+    AERO.paint(geo,(x,y,z,o)=>{o.copy(C_W).lerp(C_U,clamp(-n.getY(i)*0.7,0,1)*0.8);if(fn)fn(x,y,z,o);i++;});return geo;}
+  const FUS=S.fus;
+  function secAt(s){let i=1;while(i<FUS.length-1&&FUS[i][0]<s)i++;
+    const a=FUS[i-1],b=FUS[i],f=clamp((s-a[0])/(b[0]-a[0]),0,1);return [1,2,3,4].map(k=>AERO.lerp(a[k],b[k],f));}
+  // ---- the paint, in metres: the side view and the top view ----
+  const K=S.K||80,BELT=S.belt,WY=S.winY;
+  const LV=wrapLivery({sMax:L+0.5,yTop:S.finTop+0.3,yBot:-(S.halfH+0.4),xMax:S.halfH+0.2,K:K,TW:2048,TH:1024,base:WH,secAt:secAt,
+    side(x,right,V){
+      const Y=V.py;
+      // grey belly under the belt, the teal belt itself with a thin sand line over it
+      V.fill(x,[[0,-BELT],[L+0.5,-BELT],[L+0.5,-S.halfH-1],[0,-S.halfH-1]],Y,LINER_GREY);
+      V.line(x,[[S.nose*0.9,-BELT+0.02],[L-S.tailUp*0.6,-BELT+0.02]],Y,0.34,LINER_TEAL);
+      V.line(x,[[S.nose*0.9,-BELT+0.24],[L-S.tailUp*0.6,-BELT+0.24]],Y,0.05,LINER_SAND);
+      // the flight deck windows: two front panes and two side panes a side
+      const n=S.nose,d0=S.deck[0],d1=S.deck[1];
+      V.glass(x,[[n*0.74,d0],[n*0.92,d1],[n*1.12,d1+0.04],[n*1.06,d0]],Y,0.05);
+      V.glass(x,[[n*1.16,d0],[n*1.18,d1],[n*1.44,d1-0.03],[n*1.42,d0+0.02]],Y,0.05);
+      // cabin windows, a door's width apart from the doors; the doors with their outlines (the cargo doors right side only)
+      const doors=S.doors.filter(d=>right?d[1]!=='L':d[1]!=='R');
+      for(let s=S.win0;s<S.win1;s+=S.winStep){if(doors.some(d=>Math.abs(s-d[0])<0.75))continue;
+        V.glass(x,[[s-0.14,WY-0.2],[s-0.14,WY+0.2],[s+0.14,WY+0.2],[s+0.14,WY-0.2]],Y,0.06);}
+      for(const d of doors){const w=d[2]||0.9,h=d[3]||1.85,yb=d[4]!==undefined?d[4]:-1.0;
+        V.line(x,[[d[0]-w/2,yb],[d[0]-w/2,yb+h],[d[0]+w/2,yb+h],[d[0]+w/2,yb],[d[0]-w/2,yb]],Y,0.02,'rgba(110,116,122,0.6)');
+        if(d[1]!=='C')V.glass(x,[[d[0]-0.16,WY-0.22],[d[0]-0.16,WY+0.22],[d[0]+0.16,WY+0.22],[d[0]+0.16,WY-0.22]],Y,0.06);}
+      // titles over the windows, the registration aft, the model under the flight deck
+      V.text(x,'Pocket Air',S.titleS,S.titleY,Y,S.titleH,'800 #px Arial,Helvetica,sans-serif',LINER_TEAL,right,S.titleH*5.2);
+      V.text(x,opt.reg||S.reg,S.regS,S.regY,Y,S.regH,'700 #px Arial,Helvetica,sans-serif','rgba(20,40,60,0.9)',right,S.regH*4.6);
+      V.text(x,S.model,n*1.9,WY-0.55,Y,0.22,'600 #px Arial,Helvetica,sans-serif','rgba(20,40,60,0.75)',right,2.4);
+      // the fin: teal, the sand @OhRabah mark small near the top, a sand bar along the rudder foot
+      const F=S.fin;
+      V.fill(x,[[F.rLE-0.2,F.y0-0.2],[F.tLE,S.finTop+0.3],[F.tTE+0.3,S.finTop+0.3],[F.rTE+0.3,F.y0-0.2]],Y,LINER_TEAL);
+      V.text(x,'@OhRabah',(F.tLE+F.tTE)/2+F.logoDs,S.finTop-F.logoDy,Y,F.logoH,'800 #px Arial,Helvetica,sans-serif',LINER_SAND,right,F.logoW);
+      V.line(x,[[F.rLE+0.6,F.y0+0.35],[F.rTE-0.4,F.y0+0.35]],Y,0.12,LINER_SAND);
+    },
+    top(x,V){
+      const Y=V.tx,n=S.nose;
+      V.glass(x,[[n*0.72,-0.55],[n*1.10,-1.0],[n*1.10,1.0],[n*0.72,0.55]],Y,0.05,'#8193a3');
+      for(const d of S.doors){if(d[1]==='C')continue;const sg=d[1]==='L'?-1:1;
+        V.line(x,[[d[0]-0.45,sg*S.halfW*0.95],[d[0]+0.45,sg*S.halfW*0.95]],Y,0.02,'rgba(110,116,122,0.6)');}
+    }});
+  const fusMat=new THREE.MeshStandardMaterial({map:LV.tex,metalness:0.08,roughness:0.42});
+  const NR=36;
+  const fusGeo=AERO.loft(FUS.map(f=>{const yc=(f[2]+f[3])/2;return AERO.ring(Z(f[0]),f[1],f[2]-yc,yc-f[3],yc,f[4],NR);}),{uScale:P,vScale:P});
+  mesh(liveryUV(fusGeo,FUS.map(f=>f[0]),NR,L+0.5),fusMat,g);
+  // the 747's upper deck: its own loft and paint over the forward fuselage
+  if(S.hump){const H=S.hump,secH=s=>{let i=1;while(i<H.length-1&&H[i][0]<s)i++;const a=H[i-1],b=H[i],f=clamp((s-a[0])/(b[0]-a[0]),0,1);return [1,2,3,4].map(k=>AERO.lerp(a[k],b[k],f));};
+    const LH=wrapLivery({sMax:L+0.5,yTop:S.humpTop+0.3,yBot:-S.halfH,xMax:S.halfH,K:40,TW:1024,TH:512,base:WH,secAt:secH,
+      side(x,right,V){const Y=V.py;
+        V.glass(x,[[2.6,3.6],[3.3,4.5],[4.6,4.6],[4.4,3.6]],Y,0.05);V.glass(x,[[4.8,3.62],[4.9,4.55],[6.0,4.5],[5.9,3.65]],Y,0.05);
+        for(let s=8.5;s<22.5;s+=0.6)V.glass(x,[[s-0.14,S.humpWinY-0.2],[s-0.14,S.humpWinY+0.2],[s+0.14,S.humpWinY+0.2],[s+0.14,S.humpWinY-0.2]],Y,0.06);
+        const d=S.humpDoor;V.line(x,[[d-0.5,3.0],[d-0.5,4.9],[d+0.5,4.9],[d+0.5,3.0],[d-0.5,3.0]],Y,0.02,'rgba(110,116,122,0.6)');},
+      top(x,V){const Y=V.tx;V.glass(x,[[2.6,-0.9],[4.6,-1.5],[4.6,1.5],[2.6,0.9]],Y,0.05,'#8193a3');}});
+    const hg=AERO.loft(H.map(f=>{const yc=(f[2]+f[3])/2;return AERO.ring(Z(f[0]),f[1],f[2]-yc,yc-f[3],yc,f[4],24);}),{uScale:P,vScale:P});
+    mesh(liveryUV(hg,H.map(f=>f[0]),24,L+0.5),new THREE.MeshStandardMaterial({map:LH.tex,metalness:0.08,roughness:0.42}),g);}
+
+  // ---- wing: swept, dihedral, a yehudi inboard, the type's tip ----
+  const W=S.wing,HALF=SPAN/2-W.tipIn,TAN=Math.tan(W.sweep),DIH=Math.tan(W.dih);
+  const wLE=ax=>Z(W.rootLE)+ax*TAN;
+  const wC=ax=>ax<=W.kink?AERO.lerp(W.rootC,W.kinkC,ax/W.kink):AERO.lerp(W.kinkC,W.tipC,(ax-W.kink)/(HALF-W.kink));
+  const wY=ax=>W.y+ax*DIH;
+  const wT=ax=>AERO.lerp(0.13,0.095,ax/HALF);
+  const WX=[];for(let i=0;i<=9;i++)WX.push(HALF*Math.pow(i/9,0.95));if(W.kink>0&&!WX.includes(W.kink))WX.push(W.kink);WX.sort((a,b)=>a-b);
+  const wSec=(ax,sg)=>AERO.foil(sg*ax,wLE(ax),wC(ax),wT(ax),wY(ax),16);
+  const wingSec=[];
+  // the tip: the winglet sections rise from the tip, canted outboard, the foil's thickness turned to lie across
+  const tipSec=(sg)=>{const T=W.tip,out=[];if(!T)return out;const c=T.cant,xb0=HALF,yb0=wY(HALF),le0=wLE(HALF),c0=wC(HALF);
+    const n=T.blend?4:3;
+    for(let i=1;i<=n;i++){const u=T.h*i/n,cc=T.blend&&i===1?c*1.6:c;const xb=xb0+T.h*(i/n)*Math.sin(c)+(T.blend?0.3*(1-i/n):0),yb=yb0+u*Math.cos(c);
+      const ch=AERO.lerp(c0,c0*T.tipC,i/n),le=le0+(c0-ch)*0.75+T.rake*u;
+      const f=AERO.foil(0,le,ch,0.07,0,14);out.push(f.map(p=>[sg*(xb+p[1]*Math.cos(c)),yb-p[1]*Math.sin(c),p[2]]));}
+    return out;};
+  const tl=tipSec(-1),tr=tipSec(1);
+  for(let i=tl.length-1;i>=0;i--)wingSec.push(tl[i]);
+  for(let i=WX.length-1;i>=0;i--)wingSec.push(wSec(WX[i],-1));
+  for(let i=1;i<WX.length;i++)wingSec.push(wSec(WX[i],1));
+  for(const s of tr)wingSec.push(s);
+  mesh(white(AERO.loft(wingSec,{uScale:P,vScale:P}),(x,y,z,o)=>{if(W.tip&&Math.abs(x)>HALF+0.05)o.copy(C_T);}),paintW,g);
+  // flaps and ailerons as hinge lines on both faces
+  function hinge(x0,z0,x1,z1,y0,y1,wide){
+    const dx=x1-x0,dz=z1-z0,len=Math.hypot(dx,dz);const q=new THREE.PlaneGeometry(len,wide||0.08);q.rotateX(-Math.PI/2);
+    const e=new THREE.Euler(0,-Math.atan2(dz,dx),Math.atan2(y1-y0,len),'XYZ');const m4=new THREE.Matrix4().makeRotationFromEuler(e);m4.setPosition((x0+x1)/2,(y0+y1)/2,(z0+z1)/2);q.applyMatrix4(m4);
+    const m=new THREE.Mesh(q,MAT.hinge);m.castShadow=false;g.add(m);}
+  for(const sg of [1,-1])for(const up of [1,-1]){const yo=up*0.12;
+    hinge(sg*S.halfW,wLE(S.halfW)+wC(S.halfW)*0.72,sg*HALF*0.68,wLE(HALF*0.68)+wC(HALF*0.68)*0.72,wY(S.halfW)+yo,wY(HALF*0.68)+yo*0.9);
+    hinge(sg*HALF*0.72,wLE(HALF*0.72)+wC(HALF*0.72)*0.74,sg*HALF*0.97,wLE(HALF*0.97)+wC(HALF*0.97)*0.74,wY(HALF*0.72)+yo*0.9,wY(HALF*0.97)+yo*0.8);}
+  // wing to body fairing under the belly
+  {const F=S.fairing,sec=F.map(f=>AERO.ring(Z(f[0]),f[1],f[2]*0.5,f[2]*0.5,f[3],2.6,16));
+    mesh(white(AERO.loft(sec,{uScale:P,vScale:P}),(x,y,z,o)=>{if(y<-BELT)o.copy(C_G);}),paintW,g);}
+
+  // ---- engines: a nacelle on a pylon under the wing, the fan face turning in the inlet, the core at the back ----
+  const props=[],discs=[];
+  for(const E of S.engines)for(const sg of [1,-1]){
+    const ex=sg*E.x,ey=wY(E.x)-E.drop,R=E.R;
+    const NS=[[E.s,R*0.86,R*0.86],[E.s+0.15,R*0.98,R*0.98],[E.s+0.9,R,R],[E.s+E.len*0.55,R*0.99,R*0.98],[E.s+E.len*0.85,R*0.9,R*0.86],[E.s+E.len,R*0.76,R*0.7]];
+    const sec=NS.map(f=>AERO.ring(Z(f[0]),f[1],f[2],f[2]*E.flat,ey,2.3,20).map(p=>[p[0]+ex,p[1],p[2]]));
+    mesh(white(AERO.loft(sec,{uScale:P,vScale:P,capStart:false}),(x,y,z,o)=>{if(z<Z(E.s)+0.2)o.setRGB(0.25,0.27,0.29);}),paintW,g);
+    const duct=AERO.loft([AERO.ring(Z(E.s),R*0.84,R*0.84,R*0.84*E.flat,ey,2.3,20).map(p=>[p[0]+ex,p[1],p[2]]),AERO.ring(Z(E.s+0.9),R*0.78,R*0.78,R*0.78*E.flat,ey,2.3,20).map(p=>[p[0]+ex,p[1],p[2]])],{capStart:false,capEnd:false});
+    mesh(duct,MAT.ductDark,g);
+    const spin=new THREE.Group();spin.position.set(ex,ey-R*(1-E.flat)*0.4,Z(E.s+0.85));spin.name='prop';
+    const fan=mesh(new THREE.CircleGeometry(R*0.76,24),fanMat(E.blades),spin);fan.userData.blade=1;fan.castShadow=false;
+    const cone=new THREE.ConeGeometry(R*0.16,R*0.4,10);cone.rotateX(-Math.PI/2);const cm=mesh(cone,MAT.spinnerAlu,spin);cm.position.z=-R*0.2;
+    g.add(spin);props.push(spin);
+    const disc=new THREE.Mesh(new THREE.CircleGeometry(R*0.76,24),MAT.propDisc.clone());disc.material.opacity=0;disc.position.copy(spin.position);disc.position.z-=0.05;disc.castShadow=false;g.add(disc);discs.push(disc);
+    // the core and its nozzle behind the fan cowl
+    const core=AERO.loft([AERO.ring(Z(E.s+E.len-0.2),R*0.55,R*0.55,R*0.55,ey-R*0.05,2.2,14).map(p=>[p[0]+ex,p[1],p[2]]),AERO.ring(Z(E.s+E.len+E.core),R*0.34,R*0.34,R*0.34,ey-R*0.05,2.2,14).map(p=>[p[0]+ex,p[1],p[2]])],{capStart:false});
+    mesh(core,MAT.nozzle,g);
+    // the pylon: a slab from the nacelle top into the wing's lower surface
+    const sh=new THREE.Shape();const zl=Z(E.s+E.len*0.35),zr=Z(E.s+E.len+0.6);sh.moveTo(zl,ey+R*0.8);sh.lineTo(zr,ey+R*0.55);sh.lineTo(zr+0.2,wY(E.x)-0.05);sh.lineTo(zl+0.8,wY(E.x)-0.05);
+    const pg=new THREE.ExtrudeGeometry(sh,{depth:E.R*0.42,bevelEnabled:false});pg.translate(0,0,-E.R*0.21);pg.rotateY(-Math.PI/2);
+    const pm=mesh(white(pg),paintW,g);pm.position.set(ex,0,0);
+  }
+
+  // ---- the fin with the dorsal, the rudder line, the swept tailplane ----
+  const F=S.fin;
+  {const sec=[],n=7;
+    for(let i=0;i<=n;i++){const t=i/n,y=AERO.lerp(F.y0,S.finTop,t),le=AERO.lerp(F.rLE,F.tLE,Math.pow(t,0.9)),te=AERO.lerp(F.rTE,F.tTE,Math.pow(t,1.3));
+      const fo=AERO.foil(0,Z(le),te-le,AERO.lerp(0.10,0.08,t),0,14);sec.push(fo.map(p=>[p[1],y,p[2]]));}
+    const finMat=new THREE.MeshStandardMaterial({map:LV.sideTex,metalness:0.08,roughness:0.42});
+    mesh(LV.sideUV(AERO.loft(sec,{uScale:P,vScale:P}),-CG,sec.length,sec[0].length,15),finMat,g);
+    const D=F.dorsal;if(D){const ds=D.map(f=>AERO.ring(Z(f[0]),f[1],f[2],0.3,secAt(f[0])[1]-0.1,2.4,12));mesh(white(AERO.loft(ds,{uScale:P,vScale:P})),paintW,g);}
+    for(const sg of [1,-1]){const q=new THREE.PlaneGeometry(S.finTop-F.y0-0.4,0.06);const m=new THREE.Mesh(q,MAT.hinge);m.castShadow=false;
+      m.position.set(sg*0.09,(F.y0+S.finTop)/2,Z(AERO.lerp(F.rTE,F.tTE,0.5))-AERO.lerp(F.rTE-F.rLE,F.tTE-F.tLE,0.5)*0.3);m.rotation.set(0,Math.PI/2,Math.PI/2-Math.atan2(F.tTE-F.rTE,S.finTop-F.y0)*0.9);g.add(m);}
+  }
+  const T=S.tail;
+  {const sec=[],xs=[];for(let i=0;i<=5;i++)xs.push(T.half*i/5);
+    const at=ax=>({le:Z(T.rootLE)+ax*Math.tan(T.sweep),c:AERO.lerp(T.rootC,T.tipC,ax/T.half),y:T.y+ax*Math.tan(T.dih)});
+    for(let i=xs.length-1;i>=0;i--){const a=at(xs[i]);sec.push(AERO.foil(-xs[i],a.le,a.c,0.09,a.y,14));}
+    for(let i=1;i<xs.length;i++){const a=at(xs[i]);sec.push(AERO.foil(xs[i],a.le,a.c,0.09,a.y,14));}
+    mesh(white(AERO.loft(sec,{uScale:P,vScale:P})),paintW,g);
+    for(const sg of [1,-1])for(const up of [1,-1]){const a=at(T.half*0.1),b=at(T.half*0.95);
+      hinge(sg*T.half*0.1,a.le+a.c*0.7,sg*T.half*0.95,b.le+b.c*0.7,a.y+up*0.07,b.y+up*0.05,0.06);}
+  }
+
+  // ---- landing gear: twin wheel nose leg, the mains as the type's bogies, doors ----
+  function strut(a,b,r,parent){const d=new V3().subVectors(b,a),len=d.length();const c=new THREE.CylinderGeometry(r,r*1.06,len,10);c.translate(0,len/2,0);
+    const m=mesh(c,MAT.gearLeg,parent);m.position.copy(a);m.quaternion.setFromUnitVectors(new V3(0,1,0),d.clone().normalize());return m;}
+  const bins={tyre:[],hub:[]};
+  function wheelAt(x,y,z,R,Wd){const t=tyreGeo(R,Wd,18);t.translate(x,y,z);bins.tyre.push(t);
+    const h=new THREE.CylinderGeometry(R*0.5,R*0.5,Wd*1.04,12);h.rotateZ(Math.PI/2);h.translate(x,y,z);bins.hub.push(h);}
+  const G=S.gear2;
+  {const NR=G.noseR,yA=GND+NR;
+    strut(new V3(0,secAt(G.noseS)[2]+0.2,Z(G.noseS)),new V3(0,yA+0.1,Z(G.noseS)),G.noseR*0.32,gear);
+    for(const sg of [1,-1])wheelAt(sg*G.noseR*0.75,yA,Z(G.noseS),NR,NR*0.55);
+    for(const sg of [1,-1]){const d=mesh(new THREE.BoxGeometry(0.04,secAt(G.noseS)[2]*0.0+NR*2.2,NR*4),MAT.gearBay,gear);d.position.set(sg*NR*1.45,secAt(G.noseS)[2]+0.1-NR*1.1+0.2,Z(G.noseS));}
+    for(const M of G.mains)for(const sg of [1,-1]){const MR=M.R,yA=GND+MR,x=sg*M.x;
+      strut(new V3(x,M.top,Z(M.s)),new V3(x,yA+MR*0.5,Z(M.s)),MR*0.3,gear);
+      if(M.bogie){const bm=mesh(new THREE.BoxGeometry(MR*0.5,MR*0.6,M.bogie+MR*1.2),MAT.gearLeg,gear);bm.position.set(x,yA+MR*0.5,Z(M.s));
+        for(const dz of [-M.bogie/2,M.bogie/2])for(const sx of [1,-1])wheelAt(x+sx*MR*0.9,yA,Z(M.s)+dz,MR,MR*0.62);}
+      else for(const sx of [1,-1])wheelAt(x+sx*MR*0.9,yA,Z(M.s),MR,MR*0.62);
+      const d=mesh(new THREE.BoxGeometry(0.05,MR*2.6,MR*4.5),MAT.gearBay,gear);d.position.set(x+sg*MR*1.5,M.top-MR*1.2,Z(M.s)-MR*0.5);}
+    mesh(AERO.merge(bins.tyre),MAT.tyre,gear);mesh(AERO.merge(bins.hub),MAT.hub,gear);
+  }
+
+  // ---- the flight deck for the cockpit view: a glareshield and the window posts ----
+  {const n=S.nose,top=secAt(n*1.0)[1];
+    const co=mesh(new THREE.BoxGeometry(S.halfW*1.5,0.16,0.6),MAT.cockpit,g);co.position.set(0,S.eye[1]-0.3,Z(S.eye[2]-0.85));
+    for(const sx of [-0.33,0.33]){const yk=mesh(new THREE.BoxGeometry(0.08,0.22,0.08),MAT.seat,g);yk.position.set(sx*S.halfW*1.6,S.eye[1]-0.45,Z(S.eye[2]-0.5));}
+    const bar=new THREE.BoxGeometry(0.06,0.9,0.05);
+    for(const sx of [-0.52,0,0.52]){const b=mesh(bar,MAT.pillar,g);b.position.set(sx*S.halfW*1.2,S.eye[1]+0.15,Z(S.eye[2]-1.0));b.rotation.x=-0.5;}
+  }
+  // antennas and the beacon housings
+  {const blade=new THREE.MeshStandardMaterial({color:0xe8e8e4,metalness:0.1,roughness:0.5,side:THREE.DoubleSide});
+    for(const [s,h,sg] of S.antennas){const sh=new THREE.Shape();sh.moveTo(0,0);sh.lineTo(0.5,0);sh.lineTo(0.38,h);sh.lineTo(0.2,h);
+      const bg=new THREE.ExtrudeGeometry(sh,{depth:0.04,bevelEnabled:false});bg.translate(0,0,-0.02);bg.rotateY(-Math.PI/2);
+      const f=secAt(s),m=mesh(bg,blade,g);m.position.set(0,sg>0?f[1]-0.02:f[2]+0.02,Z(s));if(sg<0)m.scale.y=-1;}}
+
+  const meta={name:S.full,sub:'Pocket Air',spec:{len:L,span:SPAN,height:S.height},ground:GND};
+  return {g:g,gear:gear,props:props,discs:discs,ab:null,weapons:null,pylons:null,meta:meta};
+}
+// ---- the three specs: published dimensions ----
+const LINER_SPECS={
+  // Boeing 737-800 with blended winglets: 39.5 m long, 35.8 m span, 12.5 m high, 3.76 m cabin
+  b737:{name:'737-800',full:'Boeing 737-800',reg:'N737PA',model:'737-800',len:39.5,span:35.79,height:12.5,cg:18.2,gear:3.45,halfW:1.88,halfH:1.88,nose:3.4,tailUp:6,K:100,
+    fus:[[0.0,0.14,-0.42,-0.68,2.0],[0.6,0.62,-0.12,-1.02,2.0],[1.5,1.12,0.26,-1.32,2.0],[2.6,1.45,0.62,-1.55,2.0],[3.3,1.58,1.08,-1.64,2.05],[3.9,1.68,1.45,-1.70,2.05],[5.2,1.82,1.80,-1.80,2.1],[6.6,1.88,1.88,-1.88,2.1],
+      [28.5,1.88,1.88,-1.88,2.1],[31.0,1.80,1.84,-1.50,2.1],[33.5,1.60,1.74,-0.98,2.1],[35.5,1.30,1.60,-0.42,2.1],[37.5,0.90,1.42,0.16,2.1],[39.0,0.45,1.22,0.60,2.0],[39.5,0.15,1.10,0.78,2.0]],
+    belt:1.15,winY:0.52,win0:6.6,win1:29.6,winStep:0.51,
+    doors:[[5.3,'B'],[30.7,'B'],[17.4,'B',0.6,1.0,-0.2],[18.4,'B',0.6,1.0,-0.2],[9.2,'C',1.4,1.2,-1.75],[26.8,'C',1.4,1.2,-1.75]],
+    titleS:11.5,titleY:1.05,titleH:0.95,regS:33.0,regY:0.55,regH:0.42,
+    wing:{rootLE:14.2,rootC:7.6,kink:5.7,kinkC:4.5,tipC:1.5,sweep:25*Math.PI/180,dih:6*Math.PI/180,y:-1.2,tipIn:0.5,tip:{h:2.4,cant:0.25,tipC:0.55,rake:0.35,blend:1}},
+    fairing:[[12.5,1.4,0.4,-1.7],[14.5,2.3,1.6,-1.9],[18.0,2.6,2.0,-2.0],[22.0,2.5,1.8,-1.95],[25.0,1.6,0.8,-1.8]],
+    engines:[{x:5.7,drop:1.25,R:1.05,s:12.6,len:4.3,core:1.4,flat:0.85,blades:24}],
+    fin:{y0:1.5,rLE:29.8,rTE:36.8,tLE:35.2,tTE:37.9,dorsal:[[27.2,0.16,0.05],[28.4,0.18,0.5],[29.6,0.2,1.2]],logoDs:0.1,logoDy:1.6,logoH:0.42,logoW:2.2},finTop:8.9,
+    tail:{half:7.17,rootLE:34.2,rootC:4.0,tipC:1.6,sweep:30*Math.PI/180,dih:7*Math.PI/180,y:0.95},
+    gear2:{noseS:5.6,noseR:0.34,mains:[{x:2.86,s:20.9,R:0.56,top:-1.3}]},
+    deck:[0.62,1.32],eye:[-0.5,1.0,3.9],antennas:[[8.0,0.3,1],[24.0,0.28,1],[10.0,0.12,-1],[30.0,0.1,-1]]}
+};
+function buildB737HD(opt){return buildLinerHD(LINER_SPECS.b737,opt);}
+// =========================================================================
 //  Piper PA-28-181 Archer II, N8128P
 //  7.32 m long, 10.67 m span, 2.22 m to the fin top. Low semi-tapered wing
 //  (the Hershey bar centre section, 1.60 m chord out to 2.2 m, then tapered to
@@ -5276,7 +5525,7 @@ function buildArcherHD(opt){
   const meta={name:'Piper PA-28-181 Archer II',sub:'Piper',spec:{len:L,span:SPAN,height:2.22},ground:GND};
   return {g:g,gear:gear,prop:prop,ab:null,weapons:null,pylons:null,meta:meta};
 }
-return {buildF16HD:buildF16HD,buildMQ9HD:buildMQ9HD,buildC130HD:buildC130HD,buildMQ9BHD:buildMQ9BHD,buildC172HD:buildC172HD,buildAlphaHD:buildAlphaHD,buildArcherHD:buildArcherHD,buildA10HD:buildA10HD,MAT:MAT,TEX:TEX,AERO:AERO};
+return {buildF16HD:buildF16HD,buildMQ9HD:buildMQ9HD,buildC130HD:buildC130HD,buildMQ9BHD:buildMQ9BHD,buildC172HD:buildC172HD,buildAlphaHD:buildAlphaHD,buildArcherHD:buildArcherHD,buildA10HD:buildA10HD,buildB737HD:buildB737HD,MAT:MAT,TEX:TEX,AERO:AERO};
 }
 function init(){
 const glc=document.getElementById('gl');let glcH=0;const _euH=new THREE.Euler(0,0,0,'YXZ');   // canvas CSS height, kept by resize() (no layout read per frame); HUD heading scratch
@@ -5528,7 +5777,7 @@ function hbUpdate(dt){
   if(running&&!st.crashed){
     if(!HB.t6&&dist<6000&&dist>-500){HB.t6=true;toast('Haboob approaching from the south-east',4);}
     if(!HB.called&&dist<3000&&dist>-HB.DEPTH){HB.called=true;const lk=st.base==='luke',B=BASES[st.base]||BASES[BASE0];
-      say(B.twr,'Attention all aircraft, '+(lk?'Luke':'Glendale')+' Tower, visibility one half mile in blowing dust, wind gusting five zero knots, use caution.',['t_haboob_'+(lk?'luke':'glendale')]);
+      say(B.twr,'Attention all aircraft, '+(lk?'Luke':st.base==='phx'?'Phoenix':'Glendale')+' Tower, visibility one half mile in blowing dust, wind gusting five zero knots, use caution.',['t_haboob_'+(lk?'luke':st.base==='phx'?'phoenix':'glendale')]);
       if(rookie())toast('Dust storm! Land now or fly away from it',5);}
   }
 }
@@ -5805,6 +6054,10 @@ const AC_LIGHTS={
   // A-10C: nav at the tips, strobes aft of them, white on the tail cone, red beacon on the spine, landing light on the nose leg
   a10:[acNav(-8.6,0.19,-0.98),acNav(8.6,0.19,-0.98),acStrobe(-8.6,0.19,-0.55),acStrobe(8.6,0.19,-0.55),
     acAft(0,0.42,8.2),acBeacon(0,0.97,-1.6),acLand(0.42,-1.3,-4.7,{on:'gear'})],
+  // 737-800: nav and strobes at the winglets, white on the tail cone, red beacons top and belly, landing lights at the
+  // wing roots, the taxi light on the nose leg
+  b737:[acNav(-17.6,0.9,4.3),acNav(17.6,0.9,4.3),acStrobe(-17.6,0.9,4.6),acStrobe(17.6,0.9,4.6),acAft(0,1.1,21.2),
+    acBeacon(0,1.92,-6.0),acBeacon(0,-1.92,-4.0),acLand(-2.3,-1.05,-3.6),acLand(2.3,-1.05,-3.6),acTaxi(0,-2.9,-12.6,{on:'gear'})],
   // MQ-9A: nav + strobe at each tip, white aft on the tail cone, red beacon aft of the SATCOM
   // bulge, a dim taxi lamp on the nose gear on the ground only
   reaper:[acNav(-10.12,0.97,-0.8),acNav(10.12,0.97,-0.8),acStrobe(-10.12,0.97,-0.45),acStrobe(10.12,0.97,-0.45),
@@ -6252,19 +6505,21 @@ if(REGION.az)(function(){
     const conc2=lam(0x8e8c85),pale=lam(0xb4b2ab),glass2=lam(0x3f5f7a),roof=lam(0x9a9790);
     for(const r of SH_RWY){
       const g=new THREE.PlaneGeometry(46,r.len);g.rotateX(-Math.PI/2);
-      const m=new THREE.Mesh(g,conc2);m.position.set(shX(0,r.v),0.3,shZ(0,r.v));
+      const m=new THREE.Mesh(g,conc2);m.position.set(shX(0,r.v),0.06,shZ(0,r.v));   // planes2: the paint height the player rolls on (SURF_Y)
       m.rotation.y=-SKY_HARBOR.h;scene.add(m);
       // centreline, so the runways read as runways from the air
       const cg=new THREE.PlaneGeometry(2.2,r.len-160);cg.rotateX(-Math.PI/2);
-      const cm=new THREE.Mesh(cg,lam(0xe8e6de));cm.position.set(shX(0,r.v),0.36,shZ(0,r.v));
+      const cm=new THREE.Mesh(cg,lam(0xe8e6de));cm.position.set(shX(0,r.v),0.075,shZ(0,r.v));
       cm.rotation.y=-SKY_HARBOR.h;scene.add(cm);
     }
     // parallel taxiways either side of the middle runway
     for(const v of [-150,165]){
       const g=new THREE.PlaneGeometry(24,3000);g.rotateX(-Math.PI/2);
-      const m=new THREE.Mesh(g,pale);m.position.set(shX(0,v),0.28,shZ(0,v));
+      const m=new THREE.Mesh(g,pale);m.position.set(shX(0,v),0.05,shZ(0,v));
       m.rotation.y=-SKY_HARBOR.h;scene.add(m);
     }
+    // the apron by the airliner stands, where the Pocket Air ramp start is (planes2)
+    {const g=new THREE.PlaneGeometry(700,260);g.rotateX(-Math.PI/2);const m=new THREE.Mesh(g,pale);m.position.set(shX(-250,110),0.045,shZ(-250,110));m.rotation.y=-SKY_HARBOR.h;scene.add(m);}
     // Terminals 3 and 4 with their concourses, between the inner runways
     for(const [u0,v0,L,W] of [[-620,150,300,90],[120,150,420,100]]){
       const t=new THREE.Mesh(new THREE.BoxGeometry(L,26,W),roof);
@@ -6395,7 +6650,7 @@ const HD=(function(){try{return makeHD();}catch(e){console.warn('HD airframes un
 function hdModel(which){
   if(!HD)return null;
   const gr=(TYPES[which]||TYPES.reaper).gear||1.5;
-  let m;try{m=which==='f16'?HD.buildF16HD({gold:true,gear:gr}):which==='c130'?HD.buildC130HD({gear:gr}):which==='mq9b'?HD.buildMQ9BHD({gear:gr}):which==='cessna'?HD.buildC172HD({gear:gr}):which==='alpha'?HD.buildAlphaHD({gear:gr}):which==='archer'?HD.buildArcherHD({gear:gr}):which==='a10'?HD.buildA10HD({gear:gr}):HD.buildMQ9HD({gear:gr});}catch(e){console.warn(e);return null;}
+  let m;try{m=which==='f16'?HD.buildF16HD({gold:true,gear:gr}):which==='c130'?HD.buildC130HD({gear:gr}):which==='mq9b'?HD.buildMQ9BHD({gear:gr}):which==='cessna'?HD.buildC172HD({gear:gr}):which==='alpha'?HD.buildAlphaHD({gear:gr}):which==='archer'?HD.buildArcherHD({gear:gr}):which==='a10'?HD.buildA10HD({gear:gr}):which==='b737'?HD.buildB737HD({gear:gr}):HD.buildMQ9HD({gear:gr});}catch(e){console.warn(e);return null;}
   const out={g:m.g,gear:m.gear,canopy:m.canopy||null,pylons:m.pylons||null,hd:true};
   // the world is lit by a hemisphere and a sun already: keep the sky reflection to a sheen
   m.g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false;
@@ -6833,6 +7088,7 @@ function getModel(id){
   if(MODELS[id])return MODELS[id];let m;
   if(id==='f16')m=hdModel('f16')||buildF16();
   else if(id==='a10')m=hdModel('a10')||buildF16();
+  else if(id==='b737')m=hdModel('b737')||buildAirliner(0);
   else if(id==='cessna'){m=hdModel('cessna');if(!m){const c=buildPlane({reg:'N8401L',stripe:0x1d3557,accent:0xd4a017,full:true}),w=new THREE.Group();scene.remove(c.g);c.g.position.y=-0.15;w.add(c.g);scene.add(w);m={g:w,prop:c.prop,disc:c.disc};}}
   else if(id==='alpha')m=hdModel('alpha')||buildAlpha();
   else if(id==='archer'){m=hdModel('archer');if(!m){const c=buildPlane({reg:'N8128P',stripe:0x1f4e9c,accent:0x6f9fe0,full:true}),w=new THREE.Group();scene.remove(c.g);c.g.position.y=-0.15;w.add(c.g);scene.add(w);m={g:w,prop:c.prop,disc:c.disc,gear:null};}}
@@ -6896,7 +7152,7 @@ function warmObj(root){
     renderer.setRenderTarget(WARM.rt);renderer.render(scene,WARM.cam);renderer.setRenderTarget(null);root.visible=v;}catch(e){renderer.setRenderTarget(null);}
 }
 WARM.rt=new THREE.WebGLRenderTarget(4,4);WARM.cam=new THREE.PerspectiveCamera(50,1,0.5,400);const _warmOff=new THREE.Vector3();
-const WARM_STEPS=['reaper','mq9b','f16','cessna','alpha','c130','archer','a10'].map(id=>()=>warmObj(getModel(id).g))
+const WARM_STEPS=['reaper','mq9b','f16','cessna','alpha','c130','archer','a10','b737'].map(id=>()=>warmObj(getModel(id).g))
   .concat([()=>{if(!DZ.built)dzBuild();warmObj(DZ.g);},()=>fxWarmLayer(),()=>fxWarmDebris(),()=>fxWarmDecals(),()=>{if(actx)boomBufs();}]);
 function warmTick(){
   if(WARM.done)return;
@@ -7151,7 +7407,7 @@ if(REGION.az)(function(){
   for(const [dx,dz] of [[0,0],[1500,800],[-1200,1200],[900,-1400],[-1500,-700]])roam.push([DT_TOP.x+dx,DT_TOP.z+dz]);
   TFC.plans.push(
     {type:'airliner',apt:'KPHX',ends:[tfcEnd('KPHX','08'),tfcEnd('KPHX','26')],depEnds:[tfcEnd('KPHX','07L'),tfcEnd('KPHX','25R')],pattern:'straightin',
-     park:{x:sh[0][0],z:sh[0][1],hdg:2,spots:sh},twy:90,depTwy:150,exitU:2000,climbOut:{hdg:0,alt:2500},count:{min:3,max:5},every:[60,120],fin:18520,surf:0.3},
+     park:{x:sh[0][0],z:sh[0][1],hdg:2,spots:sh},twy:90,depTwy:150,exitU:2000,climbOut:{hdg:0,alt:2500},count:{min:3,max:5},every:[60,120],fin:18520,surf:0.06},
     {type:'cessna',apt:'KGEU',ends:[tfcEnd('KGEU','1'),tfcEnd('KGEU','19')],pattern:'left',park:null,twy:120,exitU:0,climbOut:null,count:{min:1,max:2},surf:0.06},
     {type:'f16',apt:'KLUF',ends:[tfcEnd('KLUF','03L'),tfcEnd('KLUF','21R')],depEnds:[tfcEnd('KLUF','03R'),tfcEnd('KLUF','21L')],pattern:'overhead',
      park:{x:lk[0][0],z:lk[0][1],hdg:312.6,spots:lk},twy:152,depTwy:100,exitU:1800,climbOut:{hdg:0,alt:1500},count:{min:2,max:2},surf:0.06},
@@ -8745,7 +9001,7 @@ let acType='reaper';try{const t=localStorage.getItem('kgeuType');if(t&&TYPES[t])
 // Home field per type. Picking an aircraft resets to its home; choosing the other
 // base sticks until the aircraft changes.
 // the base a type starts at: Luke for the F-16, Glendale for the rest; a world region's only base
-const HOME=t=>!REGION.az?BASE0:t==='f16'||t==='a10'?'luke':'kgeu';
+const HOME=t=>!REGION.az?BASE0:TYPES[t]&&TYPES[t].heavy?'phx':t==='f16'||t==='a10'?'luke':'kgeu';
 let SPAWN_BASE=HOME(acType);try{const b=localStorage.getItem('kgeuBase');if(b&&BASES[b])SPAWN_BASE=b;}catch(e){}
 const bestKey=()=>acType==='reaper'?'kgeuMQ9Best':'kgeuBest_'+acType;
 function loadBest(){try{const b=localStorage.getItem(bestKey());return b===null?null:+b;}catch(e){return null;}}
@@ -8820,7 +9076,8 @@ function cfgUpdate(dt){
 }
 function apOff(msg){if(!st.ap)return;st.ap=null;st.apW=null;st.trim=clamp((st.alpha-AC.trimBase)/AC.trimK,-1,1);if(msg)sideCfg('AUTOPILOT OFF',/your airplane/i.test(msg)?'your airplane':null,'ap');}
 // the sensor view autopilot rides through throttle changes; everything else lets go on a throttle move
-function apOffThr(){if(st.ap&&!st.ap.sensor)apOff('Autopilot off, your airplane');}
+function apOffThr(){if(st.ap&&!st.ap.sensor)apOff('Autopilot off, your airplane');
+  if(AC.athr&&st.easy&&st.ezATm===0&&!st.onGround){st.ezATm=1;sideCfg('A/THR OFF','your throttle','note');}}
 // two falling tones, a quarter second, when the sensor autopilot lets go
 function apBeep(){if(!actx||muted)return;try{const t=actx.currentTime,o=actx.createOscillator(),g=actx.createGain();o.type='sine';
   o.frequency.setValueAtTime(880,t);o.frequency.setValueAtTime(660,t+0.125);
@@ -8830,9 +9087,9 @@ function apOffSensor(){if(!st.ap)return;apOff(rookie()?'Autopilot off, your airp
 function apToggle(mode){
   if(!running||paused||st.crashed)return;initAudio();
   if(st.ap&&(st.ap.mode===mode||(mode==='to'&&st.ap.mode==='hold'))){apOff('Autopilot off, your airplane');return;}
-  if(mode==='to'){const u=toU(st.pos.x,st.pos.z),v=toV(st.pos.x,st.pos.z),h=-new THREE.Euler().setFromQuaternion(st.quat,'YXZ').y;
+  if(mode==='to'){const HF=homeRwy(st.base,st.pos.x,st.pos.z),u=HF[0],v=HF[1],rh=HF[2],h=-new THREE.Euler().setFromQuaternion(st.quat,'YXZ').y;
     if(!st.onGround){toast('Already flying. Tap Auto Land to bring it home');return;}
-    if(Math.abs(v)>14||u<-30||u>900||Math.abs(Math.atan2(Math.sin(h-RH),Math.cos(h-RH)))>0.35||Math.hypot(st.vel.x,st.vel.z)>15){toast('Line up on runway 1 first');return;}
+    if(Math.abs(v)>14||u<-30||u>900||Math.abs(Math.atan2(Math.sin(h-rh),Math.cos(h-rh)))>0.35||Math.hypot(st.vel.x,st.vel.z)>15){toast('Line up on runway '+((BASES[st.base]||BASES[BASE0]).rwy)+' first');return;}
     apEngage(st,'to');sideCfg('AUTO TAKEOFF','hands off','ap');}
   else{if(st.onGround){toast('Auto Land works once you are airborne');return;}apEngage(st,'land');sideCfg('AUTOLAND','to runway 1','ap');}
 }
@@ -9155,6 +9412,7 @@ const TIP_AC={
   mq9b:{n:'MQ-9B',flare:'power off, small flare',long:'start down sooner, that long wing floats',ok:'Smooth. The sensor crew never felt it.'},
   c130:{n:'C-130',flare:'power back at 50 ft, small flare',long:'plan it early, it takes a long time to slow',ok:'Textbook Herc arrival.'},
   a10:{n:'A-10',flare:'small flare, nose a little up',long:'power back over the fence, it takes a while to slow',ok:'Hawg driver. Nicely done.'},
+  b737:{n:'737',flare:'idle at 30 ft, a small flare',long:'idle at the threshold, it carries a lot of energy',ok:'Smooth. The cabin never felt it.'},
   f16:{n:'F-16',flare:'shallow flare, nose high',long:'cross the threshold at 50 ft, not higher',ok:'Viper driver. Textbook.'}};
 function landTip(g,clean){
   const T=TIP_AC[AC.id]||TIP_AC.cessna;if(!g)return '';
@@ -9181,6 +9439,7 @@ const REC={
   cessna:{title:'Landing grade',cmp:(a,b)=>a.pts>b.pts,fmt:r=>r.letter+'  '+r.pts+' pts, '+r.fpm+' fpm'},
   alpha: {title:'Landing grade',cmp:(a,b)=>a.pts>b.pts,fmt:r=>r.letter+'  '+r.pts+' pts, '+r.fpm+' fpm'},
   archer:{title:'Landing grade',cmp:(a,b)=>a.pts>b.pts,fmt:r=>r.letter+'  '+r.pts+' pts, '+r.fpm+' fpm'},
+  b737:  {title:'Landing grade',cmp:(a,b)=>a.pts>b.pts,fmt:r=>r.letter+'  '+r.pts+' pts, '+r.fpm+' fpm'},
   c130:  {title:'Missions',     cmp:()=>false,fmt:r=>''},
   f16:   {title:'Luke to Glendale',cmp:(a,b)=>a.secs<b.secs,fmt:r=>fmtT(r.secs)+',  '+r.g.toFixed(1)+' G'},
   reaper:{title:'Loiter and strike',cmp:(a,b)=>a.pts>b.pts,fmt:r=>r.pts+' pts, '+r.hits+'/4, '+r.avg+' m'},
@@ -9282,7 +9541,7 @@ function onLanding(e){
   if(isNight())achGrant('night');
   const dash=AC.id==='f16'?dashLand(e):null;
   let better=false;
-  if(AC.id==='cessna'||AC.id==='alpha'||AC.id==='archer'||AC.id==='mq9b')better=scRecord(AC.id,g);
+  if(AC.id==='cessna'||AC.id==='alpha'||AC.id==='archer'||AC.id==='mq9b'||AC.heavy)better=scRecord(AC.id,g);
   if(dash&&dash.better)better=true;
   const free=!ARC.on&&!LES.on&&!MISS.on&&!STRIKE.active&&!DF.live,flightT=st.time-RES.freeT0;RES.freeT0=st.time;
   const seg=free&&!dash&&st.mode==='final'&&!RES.segDone;if(seg)RES.segDone=true;   // the segment's own landing; later ones are free flight
@@ -9321,6 +9580,7 @@ const REC_ROWS=[
   ['cessna','Cessna 172','cessna','Best landing',r=>r.letter+'   '+r.pts+' pts,  '+r.fpm+' fpm,  '+r.off.toFixed(1)+' m off'],
   ['alpha','Pipistrel Alpha','alpha','Best landing',r=>r.letter+'   '+r.pts+' pts,  '+r.fpm+' fpm'],
   ['archer','Piper Archer II','archer','Best landing',r=>r.letter+'   '+r.pts+' pts,  '+r.fpm+' fpm'],
+  ['b737','Boeing 737-800','b737','Best landing',r=>r.letter+'   '+r.pts+' pts,  '+r.fpm+' fpm'],
   ['f16','F-16C Viper','f16','Luke to Glendale',r=>fmtT(r.secs)+',  '+r.g.toFixed(1)+' G peak'],
   ['mq9b','MQ-9B SkyGuardian','mq9b','Best landing',r=>r.letter+'   '+r.pts+' pts,  '+r.fpm+' fpm'],
   ['reaper','MQ-9A Reaper','reaper','Loiter and strike',r=>r.pts+' pts,  '+r.hits+'/4 hits,  '+r.avg+' m,  '+r.tot+' s on target'],
@@ -10620,8 +10880,8 @@ function say(who,text,clips,o){o=o||{};
 const L=(who,kind,text,clips)=>({who,kind,text,clips});
 
 // ---- clip helpers ----
-const CSC ={cessna:'cs_skyhawk',  alpha:'cs_pipistrel',  reaper:'cs_reaper',  f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian',  archer:'cs_archer',  a10:'cs_hawg'};
-const CSCS={cessna:'cs_skyhawk_s',alpha:'cs_pipistrel_s',reaper:'cs_reaper_s',f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian_s',archer:'cs_archer_s',a10:'cs_hawg'};
+const CSC ={cessna:'cs_skyhawk',  alpha:'cs_pipistrel',  reaper:'cs_reaper',  f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian',  archer:'cs_archer',  a10:'cs_hawg',b737:'cs_pocket737'};
+const CSCS={cessna:'cs_skyhawk_s',alpha:'cs_pipistrel_s',reaper:'cs_reaper_s',f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian_s',archer:'cs_archer_s',a10:'cs_hawg',b737:'cs_pocket737'};
 const csT =()=>'t_'+(CSC[AC.id] ||'cs_skyhawk');
 const csTs=()=>'t_'+(CSCS[AC.id]||'cs_skyhawk_s');
 const csP =()=>'p_'+(CSC[AC.id] ||'cs_skyhawk');
@@ -10753,7 +11013,7 @@ function atcUpdate(){
     say(B.twr,AC.csS+', make right closed traffic, runway '+B.rwy+'.',[csTs(),'t_closed_traffic',rwyC],{ok:inAir});}
   const hdg=((-new THREE.Euler().setFromQuaternion(s.quat,'YXZ').y*180/Math.PI)%360+360)%360;
   // lined up on the home base's runway, u from its threshold (Glendale 1 or Luke 03L)
-  const lk=s.base==='luke',K=lk?lukeUV(s.pos.x,s.pos.z):null,pu=lk?K[0]+1510.5:u-THR01,pv=lk?K[1]+152.5:v;
+  const lk=s.base==='luke',ph=s.base==='phx',K=lk?lukeUV(s.pos.x,s.pos.z):ph?shUV(s.pos.x,s.pos.z):null,pu=lk?K[0]+1510.5:ph?K[0]+1751:u-THR01,pv=lk?K[1]+152.5:ph?K[1]+300:v;
   if(!A.land&&A.pattern&&!s.onGround&&s.agl<420&&pu<150&&pu>-7000-THR01&&Math.abs(pv)<450&&Math.abs(((hdg-B.hdg+540)%360)-180)<35){A.land=1;
     say(B.twr,AC.csS+', runway '+B.rwy+', check wheels down, cleared to land.',
         [csTs(),twrC,rwyC,'t_wheels_down','t_cleared_land'],{ok:inAir});readback('land');}
@@ -10768,6 +11028,7 @@ function atcTouchdown(e){
     else say('Luke Tower 133.45',AC.cs+', you just landed at Luke Air Force Base. Hold position, security is on the way.',
         [csT(),'t_luke_tower','t_luke_security']);}
   else if(Math.abs(v)<17&&u>-5&&u<RWY_LEN+5)nice(BASES.kgeu);
+  else{const H=shUV(e.x,e.z);if(Math.abs(H[0])<1760&&Math.abs(H[1])<520)nice(BASES.phx);}
 }
 
 // ---------- guide path: glowing hoops down a 3 degree glideslope to one runway end ----------
@@ -10868,14 +11129,14 @@ function arcStart(kind){
   if(D&&D.kind==='dogfight'){dfStart({daily:1});return;}   // a dogfight day: the day's seeded fight over the Goldwater Range
   // the arcade is at Glendale and Luke, the daily wherever today's is: from elsewhere switch first, the run starts after the reload
   if(REGION.id!==reg){pickRegion(reg,{resume:{arc:kind,region:reg,type:savedType,tod:TOD.id}});return;}
-  const g1=RWY_ENDS.find(e=>e.rwy.code==='KGEU'&&e.num==='1');
+  const g1=TYPES[savedType]&&TYPES[savedType].minRwy&&REGION.az?RWY_ENDS.find(e=>e.rwy.code==='KPHX'&&e.num==='7L'):RWY_ENDS.find(e=>e.rwy.code==='KGEU'&&e.num==='1');
   // the 1 mile challenge starts lined up on the centre line, on the 3 degree path, at approach speed
   const sp=D?D:kind==='landing1'?{type:savedType,end:g1,dist:1852,off:0,alt:1852*Math.tan(GS)*M2FT,gs:1}
     :{type:savedType,end:kind==='apt'?aptEnd(REGION.id):g1,dist:9000,off:0.9,alt:2500};
   if(sp.end&&sp.end.region)sp.end=sp.end.end;   // a world region's home runway end, by name: the end itself
   if(!sp.end)return;
   const keepTod=kind==='daily'?(ARC.prevTod||TOD.id):null;
-  pickType(sp.type,1);start('runway',!REGION.az?BASE0:sp.end.rwy.code==='KLUF'?'luke':'kgeu');
+  pickType(sp.type,1);start('runway',!REGION.az?BASE0:sp.end.rwy.code==='KLUF'?'luke':sp.end.rwy.code==='KPHX'?'phx':'kgeu');
   if(kind==='daily'){setTOD(sp.tod);try{localStorage.setItem('kgeuTOD',keepTod);}catch(e){}ARC.prevTod=keepTod;hbSync(true);
     st.windBase=st.windDir=sp.wdir;st.windKt=sp.wkt;st.windPh=0;}
   const e=sp.end,back=Math.atan2(-Math.sin(e.h),Math.cos(e.h))+sp.off;         // bearing from the threshold out along the approach, swung aside
@@ -10900,7 +11161,7 @@ function arcTouchdown(ev){
   if(!ARC.on||ARC.done)return;
   const g=gradeLanding(ev),secs=st.time-ARC.t0;ARC.done=true;
   // the right runway: Glendale's, any of Luke's, or in a world region the home runway (either end of its pavement)
-  const fix=runwayFix(ev.x,ev.z),E=ARC.end,right=!!(fix&&E&&(!REGION.az?fix.num===E.rwy.lo||fix.num===E.rwy.hi:fix.name.indexOf(E.rwy.code==='KGEU'?'Glendale':'Luke')>=0));
+  const fix=runwayFix(ev.x,ev.z),E=ARC.end,right=!!(fix&&E&&(!REGION.az?fix.num===E.rwy.lo||fix.num===E.rwy.hi:fix.name.indexOf(E.rwy.code==='KGEU'?'Glendale':E.rwy.code==='KPHX'?'Sky Harbor':'Luke')>=0));
   // the results card comes once the aircraft has stopped (or 20 s into the rollout)
   resArm(()=>{if(running&&ARC.on)arcResult(g,secs,right);},20);
 }
@@ -11835,6 +12096,35 @@ function hogUI(){const h=hogOn();
   if(h!==HOG.ui){HOG.ui=h;document.body.classList.toggle('hogOn',h);if(!h&&HOG.firing){HOG.firing=false;hogAud(false);}if(window.layoutCtl)layoutCtl();}
   if(!h)return;const r=String(Math.ceil(HOG.rounds)),e=$('bGunN');if(e.textContent!==r){e.textContent=r;$('bGun').classList.toggle('dim',HOG.rounds<=0);}
 }
+// ---- Easy's flight director for the airliners (planes2): a cross pointer on a small canvas in the centre, magenta
+// command bars against the green aircraft symbol. Pitch bar: the assist's trimmed pitch (the 3 degree path on an
+// approach, the climb otherwise); roll bar: the bank the assist wants (the runway line up, else wings level).
+// No text, so the approach rule (nothing textual in the centre third) is kept. Drawn only when the bars move.
+const FD={on:false,el:null,x:null,dp:-9,dr:-9,dpr:0};
+function fdDraw(){
+  if(!FD.el){FD.el=document.getElementById('fd');if(!FD.el)return;FD.x=FD.el.getContext('2d');}
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  if(dpr!==FD.dpr){FD.dpr=dpr;FD.el.width=220*dpr;FD.el.height=160*dpr;FD.dp=-9;}
+  _eB.setFromQuaternion(st.quat,'YXZ');
+  const dp=clamp((st.ezP===undefined?_eB.x:st.ezP)-_eB.x,-0.25,0.25),dr=clamp((st.ezBC||0)-(-_eB.z),-0.6,0.6);
+  const py=Math.round(-dp*220),px=Math.round(dr*110);
+  if(py===FD.dp&&px===FD.dr)return;FD.dp=py;FD.dr=px;
+  const x=FD.x,W=220,H=160,cx=W/2,cy=H/2;x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,W,H);
+  x.lineCap='round';x.lineJoin='round';
+  // the command bars, magenta, with a dark edge
+  for(const [w,c] of [[7,'rgba(0,0,0,.55)'],[3.5,'#ff5ad6']]){x.strokeStyle=c;x.lineWidth=w;
+    x.beginPath();x.moveTo(cx-54,cy+py);x.lineTo(cx+54,cy+py);x.stroke();
+    x.beginPath();x.moveTo(cx+px,cy-38);x.lineTo(cx+px,cy+38);x.stroke();}
+  // the aircraft symbol: wings and a dot, green
+  for(const [w,c] of [[7,'rgba(0,0,0,.55)'],[3.5,'#5dff8a']]){x.strokeStyle=c;x.lineWidth=w;
+    x.beginPath();x.moveTo(cx-70,cy);x.lineTo(cx-28,cy);x.lineTo(cx-18,cy+9);x.moveTo(cx+70,cy);x.lineTo(cx+28,cy);x.lineTo(cx+18,cy+9);x.stroke();
+    x.beginPath();x.arc(cx,cy,3,0,6.283);x.stroke();}
+}
+function fdTick(){
+  const on=!!(AC.fd&&st&&st.easy&&running&&!paused&&!st.crashed&&!st.onGround&&camMode!==2&&!PHOTO.on&&!menu.classList.contains('on'));
+  if(on!==FD.on){FD.on=on;document.body.classList.toggle('fdOn',on);FD.dp=-9;}
+  if(on)fdDraw();
+}
 function dfHudUpdate(){
   const on=DF.live&&running;
   if(on!==DFH.on){DFH.on=on;document.body.classList.toggle('dfOn',on);if(!on)dfHudHide();if(window.layoutCtl)layoutCtl();DFH.trk=null;}
@@ -11973,6 +12263,7 @@ function start(mode,base){
   // missions, the strike and the Luke dash are Arizona's for now: from a world region they switch back
   if(!REGION.az&&(mode==='range'||mode==='drop'||mode==='short'||base==='luke')){pickRegion('az',{resume:{mode:mode,base:base,type:acType,tod:TOD.id}});return;}
   if(!WORLD.ready){toast('Loading '+REGION.city+'\u2026');return;}
+  if(!baseOK(acType,base||SPAWN_BASE)){const hb=HOME(acType);if(!REGION.az){pickRegion('az',{resume:{mode:mode,base:hb,type:acType,tod:TOD.id}});return;}base=hb;SPAWN_BASE=hb;locSel();}
   if(FM.on)fmClose();
   initAudio();
   if(ARC.prevTod){const p=ARC.prevTod;ARC.prevTod=null;setTOD(p);}
@@ -12412,7 +12703,7 @@ function warnFlash(){const w=document.getElementById('warn');if(w){w.textContent
 // An airport of this region is a base pick as before. One in another region: from FLY the choice is
 // saved and pickRegion reloads back onto FLY there; in the pause sheet it waits for Apply, which
 // reloads into that region and starts the same free flight (aircraft, start, time) at once.
-const LOCS=[{reg:'az',g:'Arizona',a:[['kgeu','Glendale','KGEU, the home field, 7,150 ft'],['luke','Luke AFB','KLUF, F-16 base, two 10,000 ft runways']]},
+const LOCS=[{reg:'az',g:'Arizona',a:[['kgeu','Glendale','KGEU, the home field, 7,150 ft'],['luke','Luke AFB','KLUF, F-16 base, two 10,000 ft runways'],['phx','Sky Harbor','KPHX, 11,500 ft, the airliners']]},
   {reg:'rjtt',g:'Japan',a:[['rjtt','Tokyo Haneda','RJTT, runways out in Tokyo Bay']]},
   {reg:'lfpg',g:'France',a:[['lfpg','Paris CDG','LFPG, four parallel runways']]},
   {reg:'sbrj',g:'Brazil',a:[['sbrj','Rio Santos Dumont','SBRJ, 4,340 ft on Guanabara Bay']]}];
@@ -12427,13 +12718,14 @@ function locBuild(el,pz){if(!el)return;el.innerHTML='';
     g.appendChild(row);el.appendChild(g);}}
 locBuild($('locFly'),false);locBuild($('locPz'),true);
 function locPick(b,reg,pz){
+  if(!baseOK(savedType,b)){toast(AC_INFO[savedType][1]+' needs a longer runway');return;}
   if(reg===REGION_ID){if(pz)PZ_LOC=null;pickBase(b);return;}
   if(pz){PZ_LOC={reg:reg,b:b};locSel();pzApplyUI();return;}
   try{localStorage.setItem('kgeuBase',b);}catch(e){}
   pickRegion(reg,{resume:{screen:'fly'}});}
 // the highlighted card: the base flown from, or in the pause sheet the other region's airport waiting for Apply
 function locSel(){document.querySelectorAll('.pick[data-b]').forEach(c=>{const on=PZ_LOC&&c.closest('#pauseOv')?c.dataset.b===PZ_LOC.b:c.dataset.b===SPAWN_BASE;
-  c.classList.toggle('sel',on);c.setAttribute('aria-checked',String(on));});}
+  c.classList.toggle('sel',on);c.setAttribute('aria-checked',String(on));const off=!baseOK(savedType,c.dataset.b);c.classList.toggle('off',off);c.setAttribute('aria-disabled',String(off));});}
 // bring the highlighted card into view in each row (only the rows that are showing have a width)
 function locShow(){document.querySelectorAll('.locs').forEach(L=>{const c=L.querySelector('.pick.sel');if(c&&L.clientWidth){
   const g=c.closest('.lgrp'),x=g?g.offsetLeft:c.offsetLeft;if(x<L.scrollLeft||c.offsetLeft+c.offsetWidth>L.scrollLeft+L.clientWidth)L.scrollLeft=Math.max(0,x-4);}locFade(L);});}
@@ -12458,6 +12750,7 @@ function pickType(id,temp){acType=TYPES[id]?id:'reaper';best=loadBest();
   if(temp)return;
   savedType=acType;try{localStorage.setItem('kgeuType',acType);}catch(e){}
   document.querySelectorAll('.pick[data-t]').forEach(b=>b.classList.toggle('sel',b.dataset.t===acType));
+  if(!baseOK(acType,SPAWN_BASE))pickBase(HOME(acType));else locSel();   // an airliner moves to a long runway
   sumUI();}
 // ================= menu screens =================
 // One screen at a time with a back button. Everything fits an iPhone in landscape
@@ -12499,7 +12792,7 @@ $('pLb').onclick=()=>{pauseGo('sLb');if(LB)LB.lbOpen();};
 $('storyX').onclick=()=>$('storyOv').classList.remove('on');
 
 // ---- the aircraft, friendliest first ----
-const CAR=['cessna','archer','alpha','f16','a10','reaper','mq9b','c130'];
+const CAR=['cessna','archer','alpha','f16','a10','reaper','mq9b','c130','b737'];
 // the daily challenge draws its aircraft from the six the seed always had: a new type in CAR would
 // change every past and future daily for everyone (and the Worker checks the day's runs against it)
 const DAILY_TYPES=['cessna','alpha','f16','reaper','mq9b','c130'];
@@ -12511,7 +12804,8 @@ const AC_INFO={
   a10:['A-10C Thunderbolt II','A-10','The Warthog. Slow, tough, a straight wing and the big gun in the nose.'],
   reaper:['MQ-9A Reaper','MQ-9A Reaper','A long winged drone that circles for hours and strikes from above.'],
   mq9b:['MQ-9B SkyGuardian','MQ-9B SkyGuardian','The bigger, longer winged Reaper built to fly over cities.'],
-  c130:['C-130H Hercules','C-130 Hercules','A four engine cargo hauler that lands on dirt strips.']};
+  c130:['C-130H Hercules','C-130 Hercules','A four engine cargo hauler that lands on dirt strips.'],
+  b737:['Boeing 737-800','Pocket Air 737','The Pocket Air 737. 174 seats, heavy and deliberate, long runways only.']};
 // the aircraft's story text: Arizona's names Glendale (or Luke); a world region's names its own airport,
 // home runway and elevation from REGION, then the tip every flight shares
 function flySub(t){const T=TYPES[t]||TYPES.cessna;if(REGION.az||!T.sub2)return T.sub;
@@ -12549,7 +12843,7 @@ function Carousel(root){
 const CARM=Carousel($('carMain'));
 // the pause sheet picks the aircraft with a chip row (the showroom carousel stays on the FLY screen)
 const CARP={pos:0,idx:0,sync:()=>{document.querySelectorAll('#pAc .pick').forEach(b=>b.classList.toggle('sel',b.dataset.t===savedType));CARP.idx=CARP.pos=Math.max(0,CAR.indexOf(savedType));}};
-(function(){const row=$('pAc');if(!row)return;const SHORT={cessna:'C172',archer:'PA-28',alpha:'Alpha',f16:'F-16',a10:'A-10',reaper:'MQ-9A',mq9b:'MQ-9B',c130:'C-130'};
+(function(){const row=$('pAc');if(!row)return;const SHORT={cessna:'C172',archer:'PA-28',alpha:'Alpha',f16:'F-16',a10:'A-10',reaper:'MQ-9A',mq9b:'MQ-9B',c130:'C-130',b737:'737'};
   CAR.forEach(t=>{const b=document.createElement('button');b.className='pick chip';b.dataset.t=t;b.setAttribute('role','radio');b.setAttribute('aria-label',AC_INFO[t][0]);
     b.innerHTML='<b></b>';b.firstChild.textContent=SHORT[t]||AC_INFO[t][1];b.onclick=()=>{pickType(t);CARP.sync();};row.appendChild(b);});})();
 
@@ -12596,7 +12890,7 @@ $('pApply').onclick=()=>{pauseOv.classList.remove('on');
     pickRegion(P.reg,{resume:{mode:'free',base:P.b,pos:SPAWN_POS,type:savedType,tod:TOD.id}});return;}
   if(pzChanged())freeStart();else pzRestart();};
 function sumUI(){pzApplyUI();const el=$('sumLine');if(!el)return;const I=AC_INFO[savedType]||AC_INFO.cessna;
-  el.textContent=I[1]+' at '+(!REGION.az?BASES[BASE0].name:SPAWN_BASE==='luke'?'Luke AFB':'Glendale')+', '+TOD.name.toLowerCase()+', '+POS_TXT[SPAWN_POS];}
+  el.textContent=I[1]+' at '+(!REGION.az?BASES[BASE0].name:SPAWN_BASE==='luke'?'Luke AFB':SPAWN_BASE==='phx'?'Sky Harbor':'Glendale')+', '+TOD.name.toLowerCase()+', '+POS_TXT[SPAWN_POS];}
 
 // ---- missions: everything that is not an arcade game ----
 // ---- card icons: simple silhouettes in the palette, inline SVG ----
@@ -12605,12 +12899,13 @@ const SIL={
        '<rect x="-15.5" y="-10" width="2.6" height="6" rx="1"/><rect x="-9.5" y="-10" width="2.6" height="6" rx="1"/><rect x="6.9" y="-10" width="2.6" height="6" rx="1"/><rect x="12.9" y="-10" width="2.6" height="6" rx="1"/></g>',
   f16:'<path fill="#F6C177" d="M0-16 L2.6-4 L14 6 L14 8.5 L2.6 6 L3.4 11 L7.5 14 L7.5 16 L0 14.5 L-7.5 16 L-7.5 14 L-3.4 11 L-2.6 6 L-14 8.5 L-14 6 L-2.6-4Z"/>',
   cessna:'<g fill="#F6C177"><rect x="-18" y="-6" width="36" height="4.5" rx="1.6"/><rect x="-2.2" y="-13" width="4.4" height="25" rx="2.2"/><rect x="-7" y="10" width="14" height="3.2" rx="1.4"/><rect x="-4" y="-14.5" width="8" height="1.6" rx=".8" fill="#D98A3D"/></g>',
+  liner:'<g fill="#F6C177"><path d="M-1.6 -4 L-19 7 L-19 9.5 L-1.6 4.5 L1.6 4.5 L19 9.5 L19 7 L1.6 -4Z"/><rect x="-2.3" y="-16" width="4.6" height="31" rx="2.3"/><path d="M-1.5 11 L-8 16 L-8 17.5 L-1.5 15.5 L1.5 15.5 L8 17.5 L8 16 L1.5 11Z"/><rect x="-9.5" y="0" width="2.6" height="5" rx="1.2"/><rect x="6.9" y="0" width="2.6" height="5" rx="1.2"/></g>',
   a10:'<g fill="#F6C177"><rect x="-21" y="-5" width="42" height="4.2" rx="1.6"/><rect x="-2.2" y="-14" width="4.4" height="27" rx="2.2"/><rect x="-7" y="10" width="14" height="2.8" rx="1.2"/><rect x="-7.6" y="7" width="2" height="6" rx="1"/><rect x="5.6" y="7" width="2" height="6" rx="1"/><rect x="-5.4" y="1.5" width="2.8" height="5.5" rx="1.3"/><rect x="2.6" y="1.5" width="2.8" height="5.5" rx="1.3"/></g>',
   lowwing:'<g fill="#F6C177"><path d="M-17 -1 L-2.4 -4 L2.4 -4 L17 -1 L17 3.2 L2.4 2.2 L-2.4 2.2 L-17 3.2Z"/><rect x="-2.2" y="-13" width="4.4" height="25" rx="2.2"/><rect x="-6.5" y="9.5" width="13" height="3" rx="1.4"/><rect x="-4" y="-14.5" width="8" height="1.6" rx=".8" fill="#D98A3D"/></g>',
   mq9:'<g fill="#F6C177"><rect x="-22" y="-3" width="44" height="2.8" rx="1.3"/><rect x="-2" y="-12" width="4" height="24" rx="2"/><path d="M0 10 L-7 16 L-6 17 L0 13 L6 17 L7 16Z"/></g>'};
 // the aircraft as a chip: its silhouette and its short name (results card, leaderboard rows)
-const AC_TAG={cessna:'C172',archer:'PA-28',alpha:'Alpha',f16:'F-16C',a10:'A-10C',reaper:'MQ-9A',mq9b:'MQ-9B',c130:'C-130H'};
-const AC_SIL={cessna:'cessna',archer:'lowwing',alpha:'cessna',f16:'f16',a10:'a10',reaper:'mq9',mq9b:'mq9',c130:'c130'};
+const AC_TAG={cessna:'C172',archer:'PA-28',alpha:'Alpha',f16:'F-16C',a10:'A-10C',reaper:'MQ-9A',mq9b:'MQ-9B',c130:'C-130H',b737:'737'};
+const AC_SIL={cessna:'cessna',archer:'lowwing',alpha:'cessna',f16:'f16',a10:'a10',reaper:'mq9',mq9b:'mq9',c130:'c130',b737:'liner'};
 const acIcon=t=>SIL[AC_SIL[t]]?'<svg class="acI" viewBox="-23 -18 46 36" aria-hidden="true">'+SIL[AC_SIL[t]]+'</svg>':'';
 const acTag=t=>AC_TAG[t]?'<span class="acTag">'+acIcon(t)+'<b>'+AC_TAG[t]+'</b></span>':'';
 const ICO_PARTS={
@@ -14166,7 +14461,9 @@ const CRASH_FX={
   f16:   {scale:1.6,sec:2,deb:12,fire:50,smoke:70,r:0.75,col:0x8c939a,parts:'trail',look:25},
   a10:   {scale:1.7,sec:2,deb:14,fire:55,smoke:75,r:0.8,col:0x7c8389,parts:'trail',look:22},
   c130:  {scale:2.6,sec:3,deb:20,fire:90,smoke:90,r:2.0,col:0x8d949b,parts:'c130',look:6,
-          stages:[[0.75,-0.3,1.4],[1.55,0.33,1.5],[2.4,-0.46,1.6]]}
+          stages:[[0.75,-0.3,1.4],[1.55,0.33,1.5],[2.4,-0.46,1.6]]},
+  b737:  {scale:2.7,sec:3,deb:20,fire:90,smoke:90,r:1.9,col:0xe6e8ea,parts:'c130',look:6,
+          stages:[[0.8,-0.32,1.5],[1.6,0.32,1.5]]}
 };
 // wreck pieces: 12 pooled groups (a body, a cylinder or a box, plus up to 6 box parts: wing,
 // fin, nacelles, tail plates) and a flame sprite each. Nothing is built per crash; the same
@@ -14916,7 +15213,7 @@ function tick(t,skipRender){
     camera.position.x+=(Math.random()-0.5)*k;camera.position.y+=(Math.random()-0.5)*k*1.5;camera.position.z+=(Math.random()-0.5)*k;}
   camera.updateProjectionMatrix();sky.position.copy(camera.position);hbUpdate(paused?0:dt);farUpdate();
   if(sensOn)tgtMarkUpdate(dt);else if(TM.shown)tgtMarkHide();
-  dfHudUpdate();hogUI();
+  dfHudUpdate();hogUI();fdTick();
   // PAPI
   PAPI.forEach(pp=>{const eye=camera.position,du=(toU(eye.x,eye.z)-pp.u)*pp.dir;const ang=du<0?Math.atan2(eye.y-0.9,-du)*180/Math.PI:10;
     pp.sp.material.color.setHex(ang>pp.ang?0xffffff:0xff2a2a);const cd=camera.position.distanceTo(pp.sp.position);
@@ -15250,7 +15547,7 @@ const APP_VER='2026-10-06-phone3';          // keep version.json in step when sh
     if(CITYBB.champ!==cs)CITYBB.setChamp(cs);}
 
   // ---- the player's callsign, small, on the F-16 canopy rail and on the nose of the others
-  const CS_INK={f16:'#101316',a10:'#15181b',cessna:'#1d3557',alpha:'#1d2a3a',archer:'#1f4e9c',c130:'#16181a',reaper:'#eef1f3',mq9b:'#eef1f3'};
+  const CS_INK={f16:'#101316',a10:'#15181b',cessna:'#1d3557',alpha:'#1d2a3a',archer:'#1f4e9c',b737:'#0f6e8c',a320:'#0f6e8c',b747:'#0f6e8c',c130:'#16181a',reaper:'#eef1f3',mq9b:'#eef1f3'};
   const _rc=new THREE.Raycaster(),_ro=new THREE.Vector3(),_rd=new THREE.Vector3();
   function paintModel(m,id){
     if(!m||!m.g)return;
@@ -15263,7 +15560,7 @@ const APP_VER='2026-10-06-phone3';          // keep version.json in step when sh
     const box=new THREE.Box3();meshes.forEach(o=>box.expandByObject(o));
     let z,y,w;
     if((id==='f16'||id==='a10')&&m.canopy){const cb=new THREE.Box3().setFromObject(m.canopy);z=cb.min.z+(cb.max.z-cb.min.z)*0.62;y=cb.min.y-0.1;w=0.95;}
-    else{const L=box.max.z-box.min.z;z=box.min.z+L*({c130:0.075,cessna:0.085,alpha:0.1,archer:0.09,reaper:0.13,mq9b:0.13}[id]||0.12);
+    else{const L=box.max.z-box.min.z;z=box.min.z+L*({c130:0.075,cessna:0.085,alpha:0.1,archer:0.09,reaper:0.13,mq9b:0.13,b737:0.2,a320:0.2,b747:0.2}[id]||0.12);
       const top=hit(0,box.max.y+5,z,0,-1,0),bot=hit(0,box.min.y-5,z,0,1,0);
       y=top&&bot?bot.point.y+(top.point.y-bot.point.y)*({c130:0.32,cessna:0.5}[id]||0.5):(box.min.y+box.max.y)/2;
       if(id==='alpha'&&top)y=top.point.y-0.2;       // its nose leg sits right under the cowling, so measure down from the top
@@ -15489,7 +15786,7 @@ window.__kgeu={resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{
   haboobJump:(m)=>{if(HB.on){hbPlace(m);hbUpdate(0);}},drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
   RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,ticker:()=>{const e=document.getElementById('tk'),c=document.getElementById('tkCtl');return {on:e.classList.contains('on'),paused:e.classList.contains('paused'),anim:getComputedStyle(document.getElementById('tkT')).animationName,scroll:e.classList.contains('scroll'),open:c.classList.contains('on'),text:e.querySelector('#tkT i').textContent,vis:e.offsetParent!==null&&getComputedStyle(e).display!=='none',ctlVis:c.offsetParent!==null};},tickerForce:n=>{TK.force=n||null;tkUI();},tickerOpen:()=>tkOpen(),tickerClose:()=>{TK.open=false;tkUI();},musicTick:musicTick,MUSIC:MUSIC,actx:()=>actx,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,VQ:VQ,vqLog:clear=>{const r=VQ.log.map(e=>Object.assign({},e));if(clear)VQ.log.length=0;return r;},vqAdd:(who,kind,text,clips,o)=>vqAdd(L(who,kind,text,clips),o),coach2:coach2,chatNow:()=>chatNow(),atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
-  ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),bannerShow:(k,t)=>bannerShow(k,t),badgeHide:()=>badgeHide(),auto:()=>autoSmart(),mission:k=>{if(k==='gunrun'){pickType('a10',1);start('range');return;}pickType(k==='range'?'reaper':'c130',1);start(k);},HOG:HOG,strikeScore:()=>strikeScore(),setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
+  ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),bannerShow:(k,t)=>bannerShow(k,t),badgeHide:()=>badgeHide(),auto:()=>autoSmart(),mission:k=>{if(k==='gunrun'){pickType('a10',1);start('range');return;}pickType(k==='range'?'reaper':'c130',1);start(k);},HOG:HOG,strikeScore:()=>strikeScore(),baseOK:baseOK,rwyLenOf:rwyLenOf,FD:FD,BASES:BASES,setThr:setThr,setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
   stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day,kind:d.kind}},dfDayOf:k=>dfDayOf(k),aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   // @OhRabah easter eggs (3.10): where each one is, whether its lights are on, and the tow banner

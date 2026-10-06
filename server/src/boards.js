@@ -96,7 +96,7 @@ export function boardOf(id) {
 
 // fastest ground speed each aircraft can show in a flight path, m/s: VNE as true airspeed
 // at altitude plus a strong tailwind, rounded up
-export const AC_VMAX = { cessna: 130, alpha: 110, archer: 130, reaper: 180, mq9b: 180, c130: 240, f16: 580, a10: 300 };
+export const AC_VMAX = { cessna: 130, alpha: 110, archer: 130, reaper: 180, mq9b: 180, c130: 240, f16: 580, a10: 300, b737: 300 };
 
 export const RANKS = [
   { name: 'Nugget', xp: 0 },
