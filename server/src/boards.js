@@ -23,6 +23,7 @@ export const BOARDS = {
   'arc:landing1':   { dir: 1, min: 0, max: 1500, minSecs: 10, parMax: 180, ghost: 1, ref: 1000 },
   'arc:drop':       { dir: -1, min: 0, max: 3000, minSecs: 15, ref: [0, 150] },
   'arc:strike':     { dir: 1, min: 0, max: 100, minSecs: 15, ref: 100 },
+  'arc:gunrun':     { dir: 1, min: 0, max: 100, minSecs: 15, ref: 100 },   // planes2: the A-10 on the same range
   'free:landing':   { dir: 1, min: 0, max: 100, minSecs: 8, ref: 100 },
   // world airports: the 5 mile landing challenge to the region's home runway (34R, 26L, 20L)
   'apt:RJTT':       { dir: 1, min: 0, max: 1500, minSecs: 20, parMax: 480, ghost: 1, ref: 1000 },
@@ -95,7 +96,7 @@ export function boardOf(id) {
 
 // fastest ground speed each aircraft can show in a flight path, m/s: VNE as true airspeed
 // at altitude plus a strong tailwind, rounded up
-export const AC_VMAX = { cessna: 130, alpha: 110, reaper: 180, mq9b: 180, c130: 240, f16: 580 };
+export const AC_VMAX = { cessna: 130, alpha: 110, archer: 130, reaper: 180, mq9b: 180, c130: 240, f16: 580, a10: 300 };
 
 export const RANKS = [
   { name: 'Nugget', xp: 0 },

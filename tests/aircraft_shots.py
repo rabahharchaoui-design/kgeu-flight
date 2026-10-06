@@ -10,7 +10,7 @@ from harness import serve, launch, page, IPHONE_15
 args = [a for a in sys.argv[1:] if not a.startswith('--')]
 OUT = os.path.abspath(args[0] if args else 'overnight-screenshots/aircraft/scenes')
 TYPES = args[1:] or ['cessna', 'alpha', 'reaper', 'mq9b']
-CRUISE_KT = {'f16': 420, 'c130': 250, 'cessna': 105, 'archer': 110, 'alpha': 90, 'reaper': 120, 'mq9b': 120}
+CRUISE_KT = {'f16': 420, 'c130': 250, 'cessna': 105, 'archer': 110, 'a10': 300, 'alpha': 90, 'reaper': 120, 'mq9b': 120}
 SETUP_ALT = """([kt,alt])=>{const K=window.__kgeu,s=K.state();
   const V=kt/1.94384/Math.sqrt(1.097*Math.exp(-alt/9200)/1.225);
   s.pos.y=alt+K.groundHeight(s.pos.x,s.pos.z);s.vel.set(0,0,-V);s.quat.set(0,0,0,1);s.w.set(0,0,0);

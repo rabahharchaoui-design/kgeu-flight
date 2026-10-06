@@ -363,6 +363,10 @@ body.dfOn #uiroot > #dfW{ display:block; }
 #dfW button.dim{ opacity:.38; }
 body.dfOn #uiroot > #dock{ right:calc(var(--padR) + var(--col) + 12px + 84px + 12px + 6px); bottom:calc(var(--padB) + 72px + 12px); }
 body.dfOn #uiroot > #tcas, body.crashOn #dfW, body.crashOn #dfHud{ display:none !important; }
+/* the A-10 on the strike range (planes2 item 2): the GUN button alone, the dock steps left of it */
+body.hogOn #uiroot > #dfW{ display:block; } body.hogOn #bFox, body.hogOn #bFlr{ display:none; }
+body.hogOn #uiroot > #dock{ right:calc(var(--padR) + var(--col) + 12px + 72px + 12px + 6px); }
+body.hogOn #bGun{ right:calc(var(--padR) + var(--col) + 12px); }
 /* the target boxes, edge arrows, seeker circle and gun pipper: one pool of transformed elements, no layout */
 #uiroot > #dfHud{ position:absolute; inset:0; display:none; pointer-events:none; font:700 11px/1 ui-monospace,Menlo,"SF Mono",monospace; color:#5dff8a; text-shadow:0 0 2px #000,0 0 4px rgba(0,0,0,.8); }
 body.dfOn #uiroot > #dfHud{ display:block; }
@@ -1821,6 +1825,15 @@ const TYPES={
     // outside Arizona (4.6b): the same without the field; flySub adds the region's runway and elevation
     sub2:'C-130H Hercules 91-1231, Man o\' War, the 2,000th Hercules built. 155,000 lb, 132 ft wing, four Allison T56 turboprops. It is heavy and slow and it does not hurry, but it will get into a field the others cannot.',
     tips:'Manual: flaps 50, all four up, rotate at 115 kt, gear up. Plan everything early, it takes a long time to slow down. Land at 130 kt with flaps 100. Firm is correct on a Herc.'},
+  a10:{id:'a10',name:'A-10C Thunderbolt II',title:'80-0217',mass:14500,S:47.0,Tstatic:80600,Pmax:1e9,eta:1,CL0:0.20,CLa:5.0,aStall:0.26,CD0:0.032,k:0.06,span:17.53,len:16.26,gear:2.0,
+    spool:2.5,pf:0,retract:1,wave:0,tipRoll:0.30,tipMsg:'Wingtip strike. Level the wings before touchdown.',gndPitch:0.17,trimBase:0.05,trimK:0.15,
+    flaps:[{deg:0,cl:0,cd:0},{deg:7,cl:0.18,cd:0.01},{deg:20,cl:0.48,cd:0.04}],toFlap:1,landFlap:2,finalFlap:2,finalThr:0.3,finalPitch:0.06,finalTrim:0.6,vr:125*KT,vy:160*KT,vcruise:300*KT,vloiter:220*KT,vapp:135*KT,patAlt:457,climbVS:25,descMax:12,
+    maxBank:1.0,ipD:7000,fafD:4000,slowD:2800,decel:0.9,ezG:0.4,ezGR:0.25,ezBank:1.0,thrC:0.65,flareH:6,flareK:0.3,tdSink:0.6,tdPitch:0.08,rotP:0.16,rotRate:0.07,apRate:[0.35,0.4,1.0],vne:450,vfe:200,snd:'fan',cam1:[0,1.12,-3.5],cam1Name:'Cockpit',chase:[8,42],
+    cs:'Hawg 1',csS:'Hawg 1',say:'Hawg one',sayS:'Hawg one',
+    sub:'A-10C Thunderbolt II 80-0217, a DM tail from Davis-Monthan in Tucson, at Luke Air Force Base. The 30 mm gun in the nose, two TF34s up on the tail, a straight 57 ft wing. Slow, stable and built to take a hit. Luke runway 03L is 9,910 ft.',
+    // outside Arizona (4.6b): the same without the field; flySub adds the region's runway and elevation
+    sub2:'A-10C Thunderbolt II 80-0217, a DM tail from Davis-Monthan in Tucson. The 30 mm gun in the nose, two TF34s up on the tail, a straight 57 ft wing. Slow, stable and built to take a hit.',
+    tips:'Manual: flaps 7, full power, rotate at 125 kt, gear up. It is slow to accelerate and slow to stop. Land at 135 kt with flaps 20, a little nose up.'},
   f16:{id:'f16',name:'F-16C Viper',title:'89-2032',mass:11000,S:27.87,Tstatic:95000,Pmax:1e9,eta:1,CL0:0.05,CLa:3.5,aStall:0.42,CD0:0.022,k:0.12,span:9.96,len:15,gear:1.72,
     spool:2.2,pf:0,retract:1,wave:0.06,tipRoll:0.35,tipMsg:'Wingtip strike. Level the wings before touchdown.',gndPitch:0.2,trimBase:0.08,trimK:0.18,
     flaps:[{deg:0,cl:0,cd:0},{deg:20,cl:0.55,cd:0.04}],toFlap:1,landFlap:1,finalFlap:1,finalThr:0.18,finalPitch:0.19,finalTrim:0.9,vr:145*KT,vy:300*KT,vcruise:300*KT,vapp:155*KT,patAlt:457,climbVS:22,descMax:12,
@@ -1880,7 +1893,7 @@ function createState(mode,base,finD){
     st.quat.setFromEuler(new THREE.Euler(AC.finalPitch,-bh,0,'YXZ'));st.throttle=st.power=AC.finalThr;st.flapIdx=AC.finalFlap;st.trim=AC.finalTrim;st.onGround=false;st.airTime=10;trimSpawn(st,-GS);}
   else if(mode==='range'){
     // already in orbit at about 7,000 ft MSL over the range
-    const y=(7000-FIELD_FT)/M2FT+GEAR,R=2400,V=AC.vcruise/0.93;
+    const y=(7000-FIELD_FT)/M2FT+GEAR,R=2400,V=(AC.vloiter||AC.vcruise)/0.93;
     st.pos.set(RANGE.x,y,RANGE.z-R);                  // due north of the range centre
     st.vel.set(V,0,0);                                // tracking east, turning clockwise
     st.quat.setFromEuler(new THREE.Euler(0.02,-Math.PI/2,0,'YXZ'));
@@ -2507,6 +2520,8 @@ PROP_KIND.mq9b=Object.assign({},PROP_KIND.reaper,{R:1.32});
 PROP_KIND.archer={n:2,R:0.965,r0:0.10,cR:0.075,cM:0.16,cT:0.09,bR:0.95,bT:0.30,idle:73,max:251,
   base:'#1b1c1e',rough:0.35,metal:0.45,bands:[[0.87,0.92,'#1f4e9c'],[0.92,1.01,'#eeeeea']],
   rings:[[0.895,'rgba(31,78,156,0.35)',0.05],[0.965,'rgba(240,240,236,0.38)',0.08]]};
+// turbofans: the fan face spins in the inlet and blurs with power
+PROP_KIND.a10={n:28,R:0.60,r0:0.11,cR:0.1,cM:0.1,cT:0.1,bR:0.3,bT:0.3,idle:18,max:70,base:'#2a2d30',rough:0.6,metal:0.5,bands:[],rings:[]};
 // n twisted blades about +Z, blade 0 along +X; chord in the disc plane, pitch about the blade axis
 function propBladeGeo(K){
   const R=K.R,r0=K.r0,E=0.002,col=new THREE.Color(),base=new THREE.Color(K.base);
@@ -4853,6 +4868,192 @@ function buildAlphaHD(opt){
   return {g:g,gear:gear,prop:prop,ab:null,weapons:null,pylons:null,meta:meta};
 }
 // ======================== DROP-IN END ========================
+// a turbofan face: a dark disc with n lighter blades on it, tagged as a blade so the game spins it and fades it
+// into the blur disc with power, like a prop
+const FAN_TEX={};
+function fanMat(n){if(FAN_TEX[n])return FAN_TEX[n];
+  const t=TEX.canvas(256,256,(x,w,h)=>{const c=w/2;x.clearRect(0,0,w,h);x.fillStyle='#1d2023';x.beginPath();x.arc(c,c,c-1,0,6.283);x.fill();
+    for(let k=0;k<n;k++){const a=k/n*Math.PI*2;x.save();x.translate(c,c);x.rotate(a);x.fillStyle=k%2?'#5c6166':'#4a4f54';
+      x.beginPath();x.moveTo(c*0.18,-c*0.02);x.lineTo(c*0.98,-c*0.10);x.lineTo(c*0.98,c*0.05);x.lineTo(c*0.18,c*0.04);x.closePath();x.fill();x.restore();}
+    x.fillStyle='#8a9096';x.beginPath();x.arc(c,c,c*0.18,0,6.283);x.fill();});
+  t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;
+  return FAN_TEX[n]=new THREE.MeshStandardMaterial({map:t,metalness:0.6,roughness:0.5,transparent:true,side:THREE.DoubleSide});}
+// =========================================================================
+//  A-10C Thunderbolt II, 80-0217, DM (Davis-Monthan, Tucson)
+//  16.26 m long, 17.53 m span, 4.47 m high. A slim fuselage with the cockpit
+//  high and forward, the straight wing with a flat centre section and 7 deg of
+//  dihedral on the outer panels, the two TF34 nacelles on pylons above the
+//  rear fuselage, the wide tailplane with a fin at each end, main gear in the
+//  wing pods, nose gear offset to the right of the gun. Two tone ghost grey.
+//  Stations s aft of the nose, z = s - CG, wheels at y = -opt.gear (2.0 m).
+//  Published dimensions; no reference photos in refs/.
+// =========================================================================
+function buildA10HD(opt){
+  opt=opt||{};
+  const L=16.26,SPAN=17.53,HEIGHT=4.47,CG=7.9,Z=s=>s-CG,GND=-(opt.gear||2.0),P=MAT.P;
+  const g=new THREE.Group();g.name='A-10C';
+  const gear=new THREE.Group();gear.name='gear';g.add(gear);
+  const weapons=new THREE.Group();weapons.name='weapons';g.add(weapons);
+  const SK=MAT.c130Skin;
+  const C_UP=new THREE.Color('#6d747b'),C_LOW=new THREE.Color('#9ca3a9'),C_DARK=new THREE.Color('#3a3f45');
+  function skin(x,y,z,nx,ny,nz,out){
+    const s=z+CG;
+    if(s<1.2&&Math.hypot(x,y)<0.5){out.copy(C_DARK);return;}                       // the gun nose
+    if(s>2.6&&s<5.2&&y<-0.25&&Math.abs(x)<0.75){out.copy(C_DARK);return;}          // the false canopy under the nose
+    const t=smooth(AERO.clamp(ny/1.2+0.5,0,1));
+    out.copy(C_LOW).lerp(C_UP,t);
+  }
+  function skinned(geo,fn){const n=geo.attributes.normal;let i=0;
+    AERO.paint(geo,(x,y,z,out)=>{(fn||skin)(x,y,z,n.getX(i),n.getY(i),n.getZ(i),out);i++;});return geo;}
+  const flat=c=>(x,y,z,nx,ny,nz,out)=>out.copy(c);
+
+  // ---- fuselage: [s, half width, top, bottom, squareness] ----
+  const FUS=[
+    [0.05,0.16,0.14,-0.16,2.2],[0.40,0.34,0.30,-0.34,2.3],[1.00,0.48,0.46,-0.50,2.4],
+    [1.80,0.56,0.60,-0.62,2.5],[2.60,0.60,0.78,-0.70,2.6],[3.40,0.62,0.92,-0.74,2.7],
+    [4.30,0.63,1.00,-0.76,2.8],[5.20,0.64,0.98,-0.78,2.8],[6.20,0.65,0.92,-0.80,2.8],
+    [7.40,0.66,0.88,-0.82,2.8],[8.80,0.66,0.86,-0.82,2.8],[10.2,0.64,0.84,-0.78,2.7],
+    [11.6,0.60,0.80,-0.66,2.6],[12.8,0.54,0.74,-0.50,2.5],[14.0,0.44,0.66,-0.30,2.4],
+    [15.2,0.30,0.58,-0.08,2.3],[16.1,0.12,0.46,0.22,2.2]];
+  function secAt(s){let i=1;while(i<FUS.length-1&&FUS[i][0]<s)i++;
+    const a=FUS[i-1],b=FUS[i],f=AERO.clamp((s-a[0])/(b[0]-a[0]),0,1);return [0,1,2,3,4].map(k=>AERO.lerp(a[k],b[k],f));}
+  const fusSec=FUS.map(f=>{const yc=(f[2]+f[3])/2;return AERO.ring(Z(f[0]),f[1],f[2]-yc,yc-f[3],yc,f[4],26);});
+  mesh(skinned(AERO.loft(fusSec,{uScale:P,vScale:P})),SK,g);
+  // the gun muzzle at the nose tip, below the centreline
+  {const mz=new THREE.CylinderGeometry(0.10,0.11,0.9,10);mz.rotateX(Math.PI/2);const m=mesh(mz,MAT.hotDark,g);m.position.set(0,-0.08,Z(0.25));}
+  // dorsal spine behind the canopy
+  {const sec=[];for(let i=0;i<=5;i++){const t=i/5,s=AERO.lerp(5.4,9.0,t);sec.push(AERO.ring(Z(s),AERO.lerp(0.36,0.16,t),AERO.lerp(0.10,0.02,t),0.2,secAt(s)[2]-0.05,2.4,12));}
+    mesh(skinned(AERO.loft(sec,{uScale:P,vScale:P})),SK,g);}
+
+  // ---- wing: flat centre section, 7 deg of dihedral outboard of the gear pods, a slight taper ----
+  const HALF=SPAN/2,W_LE=Z(6.55),ROOT_C=3.15,TIP_C=2.05,KINK=3.4,W_Y=-0.45,DIH=7*Math.PI/180;
+  const wLE=ax=>ax<=KINK?W_LE:W_LE+(ax-KINK)/(HALF-KINK)*(ROOT_C-TIP_C)*0.35;
+  const wC=ax=>ax<=KINK?ROOT_C:ROOT_C-(ax-KINK)/(HALF-KINK)*(ROOT_C-TIP_C);
+  const wY=ax=>W_Y+Math.max(0,ax-KINK)*Math.tan(DIH);
+  const wT=ax=>ax<=KINK?0.16:AERO.lerp(0.16,0.13,(ax-KINK)/(HALF-KINK));
+  const WX=[0,1.2,2.4,KINK,4.4,5.5,6.6,7.6,8.3,8.6,8.765];
+  const wSec=(ax,sg)=>{let c=wC(Math.min(ax,8.3)),t=wT(ax),le=wLE(Math.min(ax,8.3)),y=wY(ax);
+    if(ax>8.3){const k=(ax-8.3)/0.465;c*=1-0.2*k*k;le+=0.15*k*k;t*=1-0.7*k*k;y-=0.08*k;}   // the drooped Hoerner tips
+    return AERO.foil(sg*ax,le,c,t,y,16);};
+  const wingSec=[];
+  for(let i=WX.length-1;i>=0;i--)wingSec.push(wSec(WX[i],-1));
+  for(let i=1;i<WX.length;i++)wingSec.push(wSec(WX[i],1));
+  mesh(skinned(AERO.loft(wingSec,{uScale:P,vScale:P})),SK,g);
+  function hinge(x0,z0,x1,z1,y,wide){
+    const dx=x1-x0,dz=z1-z0,len=Math.hypot(dx,dz);const q=new THREE.PlaneGeometry(len,wide||0.06);q.rotateX(-Math.PI/2);
+    const m=new THREE.Mesh(q,MAT.hinge);m.castShadow=false;m.position.set((x0+x1)/2,y,(z0+z1)/2);m.rotation.y=-Math.atan2(dz,dx);g.add(m);return m;}
+  for(const sg of [1,-1])for(const up of [1,-1]){
+    hinge(sg*1.0,W_LE+ROOT_C*0.72,sg*3.3,W_LE+ROOT_C*0.72,wY(2)+up*0.24);                              // flaps
+    hinge(sg*4.0,wLE(4)+wC(4)*0.70,sg*8.2,wLE(8.2)+wC(8.2)*0.70,wY(6)+up*0.19);                        // ailerons (split, the speed brakes)
+  }
+  // main gear pods under the wing at the kink, the wheels hang half out of them
+  for(const sg of [1,-1]){
+    const px=sg*2.95,py=wY(2.95)-0.42;
+    const PD=[[6.1,0.20,0.22],[6.6,0.42,0.46],[7.4,0.50,0.54],[8.6,0.50,0.54],[9.8,0.42,0.46],[10.6,0.22,0.24]];
+    const sec=PD.map(f=>AERO.ring(Z(f[0]),f[1],f[2]*0.5,f[2]*0.5,py,2.4,14).map(p=>[p[0]+px,p[1],p[2]]));
+    mesh(skinned(AERO.loft(sec,{uScale:P,vScale:P})),SK,g);
+  }
+
+  // ---- TF34 nacelles on pylons above the rear fuselage, the fans turning in the inlets ----
+  const props=[],discs=[];
+  for(const sg of [1,-1]){
+    const nx=sg*1.65,ny=1.55,NS=[[9.9,0.70],[10.2,0.76],[10.9,0.78],[12.2,0.76],[13.2,0.66],[13.9,0.52]];
+    const sec=NS.map(f=>AERO.ring(Z(f[0]),f[1],f[1],f[1],ny,2.2,20).map(p=>[p[0]+nx,p[1],p[2]]));
+    mesh(skinned(AERO.loft(sec,{uScale:P,vScale:P,capStart:false})),SK,g);
+    // the inlet: a dark duct and the fan face a little way in
+    const duct=AERO.loft([AERO.ring(Z(9.9),0.66,0.66,0.66,ny,2.2,20).map(p=>[p[0]+nx,p[1],p[2]]),AERO.ring(Z(10.6),0.60,0.60,0.60,ny,2.2,20).map(p=>[p[0]+nx,p[1],p[2]])],{capStart:false,capEnd:false});
+    mesh(duct,MAT.ductDark,g);
+    const spin=new THREE.Group();spin.position.set(nx,ny,Z(10.55));spin.name='prop';
+    const fan=mesh(new THREE.CircleGeometry(0.60,24),fanMat(28),spin);fan.userData.blade=1;fan.castShadow=false;
+    const cone=new THREE.ConeGeometry(0.12,0.26,10);cone.rotateX(-Math.PI/2);const cm=mesh(cone,MAT.spinnerAlu,spin);cm.position.z=-0.12;
+    g.add(spin);props.push(spin);
+    const disc=new THREE.Mesh(new THREE.CircleGeometry(0.60,24),MAT.propDisc.clone());disc.material.opacity=0;disc.position.set(nx,ny,Z(10.5));disc.castShadow=false;g.add(disc);discs.push(disc);
+    // the exhaust
+    const ex=new THREE.CylinderGeometry(0.34,0.40,0.5,14,1,true);ex.rotateX(Math.PI/2);const em=mesh(ex,MAT.hotDark,g);em.position.set(nx,ny,Z(13.9));em.material.side=THREE.DoubleSide;
+    // the pylon from the fuselage shoulder up to the nacelle
+    const sh=new THREE.Shape();sh.moveTo(Z(10.4),0);sh.lineTo(Z(12.8),0);sh.lineTo(Z(12.6),0.95);sh.lineTo(Z(10.9),0.95);
+    const pg=new THREE.ExtrudeGeometry(sh,{depth:0.22,bevelEnabled:false});pg.translate(0,0,-0.11);pg.rotateY(-Math.PI/2);
+    const pm=mesh(pg,SK,g);AERO.paint(pm.geometry,(x,y,z,o)=>o.copy(C_UP));pm.position.set(sg*1.1,0.72,0);pm.rotation.z=sg*0.35;
+  }
+
+  // ---- the tail: a wide tailplane with a fin at each end ----
+  const ST_HALF=2.87,ST_Y=0.30;
+  {const sec=[],at=ax=>({le:Z(13.5)+ax*0.05,c:AERO.lerp(1.75,1.45,ax/ST_HALF)});
+    const xs=[0,0.8,1.6,2.3,2.87];
+    for(let i=xs.length-1;i>=0;i--){const a=at(xs[i]);sec.push(AERO.foil(-xs[i],a.le,a.c,0.11,ST_Y,14));}
+    for(let i=1;i<xs.length;i++){const a=at(xs[i]);sec.push(AERO.foil(xs[i],a.le,a.c,0.11,ST_Y,14));}
+    mesh(skinned(AERO.loft(sec,{uScale:P,vScale:P})),SK,g);
+    for(const sg of [1,-1])for(const up of [1,-1])hinge(sg*0.3,Z(13.5)+1.75*0.68,sg*2.7,Z(13.5)+0.13+1.5*0.68,ST_Y+up*0.09,0.05);}
+  const FINS=[];
+  for(const sg of [1,-1]){
+    const fx=sg*2.72,sec=[];
+    const F=[[0.30,13.2,15.4],[0.9,13.5,15.35],[1.5,13.85,15.3],[2.1,14.2,15.2],[2.5,14.45,15.1]];
+    for(const f of F){const c=f[2]-f[1],fo=AERO.foil(0,Z(f[1]),c,0.09,0,14);sec.push(fo.map(p=>[p[1]+fx,f[0]+ST_Y-0.3,p[2]]));}
+    mesh(skinned(AERO.loft(sec,{uScale:P,vScale:P})),SK,g);
+    const h=hinge(fx+sg*0.06,Z(14.95),fx+sg*0.06,Z(14.95),0,0.05);h.rotation.set(0,Math.PI/2,Math.PI/2-0.15);h.position.set(fx+sg*0.055,ST_Y+1.1,Z(15.0));h.scale.set(1.8,1,1);
+    FINS.push(fx);
+  }
+
+  // ---- canopy and cockpit: high on the nose, the pilot sits in the tub ----
+  const CAN=[[3.05,0.30,0.95,0.80],[3.40,0.48,1.42,0.84],[3.90,0.56,1.62,0.90],[4.50,0.56,1.60,0.94],[5.05,0.46,1.38,0.96],[5.40,0.30,1.10,0.97]];
+  {const cs=CAN.map(f=>AERO.ring(Z(f[0]),f[1],f[2]-f[3],0.03,f[3],2.2,18));
+    const cm=mesh(AERO.loft(cs,{uScale:P,vScale:P}),MAT.canopy(false),g);cm.castShadow=false;cm.renderOrder=3;cm.name='canopy';
+    const fr=AERO.loft([AERO.ring(Z(5.38),0.31,0.12,0.03,0.97,2.2,18),AERO.ring(Z(5.55),0.33,0.08,0.03,0.96,2.2,18)],{uScale:P,vScale:P});
+    mesh(skinned(fr,flat(C_UP)),SK,g);
+    const tub=AERO.loft([AERO.ring(Z(3.3),0.34,0.1,0.5,0.75,2.4,14),AERO.ring(Z(4.2),0.42,0.1,0.55,0.72,2.4,14),AERO.ring(Z(5.2),0.38,0.1,0.5,0.74,2.4,14)],{uScale:1,vScale:1});
+    mesh(tub,MAT.cockpit,g);
+    const pan=mesh(new THREE.BoxGeometry(0.44,0.10,0.46),MAT.seat,g);pan.position.set(0,0.62,Z(4.65));
+    const back=mesh(new THREE.BoxGeometry(0.42,0.70,0.12),MAT.seat,g);back.position.set(0,0.98,Z(4.92));back.rotation.x=-0.2;
+    const co=mesh(new THREE.BoxGeometry(0.60,0.12,0.34),MAT.cockpit,g);co.position.set(0,0.84,Z(3.4));
+    const cmb=mesh(new THREE.PlaneGeometry(0.24,0.18),new THREE.MeshPhysicalMaterial({color:0x6fa08a,transparent:true,opacity:0.3,roughness:0.05,side:THREE.DoubleSide,depthWrite:false}),g);
+    cmb.position.set(0,1.06,Z(3.42));cmb.rotation.x=0.2;cmb.castShadow=false;
+    // refuelling receptacle ahead of the windscreen, pitot on the right of the nose
+    const rc=mesh(new THREE.BoxGeometry(0.30,0.03,0.36),SK,g);AERO.paint(rc.geometry,(x,y,z,o)=>o.copy(C_UP));rc.position.set(0,0.80,Z(2.5));
+    const pit=new THREE.CylinderGeometry(0.014,0.02,0.6,6);pit.rotateX(Math.PI/2);const pm=mesh(pit,MAT.gearLeg,g);pm.position.set(0.42,0.1,Z(0.9));}
+
+  // ---- landing gear: short mains out of the pods, the nose leg offset right of the gun ----
+  function strut(a,b,r,parent){const d=new V3().subVectors(b,a),len=d.length();const c=new THREE.CylinderGeometry(r,r*1.06,len,9);c.translate(0,len/2,0);
+    const m=mesh(c,MAT.gearLeg,parent);m.position.copy(a);m.quaternion.setFromUnitVectors(new V3(0,1,0),d.clone().normalize());return m;}
+  function wheelAt(x,y,z,R,W,parent){const t=mesh(tyreGeo(R,W,18),MAT.tyre,parent);t.position.set(x,y,z);
+    const h=new THREE.CylinderGeometry(R*0.5,R*0.5,W*1.04,12);h.rotateZ(Math.PI/2);const hm=mesh(h,MAT.hub,parent);hm.position.set(x,y,z);return t;}
+  {const MR=0.48,NR=0.30;
+    for(const sg of [1,-1]){const x=sg*2.95,py=wY(2.95)-0.42;
+      strut(new V3(x,py-0.2,Z(8.5)),new V3(x,GND+MR+0.05,Z(8.55)),0.09,gear);
+      strut(new V3(x,py-0.3,Z(7.6)),new V3(x,GND+MR+0.35,Z(8.45)),0.04,gear);
+      wheelAt(x,GND+MR,Z(8.55),MR,0.38,gear);
+      const dr=mesh(new THREE.BoxGeometry(0.03,0.5,1.3),MAT.gearBay,gear);dr.position.set(x+sg*0.5,GND+MR+0.6,Z(8.4));}
+    strut(new V3(0.42,-0.7,Z(3.1)),new V3(0.42,GND+NR+0.05,Z(3.25)),0.07,gear);
+    strut(new V3(0.42,-0.75,Z(2.75)),new V3(0.42,GND+NR+0.35,Z(3.2)),0.035,gear);
+    wheelAt(0.42,GND+NR,Z(3.25),NR,0.22,gear);
+    const nd=mesh(new THREE.BoxGeometry(0.03,0.6,1.1),MAT.gearBay,gear);nd.position.set(0.0,GND+1.1,Z(3.2));}
+
+  // ---- stores: four Mavericks on the outer wing pylons, a rail each ----
+  const pylons=[];
+  for(const sg of [1,-1])for(const px of [4.2,5.6]){
+    const le=wLE(px),c=wC(px),y=wY(px)-0.11;
+    const sh=new THREE.Shape();sh.moveTo(le+c*0.15,0);sh.lineTo(le+c*0.75,0);sh.lineTo(le+c*0.68,-0.34);sh.lineTo(le+c*0.24,-0.34);
+    const pg=new THREE.ExtrudeGeometry(sh,{depth:0.1,bevelEnabled:false});pg.translate(0,0,-0.05);pg.rotateY(-Math.PI/2);
+    const pm=mesh(pg,SK,weapons);AERO.paint(pm.geometry,(x,y,z,o)=>o.copy(C_LOW));pm.position.set(sg*px,y,0);
+    const grp=new THREE.Group();grp.position.set(sg*px,y-0.48,le+c*0.45);weapons.add(grp);
+    const msl=buildStore(2.49,0.30,0.72,{nose:0.18,tail:0.08});msl.position.set(0,0,0);grp.add(msl);
+    pylons.push(grp);
+  }
+
+  // ---- markings: DM tail code and the serial on both fins, the low visibility star and bar ----
+  function halfDecal(w,h,map){const dg=new THREE.PlaneGeometry(w,h);const uv=dg.attributes.uv;for(let i=0;i<uv.count;i++)uv.setX(i,uv.getX(i)*0.5);const m=new THREE.Mesh(dg,MAT.decal(map));m.castShadow=false;return m;}
+  {const fin=TEX.finMark('DM','80','217','rgba(60,66,74,0.9)','355 WG');
+    for(const fx of FINS)for(const sg of [1,-1]){const d=halfDecal(1.0,1.3,fin);d.position.set(fx+sg*0.08,ST_Y+1.3,Z(14.65));d.rotation.y=sg*Math.PI/2;g.add(d);}
+    const ins=TEX.insignia();
+    for(const sg of [1,-1]){const d=decal(1.0,0.5,ins,0.95,0.66);d.position.set(sg*0.66,0.05,Z(11.0));d.rotation.y=sg*Math.PI/2;d.castShadow=false;g.add(d);}
+    const a=decal(1.3,0.65,ins,0.95);a.rotation.set(-Math.PI/2,0,Math.PI/2);a.position.set(-5.0,wY(5.0)+0.14,wLE(5)+wC(5)*0.45);a.castShadow=false;g.add(a);
+    const b=decal(1.3,0.65,ins,0.95);b.rotation.set(Math.PI/2,0,-Math.PI/2);b.position.set(5.0,wY(5.0)-0.14,wLE(5)+wC(5)*0.45);b.castShadow=false;g.add(b);
+    const st=TEX.stencil('U.S. AIR FORCE',56,'rgba(60,66,74,0.92)');
+    for(const sg of [1,-1]){const d=halfDecal(1.3,0.18,st);d.position.set(sg*0.64,-0.1,Z(7.3));d.rotation.y=sg*Math.PI/2;g.add(d);}
+  }
+  let canopy=null;g.traverse(o=>{if(o.name==='canopy')canopy=o;});
+  const meta={name:'A-10C Thunderbolt II',sub:'Fairchild Republic',spec:{len:L,span:SPAN,height:HEIGHT},ground:GND};
+  return {g:g,gear:gear,props:props,discs:discs,ab:null,weapons:weapons,pylons:pylons,canopy:canopy,meta:meta};
+}
 // =========================================================================
 //  Piper PA-28-181 Archer II, N8128P
 //  7.32 m long, 10.67 m span, 2.22 m to the fin top. Low semi-tapered wing
@@ -5075,7 +5276,7 @@ function buildArcherHD(opt){
   const meta={name:'Piper PA-28-181 Archer II',sub:'Piper',spec:{len:L,span:SPAN,height:2.22},ground:GND};
   return {g:g,gear:gear,prop:prop,ab:null,weapons:null,pylons:null,meta:meta};
 }
-return {buildF16HD:buildF16HD,buildMQ9HD:buildMQ9HD,buildC130HD:buildC130HD,buildMQ9BHD:buildMQ9BHD,buildC172HD:buildC172HD,buildAlphaHD:buildAlphaHD,buildArcherHD:buildArcherHD,MAT:MAT,TEX:TEX,AERO:AERO};
+return {buildF16HD:buildF16HD,buildMQ9HD:buildMQ9HD,buildC130HD:buildC130HD,buildMQ9BHD:buildMQ9BHD,buildC172HD:buildC172HD,buildAlphaHD:buildAlphaHD,buildArcherHD:buildArcherHD,buildA10HD:buildA10HD,MAT:MAT,TEX:TEX,AERO:AERO};
 }
 function init(){
 const glc=document.getElementById('gl');let glcH=0;const _euH=new THREE.Euler(0,0,0,'YXZ');   // canvas CSS height, kept by resize() (no layout read per frame); HUD heading scratch
@@ -5601,6 +5802,9 @@ const AC_LIGHTS={
   f16:[acNav(-4.76,-0.1,1.56),acNav(4.76,-0.1,1.56),acAft(0,0.62,5.58),acStrobe(0,3.45,4.2,{fl:'single'}),
     acForm(0,0.72,-1.4),acForm(0,-0.69,0.2),acForm(-3.0,-0.14,1.0),acForm(3.0,-0.14,1.0),acForm(-0.98,-0.12,-1.5),acForm(0.98,-0.12,-1.5),
     acLand(0,-1.04,-3.86,{on:'gear'})],
+  // A-10C: nav at the tips, strobes aft of them, white on the tail cone, red beacon on the spine, landing light on the nose leg
+  a10:[acNav(-8.6,0.19,-0.98),acNav(8.6,0.19,-0.98),acStrobe(-8.6,0.19,-0.55),acStrobe(8.6,0.19,-0.55),
+    acAft(0,0.42,8.2),acBeacon(0,0.97,-1.6),acLand(0.42,-1.3,-4.7,{on:'gear'})],
   // MQ-9A: nav + strobe at each tip, white aft on the tail cone, red beacon aft of the SATCOM
   // bulge, a dim taxi lamp on the nose gear on the ground only
   reaper:[acNav(-10.12,0.97,-0.8),acNav(10.12,0.97,-0.8),acStrobe(-10.12,0.97,-0.45),acStrobe(10.12,0.97,-0.45),
@@ -6191,7 +6395,7 @@ const HD=(function(){try{return makeHD();}catch(e){console.warn('HD airframes un
 function hdModel(which){
   if(!HD)return null;
   const gr=(TYPES[which]||TYPES.reaper).gear||1.5;
-  let m;try{m=which==='f16'?HD.buildF16HD({gold:true,gear:gr}):which==='c130'?HD.buildC130HD({gear:gr}):which==='mq9b'?HD.buildMQ9BHD({gear:gr}):which==='cessna'?HD.buildC172HD({gear:gr}):which==='alpha'?HD.buildAlphaHD({gear:gr}):which==='archer'?HD.buildArcherHD({gear:gr}):HD.buildMQ9HD({gear:gr});}catch(e){console.warn(e);return null;}
+  let m;try{m=which==='f16'?HD.buildF16HD({gold:true,gear:gr}):which==='c130'?HD.buildC130HD({gear:gr}):which==='mq9b'?HD.buildMQ9BHD({gear:gr}):which==='cessna'?HD.buildC172HD({gear:gr}):which==='alpha'?HD.buildAlphaHD({gear:gr}):which==='archer'?HD.buildArcherHD({gear:gr}):which==='a10'?HD.buildA10HD({gear:gr}):HD.buildMQ9HD({gear:gr});}catch(e){console.warn(e);return null;}
   const out={g:m.g,gear:m.gear,canopy:m.canopy||null,pylons:m.pylons||null,hd:true};
   // the world is lit by a hemisphere and a sun already: keep the sky reflection to a sheen
   m.g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false;
@@ -6628,6 +6832,7 @@ function buildC130(){
 function getModel(id){
   if(MODELS[id])return MODELS[id];let m;
   if(id==='f16')m=hdModel('f16')||buildF16();
+  else if(id==='a10')m=hdModel('a10')||buildF16();
   else if(id==='cessna'){m=hdModel('cessna');if(!m){const c=buildPlane({reg:'N8401L',stripe:0x1d3557,accent:0xd4a017,full:true}),w=new THREE.Group();scene.remove(c.g);c.g.position.y=-0.15;w.add(c.g);scene.add(w);m={g:w,prop:c.prop,disc:c.disc};}}
   else if(id==='alpha')m=hdModel('alpha')||buildAlpha();
   else if(id==='archer'){m=hdModel('archer');if(!m){const c=buildPlane({reg:'N8128P',stripe:0x1f4e9c,accent:0x6f9fe0,full:true}),w=new THREE.Group();scene.remove(c.g);c.g.position.y=-0.15;w.add(c.g);scene.add(w);m={g:w,prop:c.prop,disc:c.disc,gear:null};}}
@@ -6691,7 +6896,7 @@ function warmObj(root){
     renderer.setRenderTarget(WARM.rt);renderer.render(scene,WARM.cam);renderer.setRenderTarget(null);root.visible=v;}catch(e){renderer.setRenderTarget(null);}
 }
 WARM.rt=new THREE.WebGLRenderTarget(4,4);WARM.cam=new THREE.PerspectiveCamera(50,1,0.5,400);const _warmOff=new THREE.Vector3();
-const WARM_STEPS=['reaper','mq9b','f16','cessna','alpha','c130','archer'].map(id=>()=>warmObj(getModel(id).g))
+const WARM_STEPS=['reaper','mq9b','f16','cessna','alpha','c130','archer','a10'].map(id=>()=>warmObj(getModel(id).g))
   .concat([()=>{if(!DZ.built)dzBuild();warmObj(DZ.g);},()=>fxWarmLayer(),()=>fxWarmDebris(),()=>fxWarmDecals(),()=>{if(actx)boomBufs();}]);
 function warmTick(){
   if(WARM.done)return;
@@ -8540,7 +8745,7 @@ let acType='reaper';try{const t=localStorage.getItem('kgeuType');if(t&&TYPES[t])
 // Home field per type. Picking an aircraft resets to its home; choosing the other
 // base sticks until the aircraft changes.
 // the base a type starts at: Luke for the F-16, Glendale for the rest; a world region's only base
-const HOME=t=>!REGION.az?BASE0:t==='f16'?'luke':'kgeu';
+const HOME=t=>!REGION.az?BASE0:t==='f16'||t==='a10'?'luke':'kgeu';
 let SPAWN_BASE=HOME(acType);try{const b=localStorage.getItem('kgeuBase');if(b&&BASES[b])SPAWN_BASE=b;}catch(e){}
 const bestKey=()=>acType==='reaper'?'kgeuMQ9Best':'kgeuBest_'+acType;
 function loadBest(){try{const b=localStorage.getItem(bestKey());return b===null?null:+b;}catch(e){return null;}}
@@ -8949,6 +9154,7 @@ const TIP_AC={
   reaper:{n:'MQ-9A',flare:'power off, small flare',long:'start down sooner, that long wing floats',ok:'Smooth. The sensor crew never felt it.'},
   mq9b:{n:'MQ-9B',flare:'power off, small flare',long:'start down sooner, that long wing floats',ok:'Smooth. The sensor crew never felt it.'},
   c130:{n:'C-130',flare:'power back at 50 ft, small flare',long:'plan it early, it takes a long time to slow',ok:'Textbook Herc arrival.'},
+  a10:{n:'A-10',flare:'small flare, nose a little up',long:'power back over the fence, it takes a while to slow',ok:'Hawg driver. Nicely done.'},
   f16:{n:'F-16',flare:'shallow flare, nose high',long:'cross the threshold at 50 ft, not higher',ok:'Viper driver. Textbook.'}};
 function landTip(g,clean){
   const T=TIP_AC[AC.id]||TIP_AC.cessna;if(!g)return '';
@@ -8977,7 +9183,8 @@ const REC={
   archer:{title:'Landing grade',cmp:(a,b)=>a.pts>b.pts,fmt:r=>r.letter+'  '+r.pts+' pts, '+r.fpm+' fpm'},
   c130:  {title:'Missions',     cmp:()=>false,fmt:r=>''},
   f16:   {title:'Luke to Glendale',cmp:(a,b)=>a.secs<b.secs,fmt:r=>fmtT(r.secs)+',  '+r.g.toFixed(1)+' G'},
-  reaper:{title:'Loiter and strike',cmp:(a,b)=>a.pts>b.pts,fmt:r=>r.pts+' pts, '+r.hits+'/4, '+r.avg+' m'}
+  reaper:{title:'Loiter and strike',cmp:(a,b)=>a.pts>b.pts,fmt:r=>r.pts+' pts, '+r.hits+'/4, '+r.avg+' m'},
+  a10:   {title:'Gun run',cmp:(a,b)=>a.pts>b.pts,fmt:r=>r.pts+' pts, '+r.hits+'/4, '+r.avg+' m'}
 };
 function fmtT(s){const m=Math.floor(s/60);return m+':'+String(Math.round(s-m*60)).padStart(2,'0');}
 // record a result under a key; returns true when it beat the stored one
@@ -9117,6 +9324,7 @@ const REC_ROWS=[
   ['f16','F-16C Viper','f16','Luke to Glendale',r=>fmtT(r.secs)+',  '+r.g.toFixed(1)+' G peak'],
   ['mq9b','MQ-9B SkyGuardian','mq9b','Best landing',r=>r.letter+'   '+r.pts+' pts,  '+r.fpm+' fpm'],
   ['reaper','MQ-9A Reaper','reaper','Loiter and strike',r=>r.pts+' pts,  '+r.hits+'/4 hits,  '+r.avg+' m,  '+r.tot+' s on target'],
+  ['a10','A-10C Thunderbolt II','a10','Gun run',r=>r.pts+' pts,  '+r.hits+'/4 hits,  '+r.avg+' m,  '+r.tot+' s on target'],
   ['c130d','C-130H Hercules','c130:drop','Airdrop',r=>r.letter+'   '+r.dist+' m from centre'],
   ['c130s','','c130:short','Short field',r=>r.letter+'   stopped in '+r.stopFt+' ft, touched at '+r.tdFt+' ft'],
   ['arcl','Arcade','arc:landing','Landing challenge',r=>r.pts+' pts,  '+fmtT(r.secs)+',  '+r.ac],
@@ -9755,7 +9963,7 @@ function f16Flaps(){if(AC.id!=='f16'||st.easy||st.ap||st.crashed)return;
   const k=st.ias*MS2KT;let w=st.flapIdx;
   if(!st.gearDown||k>AC.vfe*0.97)w=0;else if(k<AC.vfe*0.93)w=1;
   if(st.flapIdx!==w)st.flapIdx=w;}
-const hasBall=()=>AC.id==='reaper'||AC.id==='mq9b';
+const hasBall=()=>AC.id==='reaper'||AC.id==='mq9b'||AC.id==='a10';
 // SENSOR: straight into the ball view, and back to the chase view on a second tap
 function sensorView(){if(!running||st.crashed||!hasBall())return;
   if(camMode===2){camMode=0;toast('Camera: '+CAMS[0]);snapCamera=true;return;}
@@ -9854,6 +10062,7 @@ function updateAudio(){
   if(S==='piston'){ef=36+p*40;eg=0.05+p*0.08;wf=2000;wg=0;lp=520;}
   else if(S==='jet'){ef=58+p*30;eg=0.01+p*0.02;wf=1400+p*2600;wg=0.004+p*0.014;ng=Math.max(ng,0.03+p*0.22);nq=650+p*1000;
     if(AC.id==='f16'){abv=clamp((p-0.82)/0.18,0,1);lp-=70*abv;nq-=250*abv;eg*=1+0.1*abv;ng*=1+0.1*abv;}}
+  else if(S==='fan'){ef=46+p*24;eg=0.03+p*0.055;wf=1100+p*2300;wg=0.003+p*0.013;ng=Math.max(ng,0.025+p*0.2);nq=520+p*700;lp=380;}
   else if(S==='turboprop4'){
     // T56s are constant speed: 1,020 prop rpm, four blades, so blade pass sits at
     // 68 Hz whatever the power lever does. Power moves loudness and turbine whine,
@@ -10411,8 +10620,8 @@ function say(who,text,clips,o){o=o||{};
 const L=(who,kind,text,clips)=>({who,kind,text,clips});
 
 // ---- clip helpers ----
-const CSC ={cessna:'cs_skyhawk',  alpha:'cs_pipistrel',  reaper:'cs_reaper',  f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian',  archer:'cs_archer'};
-const CSCS={cessna:'cs_skyhawk_s',alpha:'cs_pipistrel_s',reaper:'cs_reaper_s',f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian_s',archer:'cs_archer_s'};
+const CSC ={cessna:'cs_skyhawk',  alpha:'cs_pipistrel',  reaper:'cs_reaper',  f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian',  archer:'cs_archer',  a10:'cs_hawg'};
+const CSCS={cessna:'cs_skyhawk_s',alpha:'cs_pipistrel_s',reaper:'cs_reaper_s',f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian_s',archer:'cs_archer_s',a10:'cs_hawg'};
 const csT =()=>'t_'+(CSC[AC.id] ||'cs_skyhawk');
 const csTs=()=>'t_'+(CSCS[AC.id]||'cs_skyhawk_s');
 const csP =()=>'p_'+(CSC[AC.id] ||'cs_skyhawk');
@@ -11227,6 +11436,18 @@ function dfLaunch(b){
   return true;
 }
 // the missiles, tracers, flares and the bandits' flare timers, every live frame
+// the tracers: a streak from the round back along its path, bright at the head (the dogfight gun and the A-10's)
+function dfTracers(dt){
+  if(!DF.wBuilt)return;
+  let any=false;const P=DF.trP,C=DF.trC;
+  for(let i=0;i<DF_TRC;i++){const t=DF.trc[i],k=i*6;
+    if(t.on){t.t+=dt;if(t.t>1.5)t.on=false;else{t.v.y-=9.81*dt;t.p.addScaledVector(t.v,dt);}}
+    if(!t.on){if(P[k+1]!==0||C[k]!==0){P.fill(0,k,k+6);C.fill(0,k,k+6);any=true;}continue;}
+    any=true;const sp=t.v.length(),L=Math.min(28,sp*t.t)/Math.max(1,sp),f=1-t.t/1.5;
+    P[k]=t.p.x;P[k+1]=t.p.y;P[k+2]=t.p.z;P[k+3]=t.p.x-t.v.x*L;P[k+4]=t.p.y-t.v.y*L;P[k+5]=t.p.z-t.v.z*L;
+    C[k]=1*f;C[k+1]=0.85*f;C[k+2]=0.45*f;C[k+3]=0.35*f;C[k+4]=0.12*f;C[k+5]=0;}
+  if(any||DF.trM.visible){const g=DF.trM.geometry.attributes;g.position.needsUpdate=g.color.needsUpdate=true;DF.trM.visible=any;}
+}
 function dfWeap(dt){
   if(!DF.wBuilt)return;
   for(const b of DF.bandits){if(b.alive&&b.flN>0){b.flT-=dt;if(b.flT<=0){b.flN--;b.flT=0.55;dfFlare(b);}}}
@@ -11236,15 +11457,7 @@ function dfWeap(dt){
     const burn=m.t>0.15&&m.t<DF_BURN+0.15;m.mesh.glow.material.opacity=burn?0.85+0.15*Math.sin(m.t*50):0;
     m.mesh.g.position.copy(m.p);m.mesh.g.quaternion.setFromUnitVectors(_dfA.set(0,0,1),_dfB.copy(m.v).normalize().negate());
     m.smk-=dt;if(m.smk<=0&&m.t>0.15){m.smk=burn?0.035:0.09;puff(m.p.x,m.p.y,m.p.z);}}
-  // tracers: a streak from the round back along its path, bright at the head
-  let any=false;const P=DF.trP,C=DF.trC;
-  for(let i=0;i<DF_TRC;i++){const t=DF.trc[i],k=i*6;
-    if(t.on){t.t+=dt;if(t.t>1.5)t.on=false;else{t.v.y-=9.81*dt;t.p.addScaledVector(t.v,dt);}}
-    if(!t.on){if(P[k+1]!==0||C[k]!==0){P.fill(0,k,k+6);C.fill(0,k,k+6);any=true;}continue;}
-    any=true;const sp=t.v.length(),L=Math.min(28,sp*t.t)/Math.max(1,sp),f=1-t.t/1.5;
-    P[k]=t.p.x;P[k+1]=t.p.y;P[k+2]=t.p.z;P[k+3]=t.p.x-t.v.x*L;P[k+4]=t.p.y-t.v.y*L;P[k+5]=t.p.z-t.v.z*L;
-    C[k]=1*f;C[k+1]=0.85*f;C[k+2]=0.45*f;C[k+3]=0.35*f;C[k+4]=0.12*f;C[k+5]=0;}
-  if(any||DF.trM.visible){const g=DF.trM.geometry.attributes;g.position.needsUpdate=g.color.needsUpdate=true;DF.trM.visible=any;}
+  dfTracers(dt);
   // flares: fall, slow in the air, burn out in 3 s
   let fa=false;const FP=DF.flP,FC=DF.flC;
   for(let i=0;i<DF_FLR;i++){const f=DF.flr[i],k=i*3;
@@ -11578,6 +11791,50 @@ function dfEdge(o,kind,nx,ny,cz,tY,H){
   dfPut(o,DF_TRK_SIDE[T.sd[pick]],T.xs[pick],T.ys[pick]);
 }
 // after the camera is placed: tick calls this every frame
+// ---- the A-10 on the strike range (planes2 item 2): hold GUN. The pod's lock says what it is aimed at; 0.8 s of
+// fire inside 1,500 m, in front, takes the target. The tracers are the dogfight's pool. 1,150 rounds at 65 a second.
+const HOG={rounds:1150,firing:false,t:0,on:0,aud:null,ui:false,dry:false};
+const HOG_RPS=65,HOG_MAX=1150;
+function hogOn(){return STRIKE.active&&AC.id==='a10'&&running;}
+function hogAud(on){
+  if(!actx)return;
+  if(!HOG.aud){try{const saw=actx.createOscillator();saw.type='sawtooth';saw.frequency.value=65;const lp=actx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=700;
+    const n=actx.sampleRate|0,buf=actx.createBuffer(1,n,actx.sampleRate),d=buf.getChannelData(0);for(let i=0;i<n;i++)d[i]=Math.random()*2-1;
+    const ns=actx.createBufferSource();ns.buffer=buf;ns.loop=true;const bp=actx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=320;bp.Q.value=0.6;
+    const g=actx.createGain();g.gain.value=0;saw.connect(lp).connect(g);const ng=actx.createGain();ng.gain.value=0.9;ns.connect(bp).connect(ng).connect(g);g.connect(actx.destination);saw.start();ns.start();
+    HOG.aud={g:g};}catch(e){HOG.aud={g:null};}}
+  if(!HOG.aud.g)return;const t=actx.currentTime,p=HOG.aud.g.gain;p.cancelScheduledValues(t);p.setTargetAtTime(on&&!muted?0.22:0,t,on?0.015:0.12);
+}
+function hogGun(dt){
+  const want=!!(DF.gunHeld&&HOG.rounds>0&&!paused&&!st.crashed);
+  if(want!==HOG.firing){HOG.firing=want;hogAud(want);if(want)hapPattern('gun');}
+  if(want){
+    const n=Math.min(HOG.rounds,HOG_RPS*dt);HOG.rounds-=n;HOG.t+=n;camBump=Math.max(camBump,0.28);
+    if(!DF.wBuilt)dfWBuild();
+    dfNose(_dfN);
+    while(HOG.t>=3){HOG.t-=3;let t=null;for(const x of DF.trc)if(!x.on){t=x;break;}if(!t){t=DF.trc[0];for(const x of DF.trc)if(x.t>t.t)t=x;}
+      t.on=true;t.t=Math.random()*0.02;t.p.set(0,-0.1,-7.8).applyQuaternion(st.quat).add(st.pos);
+      t.v.set(st.vel.x+_dfN.x*1000+(Math.random()-0.5)*6,st.vel.y+_dfN.y*1000+(Math.random()-0.5)*6,st.vel.z+_dfN.z*1000+(Math.random()-0.5)*6);}
+    const tg=SENSOR.tgt;
+    if(tg&&!tg.dead&&SENSOR.valid&&SENSOR.slant<1500){_sd.set(tg.x-st.pos.x,tg.y-st.pos.y,tg.z-st.pos.z).normalize();
+      if(_sd.dot(_dfN)>0.94){HOG.on+=dt;if(HOG.on>=0.8){HOG.on=0;hogHit(tg);}}}
+    else HOG.on=Math.max(0,HOG.on-dt);
+    if(HOG.rounds<=0&&!HOG.dry){HOG.dry=true;toast('Winchester gun');}
+  }
+  dfTracers(dt);
+}
+function hogHit(t){hapPattern('impact');
+  explode(t.x,t.y,t.z,{scale:t.kind==='bunker'?1.4:1,secondary:t.kind==='hull'?1:0,debris:10,smokeSec:60,fireSec:600});
+  killTarget(t);STRIKE.hits++;STRIKE.gun=(STRIKE.gun||0)+1;
+  toast('Good hits. '+t.name+' destroyed');
+  vqAdd(L('Gila Range Control','tower',AC.csS+', good hit, good hit, target destroyed.',[csTs(),'t_good_hit']));
+  strikeScore();
+}
+// the GUN button and its count, only on a change
+function hogUI(){const h=hogOn();
+  if(h!==HOG.ui){HOG.ui=h;document.body.classList.toggle('hogOn',h);if(!h&&HOG.firing){HOG.firing=false;hogAud(false);}if(window.layoutCtl)layoutCtl();}
+  if(!h)return;const r=String(Math.ceil(HOG.rounds)),e=$('bGunN');if(e.textContent!==r){e.textContent=r;$('bGun').classList.toggle('dim',HOG.rounds<=0);}
+}
 function dfHudUpdate(){
   const on=DF.live&&running;
   if(on!==DFH.on){DFH.on=on;document.body.classList.toggle('dfOn',on);if(!on)dfHudHide();if(window.layoutCtl)layoutCtl();DFH.trk=null;}
@@ -11736,7 +11993,7 @@ function start(mode,base){
   if(mode==='drop'||mode==='short')missStart(mode==='drop'?'drop':'short');
   if(mode==='drop')dzStart();
   hbSync(true);
-  if(LB){LB.reset();if(mode==='range'||mode==='drop'||mode==='short')LB.runStart(mode==='range'?'arc:strike':mode==='drop'?'arc:drop':'mission:short');}
+  if(LB){LB.reset();if(mode==='range'||mode==='drop'||mode==='short')LB.runStart(mode==='range'?(acType==='a10'?'arc:gunrun':'arc:strike'):mode==='drop'?'arc:drop':'mission:short');}
   layoutViewport();VP.ctl=layoutCtl(true);   // the controls are dealt on this frame, in Easy and in Hard
 }
 // One sweep for everything a flight put on screen: the result sheets, the mission card, the drop
@@ -12242,7 +12499,7 @@ $('pLb').onclick=()=>{pauseGo('sLb');if(LB)LB.lbOpen();};
 $('storyX').onclick=()=>$('storyOv').classList.remove('on');
 
 // ---- the aircraft, friendliest first ----
-const CAR=['cessna','archer','alpha','f16','reaper','mq9b','c130'];
+const CAR=['cessna','archer','alpha','f16','a10','reaper','mq9b','c130'];
 // the daily challenge draws its aircraft from the six the seed always had: a new type in CAR would
 // change every past and future daily for everyone (and the Worker checks the day's runs against it)
 const DAILY_TYPES=['cessna','alpha','f16','reaper','mq9b','c130'];
@@ -12251,6 +12508,7 @@ const AC_INFO={
   archer:['Piper Archer II','Piper Archer','The low wing trainer with the Hershey bar wing. Steady and honest.'],
   alpha:['Pipistrel Alpha','Pipistrel Alpha','A tiny two seat trainer that glides for miles.'],
   f16:['F-16C Viper','F-16','A fighter jet. Very fast, very agile, afterburner included.'],
+  a10:['A-10C Thunderbolt II','A-10','The Warthog. Slow, tough, a straight wing and the big gun in the nose.'],
   reaper:['MQ-9A Reaper','MQ-9A Reaper','A long winged drone that circles for hours and strikes from above.'],
   mq9b:['MQ-9B SkyGuardian','MQ-9B SkyGuardian','The bigger, longer winged Reaper built to fly over cities.'],
   c130:['C-130H Hercules','C-130 Hercules','A four engine cargo hauler that lands on dirt strips.']};
@@ -12291,7 +12549,7 @@ function Carousel(root){
 const CARM=Carousel($('carMain'));
 // the pause sheet picks the aircraft with a chip row (the showroom carousel stays on the FLY screen)
 const CARP={pos:0,idx:0,sync:()=>{document.querySelectorAll('#pAc .pick').forEach(b=>b.classList.toggle('sel',b.dataset.t===savedType));CARP.idx=CARP.pos=Math.max(0,CAR.indexOf(savedType));}};
-(function(){const row=$('pAc');if(!row)return;const SHORT={cessna:'C172',archer:'PA-28',alpha:'Alpha',f16:'F-16',reaper:'MQ-9A',mq9b:'MQ-9B',c130:'C-130'};
+(function(){const row=$('pAc');if(!row)return;const SHORT={cessna:'C172',archer:'PA-28',alpha:'Alpha',f16:'F-16',a10:'A-10',reaper:'MQ-9A',mq9b:'MQ-9B',c130:'C-130'};
   CAR.forEach(t=>{const b=document.createElement('button');b.className='pick chip';b.dataset.t=t;b.setAttribute('role','radio');b.setAttribute('aria-label',AC_INFO[t][0]);
     b.innerHTML='<b></b>';b.firstChild.textContent=SHORT[t]||AC_INFO[t][1];b.onclick=()=>{pickType(t);CARP.sync();};row.appendChild(b);});})();
 
@@ -12347,11 +12605,12 @@ const SIL={
        '<rect x="-15.5" y="-10" width="2.6" height="6" rx="1"/><rect x="-9.5" y="-10" width="2.6" height="6" rx="1"/><rect x="6.9" y="-10" width="2.6" height="6" rx="1"/><rect x="12.9" y="-10" width="2.6" height="6" rx="1"/></g>',
   f16:'<path fill="#F6C177" d="M0-16 L2.6-4 L14 6 L14 8.5 L2.6 6 L3.4 11 L7.5 14 L7.5 16 L0 14.5 L-7.5 16 L-7.5 14 L-3.4 11 L-2.6 6 L-14 8.5 L-14 6 L-2.6-4Z"/>',
   cessna:'<g fill="#F6C177"><rect x="-18" y="-6" width="36" height="4.5" rx="1.6"/><rect x="-2.2" y="-13" width="4.4" height="25" rx="2.2"/><rect x="-7" y="10" width="14" height="3.2" rx="1.4"/><rect x="-4" y="-14.5" width="8" height="1.6" rx=".8" fill="#D98A3D"/></g>',
+  a10:'<g fill="#F6C177"><rect x="-21" y="-5" width="42" height="4.2" rx="1.6"/><rect x="-2.2" y="-14" width="4.4" height="27" rx="2.2"/><rect x="-7" y="10" width="14" height="2.8" rx="1.2"/><rect x="-7.6" y="7" width="2" height="6" rx="1"/><rect x="5.6" y="7" width="2" height="6" rx="1"/><rect x="-5.4" y="1.5" width="2.8" height="5.5" rx="1.3"/><rect x="2.6" y="1.5" width="2.8" height="5.5" rx="1.3"/></g>',
   lowwing:'<g fill="#F6C177"><path d="M-17 -1 L-2.4 -4 L2.4 -4 L17 -1 L17 3.2 L2.4 2.2 L-2.4 2.2 L-17 3.2Z"/><rect x="-2.2" y="-13" width="4.4" height="25" rx="2.2"/><rect x="-6.5" y="9.5" width="13" height="3" rx="1.4"/><rect x="-4" y="-14.5" width="8" height="1.6" rx=".8" fill="#D98A3D"/></g>',
   mq9:'<g fill="#F6C177"><rect x="-22" y="-3" width="44" height="2.8" rx="1.3"/><rect x="-2" y="-12" width="4" height="24" rx="2"/><path d="M0 10 L-7 16 L-6 17 L0 13 L6 17 L7 16Z"/></g>'};
 // the aircraft as a chip: its silhouette and its short name (results card, leaderboard rows)
-const AC_TAG={cessna:'C172',archer:'PA-28',alpha:'Alpha',f16:'F-16C',reaper:'MQ-9A',mq9b:'MQ-9B',c130:'C-130H'};
-const AC_SIL={cessna:'cessna',archer:'lowwing',alpha:'cessna',f16:'f16',reaper:'mq9',mq9b:'mq9',c130:'c130'};
+const AC_TAG={cessna:'C172',archer:'PA-28',alpha:'Alpha',f16:'F-16C',a10:'A-10C',reaper:'MQ-9A',mq9b:'MQ-9B',c130:'C-130H'};
+const AC_SIL={cessna:'cessna',archer:'lowwing',alpha:'cessna',f16:'f16',a10:'a10',reaper:'mq9',mq9b:'mq9',c130:'c130'};
 const acIcon=t=>SIL[AC_SIL[t]]?'<svg class="acI" viewBox="-23 -18 46 36" aria-hidden="true">'+SIL[AC_SIL[t]]+'</svg>':'';
 const acTag=t=>AC_TAG[t]?'<span class="acTag">'+acIcon(t)+'<b>'+AC_TAG[t]+'</b></span>':'';
 const ICO_PARTS={
@@ -12368,6 +12627,7 @@ const ICONS={
   dash:svgI([[SIL.f16,'translate(22 24) rotate(50) scale(1.05)'],[ICO_PARTS.watch,'translate(48 27) scale(1.05)']]),
   school:svgI([[SIL.cessna,'translate(22 24) rotate(-30) scale(1.05)'],[ICO_PARTS.list,'translate(48 24) scale(1.05)']]),
   range:svgI([[SIL.mq9,'translate(22 22) rotate(-20) scale(.9)'],[ICO_PARTS.cross,'translate(46 28) scale(.95)']]),
+  gunrun:svgI([[SIL.a10,'translate(22 22) rotate(-30) scale(.85)'],[ICO_PARTS.cross,'translate(46 28) scale(.95)']]),
   landing:svgI([[ICO_PARTS.runway,'translate(20 26) scale(1.1 1.35)'],[ICO_PARTS.watch,'translate(46 24) scale(1.1)']]),
   landing1:svgI([[ICO_PARTS.runway,'translate(20 26) scale(1.1 1.35)'],['<text x="0" y="6" text-anchor="middle" font-size="17" font-weight="800" fill="#F6C177" font-family="sans-serif">1</text><circle r="10.5" fill="none" stroke="#D98A3D" stroke-width="2.2"/>','translate(46 24) scale(1.05)']]),
   daily:svgI([['<g><rect x="-12" y="-10" width="24" height="22" rx="3" fill="none" stroke="#D98A3D" stroke-width="2.2"/><path d="M-12-4 H12" stroke="#D98A3D" stroke-width="2.2"/><rect x="-7" y="-14" width="2.6" height="6" rx="1" fill="#F6C177"/><rect x="4.4" y="-14" width="2.6" height="6" rx="1" fill="#F6C177"/></g>','translate(20 25)'],[SIL.f16,'translate(46 26) rotate(30) scale(.75)']]),
@@ -12382,6 +12642,7 @@ function scoreOf(id){
   if(id==='dash'){r=B.f16;return r?[r.secs<180?3:r.secs<240?2:1,fmtT(r.secs)+' best']:[0,''];}
   if(id==='range'){r=B.reaper||strikeBest;if(!r)return [0,''];const p=r.pts!==undefined?r.pts:null;
     return [p===null?1:p>=80?3:p>=55?2:1,(p!==null?p+' pts':r.hits+'/4 hits')];}
+  if(id==='gunrun'){r=B.a10;return r?[r.pts>=80?3:r.pts>=55?2:1,r.pts+' pts, '+r.hits+'/4 hits']:[0,''];}
   if(id==='school'){const g=LESSONS.map(l=>schoolBest[schoolAc+':'+l.id]).filter(Boolean),pass=g.filter(x=>x!=='F').length,a=g.filter(x=>x==='A').length;
     return g.length?[a>=5?3:a>=3?2:pass?1:0,pass+' of 5 passed']:[0,''];}
   if(id==='landing'||id==='landing1'||id==='daily')return arcScore(id);
@@ -12427,6 +12688,7 @@ function arcList(){
     {id:'landing1',lb:'arc:landing1',ac:AC_INFO[savedType][1],name:'1 mile landing challenge',desc:'Lined up, 300 ft, 1 mile out. Beat the clock to runway 1.',go:()=>arcStart('landing1')},
     {id:'drop',lb:'arc:drop',ac:'C-130H Hercules',name:'Airdrop challenge',desc:'Put the bundle on the drop zone.',go:()=>{pickType('c130',1);start('drop');}},
     {id:'range',lb:'arc:strike',ac:'MQ-9A Reaper',name:'Strike range',desc:'Find the targets, lock on, four missiles.',go:()=>{pickType('reaper',1);start('range');}},
+    {id:'gunrun',lb:'arc:gunrun',ac:'A-10C Thunderbolt II',name:'A-10 gun run',desc:'Four Mavericks and the 30 mm gun on the Gila range.',go:()=>{pickType('a10',1);start('range');}},
     // the world airports, below: each flies in its own region (tapping one from elsewhere switches there)
     {head:'World airports'}].concat(APT_IDS.map(id=>{const R=REGIONS[id],b=aptBoard(id);
       return {id:b,lb:b,icon:'landing',here:1,cls:'apt',ac:AC_INFO[savedType][1],name:R.base,score:arcScore(b),desc:'5 mile landing challenge at '+R.base+', runway '+R.main+'.',go:()=>aptStart(id)};})));
@@ -13902,6 +14164,7 @@ const CRASH_FX={
   reaper:{scale:0.9,sec:1,deb:8,fire:30,smoke:60,r:0.6,col:0x9ea3a6,parts:'drone'},
   mq9b:  {scale:0.9,sec:1,deb:8,fire:30,smoke:60,r:0.6,col:0xa9aeb1,parts:'drone'},
   f16:   {scale:1.6,sec:2,deb:12,fire:50,smoke:70,r:0.75,col:0x8c939a,parts:'trail',look:25},
+  a10:   {scale:1.7,sec:2,deb:14,fire:55,smoke:75,r:0.8,col:0x7c8389,parts:'trail',look:22},
   c130:  {scale:2.6,sec:3,deb:20,fire:90,smoke:90,r:2.0,col:0x8d949b,parts:'c130',look:6,
           stages:[[0.75,-0.3,1.4],[1.55,0.33,1.5],[2.4,-0.46,1.6]]}
 };
@@ -14438,14 +14701,15 @@ function boom(x,z,s,dl0){
 }
 // ---- score ----
 function strikeScore(){
-  const done=STRIKE.shots>=4||STRIKE.targets.every(t=>t.dead);
+  const done=(STRIKE.shots>=4&&(!hogOn()||HOG.rounds<=0))||STRIKE.targets.every(t=>t.dead);
   if(!done||STRIKE.cleared)return;
   STRIKE.cleared=true;
   const avg=STRIKE.shots?STRIKE.missSum/STRIKE.shots:0,secs=Math.round(st.time-STRIKE.t0);
   const sc={hits:STRIKE.hits,avg:Math.round(avg),t:secs,mode:runMode()};runLog('strike',{hits:sc.hits,avg:sc.avg,t:secs});
   const loit=loiterScore(sc);
-  if(scRecord('reaper',loit))bannerShow('NEW RECORD',loit.pts+' pts,  '+loit.hits+'/4,  '+loit.tot+' s on target');
-  if(LB)LB.runEnd('arc:strike',loit.pts);
+  const hog=AC.id==='a10';
+  if(scRecord(hog?'a10':'reaper',loit))bannerShow('NEW RECORD',loit.pts+' pts,  '+loit.hits+'/4,  '+loit.tot+' s on target');
+  if(LB)LB.runEnd(hog?'arc:gunrun':'arc:strike',loit.pts);
   const better=!strikeBest||sc.hits>strikeBest.hits||
     (sc.hits===strikeBest.hits&&sc.avg<strikeBest.avg)||
     (sc.hits===strikeBest.hits&&sc.avg===strikeBest.avg&&sc.t<strikeBest.t);
@@ -14453,8 +14717,8 @@ function strikeScore(){
   toast(`${sc.hits} of 4 hits. Average miss ${sc.avg} m, ${sc.t} s${better?'. New best':''}`);
   // the results card follows the last impact, once the boom has played
   resArm(()=>{if(!running||!STRIKE.active)return;RES.kind='strike';
-    resOpen(arcOv,{letter:letterFor(loit.pts),title:'Strike range: '+sc.hits+' of 4 hits'+(better?', new best':''),score:loit.pts+' pts',sub:'of 100',
-      stats:[['Hits',sc.hits+' of 4'],['Average miss',sc.avg+' m'],['Time on target',loit.tot+' s'],['Time',fmtT(sc.t)],['Best',strikeBestText()]],board:'arc:strike'});},4);
+    resOpen(arcOv,{letter:letterFor(loit.pts),title:(hog?'Gun run: ':'Strike range: ')+sc.hits+' of 4 hits'+(better?', new best':''),score:loit.pts+' pts',sub:'of 100',
+      stats:[['Hits',sc.hits+' of 4'+(hog&&STRIKE.gun?' ('+STRIKE.gun+' by gun)':'')],['Average miss',sc.avg+' m'],['Time on target',loit.tot+' s'],['Time',fmtT(sc.t)],['Best',strikeBestText()]],board:hog?'arc:gunrun':'arc:strike'});},4);
   vqAdd(L('Gila Range Control','tower',
     `${AC.csS}, range is cold. ${sc.hits} of 4.`,
     [csTs(),'t_gila_range','t_range_cold','t_n_'+sc.hits,'t_of_four']));
@@ -14476,7 +14740,8 @@ function strikeStart(){
   for(const m of MSL){m.g.visible=false;m.glow.material.opacity=0;}
   if(plane.pylons)plane.pylons.forEach(p=>p.visible=true);
   fireClear();fxClear();
-  apEngage(st,'orbit',{cx:RANGE.x,cz:RANGE.z,r:2400,y:st.pos.y-GEAR,v:AC.vcruise,dir:1});st.ap.sensor=true;
+  apEngage(st,'orbit',{cx:RANGE.x,cz:RANGE.z,r:2400,y:st.pos.y-GEAR,v:AC.vloiter||AC.vcruise,dir:1});st.ap.sensor=true;
+  HOG.rounds=HOG_MAX;HOG.firing=false;HOG.on=0;HOG.t=0;HOG.dry=false;if(window.dfGunRel)dfGunRel();STRIKE.gun=0;
   camMode=2;snapCamera=true;
   vqAdd(L('Gila Range Control','tower',
     AC.cs+', Gila range control, you are cleared hot. Range is clear, four targets.',
@@ -14607,7 +14872,7 @@ function tick(t,skipRender){
   if(running&&!paused&&!st.crashed){
     if(STRIKE.built){rangeMoving(dt);targetsTick(dt);}
     if(STRIKE.active||(camMode===2&&hasBall()))sensorUpdate(dt);
-    if(STRIKE.active){missileUpdate(dt);
+    if(STRIKE.active){missileUpdate(dt);if(AC.id==='a10')hogGun(dt);
       // time on target: the ball locked onto an actual target, not a ground point
       if(SENSOR.tgt&&!SENSOR.tgt.dead)STRIKE.tot=(STRIKE.tot||0)+dt;}
   }
@@ -14651,7 +14916,7 @@ function tick(t,skipRender){
     camera.position.x+=(Math.random()-0.5)*k;camera.position.y+=(Math.random()-0.5)*k*1.5;camera.position.z+=(Math.random()-0.5)*k;}
   camera.updateProjectionMatrix();sky.position.copy(camera.position);hbUpdate(paused?0:dt);farUpdate();
   if(sensOn)tgtMarkUpdate(dt);else if(TM.shown)tgtMarkHide();
-  dfHudUpdate();
+  dfHudUpdate();hogUI();
   // PAPI
   PAPI.forEach(pp=>{const eye=camera.position,du=(toU(eye.x,eye.z)-pp.u)*pp.dir;const ang=du<0?Math.atan2(eye.y-0.9,-du)*180/Math.PI:10;
     pp.sp.material.color.setHex(ang>pp.ang?0xffffff:0xff2a2a);const cd=camera.position.distanceTo(pp.sp.position);
@@ -14728,6 +14993,7 @@ const APP_VER='2026-10-06-phone3';          // keep version.json in step when sh
   board('arc:landing1',{name:'Landing challenge, 1 mile',group:'Arcade',ghost:1,go:()=>arcStart('landing1'),how:'Points: 1,000 x par / your time (up to 1.5x), x the landing grade'});
   board('arc:drop',{name:'Airdrop accuracy',group:'Arcade',dir:-1,fmt:'m',how:'Metres from the drop zone centre'});
   board('arc:strike',{name:'Strike accuracy',group:'Arcade',how:'0 to 100: hits 45%, average miss 30%, time on target 25%'});
+  board('arc:gunrun',{name:'A-10 gun run',group:'Arcade',go:()=>{pickType('a10',1);start('range');},how:'0 to 100: hits 45%, average miss 30%, time on target 25%'});
   LESSONS.forEach(l=>board('lesson:'+l.id,{name:l.name,group:'Flight school',how:'The lesson score, 0 to 100'}));
   board('free:landing',{name:'Free flight landing',group:'Free flight',how:'The landing grade points, 0 to 100'});
   // the world airports: the 5 mile landing challenge to each region's home runway (aptStart switches region when needed)
@@ -14984,7 +15250,7 @@ const APP_VER='2026-10-06-phone3';          // keep version.json in step when sh
     if(CITYBB.champ!==cs)CITYBB.setChamp(cs);}
 
   // ---- the player's callsign, small, on the F-16 canopy rail and on the nose of the others
-  const CS_INK={f16:'#101316',cessna:'#1d3557',alpha:'#1d2a3a',archer:'#1f4e9c',c130:'#16181a',reaper:'#eef1f3',mq9b:'#eef1f3'};
+  const CS_INK={f16:'#101316',a10:'#15181b',cessna:'#1d3557',alpha:'#1d2a3a',archer:'#1f4e9c',c130:'#16181a',reaper:'#eef1f3',mq9b:'#eef1f3'};
   const _rc=new THREE.Raycaster(),_ro=new THREE.Vector3(),_rd=new THREE.Vector3();
   function paintModel(m,id){
     if(!m||!m.g)return;
@@ -14996,7 +15262,7 @@ const APP_VER='2026-10-06-phone3';          // keep version.json in step when sh
     const hit=(ox,oy,oz,dx,dy,dz)=>{_rc.set(_ro.set(ox,oy,oz),_rd.set(dx,dy,dz).normalize());_rc.far=60;const h=_rc.intersectObjects(meshes,false);return h.length?h[0]:null;};
     const box=new THREE.Box3();meshes.forEach(o=>box.expandByObject(o));
     let z,y,w;
-    if(id==='f16'&&m.canopy){const cb=new THREE.Box3().setFromObject(m.canopy);z=cb.min.z+(cb.max.z-cb.min.z)*0.62;y=cb.min.y-0.1;w=0.95;}
+    if((id==='f16'||id==='a10')&&m.canopy){const cb=new THREE.Box3().setFromObject(m.canopy);z=cb.min.z+(cb.max.z-cb.min.z)*0.62;y=cb.min.y-0.1;w=0.95;}
     else{const L=box.max.z-box.min.z;z=box.min.z+L*({c130:0.075,cessna:0.085,alpha:0.1,archer:0.09,reaper:0.13,mq9b:0.13}[id]||0.12);
       const top=hit(0,box.max.y+5,z,0,-1,0),bot=hit(0,box.min.y-5,z,0,1,0);
       y=top&&bot?bot.point.y+(top.point.y-bot.point.y)*({c130:0.32,cessna:0.5}[id]||0.5):(box.min.y+box.max.y)/2;
@@ -15223,7 +15489,7 @@ window.__kgeu={resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{
   haboobJump:(m)=>{if(HB.on){hbPlace(m);hbUpdate(0);}},drawSixPack:drawSixPack,SP_CELL:SP_CELL,
   SCORE:SCORE,onLanding:onLanding,scRecord:scRecord,scReset:scReset,gradeLanding:gradeLanding,runwayFix:runwayFix,logLanding:logLanding,achGrant:achGrant,recOpen:recOpen,loiterScore:loiterScore,wX:wX,wZ:wZ,LUKE:LUKE,
   RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,ticker:()=>{const e=document.getElementById('tk'),c=document.getElementById('tkCtl');return {on:e.classList.contains('on'),paused:e.classList.contains('paused'),anim:getComputedStyle(document.getElementById('tkT')).animationName,scroll:e.classList.contains('scroll'),open:c.classList.contains('on'),text:e.querySelector('#tkT i').textContent,vis:e.offsetParent!==null&&getComputedStyle(e).display!=='none',ctlVis:c.offsetParent!==null};},tickerForce:n=>{TK.force=n||null;tkUI();},tickerOpen:()=>tkOpen(),tickerClose:()=>{TK.open=false;tkUI();},musicTick:musicTick,MUSIC:MUSIC,actx:()=>actx,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,VQ:VQ,vqLog:clear=>{const r=VQ.log.map(e=>Object.assign({},e));if(clear)VQ.log.length=0;return r;},vqAdd:(who,kind,text,clips,o)=>vqAdd(L(who,kind,text,clips),o),coach2:coach2,chatNow:()=>chatNow(),atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
-  ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),bannerShow:(k,t)=>bannerShow(k,t),badgeHide:()=>badgeHide(),auto:()=>autoSmart(),mission:k=>{pickType(k==='range'?'reaper':'c130',1);start(k);},setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
+  ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),bannerShow:(k,t)=>bannerShow(k,t),badgeHide:()=>badgeHide(),auto:()=>autoSmart(),mission:k=>{if(k==='gunrun'){pickType('a10',1);start('range');return;}pickType(k==='range'?'reaper':'c130',1);start(k);},HOG:HOG,strikeScore:()=>strikeScore(),setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
   stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day,kind:d.kind}},dfDayOf:k=>dfDayOf(k),aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   // @OhRabah easter eggs (3.10): where each one is, whether its lights are on, and the tow banner

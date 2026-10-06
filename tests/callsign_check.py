@@ -85,8 +85,8 @@ async def main():
         pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'})
         await pg.evaluate(f"()=>{K}.initAudio()")
         types = await pg.evaluate("""()=>{const T=window.__kgeu.TYPES,o={cs:{}};for(const k in T)o.cs[k]=[T[k].cs,T[k].csS];
-            o.CSC={cessna:'cs_skyhawk',alpha:'cs_pipistrel',reaper:'cs_reaper',f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian',archer:'cs_archer'};
-            o.CSCS={cessna:'cs_skyhawk_s',alpha:'cs_pipistrel_s',reaper:'cs_reaper_s',f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian_s',archer:'cs_archer_s'};return o;}""")
+            o.CSC={cessna:'cs_skyhawk',alpha:'cs_pipistrel',reaper:'cs_reaper',f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian',archer:'cs_archer',a10:'cs_hawg'};
+            o.CSCS={cessna:'cs_skyhawk_s',alpha:'cs_pipistrel_s',reaper:'cs_reaper_s',f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian_s',archer:'cs_archer_s',a10:'cs_hawg'};return o;}""")
         # the clip tables in the page must be the ones this test assumes
         same = await pg.evaluate("""(o)=>{const T=window.__kgeu.TYPES;return Object.keys(T).every(k=>o.CSC[k]&&o.CSCS[k]);}""", types)
         ok('clip table covers every type', same)

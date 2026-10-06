@@ -10,7 +10,7 @@ from playwright.async_api import async_playwright
 from harness import serve, launch, page, Checks, IPHONE_15
 ok = Checks()
 
-TYPES = {'cessna': 110, 'archer': 110, 'alpha': 100, 'f16': 420, 'reaper': 170, 'mq9b': 180, 'c130': 250}
+TYPES = {'cessna': 110, 'archer': 110, 'alpha': 100, 'f16': 420, 'a10': 300, 'reaper': 170, 'mq9b': 180, 'c130': 250}
 if sys.argv[1:]: TYPES = {t: TYPES[t] for t in sys.argv[1:]}
 # phases: name, seconds, ail, elev (touchIn.elev > 0 is a pull, see touch_check.py)
 PHASES = [('roll', 3.0, 1.0, 0.0), ('barrel', 4.0, 0.8, 0.5), ('loop', 6.0, 0.0, 1.0), ('neutral', 2.0, 0.0, 0.0)]

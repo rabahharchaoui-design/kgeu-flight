@@ -66,6 +66,7 @@ BOTH = {
     # planes2: the Archer
     'cs_archer':        'Archer eight one two eight papa',
     'cs_archer_s':      'Archer two eight papa',
+    'cs_hawg':          'Hawg one',
 }
 
 # ---- controller only ----
