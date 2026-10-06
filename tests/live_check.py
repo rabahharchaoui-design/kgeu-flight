@@ -68,9 +68,10 @@ async def main():
     chk('HD airframes are in the build',
         await pg.evaluate("()=>/makeHD/.test(document.documentElement.innerHTML)"))
 
-    # no service worker registered, so updates are instant
-    sw=await pg.evaluate("async()=>{if(!navigator.serviceWorker)return 0;const rs=await navigator.serviceWorker.getRegistrations();return rs.length;}")
-    chk('no service worker registered',sw==0,str(sw)+' registrations')
+    # offline mode (phone3 item 8): exactly one service worker, this build's (sw.js?v=APP_VER), so it holds no old copy
+    sw=await pg.evaluate("""async()=>{if(!navigator.serviceWorker)return null;await navigator.serviceWorker.ready;const rs=await navigator.serviceWorker.getRegistrations();
+      const v=document.documentElement.innerHTML.match(/APP_VER='([^']+)'/)[1];return {n:rs.length,url:rs.map(r=>(r.active||r.waiting||r.installing).scriptURL),v:v};}""")
+    chk('one service worker, this build\'s',bool(sw) and sw['n']==1 and sw['url'][0].endswith('sw.js?v='+sw['v']),str(sw))
     # a fresh device: the leaderboard Worker answers and the callsign card is up after the splash
     await pg.wait_for_timeout(3000)
     cs=await pg.evaluate("()=>({on:document.getElementById('csOv').classList.contains('on'),lb:!!(window.__kgeu.LB&&window.__kgeu.LB.E.enabled),online:window.__kgeu.LB&&window.__kgeu.LB.E.online})")
