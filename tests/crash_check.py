@@ -110,7 +110,9 @@ async def main():
             await pg.wait_for_timeout(450)   # the slide-in is a real-time CSS transition
             c = await card(pg)
             f = await pg.evaluate(f"()=>{K}.crashFx()")
-            if t == 'c130': ok('c130: 4 fuel tank fireballs over 2.5 s', f['fireballs'] == 4, f['fireballs'])
+            # the big airframes (C-130 and the Pocket Air airliners) stage fuel tank fireballs after the first one
+            stages = await pg.evaluate(f"()=>({K}.CRASH_FX['{t}'].stages||[]).length")
+            if stages: ok(f'{t}: {1 + stages} fuel tank fireballs over 2.5 s', f['fireballs'] == 1 + stages, f['fireballs'])
             else: ok(f'{t}: one fireball', f['fireballs'] == 1, f['fireballs'])
             ok(f'{t}: card up at 3.5 s with RETRY and MENU only', c['on'] and c['retry'] and c['menu'] and c['retry']['txt'] == 'RETRY'
                and c['menu']['txt'] == 'MENU' and not c['old'] and not c['top'], c)

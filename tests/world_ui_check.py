@@ -26,7 +26,7 @@ HOME = {'rjtt': '34R', 'lfpg': '26L', 'sbrj': '20L'}
 TWR = {'rjtt': 'Tokyo Tower', 'lfpg': 'de Gaulle Tower', 'sbrj': 'Santos Dumont Tower'}
 NAME = {'rjtt': 'Tokyo Haneda', 'lfpg': 'Paris CDG', 'sbrj': 'Rio Santos Dumont'}
 CLIPS = set(json.load(open(os.path.join(ROOT, 'radio', 'clips.json'))))
-DESC = {'kgeu': 'KGEU, the home field, 7,150 ft', 'luke': 'KLUF, F-16 base, two 10,000 ft runways', 'rjtt': 'RJTT, runways out in Tokyo Bay',
+DESC = {'kgeu': 'KGEU, the home field, 7,150 ft', 'luke': 'KLUF, F-16 base, two 10,000 ft runways', 'phx': 'KPHX, 11,500 ft, the airliners', 'rjtt': 'RJTT, runways out in Tokyo Bay',
         'lfpg': 'LFPG, four parallel runways', 'sbrj': 'SBRJ, 4,340 ft on Guanabara Bay'}
 
 # the visible boxes on FLY: a card counts by the part its scrolling row shows
@@ -66,9 +66,9 @@ def overlaps(boxes):
 async def fly_layout(pg, tag, region):
     await pg.evaluate(f"()=>{K}.openFly()"); await pg.wait_for_timeout(500)
     f = await pg.evaluate(FLYBOX)
-    want = [['ARIZONA', [['kgeu', 'Glendale'], ['luke', 'Luke AFB']]], ['JAPAN', [['rjtt', 'Tokyo Haneda']]], ['FRANCE', [['lfpg', 'Paris CDG']]], ['BRAZIL', [['sbrj', 'Rio Santos Dumont']]]]
+    want = [['ARIZONA', [['kgeu', 'Glendale'], ['luke', 'Luke AFB'], ['phx', 'Sky Harbor']]], ['JAPAN', [['rjtt', 'Tokyo Haneda']]], ['FRANCE', [['lfpg', 'Paris CDG']]], ['BRAZIL', [['sbrj', 'Rio Santos Dumont']]]]
     got = [[g[0], [[c[0], c[1]] for c in g[1]]] for g in f['groups']]
-    ok(f'{tag}: four region groups, five airport cards in order', got == want, got)
+    ok(f'{tag}: four region groups, six airport cards in order (Sky Harbor since planes2)', got == want, got)
     ok(f'{tag}: every card has its one line description showing', all(c[2] == DESC[c[0]] and c[3] != 'none' for g in f['groups'] for c in g[1]),
        [c[2] for g in f['groups'] for c in g[1]])
     bad = overlaps(f['boxes'])
@@ -114,7 +114,7 @@ async def main():
         await pg.evaluate(f"()=>{{{K}.pick('alpha');{K}.pickBase('kgeu');{K}.setTOD('day');{K}.pickPos('final1');{K}.start('final1');}}"); await pg.wait_for_timeout(600)
         await finger(pg, '#bPause'); await pg.wait_for_timeout(500)
         g = await pg.evaluate("()=>[...document.querySelectorAll('#locPz .lgrp')].map(g=>[g.querySelector('.glbl').textContent,[...g.querySelectorAll('.pick')].map(c=>c.dataset.b)])")
-        ok('pause sheet (Arizona): the same four groups and five airports', g == [['ARIZONA', ['kgeu', 'luke']], ['JAPAN', ['rjtt']], ['FRANCE', ['lfpg']], ['BRAZIL', ['sbrj']]], g)
+        ok('pause sheet (Arizona): the same four groups and six airports', g == [['ARIZONA', ['kgeu', 'luke', 'phx']], ['JAPAN', ['rjtt']], ['FRANCE', ['lfpg']], ['BRAZIL', ['sbrj']]], g)
         await pg.evaluate("()=>{const c=document.querySelector('#locPz .pick[data-b=sbrj]');c.closest('.locs').scrollLeft=1e4;}"); await pg.wait_for_timeout(200)
         await finger(pg, '#locPz .pick[data-b="sbrj"]'); await pg.wait_for_timeout(200)
         r = await pg.evaluate("()=>[document.getElementById('pApply').textContent,document.querySelector('#locPz .pick[data-b=sbrj]').classList.contains('sel'),window.__reloaded||0]")
@@ -161,7 +161,7 @@ async def main():
         await pg.evaluate(f"()=>{K}.start('runway')"); await pg.wait_for_timeout(600)
         await finger(pg, '#bPause'); await pg.wait_for_timeout(500)
         g = await pg.evaluate("()=>[[...document.querySelectorAll('#locPz .lgrp')].map(g=>[g.querySelector('.glbl').textContent,[...g.querySelectorAll('.pick')].map(c=>c.dataset.b)]),[...document.querySelectorAll('#locPz .pick.sel')].map(c=>c.dataset.b)]")
-        ok('pause sheet (rjtt): the same groups, Tokyo selected', g[0] == [['ARIZONA', ['kgeu', 'luke']], ['JAPAN', ['rjtt']], ['FRANCE', ['lfpg']], ['BRAZIL', ['sbrj']]] and g[1] == ['rjtt'], g)
+        ok('pause sheet (rjtt): the same groups, Tokyo selected', g[0] == [['ARIZONA', ['kgeu', 'luke', 'phx']], ['JAPAN', ['rjtt']], ['FRANCE', ['lfpg']], ['BRAZIL', ['sbrj']]] and g[1] == ['rjtt'], g)
         await pg.evaluate("()=>{document.getElementById('locPz').scrollLeft=0;}"); await pg.wait_for_timeout(150)
         await finger(pg, '#locPz .pick[data-b="kgeu"]'); await pg.wait_for_timeout(200)
         r = await pg.evaluate("()=>[document.getElementById('pApply').textContent,window.__reloaded||0]")

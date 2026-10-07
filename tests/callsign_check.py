@@ -99,7 +99,9 @@ async def main():
                         tag = f'{t}/{base}/{pos}/{skill}'
                         r['log'] += r['q']
                         heard += len(r['log'])
-                        if r['type'] != t or r['base'] != base:
+                        # an airliner picked at a short base flies from its home, Sky Harbor (planes2's long runway rule)
+                        want_base = base if await pg.evaluate(f"()=>{K}.baseOK('{t}','{base}')") else 'phx'
+                        if r['type'] != t or r['base'] != want_base:
                             bad.append(f'{tag}  state is {r["type"]}/{r["base"]}')
                         own = [l for l in r['log'] if not l['amb'] and (r['cs'] in l['text'] or r['csS'] in l['text'])]
                         if not own:

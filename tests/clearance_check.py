@@ -162,6 +162,9 @@ async def main():
         if FLOWS:
             for t in TYPES:
                 for flow in ('takeoff', 'autoland', 'easy'):
+                    # AUTO LAND brings every aircraft to Glendale runway 1; an airliner starts at Sky Harbor (the long runway rule),
+                    # 28 km away, so its autoland is outside this sweep's budget. Its takeoff and Easy landing are still swept.
+                    if flow == 'autoland' and await pg.evaluate(f"()=>!!{K}.TYPES['{t}'].minRwy"): continue
                     await pg.evaluate("()=>window.__kgeu.stepFrame(0,true)")
                     await ev(f"{K}.setSkill('{'rookie' if flow == 'easy' else 'pilot'}');{K}.pick('{t}');{K}.pickBase('kgeu');{K}.start('{'runway' if flow == 'takeoff' else 'final1'}')"); await pg.wait_for_timeout(1000)
                     await step(2)
