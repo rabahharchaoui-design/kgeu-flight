@@ -2044,7 +2044,7 @@ function step(st,dt,ev){
   // the dogfight's stick (dfTick sets st.dfPitch, st.dfRoll): the pitch authority reaches the extended wing's alpha, the
   // roll rate is the Viper's (about 240 deg/s at corner speed, 130 outside the fight)
   let el=st.elev,gx=0;const kE=2.3*(st.dfPitch||1);
-  if(st.gLim&&qd>100){const aL=(st.gLim*mg/(qd*AC.S)-AC.CL0-fl.cl)/AC.CLa;
+  if(st.gLim&&qd>100){const aL=Math.min((st.gLim*mg/(qd*AC.S)-AC.CL0-fl.cl)/AC.CLa,sA-0.03);   // and never past the wing's alpha (the FLCS limiter)
     if(el>0)el=Math.min(el,Math.max(0,(7*(aL-aTrim)+(1.2+3.2*sq)*st.gLim*AC.g/Math.max(Va,50)/qn)/kE));
     const ap=alpha+0.06*(st.w.x-st.gload*AC.g/Math.max(Va,50));if(ap>aL)gx=-qn*30*(ap-aL);}
   const ax=qn*(kE*el*(stalled?0.6:1)-7*am)-(1.2+3.2*sq)*st.w.x+gx;
@@ -11293,7 +11293,13 @@ function arcScore(id){
 // gear and hinge lines left off) plus its canopy, shared by every bandit; three boxes beyond 2 nm.
 // Their own kinematic flight model: heading, flight path angle, bank and speed, 350 to 480 kt indicated,
 // turn rate held under 7 g, never below 6,000 ft, steered back inside the arena.
-const DF_KT0=350,DF_KT1=480,DF_G=7,DF_FLOOR=6000,DF_LOD=2*1852,DF_SPLINTER=['#5b7591','#8a9aab','#3e4e63'];
+const DF_KT0=250,DF_KT1=480,DF_G=7,DF_FLOOR=6000,DF_LOD=2*1852,DF_SPLINTER=['#5b7591','#8a9aab','#3e4e63'];
+// the waves ramp (dogfight2 item 4): the bandits' speed and g factors, their reaction time (on the overshoot wait), how
+// often they make the mistake (on cfg.mist) and the extra seconds their radar needs to lock, wave 1 to 4
+const DF_RAMP={spd:[0.9,0.94,0.97,1],g:[0.82,0.9,0.96,1],react:[1.6,1.3,1.1,1],mist:[1,0.85,0.7,0.55],rLock:[1.5,1,0.5,0]};
+const dfWv=k=>DF_RAMP[k][clamp((DF.wave|0)-1,0,3)];
+// the g a wing like ours lifts at this indicated speed (CLmax 1.8, the bandits fly the same jet): 9 g at 345 KIAS
+const dfGLift=kt=>9*(kt/345)*(kt/345);
 // our F-16 in the fight (dogfight2 item 1, step): the leading edge flaps' extra alpha (CLmax 1.8, a 9 g corner speed of
 // about 345 KIAS), the roll authority (about 240 deg/s) and the pitch authority that reaches the extended wing's alpha.
 // DF_CORNER: the corner speed the HUD cue points at, with its band (KIAS)
@@ -11351,8 +11357,11 @@ function dfWave(n){
     const brg=ph+(n>1?(i-(n-1)/2)*DF.cfg().spread:0)+(DF.wave>1?(dfR()-0.5)*0.35:0),d=(3+dfR()*2)*1852;
     let x=st.pos.x+Math.sin(brg)*d,z=st.pos.z-Math.cos(brg)*d;
     const dc=Math.hypot(x-DF.C.x,z-DF.C.z),rm=DF.R*0.85;if(dc>rm){x=DF.C.x+(x-DF.C.x)*rm/dc;z=DF.C.z+(z-DF.C.z)*rm/dc;}   // inside the arena
+    // never behind us (dogfight2 item 4): pushed past 70 degrees off the nose by the arena, it spawns on the nose instead
+    if(Math.abs(wrapPi(Math.atan2(x-st.pos.x,-(z-st.pos.z))-ph))>1.22){const d2=3.5*1852;x=st.pos.x+Math.sin(ph)*d2;z=st.pos.z-Math.cos(ph)*d2;}
     b.p.set(x,dfY(12000+dfR()*6000),z);b.hdg=Math.atan2(st.pos.x-x,-(st.pos.z-z));b.gam=0;b.bank=0;
-    b.spd=dfTAS(440*DF.cfg().spd,b.p.y);b.alive=true;b.fall=false;b.state='MERGE';b.hp=1;b.st=0;b.i=i;b.abOn=0;b.flN=0;b.flT=0;b.spk=0;b.rw=0;b.rwT=0;b.rwD=0;b.rwOut=0;b.cd=0;b.vr=0;b.vrB=0;b.vrN=0;b.six=0;
+    b.spd=dfTAS(440*DF.cfg().spd*dfWv('spd'),b.p.y);b.alive=true;b.fall=false;b.state='MERGE';b.hp=1;b.st=0;b.i=i;b.abOn=0;b.flN=0;b.flT=0;b.spk=0;b.rw=0;b.rwT=0;b.rwD=0;b.rwOut=0;b.cd=0;b.vr=0;b.vrB=0;b.vrN=0;b.six=0;
+    b.ov=0;b.ovT=0;b.ovRoll=false;b.cool=0;b.errT=0;b.errX=0;b.gP=1;
     b.g.visible=true;b.body.visible=true;if(b.can)b.can.visible=true;dfPose(b);DF.bandits.push(b);}
 }
 function dfPose(b){
@@ -11362,6 +11371,7 @@ function dfPose(b){
 const _dfD=new V3(),_dfR=new V3(),_dfE=new THREE.Euler(0,0,0,'YXZ');
 // one bandit, one step: the state machine picks where it wants to point, the kinematics follow under the g limit
 function dfFly(b,dt){
+  if(b.cool>0)b.cool-=dt;
   // the victory roll (5.5): its missile hit us, so one slow aileron roll flying straight and level, then back to the fight
   if(b.vr>0){b.vr-=dt;b.bank=b.vrB+2*Math.PI*clamp(1-b.vr/DF_VR,0,1);b.gam*=Math.max(0,1-dt*1.5);
     if(b.vr<=0){b.vr=0;b.bank=b.vrB;b.state='TURN';b.st=0;}
@@ -11376,15 +11386,30 @@ function dfFly(b,dt){
   // degrees of bank, so it comes round to a bandit behind it; nothing is moved)
   dfNose(_dfC);const rear=(_dfC.x*dx+_dfC.y*dy+_dfC.z*dz)/Math.max(1,rng)>0.3;
   b.six=rear&&rng<3*1852?(b.six||0)+dt:0;if(b.six>c.six&&b.state==='TURN'){b.state='EXTEND';b.st=0;b.six=0;}
+  // the overshoot (dogfight2 items 2 and 4): chasing close behind us with the nose nearly on, closing, while we defend
+  // (a hard pull over ovG, a quick reversal, a nose low pull or the BREAK), it needs ovT seconds (longer in the early
+  // waves) to see it, and then in mist of the cases it cannot follow: it flies on through for 2.5 to 3.5 s, past us
+  const chasing=ata>0.75&&rng<1300&&rng>60,vc=((b.v.x-st.vel.x)*dx+(b.v.y-st.vel.y)*dy+(b.v.z-st.vel.z)*dz)/Math.max(1,rng);
+  if(b.state==='TURN'&&chasing&&vc>15&&dfDefending(c)){b.ovT+=dt;
+    if(b.ovT>c.ovT*dfWv('react')&&!b.ovRoll){b.ovRoll=true;
+      if(DF.test.noMiss?false:(DF.test.miss||dfR()<c.mist*dfWv('mist'))){b.state='OVERSHOOT';b.ov=2.5+dfR();b.st=0;DF.ovs++;dfCall('over',null,{ttl:2});}}}
+  else{b.ovT=Math.max(0,b.ovT-dt*0.5);if(b.ovT<=0)b.ovRoll=false;}
+  // after its missile hit us (dfHit) every bandit eases off: cool seconds of extending, its radar quiet
+  if(b.cool>0&&b.state!=='OVERSHOOT'&&b.state!=='EVADE'){if(b.state!=='EXTEND'){b.state='EXTEND';b.st=0;}}
   if(b.state==='MERGE'){if(rng<1852||ata<0.2)b.state='TURN',b.st=0;}
   else if(b.state==='TURN'){if(behind)b.state='EVADE',b.st=0;else if(b.st>c.turnT&&rng>c.extR*1852)b.state='EXTEND',b.st=0;}
   else if(b.state==='EVADE'){if(b.st>4&&!behind)b.state=dfR()<0.4?'EXTEND':'TURN',b.st=0;}
-  else if(b.state==='EXTEND'){if(b.st>8||rng>3*1852)b.state='MERGE',b.st=0;}
+  else if(b.state==='EXTEND'){if(b.cool<=0&&(b.st>8||rng>3*1852))b.state='MERGE',b.st=0;}
+  else if(b.state==='OVERSHOOT'){b.ov-=dt;if(b.ov<=0){b.ov=0;b.state=rng>1852?'EXTEND':'TURN';b.st=0;b.ovT=0;b.ovRoll=false;}}
+  // a sloppy aim (the mistakes): every 3 to 5 s a new lateral error of up to err radians, smaller in the later waves
+  b.errT-=dt;if(b.errT<=0){b.errT=3+dfR()*2;b.errX=(dfR()*2-1)*c.err*dfWv('mist');}
   // where it wants to point
   let tx,ty,tz,kt;
   if(b.state==='MERGE'){tx=dx;ty=dy;tz=dz;kt=460;}
-  else if(b.state==='TURN'){const lag=1.2+0.4*b.i;tx=dx-st.vel.x*lag;ty=dy-st.vel.y*lag;tz=dz-st.vel.z*lag;kt=410;}   // lag pursuit: into the player's six
+  else if(b.state==='TURN'){const lag=1.2+0.4*b.i;tx=dx-st.vel.x*lag;ty=dy-st.vel.y*lag;tz=dz-st.vel.z*lag;kt=410;   // lag pursuit: into the player's six
+    const l=Math.hypot(tx,tz)||1,ex=-tz/l*b.errX*l,ez=tx/l*b.errX*l;tx+=ex;tz+=ez;}   // the aim error, across the line
   else if(b.state==='EVADE'){const s=((b.i&1)?1:-1),h=b.hdg+s*1.6;tx=Math.sin(h);tz=-Math.cos(h);ty=-0.25;kt=380;}  // a hard break turn, nose a little low
+  else if(b.state==='OVERSHOOT'){tx=Math.sin(b.hdg);tz=-Math.cos(b.hdg);ty=0.02;kt=460;}       // straight on through, wings coming level
   else{tx=-dx;ty=-0.15*rng;tz=-dz;kt=480;}                                                    // extend away, burner
   const tl=Math.hypot(tx,ty,tz)||1;tx/=tl;ty/=tl;tz/=tl;
   // the arena: steer back in past 10 nm, hard past 11.5
@@ -11393,19 +11418,34 @@ function dfFly(b,dt){
   // the floor: nose up under 7,000 ft, never below 6,000; no higher than 24,000
   const ft=dfFt(b.p.y);if(ft<7000)ty=Math.max(ty,0.35*clamp((7000-ft)/1000,0,1));if(ft>24000)ty=Math.min(ty,-0.1);
   const hd=Math.atan2(tx,-tz),gd=clamp(Math.atan2(ty,Math.hypot(tx,tz)),-0.6,0.6);
-  const V=b.spd,gl=DF_G*c.g,wMax=9.81*Math.sqrt(gl*gl-1)/V,eh=wrapPi(hd-b.hdg);
-  // bank for the turn it wants (rolled at up to 200 deg/s), and the turn that bank gives: never past 7 g
+  // the energy fight (dogfight2 item 2): its g is the lower of its limit (ramped by wave) and what its wing lifts at this
+  // indicated speed (9 g at 345 KIAS, as ours); the g it pulls (from its bank) bleeds speed with g squared past 2 g
+  const V=b.spd,ias=V*Math.sqrt(1.097*Math.exp(-b.p.y/9200)/1.225)*MS2KT,gl=Math.max(1.5,Math.min(DF_G*c.g*dfWv('g'),dfGLift(ias))),wMax=9.81*Math.sqrt(gl*gl-1)/V,eh=wrapPi(hd-b.hdg);
+  // bank for the turn it wants (rolled at up to 200 deg/s), and the turn that bank gives: never past its g
   const wc=clamp(eh*1.6,-wMax,wMax),bt=Math.atan(wc*V/9.81);
   b.bank+=clamp(bt-b.bank,-3.5*dt,3.5*dt);
   b.hdg=wrapPi(b.hdg+9.81*Math.tan(b.bank)/V*dt);
   b.gam+=clamp((gd-b.gam)*1.5,-0.3,0.3)*dt;
-  // speed: toward the state's, gravity along the path, 350 to 480 kt indicated
-  const vt=dfTAS(kt*c.spd,b.p.y),acc=clamp(vt-V,-7,9)-9.81*Math.sin(b.gam)*0.6;
+  b.gP=1/Math.max(0.12,Math.cos(b.bank));
+  // speed: toward the state's (the burner's push at most 3.5 m/s^2), gravity along the path, the bleed, 250 to 480 kt indicated
+  const vt=dfTAS(kt*c.spd*dfWv('spd'),b.p.y),bleed=b.gP>2?c.bBleed*(b.gP*b.gP-4):0,acc=clamp(vt-V,-7,3.5)-9.81*Math.sin(b.gam)*0.6-bleed;
   b.spd=clamp(V+acc*dt,dfTAS(DF_KT0*c.spd,b.p.y),dfTAS(DF_KT1*c.spd,b.p.y));
   b.abOn+=((acc>3||b.state==='EXTEND'?1:0)-b.abOn)*Math.min(1,dt*4);
   b.v.set(Math.sin(b.hdg)*Math.cos(b.gam),Math.sin(b.gam),-Math.cos(b.hdg)*Math.cos(b.gam)).multiplyScalar(b.spd);
   b.p.addScaledVector(b.v,dt);
   const fy=dfY(DF_FLOOR);if(b.p.y<fy){b.p.y=fy;if(b.gam<0)b.gam=0;}
+}
+// are we defending (dfFly's overshoot): pulling over c.ovG, a BREAK (item 3), or a reversal / nose low pull in the last 1.2 s
+function dfDefending(c){return DF.brk>0||DF.revT>0||st.gload>c.ovG;}
+// every live frame: a reversal (rolled from past 57 degrees one way to past 30 the other) or a nose low pull (nose 23 degrees
+// down pulling over 3.5 g) opens a 1.2 s window the bandits can be made to overshoot in
+function dfDefTick(dt){
+  if(DF.revT>0)DF.revT-=dt;
+  _dfE.setFromQuaternion(st.quat,'YXZ');const bank=-_dfE.z,pitch=_dfE.x;
+  if(Math.abs(bank)<0.3){DF.lvlT=(DF.lvlT||0)+dt;if(DF.lvlT>1.5)DF.bankPk=0;}else DF.lvlT=0;
+  if(DF.bankPk&&Math.sign(bank)!==Math.sign(DF.bankPk)&&Math.abs(DF.bankPk)>1&&Math.abs(bank)>0.5){DF.revT=1.2;DF.revs++;DF.bankPk=bank;}
+  else if(Math.abs(bank)>=Math.abs(DF.bankPk||0)||Math.sign(bank)!==Math.sign(DF.bankPk||bank))DF.bankPk=bank;
+  if(pitch<-0.4&&st.gload>3.5)DF.revT=Math.max(DF.revT,1.2);
 }
 // a kill: the airburst, then it falls burning and smoking to a ground impact (the crash fireball and scorch)
 function dfKill(b,how){
@@ -11455,7 +11495,8 @@ function dfStart(o){
   st.gearDown=false;st.gearPos=0;st.flapIdx=0;trimSpawn(st,0);st.mode='dogfight';   // trimmed for level flight at 400 ktA.land=1;A.tko=1;
   Object.assign(DF,{on:true,live:true,done:false,wave:1,t:DF.ROUND,bank:[],kills:0,gunKills:0,hits:0,clearT:0,fightT:0,flares:DF_FLARES,won:false,out:0,gap:0,why:'',
     rwr:'none',flareSaves:0,dmg:0,inv:0,deckG:0,below:0,puT:0,wTxt:'',ej:false,ejWhy:'',eShots:0,breaks:0,smk:0,paOk:false,
-    tally:false,sixCallT:-99,altT:-99,ckRec:null,pic:null,gv:0,ach:[],sc:null,daily:daily,seed:daily?todayKey():null,lb:''});DF.pend.length=0;
+    tally:false,sixCallT:-99,altT:-99,ckRec:null,pic:null,gv:0,ach:[],sc:null,daily:daily,seed:daily?todayKey():null,lb:'',
+    ovs:0,revs:0,brk:0,brkCd:0,brks:0,revT:0,bankPk:0,lvlT:0});DF.pend.length=0;
   dfSeed(DF.test.seed!=null?DF.test.seed:DF.seed);
   for(const b of DF.pool){b.alive=false;b.fall=false;b.g.visible=false;}
   // the air is the fight's: the tower and the chatter go quiet (vqAdd drops them), the subtitle moves to the bottom strip
@@ -11492,6 +11533,7 @@ function dfHit(kind,m){
   DF.hits++;
   if(DF.hits<3){dfCall(kind==='deck'?'deck':'hit');
     const b=m&&m.src;if(kind==='msl'&&b&&b.alive&&!(b.vr>0)){b.vr=DF_VR;b.vrB=b.bank;b.vrN++;b.rw=0;b.rwT=0;}   // the shooter's victory roll
+    if(kind==='msl')for(const x of DF.bandits)if(x.alive){x.cool=DF.cfg().cool;x.rw=0;x.rwT=0;}   // and every bandit eases off (dogfight2 item 4)
     return;}
   // three: the eject. The jet goes up in the air, EJECT EJECT, the results card (not the crash card)
   DF.ej=true;DF.wTxt='EJECT, EJECT';document.body.classList.add('dfEj');DF.ejWhy=kind==='deck'?'three kills against you, you ejected':'shot down, you ejected';
@@ -11512,6 +11554,7 @@ function dfTick(dt){
     // grey vision (Hard): over 7.5 g it closes in from the edges (4 s at 9 g to the full tunnel), held from 5 to 7.5 g,
     // gone in 2 s under 5 g; never in Easy. dfGrey draws it.
     const g=st.gload;if(!c.gv||!fl)DF.gv=c.gv?Math.max(0,DF.gv-dt/2):0;else if(g>7.5)DF.gv=Math.min(1,DF.gv+(g-7.5)/6*dt);else if(g<5)DF.gv=Math.max(0,DF.gv-dt/2);
+    dfDefTick(dt);
     for(const b of DF.pool){if(b.alive){const n=Math.ceil(dt/0.034);for(let i=0;i<n;i++)dfFly(b,dt/n);dfPose(b);}else if(b.fall)dfFall(b,dt);}
     // the near model or the three boxes, by range from the camera; the burner when it accelerates
     for(const b of DF.pool){if(!b.g.visible)continue;const far=camera.position.distanceTo(b.p)>DF_LOD;
@@ -11623,12 +11666,18 @@ function dfStop(){
 // burner, eAB: the burner's push in a turn, m/s^2 (Hard only); gv: the grey vision near the limit (Hard only).
 // The bandits: turnT, extR: seconds in a turning fight before they extend (when past extR nm); six: seconds chasing in
 // our rear quarter before an Easy bandit breaks off; spread: radians between a wave's bandits at the spawn; outT: seconds
-// outside the arena before the run ends; ezTurn: Easy's fight turn, 80 degrees of bank pulled up to about 6 g (easyFly).
+// outside the arena before the run ends; ezTurn: Easy's fight turn, 83 degrees of bank pulled up to about 7.3 g (easyFly).
+// Dogfight2: bBleed: the bandits' speed bleed, m/s^2 per g^2 over 2 g; ovG: our g that counts as defending; ovT: seconds
+// of it a chasing bandit needs to react (times the wave's react factor); mist: the chance it then overshoots (times the
+// wave's mist factor); cool: seconds every bandit eases off after a hit on us; err: its aim error, radians; brkCd, brkT:
+// the BREAK's cooldown and length, s (item 3).
 const DF_CFG={
   hard:{seek:6,lock:1.5,fox:6,decoy:0.3,decoyRear:0.1,flares:2,gunR:12,gunKill:0.35,spd:1,g:1,
-    rLock:3,rDel:[2,4],rCd:12,eMax:2,eG:25,flrGood:0.65,flrEarly:0.25,flrG:0.15,autoFlr:0,gLim:9,eDrag:0.13,eAB:6,gv:1,turnT:25,extR:2,six:99,spread:0.95,outT:10},
+    rLock:3,rDel:[2,4],rCd:12,eMax:2,eG:25,flrGood:0.65,flrEarly:0.25,flrG:0.15,autoFlr:0,gLim:9,eDrag:0.13,eAB:6,gv:1,turnT:25,extR:2,six:14,spread:0.6,outT:10,
+    bBleed:0.135,ovG:5.5,ovT:0.8,mist:0.7,cool:6,err:0.08,brkCd:8,brkT:1.6},
   easy:{seek:11,lock:0.8,fox:10,decoy:0.1,decoyRear:0,flares:2,gunR:20,gunKill:0.2,spd:0.8,g:0.75,
-    rLock:5,rDel:[4,6],rCd:20,eMax:1,eG:18,flrGood:0.85,flrEarly:0.25,flrG:0.15,autoFlr:2,gLim:9,eDrag:0,eAB:0,gv:0,turnT:10,extR:1,six:6,spread:0.3,outT:20,ezTurn:1}};
+    rLock:5,rDel:[4,6],rCd:20,eMax:1,eG:18,flrGood:0.85,flrEarly:0.25,flrG:0.15,autoFlr:2,gLim:9,eDrag:0,eAB:0,gv:0,turnT:10,extR:1,six:6,spread:0.3,outT:20,ezTurn:1,
+    bBleed:0.15,ovG:4.2,ovT:0.45,mist:0.95,cool:9,err:0.22,brkCd:6,brkT:1.8}};
 DF.cfg=()=>rookie()?DF_CFG.easy:DF_CFG.hard;
 // the run's dice: spawns, the bandits' choices and waits, every decoy roll. DF.test.seed (a number) makes each run the
 // same (dfStart seeds it); null is Math.random
@@ -11638,10 +11687,10 @@ function dfSeed(n){if(n===null||n===undefined){dfRnd=Math.random;return;}let a=n
 // seek.state 'none' | 'search' (the growl) | 'lock' (the tone); test: noDecoy / decoy=1 force the flare roll (both sides'),
 // hold flies bandits straight, noBanditFire keeps the bandits' radars and missiles off, launchAt() makes bandit 0 shoot now.
 // rwr: the radar warning, 'none' | 'search' | 'lock' | 'launch'. pa: our own acceleration (smoothed), for the missiles' end game.
-Object.assign(DF,{fox:6,rounds:510,seek:{state:'none',b:null,t:0,out:0},test:{noBrief:false,seed:null,wave:n=>dfWave(n),noDecoy:false,decoy:0,hold:false,noBanditFire:false,launchAt:()=>{const b=DF.bandits[0];if(b&&b.alive)dfLaunch(b);}},gunHeld:false,firing:false,
+Object.assign(DF,{fox:6,rounds:510,seek:{state:'none',b:null,t:0,out:0},test:{noBrief:false,seed:null,wave:n=>dfWave(n),noDecoy:false,decoy:0,hold:false,noBanditFire:false,miss:false,noMiss:false,launchAt:()=>{const b=DF.bandits[0];if(b&&b.alive)dfLaunch(b);}},gunHeld:false,firing:false,
   gunCallT:-99,trAcc:0,kc:0,kcB:null,kcO:new V3(),lastCall:'',calls:[],shots:0,noLock:0,side:1,msl:[],trc:[],flr:[],wBuilt:false,
   rwr:'none',flareSaves:0,dmg:0,inv:0,deckG:0,below:0,puT:0,wTxt:'',ej:false,ejWhy:'',waveT:0,autoLeft:0,eShots:0,breaks:0,smk:0,
-  pa:new V3(),pv:new V3(),paOk:false,subT:0,subAge:9,
+  pa:new V3(),pv:new V3(),paOk:false,subT:0,subAge:9,ovs:0,revs:0,brk:0,brkCd:0,brks:0,revT:0,bankPk:0,lvlT:0,
   brief:false,pend:[],vlog:[],ckRec:null,pic:null,bbSaid:false,sixT:0,sixCallT:-99,tally:false,altT:-99});
 const DF_ROUNDS=510,DF_RPS=100,DF_VB=1030,DF_SEEK_R=5*1852,DF_MACH=2.5*300,DF_BURN=2.2,DF_MSL_T=12,DF_FUZE=15,DF_MSL_G=30*9.81,DF_PN=4;
 // FLR 32: both sides' flares (a bandit pops 2 a missile, a FLARES tap 2) from one pool. The enemy missile: 10 s of
@@ -11834,12 +11883,12 @@ function dfDef(dt){
   let nf=0;for(const m of DF.msl)if(m.on&&m.foe&&!m.dec&&!m.lost)nf++;
   let rw=0;const quiet=!fight||DF.test.noBanditFire||DF.gap>0||DF.kc>0;
   for(const b of DF.bandits){
-    if(!b.alive||quiet){b.rw=0;b.rwT=0;continue;}
+    if(!b.alive||quiet||b.cool>0){b.rw=0;b.rwT=0;continue;}
     const dx=st.pos.x-b.p.x,dy=st.pos.y-b.p.y,dz=st.pos.z-b.p.z,r=Math.hypot(dx,dy,dz)||1;
     const cone=r<DF_RWR_R&&(dx*b.v.x+dy*b.v.y+dz*b.v.z)/(r*Math.max(1,b.spd))>DF_RWR_COS;   // us within 30 deg of its nose, inside 4 nm
     if(!cone){if(b.rw){b.rwOut+=dt;if(b.rwOut>0.6){b.rw=0;b.rwT=0;}}continue;}
     b.rwOut=0;if(!b.rw){b.rw=1;b.rwT=0;}b.rwT+=dt;
-    if(b.rw===1&&b.rwT>=c.rLock){b.rw=2;b.rwT=0;b.rwD=c.rDel[0]+dfR()*(c.rDel[1]-c.rDel[0]);}
+    if(b.rw===1&&b.rwT>=c.rLock+dfWv('rLock')){b.rw=2;b.rwT=0;b.rwD=c.rDel[0]+dfR()*(c.rDel[1]-c.rDel[0]);}
     else if(b.rw===2&&b.rwT>=b.rwD&&st.time>=b.cd&&!(b.vr>0)&&nf<c.eMax&&DF.waveT>=DF_QUIET_T){if(dfLaunch(b))nf++;b.rwT=0;}
     if(b.rw>rw)rw=b.rw;}
   DF.rwr=!fight?'none':nf>0?'launch':rw===2?'lock':rw===1?'search':'none';
@@ -11930,6 +11979,7 @@ const DF_V={
   breakR:['w',['d_w_break_r'],'Break right!','Turn hard right!'],
   breakL:['w',['d_w_break_l'],'Break left!','Turn hard left!'],
   six:['w',['d_w_six'],'He\'s on your six!','Enemy behind you!'],
+  over:['w',null,'Overshoot! Reverse!','He flew past you! Turn back on him!'],
   flaresave:['w',['d_w_niceflares'],'Nice flares','The flares fooled it!'],
   autoflare:['c',['d_c_flares'],'Flares','Auto flares!'],
   pullup:['c',['d_c_pullup'],'Pull up','Too low! Pull up!'],
@@ -11957,6 +12007,7 @@ function dfCall(id,arg,o){
   DF.calls.push(id);if(DF.calls.length>40)DF.calls.shift();
   if(v[0]==='c'){dfCock(clips&&clips[0],t);return;}
   const who=DF_WHO[v[0]];
+  if(!clips){dfSay(ez?t:who+': '+t,2.5);return;}   // no recording: the line on the strip only
   vqAdd({who:who,kind:'df',text:t,clips:clips,df:1,sub:ez?t:who+': '+t.replace(/^Sentry, /,'')},{df:1,pri:2,ttl:o.ttl||3,cut:!!o.cut,ok:()=>DF.live});
 }
 // the cockpit voice: dry, now; its record goes in VQ.log beside the radio lines (one voice at a time is checked there)
@@ -15957,7 +16008,7 @@ window.__kgeu.TCAS={levels:tcasLevels,state:()=>({ta:TCAS.list.some(o=>tcasLvl(o
 window.__kgeu.tcasConflict=tcasConflict;window.__kgeu.tcasVoiceLog=TCAS.voiceLog;
 window.__kgeu.LB=LB;try{LB.boot();}catch(e){console.warn('leaderboards',e);}
 // the Red Flag Dogfight (5.1)
-Object.assign(window.__kgeu,{dfScore:dfScore,dfStars:dfStars,dfGrade:dfGrade,dfAch:dfAch,dfPFlare:dfPFlare,ACH:ACH,SCORE:SCORE,scoreOf:scoreOf,DF:DF,DFM:DFM,dfStart:dfStart,dfKill:dfKill,dfHit:dfHit,dfEnd:dfEnd,dfStop:dfStop,dfFox:dfFox,dfCall:dfCall,DF_CFG:DF_CFG,musicTitle:musicTitle});
+Object.assign(window.__kgeu,{dfScore:dfScore,dfStars:dfStars,dfGrade:dfGrade,dfAch:dfAch,dfPFlare:dfPFlare,ACH:ACH,SCORE:SCORE,scoreOf:scoreOf,DF:DF,DFM:DFM,dfStart:dfStart,dfKill:dfKill,dfHit:dfHit,dfEnd:dfEnd,dfStop:dfStop,dfFox:dfFox,dfCall:dfCall,DF_CFG:DF_CFG,dfWv:dfWv,DF_RAMP:DF_RAMP,musicTitle:musicTitle});
 Object.defineProperty(window.__kgeu,'audioSessionSet',{get:()=>AUD_SESS,configurable:true});   // 5.4: navigator.audioSession set to playback
 // world regions (4.6a)
 Object.assign(window.__kgeu,{flySub:flySub,CHAT_R:CHAT_R,APTS:APTS,PLACES:PLACES,TERRAIN:TERRAIN,LANDMARKS:LANDMARKS,locShow:locShow,REGION:REGION,REGIONS:REGIONS,WORLD:WORLD,pickRegion:pickRegion,isWater:isWater,TERR:TERR,RUNWAYS:RUNWAYS,WB:WB,AL:AL,OBST:OBST,TKY:TKY,PARIS:PARIS,RIO:RIO,CITYBB:CITYBB,buildCityBillboard:buildCityBillboard,
