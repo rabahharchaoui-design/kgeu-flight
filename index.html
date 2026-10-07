@@ -477,6 +477,17 @@ body.dfOn #miss b, body.dfOn #miss span{ display:block; white-space:nowrap; over
 body.dfOn #atc, body.dfOn #toast{ display:none !important; }
 body.dfOn #warn{ white-space:nowrap; font-size:16px; padding:2px 10px; }
 body.dfEj #warn{ font-size:28px; }
+/* the rear threat warning (dogfight2 item 4): a red pill under the wave card with the side arrow, the clock position and the
+   range of the nearest bandit in the rear 120 degree cone inside 1.5 nm ("7 O'CLOCK 0.8 nm"); the text only changes on a
+   change of clock or tenth of a mile. Opacity only, in 120 ms. */
+#dfSix{ display:none; align-items:center; gap:6px; padding:3px 10px 3px 8px; border-radius:9px; background:rgba(120,10,6,.78); border:1px solid rgba(255,90,74,.9);
+  font:800 12px/1.2 var(--font); letter-spacing:.05em; color:#fff; white-space:nowrap; opacity:0; transition:opacity .12s ease; }
+body.dfOn #dfSix{ display:flex; } #dfSix.on{ opacity:1; }
+#dfSix i{ display:block; width:0; height:0; border-top:6px solid transparent; border-bottom:6px solid transparent; }
+#dfSix.l i{ border-right:9px solid #ff6a5a; } #dfSix.r i{ border-left:9px solid #ff6a5a; } #dfSix.b i{ border-top:9px solid #ff6a5a; border-bottom:0; border-left:6px solid transparent; border-right:6px solid transparent; }
+#dfSix.hot{ animation:dfSixP .6s ease-in-out infinite alternate; }   /* inside 0.7 nm */
+@keyframes dfSixP{ from{ background:rgba(120,10,6,.78); } to{ background:rgba(200,30,20,.92); } }
+@media (prefers-reduced-motion: reduce){ #dfSix.hot{ animation:none; } }
 /* hits taken: three pips after the sub line, lost ones red */
 #miss{ --p1:#5dff8a; --p2:#5dff8a; --p3:#5dff8a; }
 #miss.dfH1{ --p3:#ff4a3a; } #miss.dfH2{ --p2:#ff4a3a; --p3:#ff4a3a; } #miss.dfH3{ --p1:#ff4a3a; --p2:#ff4a3a; --p3:#ff4a3a; }
@@ -1277,7 +1288,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   <div id="dfSub" role="status" aria-live="polite"></div>
   <div id="lookPad" role="slider" aria-label="Free look, drag to swing the camera"><svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13c2-3.2 4.3-4.8 7-4.8s5 1.6 7 4.8c-2 3.2-4.3 4.8-7 4.8S8 16.2 6 13z"/><circle cx="13" cy="13" r="2" fill="currentColor"/><path d="M13 1.5v3M11.5 3l1.5-1.5L14.5 3M13 24.5v-3M11.5 23l1.5 1.5 1.5-1.5M1.5 13h3M3 11.5L1.5 13 3 14.5M24.5 13h-3M23 11.5l1.5 1.5-1.5 1.5"/></svg><i>LOOK</i></div>
   <!-- the centre column under pause: mission card, jump light, warning, toast, tower subtitle -->
-  <div id="topCol"><div id="miss" class="card"><b id="missT"></b><span id="missS"></span></div><div id="jumpLt" class="card"><i class="r"></i><i class="g"></i><b></b></div><div id="warn"></div><div id="toast"></div><div id="atc" class="card"></div></div>
+  <div id="topCol"><div id="miss" class="card"><b id="missT"></b><span id="missS"></span></div><div id="dfSix" role="status"><i></i><span></span></div><div id="jumpLt" class="card"><i class="r"></i><i class="g"></i><b></b></div><div id="warn"></div><div id="toast"></div><div id="atc" class="card"></div></div>
   <!-- crash: the reason as one line at the top, then after 3 s a small card at the bottom
        that leaves the fireball in view -->
   <div id="crashTop" aria-live="assertive"></div>
@@ -9114,13 +9125,14 @@ const bestKey=()=>acType==='reaper'?'kgeuMQ9Best':'kgeuBest_'+acType;
 function loadBest(){try{const b=localStorage.getItem(bestKey());return b===null?null:+b;}catch(e){return null;}}
 let best=loadBest();
 function showBest(){}
-const CAMS=['Chase','Nose camera','Sensor ball'];
+const CAMS=['Chase','Nose camera','Sensor ball','Padlock'];
 // chase, nose, and the ball on the aircraft that carry one
 function cycleCam(){
   if(running&&st.crashed)return;   // the wreck view holds until RETRY or MENU
   // VIEW out of the ramp view or the pallet ride goes straight back to the chase camera
   if(camMode===0&&DCAM.mode!=='chase'){dcSet('chase',0);toast('Camera: '+CAMS[0]);return;}
-  camMode=(camMode+1)%(hasBall()?3:2);
+  if(DF.live&&running)camMode=camMode===0?3:camMode===3?1:0;   // the fight: chase, padlock, cockpit (dogfight2 item 4)
+  else camMode=(camMode+1)%(hasBall()?3:2);
   toast('Camera: '+(camMode===1?AC.cam1Name:CAMS[camMode]));snapCamera=true;
   // the ball is only useful with something else flying, so hand the aircraft to the orbit
   if(camMode===2)sensorAP();}
@@ -11459,6 +11471,47 @@ function dfFly(b,dt){
   b.p.addScaledVector(b.v,dt);
   const fy=dfY(DF_FLOOR);if(b.p.y<fy){b.p.y=fy;if(b.gam<0)b.gam=0;}
 }
+// ---- awareness (dogfight2 item 4). The padlock view: the camera behind us on the far side from the bandit (the seeker's,
+// else the nearest alive), looking past us at it, so both stay in frame; with no bandit it is the chase view. Smoothed so a
+// bandit passing overhead swings the camera, never snaps it.
+const _pdP=new V3(),_pdT=new V3(),_pdD=new V3();let pdLive=false;
+function dfPadCam(q,dp,cf,dt){
+  let b=DF.seek.b&&DF.seek.b.alive?DF.seek.b:null;
+  if(!b){let r=1e18;for(const x of DF.bandits){if(!x.alive)continue;const d=x.p.distanceToSquared(st.pos);if(d<r){r=d;b=x;}}}
+  if(!b||DF.gap>0){pdLive=false;dcCamera(q,dp,cf,dt);return;}
+  _pdD.copy(b.p).sub(dp);const R=_pdD.length()||1;_pdD.divideScalar(R);
+  // the camera: behind us along the line away from the bandit, a little high; the look point most of the way to the bandit.
+  // The offsets from the jet are what is smoothed (the jet itself moves 20 m a frame at 400 kt)
+  const back=AC.chase[1]*1.15,up=AC.chase[0]*1.3;
+  _pdP.copy(_pdD).multiplyScalar(-back);_pdP.y+=up;
+  _pdT.copy(_pdD).multiplyScalar(Math.min(R*0.55,900));
+  if(!pdLive||snapCamera){DF.pdO.copy(_pdP);DF.pdT.copy(_pdT);pdLive=true;snapCamera=false;}
+  else{const k=1-Math.exp(-5*dt);DF.pdO.lerp(_pdP,k);DF.pdT.lerp(_pdT,k);}
+  camera.position.copy(dp).add(DF.pdO);const cg=groundHeight(camera.position.x,camera.position.z)+2;if(camera.position.y<cg)camera.position.y=cg;
+  _pdT.copy(dp).add(DF.pdT);camera.up.set(0,1,0);camera.lookAt(_pdT);camera.fov=68;
+}
+// CHECK 6 over the chase view: the camera blends (DF.sixK) from the chase pose to one just ahead of the nose, looking back
+// over the tail, so the rear hemisphere fills the screen while the button is held
+function dfSixCam(q,dp){
+  const k=DF.sixK*DF.sixK*(3-2*DF.sixK);
+  _pdP.set(0,AC.chase[0]*0.8,-AC.chase[1]*0.9).applyQuaternion(q).add(dp);
+  _pdT.set(0,1,600).applyQuaternion(q).add(dp);
+  _pdD.set(0,0,-1).applyQuaternion(camera.quaternion).multiplyScalar(60).add(camera.position);   // where the chase camera looks
+  camera.position.lerp(_pdP,k);_pdD.lerp(_pdT,k);camera.up.set(0,1,0).applyQuaternion(q);camera.lookAt(_pdD);
+}
+// the rear threat pill: the nearest bandit in the rear 120 degree cone inside 1.5 nm, its clock position and range
+function dfSixUI(){
+  const e=DFH.six;if(!e)return;let best=null,br=1.5*1852;
+  if(DF.on&&!DF.done&&!DF.ej&&DF.gap<=0&&!PHOTO.on){dfNose(_dfN);
+    for(const b of DF.bandits){if(!b.alive)continue;const dx=b.p.x-st.pos.x,dy=b.p.y-st.pos.y,dz=b.p.z-st.pos.z,r=Math.hypot(dx,dy,dz)||1;
+      if(r<br&&(dx*_dfN.x+dy*_dfN.y+dz*_dfN.z)/r<-0.5){br=r;best=b;}}}
+  if(!best){if(DFH.sixK!==''){DFH.sixK='';e.className='';}return;}
+  _dfE.setFromQuaternion(st.quat,'YXZ');const rel=wrapPi(Math.atan2(best.p.x-st.pos.x,-(best.p.z-st.pos.z))+_dfE.y);
+  const clk=(((Math.round(rel/(Math.PI/6))%12)+12)%12)||12,nm=Math.round(br/185.2),side=clk===6?'b':clk>6?'l':'r',k=side+clk*1000+nm+(br<0.7*1852?'h':'');
+  if(k!==DFH.sixK){DFH.sixK=k;e.className='on '+side+(br<0.7*1852?' hot':'');e.lastChild.textContent=clk+' O\'CLOCK '+(nm/10).toFixed(1)+' nm';}
+}
+// CHECK 6's blend, every live frame (the camera reads DF.sixK)
+function dfSixTick(dt){const t=DF.six6?1:0;DF.sixK+=(t-DF.sixK)*Math.min(1,dt*10);if(Math.abs(DF.sixK-t)<0.002)DF.sixK=t;}
 // are we defending (dfFly's overshoot): pulling over c.ovG, a BREAK (item 3), or a reversal / nose low pull in the last 1.2 s
 function dfDefending(c){return DF.brk>0||DF.revT>0||st.gload>c.ovG;}
 // every live frame: a reversal (rolled from past 57 degrees one way to past 30 the other) or a nose low pull (nose 23 degrees
@@ -11579,7 +11632,7 @@ function dfTick(dt){
     // grey vision (Hard): over 7.5 g it closes in from the edges (4 s at 9 g to the full tunnel), held from 5 to 7.5 g,
     // gone in 2 s under 5 g; never in Easy. dfGrey draws it.
     const g=st.gload;if(!c.gv||!fl)DF.gv=c.gv?Math.max(0,DF.gv-dt/2):0;else if(g>7.5)DF.gv=Math.min(1,DF.gv+(g-7.5)/6*dt);else if(g<5)DF.gv=Math.max(0,DF.gv-dt/2);
-    dfDefTick(dt);dfBreakTick(dt);
+    dfDefTick(dt);dfBreakTick(dt);dfSixTick(dt);
     for(const b of DF.pool){if(b.alive){const n=Math.ceil(dt/0.034);for(let i=0;i<n;i++)dfFly(b,dt/n);dfPose(b);}else if(b.fall)dfFall(b,dt);}
     // the near model or the three boxes, by range from the camera; the burner when it accelerates
     for(const b of DF.pool){if(!b.g.visible)continue;const far=camera.position.distanceTo(b.p)>DF_LOD;
@@ -11673,6 +11726,7 @@ function dfStop(){
   missEl.classList.remove('dfH1','dfH2','dfH3');DFH.hk=-1;if(CLOUD_MESH)CLOUD_MESH.visible=true;
   dfHudUpdate();
   if(MUSIC.forced==='dogfight.m4a')MUSIC.forced=null;if(st.mode==='dogfight')st.mode='runway';
+  if(camMode===3){camMode=0;snapCamera=true;}DF.six6=false;DF.sixK=0;if(DFH.six){DFH.six.className='';DFH.sixK='';}
 }
 // ================= Red Flag Dogfight: offense (5.2) =================
 // Target boxes and edge arrows (dfHud), the Fox 2 heat missile (seeker growl, lock tone, real flight with
@@ -11715,7 +11769,7 @@ function dfSeed(n){if(n===null||n===undefined){dfRnd=Math.random;return;}let a=n
 Object.assign(DF,{fox:6,rounds:510,seek:{state:'none',b:null,t:0,out:0},test:{noBrief:false,seed:null,wave:n=>dfWave(n),noDecoy:false,decoy:0,hold:false,noBanditFire:false,miss:false,noMiss:false,launchAt:()=>{const b=DF.bandits[0];if(b&&b.alive)dfLaunch(b);}},gunHeld:false,firing:false,
   gunCallT:-99,trAcc:0,kc:0,kcB:null,kcO:new V3(),lastCall:'',calls:[],shots:0,noLock:0,side:1,msl:[],trc:[],flr:[],wBuilt:false,
   rwr:'none',flareSaves:0,dmg:0,inv:0,deckG:0,below:0,puT:0,wTxt:'',ej:false,ejWhy:'',waveT:0,autoLeft:0,eShots:0,breaks:0,smk:0,
-  pa:new V3(),pv:new V3(),paOk:false,subT:0,subAge:9,ovs:0,revs:0,brk:0,brkCd:0,brks:0,brkX:1,revT:0,bankPk:0,lvlT:0,six6:false,
+  pa:new V3(),pv:new V3(),paOk:false,subT:0,subAge:9,ovs:0,revs:0,brk:0,brkCd:0,brks:0,brkX:1,revT:0,bankPk:0,lvlT:0,six6:false,sixK:0,pdT:new V3(),pdO:new V3(),
   brief:false,pend:[],vlog:[],ckRec:null,pic:null,bbSaid:false,sixT:0,sixCallT:-99,tally:false,altT:-99});
 const DF_ROUNDS=510,DF_RPS=100,DF_VB=1030,DF_SEEK_R=5*1852,DF_MACH=2.5*300,DF_BURN=2.2,DF_MSL_T=12,DF_FUZE=15,DF_MSL_G=30*9.81,DF_PN=4;
 // FLR 32: both sides' flares (a bandit pops 2 a missile, a FLARES tap 2) from one pool. The enemy missile: 10 s of
@@ -12134,7 +12188,7 @@ function dfAud(){
 // circle on the boresight, and the gun pipper. Pooled elements, transforms only, text only when it changes.
 const DFH={box:[],arr:[],seek:null,pip:null,mw:null,W:0,H:0,mt:0,on:false,trk:null,trkT:0,pn:0,pb:[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],bx:[0,0,0,0],r:-1,ui:-1,fl:-1,flPop:0,hk:-1,vig:'',vigEl:document.getElementById('dfVig'),
   gk:-1,gq:-999,gvO:document.querySelector('#dfGv .o'),gvI:document.querySelector('#dfGv .i'),hG:document.getElementById('hG'),
-  hGn:document.querySelector('#hG em'),hGb:document.querySelector('#hG i b'),hCn:document.getElementById('hCn'),cn:-1,brkPop:0,bcd:-1};
+  hGn:document.querySelector('#hG em'),hGb:document.querySelector('#hG i b'),hCn:document.getElementById('hCn'),cn:-1,brkPop:0,bcd:-1,six:document.getElementById('dfSix'),sixK:''};
 (function(){const h=$('dfHud');
   const mk=(c,inner)=>{const e=document.createElement('div');e.className=c;e.innerHTML=inner;h.appendChild(e);return e;};
   for(let i=0;i<4;i++){const b=mk('dfBox','<b></b><span></span>');DFH.box.push({el:b,tx:b.lastChild,base:'dfBox',c:'',tr:'',n:-1});
@@ -12349,7 +12403,7 @@ function dfHudUpdate(){
   const on=DF.live&&running;
   if(on!==DFH.on){DFH.on=on;document.body.classList.toggle('dfOn',on);if(!on)dfHudHide();if(window.layoutCtl)layoutCtl();DFH.trk=null;}
   if(!on){if(DFH.vig){DFH.vig='';DFH.vigEl.className='';}DF.gv=0;if(DFH.gk)dfGrey();return;}
-  dfBtnUI();dfDefUI();dfGrey();
+  dfBtnUI();dfDefUI();dfGrey();dfSixUI();
   if(!DF.on||DF.done||DF.kc>0||PHOTO.on||st.crashed){dfHudHide();return;}
   DFH.mt-=1;if(!DFH.W||DFH.mt<=0){DFH.mt=60;const u=$('uiroot');if(u.clientWidth!==DFH.W||u.clientHeight!==DFH.H)DFH.trk=null;DFH.W=u.clientWidth;DFH.H=u.clientHeight;}
   // the arrows' track: from the DOM once per layout (and a refresh every 3 s for the music ticker coming and going)
@@ -15428,8 +15482,9 @@ function tick(t,skipRender){
     camera.position.copy(_co);camera.up.set(0,1,0);camera.lookAt(_ct);camera.fov=FREECAM.fov||30;}
   else if(DF.kc>0&&DF.kcB){dfCam();snapCamera=false;}   // the dogfight kill cam
   else if(CRASH.cam){crashCam(paused?0:dt);snapCamera=false;DCAM.chLive=false;}   // after impact: a steady view of the wreck
-  else if(camMode===0)dcCamera(q,dp,_cf,dt);   // chase, plus the C-130 drop views on top of it
-  else if(camMode===1){_co.set(AC.cam1[0],AC.cam1[1],AC.cam1[2]).applyQuaternion(q).add(dp);camera.position.copy(_co);camera.quaternion.copy(q);camera.rotateX(-0.05);camera.fov=64;camera.up.set(0,1,0);snapCamera=false;}
+  else if(camMode===0){dcCamera(q,dp,_cf,dt);if(DF.sixK>0.001)dfSixCam(q,dp);}   // chase, plus the C-130 drop views on top of it; CHECK 6 over it
+  else if(camMode===1){_co.set(AC.cam1[0],AC.cam1[1],AC.cam1[2]).applyQuaternion(q).add(dp);camera.position.copy(_co);camera.quaternion.copy(q);camera.rotateX(-0.05);if(DF.sixK>0.001)camera.rotateY(Math.PI*DF.sixK);camera.fov=64;camera.up.set(0,1,0);snapCamera=false;}
+  else if(camMode===3)dfPadCam(q,dp,_cf,dt);   // the dogfight's padlock view (item 4)
   else if(camMode===2){
     sensorOrigin(_co);camera.position.copy(_co);camera.up.set(0,1,0);snapCamera=false;
     sensorDir(SENSOR.az,SENSOR.el,_sd);
