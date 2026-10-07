@@ -411,6 +411,13 @@ body.dfOn #uiroot > #dfHud{ display:block; }
 #dfHud .dfSeek.sr b{ border-color:rgba(255,180,58,.9); } #dfHud .dfSeek.lk b{ border-color:#ff3a2a; border-width:2.5px; }
 #dfHud .dfPip b{ position:absolute; left:-11px; top:-11px; width:22px; height:22px; border-radius:50%; border:2px solid #5dff8a; box-shadow:0 0 2px rgba(0,0,0,.8); }
 #dfHud .dfPip i{ position:absolute; left:-2px; top:-2px; width:4px; height:4px; border-radius:50%; background:#5dff8a; }
+/* Easy's lead computing gun cross (dogfight2 item 5): the ring grows a cross, a thin line runs from it to the bandit it is
+   computed for (one element scaled along x, transform only), and it fills when the solution is on him inside 900 m */
+#dfHud .dfPip em{ display:none; position:absolute; left:-17px; top:-17px; width:34px; height:34px;
+  background:linear-gradient(#5dff8a,#5dff8a) center/2px 10px no-repeat, linear-gradient(#5dff8a,#5dff8a) center/10px 2px no-repeat; filter:drop-shadow(0 0 1px #000); }
+#dfHud .dfPip.ez em{ display:block; }
+#dfHud .dfPip.hot b{ background:rgba(93,255,138,.35); border-width:3px; }
+#dfHud .dfLead{ width:1px; height:1px; background:rgba(93,255,138,.55); transform-origin:0 50%; }
 /* defense (5.3): the incoming missile, an arrow on the edge (a ring when it is in view) with its clock and range */
 #dfHud .dfMw{ color:#ff5040; font-size:12px; font-weight:800; }
 #dfHud .dfMw b{ position:absolute; left:-11px; top:-10px; width:0; height:0; border-left:22px solid #ff3a2a; border-top:10px solid transparent; border-bottom:10px solid transparent; filter:drop-shadow(0 0 1px #000); }
@@ -1284,7 +1291,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
        pipper and the incoming missile arrow, and the one subtitle line in the bottom strip -->
   <div id="dfW"><button id="bFox" aria-label="Fox 2, fire a heat missile"><b>FOX 2</b><i id="bFoxN">x6</i></button><button id="bGun" aria-label="Gun, hold to fire"><b>GUN</b><i id="bGunN">510</i></button><button id="bFlr" aria-label="Flares"><b>FLARES</b><i id="bFlrN">30</i></button><button id="bBrk" aria-label="Break, a hard defensive turn with flares"><b>BREAK</b><i id="bBrkN">READY</i></button><button id="bSix" aria-label="Check six, hold to look behind"><b>CHECK 6</b><i>HOLD</i></button></div>
   <canvas id="fd" aria-hidden="true"></canvas>
-  <div id="dfHud" aria-hidden="true"><div class="dfSeek"><b></b></div><div class="dfPip"><b></b><i></i></div><div class="dfMw"><b></b><span></span></div></div>
+  <div id="dfHud" aria-hidden="true"><div class="dfSeek"><b></b></div><div class="dfLead"></div><div class="dfPip"><b></b><i></i><em></em></div><div class="dfMw"><b></b><span></span></div></div>
   <div id="dfSub" role="status" aria-live="polite"></div>
   <div id="lookPad" role="slider" aria-label="Free look, drag to swing the camera"><svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13c2-3.2 4.3-4.8 7-4.8s5 1.6 7 4.8c-2 3.2-4.3 4.8-7 4.8S8 16.2 6 13z"/><circle cx="13" cy="13" r="2" fill="currentColor"/><path d="M13 1.5v3M11.5 3l1.5-1.5L14.5 3M13 24.5v-3M11.5 23l1.5 1.5 1.5-1.5M1.5 13h3M3 11.5L1.5 13 3 14.5M24.5 13h-3M23 11.5l1.5 1.5-1.5 1.5"/></svg><i>LOOK</i></div>
   <!-- the centre column under pause: mission card, jump light, warning, toast, tower subtitle -->
@@ -11337,9 +11344,10 @@ const dfWv=k=>DF_RAMP[k][clamp((DF.wave|0)-1,0,3)];
 // the g a wing like ours lifts at this indicated speed (CLmax 1.8, the bandits fly the same jet): 9 g at 345 KIAS
 const dfGLift=kt=>9*(kt/345)*(kt/345);
 // our F-16 in the fight (dogfight2 item 1, step): the leading edge flaps' extra alpha (CLmax 1.8, a 9 g corner speed of
-// about 345 KIAS), the roll authority (about 240 deg/s) and the pitch authority that reaches the extended wing's alpha.
+// about 350 KIAS, the FLCS limiter 0.03 rad under the extended wing's stall), the roll authority (about 260 deg/s) and the pitch
+// authority that reaches that alpha.
 // DF_CORNER: the corner speed the HUD cue points at, with its band (KIAS)
-const DF_LEF=0.08,DF_ROLL=1.5,DF_PITCH=1.7,DF_CORNER=340,DF_CORNER_BAND=25;
+const DF_LEF=0.1,DF_ROLL=1.5,DF_PITCH=1.7,DF_CORNER=350,DF_CORNER_BAND=25;
 const dfY=ft=>(ft-FIELD_FT)/M2FT+GEAR,dfFt=y=>(y-GEAR)*M2FT+FIELD_FT;
 const dfTAS=(kt,y)=>kt/MS2KT/Math.sqrt(1.097*Math.exp(-y/9200)/1.225);   // indicated to true, as placeAir does
 const DFM={};   // the shared bandit geometry and materials, built on the first run
@@ -11422,11 +11430,11 @@ function dfFly(b,dt){
   // degrees of bank, so it comes round to a bandit behind it; nothing is moved)
   dfNose(_dfC);const rear=(_dfC.x*dx+_dfC.y*dy+_dfC.z*dz)/Math.max(1,rng)>0.3;
   b.six=rear&&rng<3*1852?(b.six||0)+dt:0;if(b.six>c.six&&b.state==='TURN'){b.state='EXTEND';b.st=0;b.six=0;}
-  // the overshoot (dogfight2 items 2 and 4): chasing close behind us with the nose nearly on, closing, while we defend
+  // the overshoot (dogfight2 items 2 and 4): chasing close behind us (we are inside 63 degrees of its nose), closing, while we defend
   // (a hard pull over ovG, a quick reversal, a nose low pull or the BREAK), it needs ovT seconds (longer in the early
   // waves) to see it, and then in mist of the cases it cannot follow: it flies on through for 2.5 to 3.5 s, past us
-  const chasing=ata>0.75&&rng<1300&&rng>60,vc=((b.v.x-st.vel.x)*dx+(b.v.y-st.vel.y)*dy+(b.v.z-st.vel.z)*dz)/Math.max(1,rng);
-  if(b.state==='TURN'&&chasing&&vc>15&&dfDefending(c)){b.ovT+=dt;
+  const chasing=ata>0.45&&rng<1500&&rng>60,vc=((b.v.x-st.vel.x)*dx+(b.v.y-st.vel.y)*dy+(b.v.z-st.vel.z)*dz)/Math.max(1,rng);
+  if(b.state==='TURN'&&chasing&&(vc>0||rng<400)&&dfDefending(c)){b.ovT+=dt;
     if(b.ovT>c.ovT*dfWv('react')&&!b.ovRoll){b.ovRoll=true;
       if(DF.test.noMiss?false:(DF.test.miss||dfR()<c.mist*dfWv('mist'))){b.state='OVERSHOOT';b.ov=2.5+dfR();b.st=0;DF.ovs++;dfCall('over',null,{ttl:2});}}}
   else{b.ovT=Math.max(0,b.ovT-dt*0.5);if(b.ovT<=0)b.ovRoll=false;}
@@ -11749,14 +11757,14 @@ function dfStop(){
 // Dogfight2: bBleed: the bandits' speed bleed, m/s^2 per g^2 over 2 g; ovG: our g that counts as defending; ovT: seconds
 // of it a chasing bandit needs to react (times the wave's react factor); mist: the chance it then overshoots (times the
 // wave's mist factor); cool: seconds every bandit eases off after a hit on us; err: its aim error, radians; brkCd, brkT:
-// the BREAK's cooldown and length, s (item 3).
+// the BREAK's cooldown and length, s (item 3); assist: Easy's gun aim assist cone, degrees (item 5), none in Hard.
 const DF_CFG={
   hard:{seek:6,lock:1.5,fox:6,decoy:0.3,decoyRear:0.1,flares:2,gunR:12,gunKill:0.35,spd:1,g:1,
     rLock:3,rDel:[2,4],rCd:12,eMax:2,eG:25,flrGood:0.65,flrEarly:0.25,flrG:0.15,autoFlr:0,gLim:9,eDrag:0.13,eAB:6,gv:1,turnT:25,extR:2,six:14,spread:0.6,outT:10,
-    bBleed:0.135,ovG:5.5,ovT:0.8,mist:0.7,cool:6,err:0.08,brkCd:8,brkT:1.6},
+    bBleed:0.2,ovG:5.5,ovT:0.8,mist:0.7,cool:6,err:0.08,brkCd:8,brkT:1.6},
   easy:{seek:11,lock:0.8,fox:10,decoy:0.1,decoyRear:0,flares:2,gunR:20,gunKill:0.2,spd:0.8,g:0.75,
     rLock:5,rDel:[4,6],rCd:20,eMax:1,eG:18,flrGood:0.85,flrEarly:0.25,flrG:0.15,autoFlr:2,gLim:9,eDrag:0,eAB:0,gv:0,turnT:10,extR:1,six:6,spread:0.3,outT:20,ezTurn:1,
-    bBleed:0.15,ovG:4.2,ovT:0.45,mist:0.95,cool:9,err:0.22,brkCd:6,brkT:2.4}};
+    bBleed:0.22,ovG:4.2,ovT:0.45,mist:0.95,cool:9,err:0.22,brkCd:6,brkT:2.4,assist:4}};
 DF.cfg=()=>rookie()?DF_CFG.easy:DF_CFG.hard;
 // the run's dice: spawns, the bandits' choices and waits, every decoy roll. DF.test.seed (a number) makes each run the
 // same (dfStart seeds it); null is Math.random
@@ -12026,13 +12034,18 @@ function dfGun(dt){
   if(!want||!DF.wBuilt)return;
   const n=Math.min(DF.rounds,DF_RPS*dt);DF.rounds=Math.max(0,DF.rounds-n);DF.trAcc+=n;if(DF.rounds<=0&&DF.fox<=0)dfCall('gunsdry');
   camBump=Math.max(camBump,0.32);
-  dfNose(_dfN);
+  dfNose(_dfN);const c=DF.cfg();
+  // Easy's aim assist (dogfight2 item 5): the nose within c.assist degrees of the firing solution on the nearest bandit in
+  // front inside 1,000 m bends the stream onto it (fully when dead on, not at all at the edge), tracers and hits alike
+  if(c.assist){let nb=null,nr=1000;for(const b of DF.bandits){if(!b.alive)continue;_dfB.copy(b.p).sub(st.pos);const r=_dfB.length();if(r<nr&&_dfB.dot(_dfN)>0){nr=r;nb=b;}}
+    if(nb){const t=nr/DF_VB;_dfB.copy(nb.p).addScaledVector(nb.v,t).sub(st.pos);_dfB.y+=4.905*t*t;_dfB.addScaledVector(st.vel,-t).normalize();
+      const ang=Math.acos(clamp(_dfB.dot(_dfN),-1,1)),k=clamp(1-ang/(c.assist*Math.PI/180),0,1);
+      if(k>0){_dfN.lerp(_dfB,k).normalize();}}}
   const vbx=st.vel.x+_dfN.x*DF_VB,vby=st.vel.y+_dfN.y*DF_VB,vbz=st.vel.z+_dfN.z*DF_VB;
   while(DF.trAcc>=4){DF.trAcc-=4;
     let t=null;for(const x of DF.trc)if(!x.on){t=x;break;}if(!t){t=DF.trc[0];for(const x of DF.trc)if(x.t>t.t)t=x;}
     t.on=true;t.t=Math.random()*0.02;t.p.set(-0.95,0.45,-2.2).applyQuaternion(st.quat).add(st.pos);
     t.v.set(vbx+(Math.random()-0.5)*8,vby+(Math.random()-0.5)*8,vbz+(Math.random()-0.5)*8);}
-  const c=DF.cfg();
   for(const b of DF.bandits){if(!b.alive)continue;
     const dx=b.p.x-st.pos.x,dy=b.p.y-st.pos.y,dz=b.p.z-st.pos.z,R=Math.hypot(dx,dy,dz);if(R>1200||R<1)continue;
     const vl=((vbx-b.v.x)*dx+(vby-b.v.y)*dy+(vbz-b.v.z)*dz)/R;if(vl<200)continue;   // the rounds' closing speed on it
@@ -12193,7 +12206,7 @@ const DFH={box:[],arr:[],seek:null,pip:null,mw:null,W:0,H:0,mt:0,on:false,trk:nu
   const mk=(c,inner)=>{const e=document.createElement('div');e.className=c;e.innerHTML=inner;h.appendChild(e);return e;};
   for(let i=0;i<4;i++){const b=mk('dfBox','<b></b><span></span>');DFH.box.push({el:b,tx:b.lastChild,base:'dfBox',c:'',tr:'',n:-1});
     const a=mk('dfArr','<b></b><span></span>');DFH.arr.push({el:a,ar:a.firstChild,tx:a.lastChild,base:'dfArr',c:'',tr:'',rot:'',n:-1});}
-  const s=h.querySelector('.dfSeek'),p=h.querySelector('.dfPip');DFH.seek={el:s,b:s.firstChild,base:'dfSeek',c:'',tr:''};DFH.pip={el:p,base:'dfPip',c:'',tr:''};
+  const s=h.querySelector('.dfSeek'),p=h.querySelector('.dfPip'),ld=h.querySelector('.dfLead');DFH.seek={el:s,b:s.firstChild,base:'dfSeek',c:'',tr:''};DFH.pip={el:p,base:'dfPip',c:'',tr:''};DFH.lead={el:ld,base:'dfLead',c:'',tr:''};
   const w=h.querySelector('.dfMw');DFH.mw={el:w,ar:w.firstChild,tx:w.lastChild,base:'dfMw',c:'',tr:'',rot:'',k:-1};
   window.addEventListener('resize',()=>{DFH.W=0;DFH.trk=null;});
   tapBtn($('dfbGo'),()=>dfGo());
@@ -12250,7 +12263,7 @@ function dfBreakStick(){
 function dfPut(o,cls,x,y){const c=o.base+(cls===null?'':' on'+(cls?' '+cls:''));if(o.c!==c){o.c=c;o.el.className=c;}
   if(cls===null)return;const tr='translate('+Math.round(x)+'px,'+Math.round(y)+'px)';if(o.tr!==tr){o.tr=tr;o.el.style.transform=tr;}}
 function dfNm(o,R){const n=Math.round(R/185.2);if(o.n!==n){o.n=n;o.tx.textContent=(n/10).toFixed(1)+' nm';}}
-function dfHudHide(){for(let i=0;i<4;i++){dfPut(DFH.box[i],null);dfPut(DFH.arr[i],null);}dfPut(DFH.seek,null);dfPut(DFH.pip,null);dfPut(DFH.mw,null);}
+function dfHudHide(){for(let i=0;i<4;i++){dfPut(DFH.box[i],null);dfPut(DFH.arr[i],null);}dfPut(DFH.seek,null);dfPut(DFH.pip,null);dfPut(DFH.lead,null);dfPut(DFH.mw,null);}
 // the buttons' labels and states, only on a change
 function dfBtnUI(){const lk=DF.seek.state==='lock',k=DF.fox*4096+Math.ceil(DF.rounds)*2+(lk?1:0);if(k===DFH.ui)return;DFH.ui=k;
   $('bFoxN').textContent='x'+DF.fox;$('bGunN').textContent=String(Math.ceil(DF.rounds));
@@ -12445,8 +12458,20 @@ function dfHudUpdate(){
     _dfB.copy(_dfN).multiplyScalar(DF_VB*t);_dfB.y-=4.905*t*t;
     _dfC.copy(st.w).applyQuaternion(st.quat);const w=_dfC.length();if(w>1e-4){_dfQ.setFromAxisAngle(_dfC.divideScalar(w),-w*t);_dfB.applyQuaternion(_dfQ);}
     _dfA.copy(st.pos).add(_dfB).applyMatrix4(M);const cz=-_dfA.z;
-    if(cz>1)dfPut(DFH.pip,'',(_dfA.x/tX/cz+1)/2*W,(1-_dfA.y/tY/cz)/2*H);else dfPut(DFH.pip,null);}
-  else dfPut(DFH.pip,null);
+    const ez=!!DF.cfg().assist;let hot=false;
+    if(ez){   // the solution's miss on him when the rounds get there (their closing speed on him, not just their own)
+      _dfC.copy(nb.p).sub(st.pos).divideScalar(nr);const tt=nr/Math.max(300,DF_VB+(st.vel.x-nb.v.x)*_dfC.x+(st.vel.y-nb.v.y)*_dfC.y+(st.vel.z-nb.v.z)*_dfC.z);
+      _dfC.copy(nb.p).addScaledVector(nb.v,tt).sub(st.pos).addScaledVector(st.vel,-tt).addScaledVector(_dfN,-DF_VB*tt);_dfC.y-=4.905*tt*tt;hot=nr<900&&_dfC.length()<DF.cfg().gunR*1.6;}
+    if(cz>1){const px=(_dfA.x/tX/cz+1)/2*W,py=(1-_dfA.y/tY/cz)/2*H;dfPut(DFH.pip,ez?(hot?'ez hot':'ez'):'',px,py);
+      // Easy: the line from the cross to the bandit's box
+      if(ez){_dfC.copy(nb.p).applyMatrix4(M);const bz=-_dfC.z;
+        if(bz>1){const bx=(_dfC.x/tX/bz+1)/2*W,by=(1-_dfC.y/tY/bz)/2*H,L=Math.hypot(bx-px,by-py),a=Math.atan2(by-py,bx-px);
+          const o=DFH.lead,tr='translate('+Math.round(px)+'px,'+Math.round(py)+'px) rotate('+(a*180/Math.PI).toFixed(1)+'deg) scaleX('+Math.max(0,L-14).toFixed(0)+')';
+          if(o.c!=='dfLead on'){o.c='dfLead on';o.el.className=o.c;}if(o.tr!==tr){o.tr=tr;o.el.style.transform=tr;}}
+        else dfPut(DFH.lead,null);}
+      else dfPut(DFH.lead,null);}
+    else{dfPut(DFH.pip,null);dfPut(DFH.lead,null);}}
+  else{dfPut(DFH.pip,null);dfPut(DFH.lead,null);}
 }
 // ================= photo mode (the Action Shot) =================
 // Freeze the frame, hide the HUD, orbit and zoom around the aircraft by finger, and
