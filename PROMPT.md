@@ -20,7 +20,7 @@ LOOP, for every unchecked item in PLAN.md, in order, one at a time (the game is 
 
 SESSION BLOCKS: PLAN.md is split into session blocks, each with its own tag and branch. At the start of a block: tag master with the given tag, push the tag, create the branch. At the end of a block: have tester run the full pass (zsh tests/run_all.sh) and the frame rate comparison. If it passes (ignoring the known pre existing failures), merge the branch into master, push, have tester run tests/live_check.py against the live site, and write the block's report file. If it fails, do NOT merge; leave the branch and explain in the report.
 
-STOP RULE: PLAN.md contains a line "=== STOP HERE UNLESS TOLD OTHERWISE ===". Do not start any item below that line. When everything above it is done and merged and pushed and live (or reverted and explained), print exactly: ALL DONE and stop.
+STOP RULE: PLAN.md contains a line "=== STOP HERE UNLESS TOLD OTHERWISE ===". Do not start any item below that line. When everything above it is done and merged and pushed and live (or reverted and explained), print exactly ALL DONE on a line by itself and stop.
 
 HARD RULES:
 - iOS Safari only. Tilt controls stay removed.
