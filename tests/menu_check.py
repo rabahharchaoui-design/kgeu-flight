@@ -63,7 +63,7 @@ async def main():
                 await finger(pg, '#hFly'); await pg.wait_for_timeout(600)
                 ok('FLY goes straight to the one fly screen', await pg.evaluate("()=>window.__kgeu.curScr()") == 'sFly')
                 one = await pg.evaluate("()=>{const s=document.getElementById('sFly');return [!!s.querySelector('#carMain .cwin'),s.querySelectorAll('.pick[data-b]').length,s.querySelectorAll('.pick[data-tod]').length,s.querySelectorAll('.pick[data-pos]').length,!!s.querySelector('#bGo')]}")
-                ok('carousel, location (five airports, 4.6b), time, start and GO are all on that one screen', one == [True, 5, 4, 4, True], one)   # start: runway, ramp, 1 mi final, 3 mi final
+                ok('carousel, location (six airports: 4.6b plus Sky Harbor), time, start and GO are all on that one screen', one == [True, 6, 4, 4, True], one)   # start: runway, ramp, 1 mi final, 3 mi final
                 await finger(pg, '#bGo'); await pg.wait_for_timeout(1400)
                 s1 = await pg.evaluate("()=>{const s=window.__kgeu.state();return [s.type,s.base,s.mode,document.getElementById('menu').classList.contains('on')]}")
                 ok('GO flies the saved picks (2 taps from home)', s1 == ['cessna', 'kgeu', 'runway', False], s1)
@@ -73,11 +73,12 @@ async def main():
                 for _ in range(8):
                     await finger(pg, '#carMain .arrow.r'); await pg.wait_for_timeout(350)
                     seen.append(await pg.evaluate("()=>window.__kgeu.prefs().type"))
-                ok('right arrow loops past the last aircraft back to the first', seen[:7] == ['alpha','f16','reaper','mq9b','c130','cessna','alpha'], seen)
+                car = await pg.evaluate("()=>window.__kgeu.CAR")
+                ok('right arrow loops past the last aircraft back to the first', seen == [car[(1 + i) % len(car)] for i in range(8)], seen)
                 for _ in range(3):
                     await finger(pg, '#carMain .arrow.l'); await pg.wait_for_timeout(350)
                 t = await pg.evaluate("()=>window.__kgeu.prefs().type")
-                ok('left arrow loops backwards too', t == 'mq9b' or t == 'c130', t)
+                ok('left arrow loops backwards too', t == car[5 % len(car)], t)
                 await pg.evaluate("()=>{window.__kgeu.pick('cessna');window.__kgeu.openFly()}"); await pg.wait_for_timeout(300)
                 r = await pg.evaluate("()=>{const r=document.querySelector('#carMain .cwin').getBoundingClientRect();return [r.x,r.y,r.width,r.height]}")
                 y = r[1] + r[3]*0.3
@@ -86,11 +87,11 @@ async def main():
                       ev('pointerdown',x0);for(let i=1;i<=6;i++)ev('pointermove',x0+(x1-x0)*i/6);ev('pointerup',x1);}""", [x0, x1, y])
                     await pg.wait_for_timeout(500)
                 await swipe(r[0]+r[2]*0.8, r[0]+r[2]*0.3)
-                ok('swiping left goes to the next aircraft', await pg.evaluate("()=>window.__kgeu.prefs().type") == 'alpha')
+                ok('swiping left goes to the next aircraft', await pg.evaluate("()=>window.__kgeu.prefs().type") == car[1])
                 await swipe(r[0]+r[2]*0.3, r[0]+r[2]*0.8); await swipe(r[0]+r[2]*0.3, r[0]+r[2]*0.8)
-                ok('swiping right past the first wraps to the last', await pg.evaluate("()=>window.__kgeu.prefs().type") == 'c130')
+                ok('swiping right past the first wraps to the last', await pg.evaluate("()=>window.__kgeu.prefs().type") == car[-1])
                 for _ in range(10): await swipe(r[0]+r[2]*0.8, r[0]+r[2]*0.3)
-                ok('keeps swiping forever', await pg.evaluate("()=>window.__kgeu.prefs().type") == CAR_AFTER_10)
+                ok('keeps swiping forever', await pg.evaluate("()=>window.__kgeu.prefs().type") == car[9 % len(car)])
                 await finger(pg, '#carMain .story'); await pg.wait_for_timeout(300)
                 ok('Story opens the tail number history', await pg.evaluate("()=>document.getElementById('storyOv').classList.contains('on')&&document.getElementById('storyT').textContent.length>40"))
                 await finger(pg, '#storyX'); await pg.wait_for_timeout(200)
@@ -117,7 +118,7 @@ async def main():
                 await finger(pg, '.scr.on .back'); await pg.wait_for_timeout(200)
                 await finger(pg, '#hMis'); await pg.wait_for_timeout(300)
                 n = await pg.evaluate("()=>[...document.querySelectorAll('#misCards .mcard')].map(c=>[c.dataset.m,!!c.querySelector('svg.ico'),!!c.querySelector('.stars')])")
-                ok('mission cards have an icon and stars', [x[0] for x in n] == ['daily', 'short', 'dash'] and all(x[1] and x[2] for x in n), n)
+                ok('mission cards have an icon and stars', [x[0] for x in n] == ['daily', 'short', 'dash', 'gunrun'] and all(x[1] and x[2] for x in n), n)
                 await finger(pg, '#misCards [data-m="short"]'); await pg.wait_for_timeout(1200)
                 s = await pg.evaluate("()=>({t:window.__kgeu.state().type,saved:window.__kgeu.prefs().type,kind:window.__kgeu.MISS.kind})")
                 ok('a mission card starts it without changing the saved aircraft', s == {'t': 'c130', 'saved': 'alpha', 'kind': 'short'}, s)

@@ -56,7 +56,7 @@ async def main():
             ok(f'{tag}: MAIN MENU sits on its own at the far right, secondary style, clear of everything', a['menuRight'] and a['menuApart'] >= 11.5 and a['menuSecondary'], (a['menuRight'], a['menuApart'], a['menuSecondary']))
             ok(f'{tag}: nav row Missions, Arcade, School, Boards; MAIN MENU and RESUME labelled', a['labels'] == ['Missions', 'Arcade', 'School', 'Boards', 'MAIN MENU', 'RESUME'], a['labels'])
             ok(f'{tag}: the quick tiles and the music row are rows (same top)', len({round(t['y']) for t in a['tiles']}) == 1 and len({round(t['y']) for t in a['music']}) == 1, (a['tiles'], a['music']))
-            ok(f'{tag}: six aircraft chips', a['acChips'] == 6, a['acChips'])
+            ok(f'{tag}: a chip for every aircraft', a['acChips'] == await pg.evaluate(f'()=>{K}.CAR.length'), a['acChips'])
             # order: nav above tiles above music (left panel); mode row above aircraft above base/time above starts (right)
             ok(f'{tag}: nav, then tiles, then music, top to bottom', a['navRow'][0]['y'] < a['tiles'][0]['y'] < a['music'][0]['y'])
             await pg.screenshot(path=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'overnight-screenshots', 'phone2', 'menus', f'after_pause_{tag}.png'))

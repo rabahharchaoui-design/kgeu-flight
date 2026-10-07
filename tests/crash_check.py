@@ -14,9 +14,9 @@ ok = Checks()
 SHOTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'overnight-screenshots', 'crash')
 SHOT = '--noshots' not in sys.argv
 K = 'window.__kgeu'
-TYPES = ['cessna', 'alpha', 'reaper', 'mq9b', 'f16', 'c130']
-SCALE = {'cessna': 0.8, 'alpha': 0.8, 'reaper': 0.9, 'mq9b': 0.9, 'f16': 1.6, 'c130': 2.6}
-SEC = {'cessna': 0, 'alpha': 0, 'reaper': 1, 'mq9b': 1, 'f16': 2, 'c130': 3}
+TYPES = ['cessna', 'archer', 'alpha', 'reaper', 'mq9b', 'f16', 'a10', 'c130', 'b737', 'a320', 'b747']
+SCALE = {'cessna': 0.8, 'archer': 0.8, 'alpha': 0.8, 'reaper': 0.9, 'mq9b': 0.9, 'f16': 1.6, 'a10': 1.7, 'c130': 2.6, 'b737': 2.7, 'a320': 2.7, 'b747': 3.2}
+SEC = {'cessna': 0, 'archer': 0, 'alpha': 0, 'reaper': 1, 'mq9b': 1, 'f16': 2, 'a10': 2, 'c130': 3, 'b737': 3, 'a320': 3, 'b747': 3}
 
 async def step(pg, secs, dt=1/30, render=False):
     await pg.evaluate("([n,dt,r])=>{const K=window.__kgeu;for(let i=0;i<n;i++)K.stepFrame(dt,false,true);if(r)K.stepFrame(1/60);}",
@@ -64,7 +64,7 @@ async def main():
         await pg.evaluate(f"()=>{{{K}.WST.off=true;}}")   # the explosion in sim time; WASTED (phone3 item 7) has its own wasted_check
         for i, t in enumerate(TYPES):
             if t == 'c130': await pg.evaluate(f"()=>{K}.setSkill('rookie')")   # both skills get the same card
-            await pg.evaluate(f"()=>{{{K}.pick('{t}');{K}.pickBase('kgeu');{K}.start('runway');}}")
+            await pg.evaluate(f"()=>{{{K}.pick('{t}');{K}.pickBase({K}.baseOK('{t}','kgeu')?'kgeu':'phx');{K}.start('runway');}}")
             await step(pg, 0.2)
             s0 = await pg.evaluate(f"()=>{{const s={K}.state();return {{x:s.pos.x,z:s.pos.z,mode:s.mode,base:s.base}}}}")
             agl = await climb(pg)
@@ -110,7 +110,9 @@ async def main():
             await pg.wait_for_timeout(450)   # the slide-in is a real-time CSS transition
             c = await card(pg)
             f = await pg.evaluate(f"()=>{K}.crashFx()")
-            if t == 'c130': ok('c130: 4 fuel tank fireballs over 2.5 s', f['fireballs'] == 4, f['fireballs'])
+            # the big airframes (C-130 and the Pocket Air airliners) stage fuel tank fireballs after the first one
+            stages = await pg.evaluate(f"()=>({K}.CRASH_FX['{t}'].stages||[]).length")
+            if stages: ok(f'{t}: {1 + stages} fuel tank fireballs over 2.5 s', f['fireballs'] == 1 + stages, f['fireballs'])
             else: ok(f'{t}: one fireball', f['fireballs'] == 1, f['fireballs'])
             ok(f'{t}: card up at 3.5 s with RETRY and MENU only', c['on'] and c['retry'] and c['menu'] and c['retry']['txt'] == 'RETRY'
                and c['menu']['txt'] == 'MENU' and not c['old'] and not c['top'], c)

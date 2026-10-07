@@ -85,8 +85,8 @@ async def main():
         pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'})
         await pg.evaluate(f"()=>{K}.initAudio()")
         types = await pg.evaluate("""()=>{const T=window.__kgeu.TYPES,o={cs:{}};for(const k in T)o.cs[k]=[T[k].cs,T[k].csS];
-            o.CSC={cessna:'cs_skyhawk',alpha:'cs_pipistrel',reaper:'cs_reaper',f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian'};
-            o.CSCS={cessna:'cs_skyhawk_s',alpha:'cs_pipistrel_s',reaper:'cs_reaper_s',f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian_s'};return o;}""")
+            o.CSC={cessna:'cs_skyhawk',alpha:'cs_pipistrel',reaper:'cs_reaper',f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian',archer:'cs_archer',a10:'cs_hawg',b737:'cs_pocket737',a320:'cs_pocket320',b747:'cs_pocket747'};
+            o.CSCS={cessna:'cs_skyhawk_s',alpha:'cs_pipistrel_s',reaper:'cs_reaper_s',f16:'cs_viper',c130:'cs_herky',mq9b:'cs_skyguardian_s',archer:'cs_archer_s',a10:'cs_hawg',b737:'cs_pocket737',a320:'cs_pocket320',b747:'cs_pocket747'};return o;}""")
         # the clip tables in the page must be the ones this test assumes
         same = await pg.evaluate("""(o)=>{const T=window.__kgeu.TYPES;return Object.keys(T).every(k=>o.CSC[k]&&o.CSCS[k]);}""", types)
         ok('clip table covers every type', same)
@@ -99,7 +99,9 @@ async def main():
                         tag = f'{t}/{base}/{pos}/{skill}'
                         r['log'] += r['q']
                         heard += len(r['log'])
-                        if r['type'] != t or r['base'] != base:
+                        # an airliner picked at a short base flies from its home, Sky Harbor (planes2's long runway rule)
+                        want_base = base if await pg.evaluate(f"()=>{K}.baseOK('{t}','{base}')") else 'phx'
+                        if r['type'] != t or r['base'] != want_base:
                             bad.append(f'{tag}  state is {r["type"]}/{r["base"]}')
                         own = [l for l in r['log'] if not l['amb'] and (r['cs'] in l['text'] or r['csS'] in l['text'])]
                         if not own:

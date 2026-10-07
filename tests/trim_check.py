@@ -11,7 +11,7 @@ from playwright.async_api import async_playwright
 from harness import serve, launch, page, Checks, IPHONE_15
 ok = Checks()
 K = "window.__kgeu"
-TYPES = ['cessna', 'alpha', 'reaper', 'mq9b', 'f16', 'c130']
+TYPES = ['cessna', 'archer', 'alpha', 'reaper', 'mq9b', 'f16', 'a10', 'c130', 'b737', 'a320', 'b747']
 DEV = 60      # ft, the C-130's limit on a final
 LEVEL = 50    # ft, a level spawn
 

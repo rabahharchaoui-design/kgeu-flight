@@ -70,6 +70,7 @@ game's `runMode()`), including the first flight lesson's assists. Every board ha
 | `arc:landing1` | Landing challenge, 1 mile | arcade points | higher | 10 s | 0 to 1,500 | yes |
 | `arc:drop` | Airdrop accuracy (C-130) | metres | lower | 15 s | 0 to 3,000 | |
 | `arc:strike` | Strike accuracy (MQ-9A) | points | higher | 15 s | 0 to 100 | |
+| `arc:gunrun` | A-10 gun run (same range, same formula) | points | higher | 15 s | 0 to 100 | |
 | `lesson:first` | First flight | lesson score | higher | 20 s | 0 to 100 | |
 | `lesson:steep` | Steep turns | lesson score | higher | 10 s | 0 to 100 | |
 | `lesson:slow` | Slow flight | lesson score | higher | 25 s | 0 to 100 | |

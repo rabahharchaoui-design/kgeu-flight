@@ -46,6 +46,8 @@ BOTH = {
     'luke_tower':       'Luke Tower',
     'luke_ground':      'Luke Ground',
     'phoenix_approach': 'Phoenix Approach',
+    'phoenix_tower':    'Phoenix Tower',
+    'phoenix_ground':   'Phoenix Ground',
     # world regions (4.6b): the tower and ground of each region's airport
     'tokyo_tower':         'Tokyo Tower',
     'tokyo_ground':        'Haneda Ground',
@@ -63,6 +65,13 @@ BOTH = {
     'cs_skyguardian_s': 'Sky Guardian zero tango charlie',
     'cs_pipistrel':     'Pipistrel five zero two alpha tango',
     'cs_pipistrel_s':   'Pipistrel two alpha tango',
+    # planes2: the Archer
+    'cs_archer':        'Archer eight one two eight papa',
+    'cs_archer_s':      'Archer two eight papa',
+    'cs_hawg':          'Hawg one',
+    'cs_pocket737':     'Pocket seven three seven',
+    'cs_pocket320':     'Pocket three two zero',
+    'cs_pocket747':     'Pocket seven four seven',
 }
 
 # ---- controller only ----
@@ -70,6 +79,7 @@ TOWER = {
     'rwy_1':   'runway one',              'rwy_19':  'runway one niner',
     'rwy_03l': 'runway zero three left',  'rwy_03r': 'runway zero three right',
     'rwy_21l': 'runway two one left',     'rwy_21r': 'runway two one right',
+    'rwy_07l': 'runway zero seven left',  'rwy_25r': 'runway two five right',
     # world regions (4.6b): every runway end at Haneda, de Gaulle and Santos Dumont
     'rwy_34r': 'runway three four right', 'rwy_34l': 'runway three four left',
     'rwy_16r': 'runway one six right',    'rwy_16l': 'runway one six left',
@@ -99,6 +109,7 @@ TOWER = {
     'luke_security':  'you just landed at Luke Air Force Base. Hold position, security is on the way.',
     'haboob_luke':     'Attention all aircraft, Luke Tower, visibility one half mile in blowing dust, wind gusting five zero knots, use caution.',
     'haboob_glendale': 'Attention all aircraft, Glendale Tower, visibility one half mile in blowing dust, wind gusting five zero knots, use caution.',
+    'haboob_phoenix':  'Attention all aircraft, Phoenix Tower, visibility one half mile in blowing dust, wind gusting five zero knots, use caution.',
 
     'wind':   'wind',
     'at':     'at',

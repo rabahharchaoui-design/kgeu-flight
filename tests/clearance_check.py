@@ -14,7 +14,7 @@ ok = Checks()
 SHOTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'overnight-screenshots', 'phone0929', 'item13')
 K = 'window.__kgeu'
 ARGS = [a for a in sys.argv[1:] if not a.startswith('--')]
-TYPES = ARGS or ['cessna', 'alpha', 'reaper', 'mq9b', 'f16', 'c130']
+TYPES = ARGS or ['cessna', 'archer', 'alpha', 'reaper', 'mq9b', 'f16', 'a10', 'c130', 'b737', 'a320', 'b747']
 SHOT = '--noshots' not in sys.argv
 FLOWS = '--noflows' not in sys.argv   # the takeoff and autoland sweep (slow: about 5 min)
 TYRE_TOL = 0.05          # tyre bottoms within 5 cm of the surface
@@ -22,7 +22,7 @@ CLEAR = 0.05             # everything else at least 5 cm up
 # prop tip clearance at rest, metres (real values, a little under: 172 about 11 in, Alpha
 # about 10 in, the Reaper pusher tips small but positive over the ventral fin, Herc tips
 # about 4 ft up on the wing)
-PROP_MIN = {'cessna': 0.22, 'alpha': 0.20, 'reaper': 0.15, 'mq9b': 0.15, 'c130': 1.0}
+PROP_MIN = {'cessna': 0.22, 'archer': 0.20, 'alpha': 0.20, 'reaper': 0.15, 'mq9b': 0.15, 'c130': 1.0}
 
 MEASURE = r"""
 (pitchAdd)=>{
@@ -105,7 +105,7 @@ async def main():
         for t in TYPES:
             print('--', t)
             await pg.evaluate("()=>window.__kgeu.stepFrame(0,true)")
-            await ev(f"{K}.pick('{t}');{K}.pickBase('kgeu');{K}.start('runway')"); await pg.wait_for_timeout(1200)
+            await ev(f"{K}.pick('{t}');{K}.pickBase({K}.baseOK('{t}','kgeu')?'kgeu':'phx');{K}.start('runway')"); await pg.wait_for_timeout(1200)
             await ev(f"const s={K}.state();s.throttle=0;s.brake=true;")
             await step(120)
             await ev(f"const s={K}.state();s.throttle=0;s.power=0;s.brake=true;")
@@ -162,6 +162,9 @@ async def main():
         if FLOWS:
             for t in TYPES:
                 for flow in ('takeoff', 'autoland', 'easy'):
+                    # AUTO LAND brings every aircraft to Glendale runway 1; an airliner starts at Sky Harbor (the long runway rule),
+                    # 28 km away, so its autoland is outside this sweep's budget. Its takeoff and Easy landing are still swept.
+                    if flow == 'autoland' and await pg.evaluate(f"()=>!!{K}.TYPES['{t}'].minRwy"): continue
                     await pg.evaluate("()=>window.__kgeu.stepFrame(0,true)")
                     await ev(f"{K}.setSkill('{'rookie' if flow == 'easy' else 'pilot'}');{K}.pick('{t}');{K}.pickBase('kgeu');{K}.start('{'runway' if flow == 'takeoff' else 'final1'}')"); await pg.wait_for_timeout(1000)
                     await step(2)
