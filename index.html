@@ -417,9 +417,17 @@ body.dfOn #uiroot > #dfGv{ display:block; }
 #dfGv i{ position:absolute; inset:0; opacity:0; }
 #dfGv .o{ background:radial-gradient(ellipse at center, rgba(70,72,76,0) 46%, rgba(62,64,68,.7) 74%, rgba(48,50,54,.93) 100%); }
 #dfGv .i{ background:radial-gradient(ellipse at center, rgba(70,72,76,0) 20%, rgba(66,68,72,.62) 42%, rgba(60,62,66,.8) 62%); }
-#hG{ display:none; font-weight:800; color:var(--ink); }
-body.dfOn #hG{ display:inline; } body.dfOn #hWind{ display:none; }
-#hG.a{ color:var(--caution); } #hG.r{ color:#ff5a4a; }
+/* the G meter (dogfight2 item 1): a 40 px bar filled to 9 g (transform only, set every frame from dfGrey) beside the
+   number; amber from 7.5 g, red from 8.8. The corner speed cue beside it: CORNER lit green inside the band, amber
+   with an arrow toward 340 outside it. Three states, so the text only changes on a state change. */
+#hG{ display:none; align-items:center; gap:5px; font-weight:800; color:var(--ink); }
+body.dfOn #hG, body.dfOn #hCn{ display:inline-flex; } body.dfOn #hWind{ display:none; }
+#hG i{ display:block; width:40px; height:5px; border-radius:3px; background:rgba(255,255,255,.14); overflow:hidden; }
+#hG i b{ display:block; width:100%; height:100%; border-radius:3px; background:#5dff8a; transform:scaleX(.11); transform-origin:0 50%; transition:background-color .16s ease; }
+#hG em{ font-style:normal; min-width:22px; text-align:right; font-variant-numeric:tabular-nums; }
+#hG.a i b{ background:var(--caution); } #hG.r i b{ background:#ff5a4a; } #hG.a em{ color:var(--caution); } #hG.r em{ color:#ff5a4a; }
+#hCn{ display:none; align-items:center; font-weight:800; color:var(--caution); transition:color .16s ease; }
+#hCn.ok{ color:#5dff8a; }
 /* the dogfight's one subtitle line: the bottom strip between the stick and GUN, one line, an ellipsis when long.
    Calls, tower lines (silenced anyway) and toasts all land here, never over the seeker or the target area. */
 #uiroot > #dfSub{ position:absolute; left:calc(var(--padL) + 126px); right:calc(var(--padR) + var(--col) + 192px); bottom:calc(var(--padB) + 6px); display:none; justify-content:center; pointer-events:none; z-index:5; opacity:0; transition:opacity .25s; }
@@ -1207,7 +1215,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
       <div class="card"><div class="big" id="hVs">0</div><div class="lbl" id="lVs">VS</div></div>
       <div class="card"><div class="big" id="hHdg">026</div><div class="lbl" id="lHdg">HDG</div></div>
     </div>
-    <div id="hLine" class="card"><span id="hFlap">FLAPS 0&deg;</span><span id="hGear"></span><span id="hWind"><svg viewBox="0 0 20 20" width="12" height="12"><path id="hWindA" d="M10 2 L15 11 L11.5 11 L11.5 18 L8.5 18 L8.5 11 L5 11 Z" fill="currentColor"/></svg><span id="hWindT">050&deg; 5 KT</span></span><span id="hG">1.0 G</span></div>
+    <div id="hLine" class="card"><span id="hFlap">FLAPS 0&deg;</span><span id="hGear"></span><span id="hWind"><svg viewBox="0 0 20 20" width="12" height="12"><path id="hWindA" d="M10 2 L15 11 L11.5 11 L11.5 18 L8.5 18 L8.5 11 L5 11 Z" fill="currentColor"/></svg><span id="hWindT">050&deg; 5 KT</span></span><span id="hG"><i><b></b></i><em>1.0</em> G</span><span id="hCn"></span></div>
     <div id="hAp"></div>
   </div>
   <button id="hDest" hidden aria-label="Destination, tap to clear"><svg id="dArrow" viewBox="0 0 24 24"><path d="M12 2 L20 20 L12 15.5 L4 20Z" fill="#D98A3D" stroke="#2A1608" stroke-width="1.2" stroke-linejoin="round"/></svg><span id="dTxt"></span></button>
@@ -1894,8 +1902,8 @@ const TYPES={
 };
 let AC=TYPES.reaper,FLAPS=AC.flaps;AC.g=9.81;
 function setType(id){AC=TYPES[id]||TYPES.reaper;AC.g=9.81;FLAPS=AC.flaps;GEAR=AC.gear||1.5;}
-function liftCoef(a,fl){
-  const s=AC.aStall,peak=AC.CL0+AC.CLa*s;let cl;
+function liftCoef(a,fl,s0){
+  const s=s0||AC.aStall,peak=AC.CL0+AC.CLa*s;let cl;
   if(a>s) cl=Math.max(peak*(1-(a-s)*2.0),0.95*Math.sin(2*a));
   else if(a<-0.22){const npk=AC.CL0-AC.CLa*0.22;cl=Math.min(npk*(1-(-0.22-a)*2.0),0.95*Math.sin(2*a));}
   else cl=AC.CL0+AC.CLa*a;
@@ -2003,11 +2011,14 @@ function step(st,dt,ev){
   _F.addScaledVector(_f,st.power*Tav);
   st.rpm=1600+st.power*300;
   let liftY=0;
-  const beyond=alpha>AC.aStall||alpha<-0.22, stalled=!st.onGround&&beyond&&Va>3;
+  // the dogfight (dfTick sets st.dfLef): the F-16's leading edge flaps schedule with alpha, so the wing keeps lifting
+  // further (CLmax 1.52 to 1.8): the 9 g corner speed comes down from about 375 to about 345 KIAS
+  const sA=AC.aStall+(st.dfLef||0);
+  const beyond=alpha>sA||alpha<-0.22, stalled=!st.onGround&&beyond&&Va>3;
   if(Va>0.5){
     _vh.copy(_air).divideScalar(Va);
     const hw=agl+2.0, xg=16*hw/AC.span, phi=hw<25?(xg*xg)/(1+xg*xg):1;
-    const cl=liftCoef(alpha,fl)*(1+0.08*(1-phi)), sa=Math.sin(alpha);
+    const cl=liftCoef(alpha,fl,sA)*(1+0.08*(1-phi)), sa=Math.sin(alpha);
     const cd=AC.CD0+AC.k*phi*Math.min(cl*cl,3)+fl.cd+st.gearPos*0.012+(beyond?1.25*sa*sa:0)+(AC.wave?AC.wave*smooth(0.82,1.02,Va/340):0);
     _ld.copy(_u).addScaledVector(_vh,-_u.dot(_vh));
     const ll=_ld.length();
@@ -2026,17 +2037,19 @@ function step(st,dt,ev){
   const qn=qd/2400, sq=Math.sqrt(qn), aTrim=AC.trimBase+st.trim*AC.trimK;
   if(stalled&&!st.stalled) st.dropDir=wRnd()<0.5?-1:1;
   st.stalled=stalled;
-  st.aoaWarn=!st.onGround&&Va>5&&alpha>AC.aStall-0.05;
+  st.aoaWarn=!st.onGround&&Va>5&&alpha>sA-0.05;
   const am=clamp(alpha-aTrim,-0.6,0.6), bm=clamp(beta,-0.6,0.6);
   // the dogfight's g limit (st.gLim, dfTick): the stick asks for no more than the angle of attack that pulls the
   // limit at this dynamic pressure (with the pitch rate's damping), and past it the nose is pushed back
-  let el=st.elev,gx=0;
+  // the dogfight's stick (dfTick sets st.dfPitch, st.dfRoll): the pitch authority reaches the extended wing's alpha, the
+  // roll rate is the Viper's (about 240 deg/s at corner speed, 130 outside the fight)
+  let el=st.elev,gx=0;const kE=2.3*(st.dfPitch||1);
   if(st.gLim&&qd>100){const aL=(st.gLim*mg/(qd*AC.S)-AC.CL0-fl.cl)/AC.CLa;
-    if(el>0)el=Math.min(el,Math.max(0,(7*(aL-aTrim)+(1.2+3.2*sq)*st.gLim*AC.g/Math.max(Va,50)/qn)/2.3));
+    if(el>0)el=Math.min(el,Math.max(0,(7*(aL-aTrim)+(1.2+3.2*sq)*st.gLim*AC.g/Math.max(Va,50)/qn)/kE));
     const ap=alpha+0.06*(st.w.x-st.gload*AC.g/Math.max(Va,50));if(ap>aL)gx=-qn*30*(ap-aL);}
-  const ax=qn*(2.3*el*(stalled?0.6:1)-7*am)-(1.2+3.2*sq)*st.w.x+gx;
+  const ax=qn*(kE*el*(stalled?0.6:1)-7*am)-(1.2+3.2*sq)*st.w.x+gx;
   let ay=qn*(-1.3*st.rud-4.5*bm)-(0.8+2.6*sq)*st.w.y;
-  let az=qn*(-3.2*st.ail*(stalled?0.35:1))-(0.9+3.2*sq)*st.w.z;
+  let az=qn*(-3.2*st.ail*(st.dfRoll||1)*(stalled?0.35:1))-(0.9+3.2*sq)*st.w.z;
   if(AC.pf&&!st.noPF&&!st.onGround) ay+=st.power*(0.015+0.05*(1-clamp(Va/60,0,1)));
   if(stalled) az+=qn*1.1*st.dropDir;
   if(st.apW) st.w.copy(st.apW); else {st.w.x+=ax*dt; st.w.y+=ay*dt; st.w.z+=az*dt;}
@@ -2269,7 +2282,7 @@ function easyFly(st,dt,ev){
     if(AC.ezAoA&&cfg==='approach')st.ezAT=Math.min(AC.aStall-0.1,st.ezAT+(vLim-st.vel.y)/gsp*4*dt);}
   const p=st.ezP;
   // the dogfight in Easy (st.dfEz, dfTick): 80 degrees of bank, and the turn pulled for it below (up to about 6 g)
-  let bank=x*(st.dfEz?1.396:(st.bankMax||AC.ezBank))*clamp(agl/40,0.12,1);
+  let bank=x*(st.dfEz?1.45:(st.bankMax||AC.ezBank))*clamp(agl/40,0.12,1);
   if(st.noProt&&st.stalled)bank+=(st.dropDir||1)*0.35;          // and one wing drops
   let yawC=trk;
   // banked in the fight the nose is turned for it (below), not dragged back to the track
@@ -2294,8 +2307,8 @@ function easyFly(st,dt,ev){
   apAtt(st,p,bank,yawC);
   // the fight's coordinated turn: the jet turns about the vertical at the rate a level turn at this bank gives
   // (g tan(bank) / V: about 5.8 g at 80 degrees), the wing's lift follows; eased off near the stall and over 6 g
-  if(dfW>0){const ph=-_eB.z,V=Math.max(60,st.vel.length()),lim2=AC.aStall-0.1,
-      k=dfW*clamp((lim2-st.alpha)/0.06,0,1)*clamp((6.3-st.gload)/0.5,0,1),om=-9.81*Math.tan(clamp(ph,-1.4,1.4))/V*k;
+  if(dfW>0){const ph=-_eB.z,V=Math.max(60,st.vel.length()),lim2=AC.aStall+(st.dfLef||0)-0.1,
+      k=dfW*clamp((lim2-st.alpha)/0.06,0,1)*clamp((7.3-st.gload)/0.5,0,1),om=-9.81*Math.tan(clamp(ph,-1.4,1.4))/V*k;
     _qe.copy(st.quat).invert();st.apW.add(_dfV.set(0,om,0).applyQuaternion(_qe));}
   // switched into Easy mid flight: blend the assists in over 1.5 s from what the aircraft is
   // already doing, so a bank or a pitch the pilot was holding is eased out, never snapped
@@ -11281,6 +11294,10 @@ function arcScore(id){
 // Their own kinematic flight model: heading, flight path angle, bank and speed, 350 to 480 kt indicated,
 // turn rate held under 7 g, never below 6,000 ft, steered back inside the arena.
 const DF_KT0=350,DF_KT1=480,DF_G=7,DF_FLOOR=6000,DF_LOD=2*1852,DF_SPLINTER=['#5b7591','#8a9aab','#3e4e63'];
+// our F-16 in the fight (dogfight2 item 1, step): the leading edge flaps' extra alpha (CLmax 1.8, a 9 g corner speed of
+// about 345 KIAS), the roll authority (about 240 deg/s) and the pitch authority that reaches the extended wing's alpha.
+// DF_CORNER: the corner speed the HUD cue points at, with its band (KIAS)
+const DF_LEF=0.08,DF_ROLL=1.5,DF_PITCH=1.7,DF_CORNER=340,DF_CORNER_BAND=25;
 const dfY=ft=>(ft-FIELD_FT)/M2FT+GEAR,dfFt=y=>(y-GEAR)*M2FT+FIELD_FT;
 const dfTAS=(kt,y)=>kt/MS2KT/Math.sqrt(1.097*Math.exp(-y/9200)/1.225);   // indicated to true, as placeAir does
 const DFM={};   // the shared bandit geometry and materials, built on the first run
@@ -11489,7 +11506,8 @@ function dfTick(dt){
   if(DF.subT>0){DF.subT-=dt;DF.subAge+=dt;if(DF.subT<=0)DFS.el.classList.remove('on');}
   const live=running&&!paused,c=DF.cfg(),fl=DF.on&&!DF.done&&!DF.ej&&!st.crashed;
   // the flight model's dogfight terms (step): the g limit (a hair under, so the overshoot stays under it), Hard's energy fight
-  st.gLim=fl?c.gLim-0.15:0;st.dfE=fl?c.eDrag:0;st.dfAB=fl?c.eAB:0;st.dfEz=fl&&c.ezTurn?1:0;   // dfEz: Easy's 80 degree fight turn (easyFly)
+  st.gLim=fl?c.gLim-0.15:0;st.dfE=fl?c.eDrag:0;st.dfAB=fl?c.eAB:0;st.dfEz=fl&&c.ezTurn?1:0;   // dfEz: Easy's 83 degree fight turn (easyFly)
+  st.dfLef=fl?DF_LEF:0;st.dfRoll=fl?DF_ROLL:1;st.dfPitch=fl?DF_PITCH:1;   // the Viper's wing and stick in the fight (step)
   if(live){
     // grey vision (Hard): over 7.5 g it closes in from the edges (4 s at 9 g to the full tunnel), held from 5 to 7.5 g,
     // gone in 2 s under 5 g; never in Easy. dfGrey draws it.
@@ -11582,7 +11600,7 @@ function dfStop(){
   for(const b of DF.pool){b.alive=false;b.fall=false;b.g.visible=false;}DF.bandits.length=0;
   if(DF.wBuilt)dfWReset();dfAudOff();
   // the air back to the tower, the clouds back, the damage and the warnings gone
-  st.gLim=0;st.dfE=0;st.dfAB=0;st.dfEz=0;DF.gv=0;
+  st.gLim=0;st.dfE=0;st.dfAB=0;st.dfEz=0;st.dfLef=0;st.dfRoll=1;st.dfPitch=1;DF.gv=0;
   DF_QUIET=false;DF_GK=1;DF.ej=false;DF.wTxt='';DF.rwr='none';DF.subT=0;DFS.el.classList.remove('on');document.body.classList.remove('dfEj');
   missEl.classList.remove('dfH1','dfH2','dfH3');DFH.hk=-1;if(CLOUD_MESH)CLOUD_MESH.visible=true;
   dfHudUpdate();
@@ -12038,7 +12056,8 @@ function dfAud(){
 // ---- the overlay: a box on each bandit in view (range under it), an arrow on the edge for the rest, the seeker
 // circle on the boresight, and the gun pipper. Pooled elements, transforms only, text only when it changes.
 const DFH={box:[],arr:[],seek:null,pip:null,mw:null,W:0,H:0,mt:0,on:false,trk:null,trkT:0,pn:0,pb:[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],bx:[0,0,0,0],r:-1,ui:-1,fl:-1,flPop:0,hk:-1,vig:'',vigEl:document.getElementById('dfVig'),
-  gk:-1,gq:-999,gvO:document.querySelector('#dfGv .o'),gvI:document.querySelector('#dfGv .i'),hG:document.getElementById('hG')};
+  gk:-1,gq:-999,gvO:document.querySelector('#dfGv .o'),gvI:document.querySelector('#dfGv .i'),hG:document.getElementById('hG'),
+  hGn:document.querySelector('#hG em'),hGb:document.querySelector('#hG i b'),hCn:document.getElementById('hCn'),cn:-1};
 (function(){const h=$('dfHud');
   const mk=(c,inner)=>{const e=document.createElement('div');e.className=c;e.innerHTML=inner;h.appendChild(e);return e;};
   for(let i=0;i<4;i++){const b=mk('dfBox','<b></b><span></span>');DFH.box.push({el:b,tx:b.lastChild,base:'dfBox',c:'',tr:'',n:-1});
@@ -12077,7 +12096,11 @@ function dfDefUI(){
 function dfGrey(){
   const k=PHOTO.on||DF.kc>0||!DFH.on?0:Math.round(DF.gv*50);
   if(k!==DFH.gk){DFH.gk=k;const v=k/50;DFH.gvO.style.opacity=Math.min(1,v*1.7).toFixed(2);DFH.gvI.style.opacity=clamp((v-0.4)/0.6,0,1).toFixed(2);}
-  const gq=Math.round(st.gload*10);if(gq!==DFH.gq){DFH.gq=gq;DFH.hG.textContent=(gq/10).toFixed(1)+' G';const c=gq>=88?'r':gq>75?'a':'';if(DFH.hG.className!==c)DFH.hG.className=c;}
+  const gq=Math.round(st.gload*10);if(gq!==DFH.gq){DFH.gq=gq;DFH.hGn.textContent=(gq/10).toFixed(1);DFH.hGb.style.transform='scaleX('+clamp(gq/90,0,1).toFixed(3)+')';
+    const c=gq>=88?'r':gq>75?'a':'';if(DFH.hG.className!==c)DFH.hG.className=c;}
+  // the corner speed cue: below the band, in it, above it (and off outside the fight)
+  const kt=st.ias*MS2KT,cs=!DF.on||DF.done||st.crashed?0:kt<DF_CORNER-DF_CORNER_BAND?1:kt>DF_CORNER+DF_CORNER_BAND?3:2;
+  if(cs!==DFH.cn){DFH.cn=cs;DFH.hCn.className=cs===2?'ok':'';DFH.hCn.textContent=cs===0?'':cs===2?'CORNER \u2713':cs===1?'CORNER \u25B2 '+DF_CORNER:'CORNER \u25BC '+DF_CORNER;}
 }
 // The edge arrows' track: a rectangle inside the screen (its left and top edges in from the safe area, its right edge
 // left of the throttle, its bottom edge above the call strip), sampled every 4 px. A sample is free for an arrow kind
