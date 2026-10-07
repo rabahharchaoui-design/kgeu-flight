@@ -473,11 +473,11 @@ body.dfOn #uiroot > #dfSub{ display:flex; }
 #dfBrief .dfbSnd{ color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; gap:7px; }
 #dfBrief .dfbSnd svg{ width:18px; height:18px; flex:none; }
 #dfBrief .dfbSil{ color:var(--caution); font-weight:700; }
-#dfBrief .dfbH{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:10px 0 12px; text-align:left; }
+#dfBrief .dfbH{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px 8px; margin:10px 0 12px; text-align:left; }
 #dfBrief .dfbH div{ background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); border-radius:9px; padding:6px 8px; font-size:12px; line-height:1.3; color:var(--soft); }
 #dfBrief .dfbH b{ display:block; font:800 13px var(--font); letter-spacing:.06em; color:var(--caution); margin-bottom:2px; }
 #dfBrief #dfbGo{ min-height:64px; min-width:240px; font:800 24px var(--font); letter-spacing:.06em; border-radius:14px; }
-@media (max-height:340px){ #dfBrief .sheet{ padding:8px 14px 10px; } #dfBrief .dfbH{ margin:6px 0 8px; } #dfBrief .dfbH div{ font-size:11px; padding:4px 6px; } #dfBrief p{ font-size:13px; margin-top:1px; } }
+@media (max-height:340px){ #dfBrief .sheet{ padding:8px 14px 10px; } #dfBrief .dfbH{ margin:6px 0 8px; gap:4px 6px; } #dfBrief .dfbH div{ font-size:10px; padding:3px 6px; line-height:1.2; } #dfBrief .dfbH b{ font-size:11px; margin-bottom:1px; } #dfBrief p{ font-size:13px; margin-top:1px; } }
 /* the wave card: one line each, 170 wide, centred unless that would sit on the readouts (568 wide), then just right of them */
 body.dfOn #topCol{ width:170px; left:max(50%, calc(var(--padL) + var(--map) + var(--hudW) + 16px + 85px)); }
 body.dfOn #miss b, body.dfOn #miss span{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -1531,7 +1531,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   <p>Barry M. Goldwater Range</p>
   <p class="dfbSnd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>Sound on for the full experience</p>
   <p class="dfbSil" id="dfbSil" hidden>Turn off silent mode</p>
-  <div class="dfbH"><div><b>FOX 2</b>Hold the bandit in the circle until the tone goes high</div><div><b>GUN</b>Close in and put the pipper on him</div><div><b>FLARES</b>Tap when you hear Missile launch and turn hard</div></div>
+  <div class="dfbH"><div><b>FOX 2</b>Hold the bandit in the circle until the tone goes high</div><div><b>GUN</b>Close in and put the pipper on him</div><div><b>FLARES</b>Tap when you hear Missile launch and turn hard</div><div><b>BREAK</b>A hard turn away from the threat, flares out. Tap it as he closes and he overshoots</div><div><b>CHECK 6</b>Hold to look behind. The red pill says where he is</div><div><b>CORNER</b>Fight near 350 kt, the tightest turn. The HUD says CORNER</div></div>
   <button class="primary" id="dfbGo">FIGHT'S ON</button>
 </div></div>
 <div class="overlay res" id="gradeOv" role="dialog" aria-label="Lesson results"><div class="sheet">
@@ -11700,18 +11700,19 @@ function dfEnd(why){
   if(!DF.on||DF.done)return;DF.done=true;DF.why=why;DF.on=false;
   if(why==='win')dfCall('kioWin',null,{ttl:6});else if(why!=='crash')dfCall('kio',null,{ttl:6});
   const r=dfScore(),stars=dfStars(r.score),letter=dfGrade(r.score),better=dfRecord(r,stars);DF.sc=r;
-  runLog('dogfight',{score:r.score,kills:r.kills,gunKills:r.gunKills,waves:r.waves,hits:r.hits,won:r.won,why:why,secs:r.secs,clearT:r.clearT,flareSaves:r.flareSaves,stars:stars,ach:DF.ach.slice()});
+  runLog('dogfight',{score:r.score,kills:r.kills,gunKills:r.gunKills,waves:r.waves,hits:r.hits,won:r.won,why:why,secs:r.secs,clearT:r.clearT,flareSaves:r.flareSaves,stars:stars,ach:DF.ach.slice(),breaks:DF.brks,overshoots:DF.ovs});
   missHud(null);
   // the boards: one submission with the whole run (a run with no points and no kills is not sent). The daily's points
   // are half the run's, up to 1,500; the Worker fans a df:score run out to the kills, clear and guns boards
   const bonus=dfBonus(DF),dp=Math.min(1500,Math.round(r.score/2)),send=r.score>0||r.kills>0,lb=DF.daily?'daily':'df:score:'+r.mode;
   if(DF.daily&&send)scRecord('arc:daily:'+todayKey(),{pts:dp,secs:r.secs,letter:letter,stars:stars,ac:AC.name,df:1});
   if(LB&&DF.lb){if(send)LB.runEnd(DF.lb,DF.daily?dp:r.score,{secs:Math.round(DF.fightT*100)/100,df:{kills:r.kills,guns:r.gunKills,hits:r.hits,waves:r.waves,won:r.won,
-      clear:r.won?r.clearT:null,bank:bonus/DF_PTS.sec,flares:DF_FLARES-DF.flares,ach:DF.ach.slice()}});else LB.runCancel(DF.lb);}
+      clear:r.won?r.clearT:null,bank:bonus/DF_PTS.sec,flares:DF_FLARES-DF.flares,ach:DF.ach.slice(),brk:DF.brks,ov:DF.ovs}});else LB.runCancel(DF.lb);}
   if(why==='crash')return;
   const B=SCORE.best[dfKey(r.mode)];
   const stats=[['Kills',r.kills+(r.gunKills?' ('+r.gunKills+' by gun)':'')],['Waves cleared',r.waves+'/'+DF.waves.length],['Hits taken',r.hits+' of 3'],['Time bonus','+'+resNum(bonus)]];
   if(r.won)stats.push(['Clear time',dfClock(r.clearT)]);
+  if(DF.brks||DF.ovs)stats.push(['Defence',DF.brks+(DF.brks===1?' break, ':' breaks, ')+DF.ovs+' overshoot'+(DF.ovs===1?'':'s')+' forced']);
   if(DF.daily)stats.push(['Daily points',resNum(dp)+' (half the score)']);
   stats.push(['Best',B?resNum(B.pts)+' pts, '+B.kills+' kills'+(B.clr!=null?', '+dfClock(B.clr):''):'none yet']);
   resArm(()=>{if(!running||!DF.live)return;RES.kind='df';
