@@ -24,7 +24,7 @@ async def main():
         await pg.wait_for_timeout(1500)
         s = await m(pg)
         ok('rjtt: nothing before the first gesture', s['playing'] is None and not s['allowed'], s)
-        await pg.touchscreen.tap(420, 8)
+        await pg.touchscreen.tap(420, 3)
         s = await wait_for(pg, lambda s: s['allowed'])
         await pg.wait_for_timeout(1500); s = await m(pg)
         ok('rjtt: the gate opens on the first gesture, menu stays silent', s['allowed'] and s['playing'] is None, s)

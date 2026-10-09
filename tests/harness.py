@@ -26,8 +26,8 @@ async def launch(p):
     return await p.chromium.launch(args=['--use-gl=swiftshader', '--enable-webgl',
         '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'])
 
-async def page(b, url, vp=IPHONE_SE, storage=None, touch=True):
-    """New iPhone-landscape page. storage: dict preloaded into localStorage."""
+async def page(b, url, vp=IPHONE_SE, storage=None, touch=True, pre=None):
+    """New iPhone-landscape page. storage: dict preloaded into localStorage. pre: async fn(ctx) run before the load (route mocks)."""
     ctx = await b.new_context(viewport=vp, has_touch=touch, is_mobile=touch, device_scale_factor=2)
     pg = await ctx.new_page()
     pg.errs = []
@@ -42,6 +42,7 @@ async def page(b, url, vp=IPHONE_SE, storage=None, touch=True):
     if os.environ.get('PFS_SWITCH'):   # stand in iOS's <input switch>: the haptic labels go over every control (phone3 item 6)
         await ctx.add_init_script("Object.defineProperty(Navigator.prototype,'vibrate',{configurable:true,value:undefined});"
             "Object.defineProperty(HTMLInputElement.prototype,'switch',{configurable:true,get(){return this.hasAttribute('switch');},set(v){}});")
+    if pre is not None: await pre(ctx)
     await pg.goto(url)
     await pg.wait_for_function('()=>window.__kgeu', timeout=30000)
     await splash_gone(pg)

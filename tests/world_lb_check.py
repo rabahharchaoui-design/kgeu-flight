@@ -119,8 +119,8 @@ async def main():
         await pg.evaluate(f"()=>{{{K}.openMenu();{K}.nav('sArc')}}"); await pg.wait_for_timeout(400)
         cards = await pg.evaluate(ARCCARDS)
         apt = [c for c in cards if c['id'].startswith('apt:')]
-        grp = await pg.evaluate("()=>{const h=document.querySelector('#arcCards .cgrp');return h&&[h.textContent,[...h.parentElement.children].indexOf(h)]}")
-        ok('(a) ARCADE: a World airports group after the six arcade cards', grp == ['World airports', 6], grp)
+        grp = await pg.evaluate("()=>{const h=[...document.querySelectorAll('#arcCards .cgrp')].pop();return h&&[h.textContent,[...h.parentElement.children].indexOf(h)]}")
+        ok('(a) CHALLENGES: a World airports group after the six arcade cards and the missions', grp == ['World airports', 10], grp)
         ok('(a) ARCADE: Tokyo, Paris and Rio cards with their one line and runway, not flown yet, no ARIZONA tag',
            [(c['id'], c['name']) for c in apt] == [('apt:RJTT', 'Tokyo Haneda'), ('apt:LFPG', 'Paris CDG'), ('apt:SBRJ', 'Rio Santos Dumont')]
            and [c['d'] for c in apt] == ['5 mile landing challenge at Tokyo Haneda, runway 34R.', '5 mile landing challenge at Paris CDG, runway 26L.', '5 mile landing challenge at Rio Santos Dumont, runway 20L.']
@@ -186,14 +186,13 @@ async def main():
         cardq = "(s)=>{const c=document.querySelector(s);return {t:c.innerText,tag:!!c.querySelector('.azTag')}}"
         await pg.evaluate(f"()=>{{{K}.openMenu();{K}.nav('sArc')}}"); await pg.wait_for_timeout(300)
         ca = await pg.evaluate(cardq, '#arcCards .mcard[data-m=daily]')
-        await pg.evaluate(f"()=>{K}.nav('sMis')"); await pg.wait_for_timeout(300)
-        cm = await pg.evaluate(cardq, '#misCards .mcard[data-m=daily]')
+        cm = ca   # ui1: one Challenges list, one daily card
         wind = f"wind {d1['wdir']:03d} at {d1['wkt']}"
         ok('(c) the daily card on ARCADE and MISSIONS: Paris CDG, runway 26L, the time and wind, no ARIZONA tag',
            all('Paris CDG' in c['t'] and 'runway 26L' in c['t'] and d1['tod'] in c['t'] and wind in c['t'] and not c['tag'] for c in (ca, cm)), (ca, cm, wind))
         await pg.screenshot(path=os.path.join(os.path.dirname(__file__), '..', 'overnight-screenshots', 'world_lb_daily_card.png'))
         await pg.evaluate(STUB)
-        await finger(pg, '#misCards .mcard[data-m="daily"]'); await pg.wait_for_timeout(300)
+        await finger(pg, '#arcCards .mcard[data-m="daily"]'); await pg.wait_for_timeout(300)
         k = await pg.evaluate("()=>({r:localStorage.getItem('kgeuRegion'),res:JSON.parse(sessionStorage.getItem('kgeuResume')||'null'),rl:window.__reloaded||0,daily:localStorage.getItem('kgeuDaily')})")
         s0 = (k['res'] or {}).get('start') or {}
         tok0 = [x for x in seen if x == ('/token', 'daily')]

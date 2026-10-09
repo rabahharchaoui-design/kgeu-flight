@@ -44,7 +44,7 @@ async def main():
             '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'])
         pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'})
         await pg.evaluate("(l)=>window.__kgeu.musicLoad(l)", TONES)
-        await pg.touchscreen.tap(420, 8)
+        await pg.touchscreen.tap(420, 3)
         s = await wait_for(pg, lambda s: s['allowed'], 4000)
         ok('launch, a tap on the main menu: the audio gate opens', s['allowed'], s['allowed'])
         # 10 s on the main menu, then the FLY and Settings screens: nothing ever plays
@@ -53,7 +53,7 @@ async def main():
             await pg.wait_for_timeout(500); s = await m(pg)
             peak = max(peak, s['gain']); played.add(s['playing'])
         ok('10 s on the main menu: silence, nothing playing', peak < 1e-3 and played == {None}, (peak, played))
-        for scr in ('sFly', 'sMis', 'sSet'):
+        for scr in ('sFly', 'sArc', 'sSet'):
             await pg.evaluate(f"(s)=>{K}.nav(s)", scr); await pg.wait_for_timeout(1200); s = await m(pg)
             ok(f'{scr}: silent', s['gain'] < 1e-3 and s['playing'] is None and not s['want'], (s['gain'], s['playing']))
 
@@ -80,7 +80,7 @@ async def main():
         ok('pause, Settings: silent within 1.5 s', t is not None and not s['want'], (t, s['gain']))
         await pg.wait_for_timeout(2500); s = await m(pg)
         ok('Settings from the pause sheet: the track is held, not dropped', s['playing'] == track, (track, s['playing']))
-        await finger(pg, '#sSet .back'); await pg.wait_for_timeout(400)
+        await finger(pg, '#mBack'); await pg.wait_for_timeout(400)
         ok('Back returns to the pause sheet', await pg.evaluate("()=>document.getElementById('pauseOv').classList.contains('on')"))
         await finger(pg, '#pResume')
         s = await wait_for(pg, lambda s: s['gain'] > 0.3, 4000)

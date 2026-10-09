@@ -23,9 +23,9 @@ def arg(name, default=None):
 EVENTS = {
     'free_runway':    ('sFly', '#bGo', f"{K}.pickPos('runway')"),
     'free_final1':    ('sFly', '#bGo', f"{K}.pickPos('final1')"),
-    'daily':          ('sMis', '#misCards .mcard[data-m=daily]', ''),
-    'short':          ('sMis', '#misCards .mcard[data-m=short]', ''),
-    'dash':           ('sMis', '#misCards .mcard[data-m=dash]', ''),
+    'daily':          ('sArc', '#arcCards .mcard[data-m=daily]', ''),
+    'short':          ('sArc', '#arcCards .mcard[data-m=short]', ''),
+    'dash':           ('sArc', '#arcCards .mcard[data-m=dash]', ''),
     'landing':        ('sArc', '#arcCards .mcard[data-m=landing]', ''),
     'landing1':       ('sArc', '#arcCards .mcard[data-m=landing1]', ''),
     'drop':           ('sArc', '#arcCards .mcard[data-m=drop]', ''),

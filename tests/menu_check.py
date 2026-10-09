@@ -8,7 +8,7 @@ from harness import serve, launch, page, Checks, finger
 ok = Checks()
 CAR = ['cessna','alpha','f16','reaper','mq9b','c130']
 CAR_AFTER_10 = CAR[(CAR.index('c130') + 10) % 6]
-SCREENS = ['sHome', 'sFly', 'sMis', 'sSchool', 'sArc', 'sSet', 'sHelp']
+SCREENS = ['sHome', 'sFly', 'sSchool', 'sArc', 'sSet', 'sHelp']   # ui1: six tabs (Missions joined Challenges, sArc)
 # ARCADE scrolls by design (World airports): its first screen is checked without the three .apt cards, then ARC_SCROLLED
 FIT = """(arg)=>{const [id,skip]=Array.isArray(arg)?arg:[arg,null];const s=document.getElementById(id);const W=innerWidth,H=innerHeight;const bad=[];
   if(s.scrollHeight>s.clientHeight+1||s.scrollWidth>s.clientWidth+1)bad.push('scrolls '+s.scrollWidth+'x'+s.scrollHeight);
@@ -16,6 +16,10 @@ FIT = """(arg)=>{const [id,skip]=Array.isArray(arg)?arg:[arg,null];const s=docum
   const RC=e=>{const r=e.getBoundingClientRect(),L=e.closest('.locs');if(!L)return r;const q=L.getBoundingClientRect(),x0=Math.max(r.left,q.left),x1=Math.max(x0,Math.min(r.right,q.right));
     return {left:x0,right:x1,top:r.top,bottom:r.bottom,width:x1-x0,height:r.height};};
   const keep=e=>!(skip&&e.closest(skip));
+  // ui1: nothing on a screen may sit under the tab bar, and the tab bar itself fits
+  const T=document.getElementById('mTabs');if(T&&s.closest('#menu')){const tb=T.getBoundingClientRect().bottom;
+    s.querySelectorAll('button,input,.chip').forEach(e=>{if(!keep(e))return;const r=e.getBoundingClientRect();if(r.width>0.5&&r.top<tb-0.5&&getComputedStyle(e).visibility!=='hidden')bad.push('under the tabs '+(e.id||e.textContent.trim().slice(0,16)));});
+    T.querySelectorAll('button').forEach(e=>{const r=e.getBoundingClientRect();if(r.width<0.5)return;if(r.left<-0.5||r.right>W+0.5)bad.push('tab off screen '+e.textContent.trim());if(r.width<43.5||r.height<43.5)bad.push('small tab '+e.textContent.trim());});}
   s.querySelectorAll('button,input,.chip').forEach(e=>{if(!keep(e))return;const r0=e.getBoundingClientRect(),r=RC(e);if(r.width<0.5||getComputedStyle(e).visibility==='hidden')return;
     if(r.left<-0.5||r.top<-0.5||r.right>W+0.5||r.bottom>H+0.5)bad.push('off screen '+(e.id||e.textContent.trim().slice(0,16)));
     if(e.matches('button')&&(r0.width<43.5||r0.height<43.5))bad.push('small '+(e.id||e.textContent.trim().slice(0,16))+' '+Math.round(r0.width)+'x'+Math.round(r0.height));});
@@ -46,7 +50,7 @@ async def main():
             for sid in SCREENS:
                 await pg.evaluate(f"()=>{{window.__kgeu.openFly();window.__kgeu.nav('{sid}')}}"); await pg.wait_for_timeout(250)
                 if sid == 'sArc':
-                    bad = await pg.evaluate(FIT, [sid, '.mcard.apt'])
+                    bad = await pg.evaluate(FIT, [sid, '.mcard.apt,.mcard.more'])
                     ok(f'{tag} sArc: the six Arizona cards and the daily fit with no scrolling, 44 px targets, no overlaps', not bad, bad[:4])
                     bad = await pg.evaluate(ARC_SCROLLED)
                     ok(f'{tag} sArc: the three World airports cards scroll into view, 44 px targets, no overlaps', not bad, bad[:4])
@@ -55,7 +59,9 @@ async def main():
                 ok(f'{tag} {sid} fits with no scrolling, 44 px targets, no overlaps', not bad, bad[:4])
             if vp['width'] == 667:
                 home = await pg.evaluate("""()=>{window.__kgeu.nav('sHome',true);return [...document.querySelectorAll('#sHome button')].map(b=>b.id)}""")
-                ok('home has only FLY, FLIGHT SCHOOL, MISSIONS, ARCADE, LEADERBOARDS plus Records and Settings', sorted(home) == sorted(['hRec','hSet','hFly','hSch','hMis','hArc','hLb']), home)
+                ok('home has only FLY, FLIGHT SCHOOL, CHALLENGES and RECORDS (Settings and Boards are tabs)', sorted(home) == sorted(['hRec','hFly','hSch','hChal']), home)
+                tabs = await pg.evaluate("()=>[...document.querySelectorAll('#mTabs [data-go]')].map(b=>b.innerText.trim())")
+                ok('six tabs: Home, Fly, Challenges, School, Boards, Settings', tabs == ['Home', 'Fly', 'Challenges', 'School', 'Boards', 'Settings'], tabs)
                 keys = await pg.evaluate("()=>{window.__kgeu.nav('sHelp');const k=document.querySelector('.keys');return getComputedStyle(k).display}")
                 ok('keyboard and controller chart is hidden on a touch device', keys == 'none', keys)
                 # two taps from opening the app to flying: FLY, then GO
@@ -115,16 +121,16 @@ async def main():
                 ok('Apply restarts at once with the new aircraft, base, time and start, no main menu', s == ['alpha', 'kgeu', 'ramp', 'night', False, False], s)
                 sync = await pg.evaluate("()=>{window.__kgeu.openFly();return [window.__kgeu.prefs().type,document.querySelector('#sFly .pick[data-tod=night]').classList.contains('sel'),document.querySelector('#sFly .pick[data-pos=ramp]').classList.contains('sel'),document.querySelector('#carMain .nm').textContent.startsWith('Pipistrel')]}")
                 ok('the main menu shows the same choices', sync == ['alpha', True, True, True], sync)
-                await finger(pg, '.scr.on .back'); await pg.wait_for_timeout(200)
-                await finger(pg, '#hMis'); await pg.wait_for_timeout(300)
-                n = await pg.evaluate("()=>[...document.querySelectorAll('#misCards .mcard')].map(c=>[c.dataset.m,!!c.querySelector('svg.ico'),!!c.querySelector('.stars')])")
-                ok('mission cards have an icon and stars', [x[0] for x in n] == ['daily', 'short', 'dash', 'gunrun'] and all(x[1] and x[2] for x in n), n)
-                await finger(pg, '#misCards [data-m="short"]'); await pg.wait_for_timeout(1200)
+                await finger(pg, '#tChal'); await pg.wait_for_timeout(300)
+                n = await pg.evaluate("()=>[...document.querySelectorAll('#arcCards .mcard:not(.apt)')].map(c=>[c.dataset.m,!!c.querySelector('svg.ico'),!!c.querySelector('.stars')])")
+                ok('Challenges cards have an icon and stars', all(x[1] and x[2] for x in n) and {'daily', 'short', 'dogfight', 'range', 'drop'} <= set(x[0] for x in n), n)
+                await pg.evaluate("()=>document.querySelector('#arcCards [data-m=short]').scrollIntoView()")
+                await finger(pg, '#arcCards [data-m="short"]'); await pg.wait_for_timeout(1200)
                 s = await pg.evaluate("()=>({t:window.__kgeu.state().type,saved:window.__kgeu.prefs().type,kind:window.__kgeu.MISS.kind})")
                 ok('a mission card starts it without changing the saved aircraft', s == {'t': 'c130', 'saved': 'alpha', 'kind': 'short'}, s)
                 await pg.evaluate("()=>window.__kgeu.openMenu()"); await pg.wait_for_timeout(200)
                 await finger(pg, '#hRec'); await pg.wait_for_timeout(300)
-                ok('Records opens from the corner icon', await pg.evaluate("()=>document.getElementById('recOv').classList.contains('on')"))
+                ok('Records opens from its home button', await pg.evaluate("()=>document.getElementById('recOv').classList.contains('on')"))
             ok(f'{tag} no page errors', not pg.errs, pg.errs[:3])
             await pg.context.close()
         await b.close()

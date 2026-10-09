@@ -27,7 +27,7 @@ async def main():
             await pg.context.close()
             pg = await page(b, url, vp=vp, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'})
             await pg.evaluate("()=>{const r=document.getElementById('rotOk');if(r&&r.offsetParent)r.click();}")
-            for scr in ('sHome', 'sFly', 'sMis', 'sSchool', 'sArc', 'sSet', 'sHelp', 'sCredits', 'sLb'):
+            for scr in ('sHome', 'sFly', 'sSchool', 'sArc', 'sSet', 'sHelp', 'sCredits', 'sLb'):
                 await pg.evaluate(f"(s)=>{{const K={K};K.openMenu();K.nav(s)}}", scr)
                 await shot(pg, scr, vp)
             await pg.evaluate(f"()=>{K}.recOpen()"); await shot(pg, 'records', vp)

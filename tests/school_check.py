@@ -63,7 +63,7 @@ async def main():
         # home and the school screen
         await pg.evaluate(f"()=>{K}.openMenu()"); await pg.wait_for_timeout(300)
         home = await pg.evaluate("()=>[...document.querySelectorAll('#sHome button')].map(b=>b.id)")
-        ok('home: big FLY, then FLIGHT SCHOOL, MISSIONS, ARCADE, LEADERBOARDS, and the two corner icons', sorted(home) == sorted(['hRec','hSet','hFly','hSch','hMis','hArc','hLb']), home)
+        ok('home: big FLY, then FLIGHT SCHOOL, CHALLENGES and RECORDS (ui1: Settings and Boards are tabs)', sorted(home) == sorted(['hRec','hFly','hSch','hChal']), home)
         sz = await pg.evaluate("()=>['hFly','hSch'].map(i=>{const r=document.getElementById(i).getBoundingClientRect();return r.width*r.height})")
         ok('FLY is the big primary button', sz[0] > sz[1] * 1.6, sz)
         ok('Start here is gone once lesson 1 is finished', not await pg.evaluate("()=>document.getElementById('startHere').classList.contains('on')"))
@@ -71,7 +71,7 @@ async def main():
         rows = await pg.evaluate("()=>[...document.querySelectorAll('#school .lrow')].map(r=>[r.dataset.l,r.classList.contains('done'),r.classList.contains('next')])")
         ok('six lessons, lesson 1 ticked, steep turns highlighted next', len(rows) == 6 and rows[0] == ['first', True, False] and rows[1] == ['steep', False, True], rows)
         ok('school screen fits with no scrolling', not await pg.evaluate(FIT, '#sSchool'), await pg.evaluate(FIT, '#sSchool'))
-        ok('flight school is no longer in Missions', await pg.evaluate("()=>{window.__kgeu.nav('sMis');return !document.querySelector('#misCards [data-m=school]')}"))
+        ok('flight school is not a Challenges card', await pg.evaluate("()=>{window.__kgeu.nav('sArc');return !document.querySelector('#arcCards [data-m=school]')}"))
         await pg.evaluate(f"()=>{K}.nav('sSchool')"); await pg.wait_for_timeout(200)
         await finger(pg, '#school [data-l="slow"]'); await pg.wait_for_timeout(1200)
         ok('one tap on a lesson starts it', await pg.evaluate(f"()=>{K}.LES.on") == 'slow')

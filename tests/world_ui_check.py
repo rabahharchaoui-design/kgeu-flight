@@ -168,9 +168,9 @@ async def main():
         ok('pause (rjtt): Glendale picked, Apply pending, no reload yet', r == ['Apply', 0], r)
         await finger(pg, '#pResume'); await pg.wait_for_timeout(300)
         # (d) Arizona tags; the airdrop switches back to Arizona
-        await pg.evaluate(f"()=>{K}.openMenu('sMis')"); await pg.wait_for_timeout(300)
-        m = await pg.evaluate("()=>[...document.querySelectorAll('#misCards .mcard')].map(c=>[c.dataset.m,!!c.querySelector('.azTag')&&c.querySelector('.azTag').textContent])")
-        ok('rjtt MISSIONS: every card tagged ARIZONA but the daily, which names its airport instead', m and all(x[1] == 'ARIZONA' for x in m if x[0] != 'daily') and [x[1] for x in m if x[0] == 'daily'] == [False], m)
+        await pg.evaluate(f"()=>{K}.openMenu('sArc')"); await pg.wait_for_timeout(300)
+        m = await pg.evaluate("()=>[...document.querySelectorAll('#arcCards .mcard')].filter(c=>!c.dataset.m.startsWith('apt:')).map(c=>[c.dataset.m,!!c.querySelector('.azTag')&&c.querySelector('.azTag').textContent])")
+        ok('rjtt CHALLENGES: every card tagged ARIZONA but the daily, which names its airport instead', m and all(x[1] == 'ARIZONA' for x in m if x[0] != 'daily') and [x[1] for x in m if x[0] == 'daily'] == [False], m)
         await pg.evaluate(f"()=>{K}.nav('sSchool')"); await pg.wait_for_timeout(300)
         sch = await pg.evaluate("()=>[...document.querySelectorAll('#school .lrow')].map(c=>!!c.querySelector('.azTag'))")
         ok('rjtt SCHOOL: every lesson tagged ARIZONA', sch and all(sch), sch)

@@ -63,10 +63,10 @@ async def main():
 
         # (a) the real, empty playlist: silent and error free
         pg = await page(b, url, storage=seed)
-        await pg.touchscreen.tap(330, 8); await pg.wait_for_timeout(600)
+        await pg.touchscreen.tap(6, 370); await pg.wait_for_timeout(600)
         await finger(pg, '#hFly'); await pg.wait_for_timeout(400)
         await pg.evaluate("()=>window.__kgeu.nav('sHome',true)"); await finger(pg, '#hSch'); await pg.wait_for_timeout(400)
-        await pg.evaluate("()=>window.__kgeu.nav('sHome',true)"); await finger(pg, '#hSet'); await pg.wait_for_timeout(400)
+        await pg.evaluate("()=>window.__kgeu.nav('sHome',true)"); await finger(pg, '#tSet'); await pg.wait_for_timeout(400)
         await pg.evaluate("()=>{const K=window.__kgeu;K.pick('cessna');K.pickBase('kgeu');K.start('runway')}"); await pg.wait_for_timeout(1200)
         await pg.evaluate("()=>window.__kgeu.togglePause()"); await pg.wait_for_timeout(500)
         await finger(pg, '#pResume'); await pg.wait_for_timeout(800)
@@ -81,7 +81,7 @@ async def main():
         await pg.evaluate("(l)=>window.__kgeu.musicLoad(l)", tones(2.0, 's'))
         s0 = await m(pg)
         ok('(b) nothing plays before the first tap', s0['playing'] is None, s0['playing'])
-        await pg.touchscreen.tap(330, 8)
+        await pg.touchscreen.tap(6, 370)
         s = await wait_for(pg, lambda s: s['allowed'])
         await pg.wait_for_timeout(1500); s = await m(pg)
         ok('(b) home screen after a tap: the gate is open but nothing plays (music only in flight)', s['allowed'] and s['playing'] is None and await pg.evaluate("()=>window.__kgeu.curScr()") == 'sHome', s['playing'])
@@ -167,7 +167,7 @@ async def main():
         await finger(pg, '#bCredits'); await pg.wait_for_timeout(300)
         titles = await pg.evaluate("()=>[...document.querySelectorAll('#creditsList li b')].map(e=>e.textContent)")
         ok('(b) Music credits lists every playlist title plus dogfight', len(titles) == len(REAL_FILES) + 1 and titles[-1].endswith('Dogfight'), (len(titles), titles[:3], titles[-1] if titles else None))
-        await finger(pg, '#sCredits .back'); await pg.wait_for_timeout(300)
+        await finger(pg, '#mBack'); await pg.wait_for_timeout(300)
 
         # pause menu controls, in a mission
         await pg.evaluate("()=>window.__kgeu.mission('drop')"); await pg.wait_for_timeout(600)

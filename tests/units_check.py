@@ -30,7 +30,7 @@ async def main():
         b = await launch(p)
         pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'rookie', 'kgeuTut': '1'})
         # ---- menus ----
-        for s in ('sHome', 'sFly', 'sMis', 'sSchool', 'sArc', 'sSet', 'sHelp', 'sCredits', 'sLb'):
+        for s in ('sHome', 'sFly', 'sSchool', 'sArc', 'sSet', 'sHelp', 'sCredits', 'sLb'):
             await pg.evaluate(f"()=>{{{K}.openMenu();{K}.nav('{s}')}}"); await pg.wait_for_timeout(250)
             await scan(pg, s)
         # ---- HUD, Easy then Hard ----
