@@ -24,6 +24,9 @@ class Mock:
         return s
 
     def board(self, b, p):
+        # ui1_break_check: a full worst-case board handed in as-is, bypassing the generator below
+        if b in self.extra.get('boards', {}):
+            return self.extra['boards'][b]
         rnd = random.Random(b + p)
         n = self.nrows if p == 'all' else max(0, self.nrows // (3 if p == 'week' else 6))
         rows = []
