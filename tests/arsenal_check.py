@@ -28,6 +28,115 @@ async def shot(pg, name):
     await pg.screenshot(path=os.path.join(OUT, name), timeout=120000)
     print('  wrote', os.path.join(OUT, name))
 
+# bandit i at d metres along the nose (or off it by off radians, positive to the left), flying our way and speed (test.hold)
+PLACE = """([i,d,off])=>{const K=window.__kgeu,s=K.state(),D=K.DF,b=D.bandits[i];D.test.hold=true;
+  const q=s.quat.clone();if(off)q.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),off));
+  const n=new THREE.Vector3(0,0,-1).applyQuaternion(q);b.p.copy(s.pos).addScaledVector(n,d);
+  const v=s.vel;b.hdg=Math.atan2(v.x,-v.z);b.gam=Math.asin(Math.max(-1,Math.min(1,v.y/v.length())));b.bank=0;b.spd=v.length();b.state='TURN';b.st=0;b.hp=1;b.alive=true;
+  b.v.set(Math.sin(b.hdg)*Math.cos(b.gam),Math.sin(b.gam),-Math.cos(b.hdg)*Math.cos(b.gam)).multiplyScalar(b.spd);return true;}"""
+FAST = "(n)=>{const K=window.__kgeu;for(let i=0;i<n;i++)K.stepFrame(0.1,false,true);}"
+DRAW = "(n)=>{const K=window.__kgeu;for(let i=0;i<n;i++)K.stepFrame(1/60);}"
+W = f"""()=>{{const D={K}.DF,S=D.seek,r=document.querySelector('#dfHud .dfRad'),c=document.querySelector('#dfHud .dfSeek'),f=document.getElementById('bFox');
+  return {{wpn:D.wpn,fox:D.fox,mrm:D.mrm,st:S.state,min:!!S.min,rel:!!D.rel,ab:D.mAbort,ms:D.mShots,mk:D.mKills,kills:D.kills,
+    msl:D.msl.filter(m=>m.on&&!m.foe).map(m=>m.kind),rad:r.className,radT:r.lastChild.textContent,seek:c.className,
+    L:document.getElementById('bFoxL').textContent,N:document.getElementById('bFoxN').textContent,Wt:document.getElementById('bFoxW').textContent,cls:f.className,
+    side:document.getElementById('sideToast').textContent,v:{K}.DFA.w.slice()}}}}"""
+
+async def hold_fox(pg, ms):
+    await pg.evaluate("(ms)=>{const f=document.getElementById('bFox');f.dispatchEvent(new PointerEvent('pointerdown',{pointerId:91,bubbles:true,pointerType:'touch'}));}", ms)
+    await pg.wait_for_timeout(ms)
+    await pg.evaluate("()=>{const f=document.getElementById('bFox');f.dispatchEvent(new PointerEvent('pointerup',{pointerId:91,bubbles:true,pointerType:'touch'}));}")
+
+async def start_rack(pg, mode, rack, gun='full'):
+    await open_brief(pg, mode); await finger(pg, '#dfbNext'); await pg.wait_for_timeout(300)
+    await finger(pg, f'#loRacks [data-r="{rack}"]'); await finger(pg, f'#loGuns [data-g="{gun}"]'); await pg.wait_for_timeout(150)
+    await finger(pg, '#dfbGo'); await pg.wait_for_timeout(200)
+    await pg.evaluate(FAST, 2); await pg.evaluate(DRAW, 6)
+
+async def mrm_section(b, url):
+    """item 2: the MRM (FOX 3): the swap, the radar box and its tones, the lock held until it is away, min range, the kill"""
+    pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuType': 'f16'})
+    await start_rack(pg, 'pilot', 'mixed')
+    w = await pg.evaluate(W)
+    ok('MIXED (Hard): 2 SRM + 2 MRM, SRM selected first; FOX reads FOX 2, SRM x2, and the swap line MRM 2', w['fox'] == 2 and w['mrm'] == 2 and w['wpn'] == 'srm' and w['L'] == 'FOX 2' and w['N'] == 'SRM x2' and 'MRM 2' in w['Wt'], w)
+    await pg.evaluate(PLACE, [0, 3 * 1852, 1.6]); await pg.evaluate(FAST, 6)   # the wave's bandit off to the side: no lock (a press with a lock fires)
+    await pg.evaluate(f"()=>{K}.hapLog(true)")
+    await hold_fox(pg, 650); await pg.evaluate(DRAW, 4)
+    w = await pg.evaluate(W); hl = [h['n'] for h in await pg.evaluate(f"()=>{K}.hapLog(true)")]
+    ok('holding FOX 0.65 s swaps to the MRM: FOX 3, MRM x2, swap line SRM 2, cyan (mrm), a detent tick, nothing fired', w['wpn'] == 'mrm' and w['L'] == 'FOX 3' and w['N'] == 'MRM x2' and 'SRM 2' in w['Wt'] and 'mrm' in w['cls'] and not w['msl'] and 'detent' in hl and 'MRM' in w['side'], (w, hl))
+    ok('the MRM shows its radar box on the boresight (the SRM circle is off)', ' on' in w['rad'] and ' on' not in w['seek'] and w['radT'] == 'MRM', w)
+    # a bandit 6 nm ahead: past the SRM's 5 nm, inside the MRM's 10
+    await pg.evaluate(PLACE, [0, 6 * 1852, 0]); await pg.evaluate(FAST, 3); await pg.evaluate(DRAW, 3)
+    w = await pg.evaluate(W)
+    ok('a bandit 6 nm ahead: the radar searches (box lit, MRM 6.0 nm), the MRM search chirp (no SRM growl)', w['st'] == 'search' and 'sr' in w['rad'] and w['radT'].startswith('MRM 6') and w['v'][0] == 0, w)
+    await pg.evaluate(FAST, 18); await pg.evaluate(DRAW, 3)
+    w = await pg.evaluate(W)
+    ok('held in the box 2 s: lock (red box, LOCK), the MRM lock tone on, the SRM lock tone off', w['st'] == 'lock' and 'lk' in w['rad'] and w['radT'].startswith('LOCK') and w['v'][5] > 0 and w['v'][1] == 0 and 'lock' in w['cls'], w)
+    await shot(pg, 'a2_mrm_lock_844.png')
+    await pg.evaluate(f"()=>{K}.hapLog(true)")
+    await finger(pg, '#bFox'); await pg.evaluate(FAST, 4); await pg.evaluate(DRAW, 2)
+    w = await pg.evaluate(W)
+    ok('FOX 3 with the lock: the release starts (HOLD, the button pulses), no missile yet 0.4 s in', w['rel'] and not w['msl'] and 'rel' in w['cls'] and w['radT'].startswith('HOLD'), w)
+    await shot(pg, 'a2_mrm_hold_844.png')
+    await pg.evaluate(FAST, 5)
+    w = await pg.evaluate(W); hl = [h['n'] for h in await pg.evaluate(f"()=>{K}.hapLog(true)")]
+    calls = await pg.evaluate(f"()=>{K}.DF.calls.slice(-4)")
+    ok('the lock held 0.8 s: the MRM is away (one MRM left), the FOX 3 haptic (launch3) and the Fox three call', w['msl'] == ['mrm'] and w['mrm'] == 1 and w['ms'] == 1 and not w['rel'] and 'launch3' in hl and 'fox3' in calls, (w, hl, calls))
+    for _ in range(30):
+        await pg.evaluate(FAST, 10)
+        w = await pg.evaluate(W)
+        if w['kills'] >= 1 or not w['msl']: break
+    ok('the MRM reaches the bandit 6 nm out and kills it (counted as a FOX 3 kill)', w['kills'] == 1 and w['mk'] == 1, w)
+    # the abort: lock, FOX 3, then the bandit leaves the box before the missile is away
+    await pg.evaluate(f"()=>{{const D={K}.DF;D.gap=0;D.kc=0;D.kcB=null;document.body.classList.remove('dfKc');D.test.wave(1);}}")   # past the wave's breather and kill cam
+    await pg.evaluate(PLACE, [0, 4 * 1852, 0]); await pg.evaluate(FAST, 25)
+    w = await pg.evaluate(W)
+    ok('a second bandit at 4 nm: locked again', w['st'] == 'lock', w)
+    await finger(pg, '#bFox'); await pg.evaluate(FAST, 2)
+    await pg.evaluate(PLACE, [0, 4 * 1852, 0.6]); await pg.evaluate(FAST, 8); await pg.evaluate(DRAW, 2)
+    w = await pg.evaluate(W)
+    ok('the bandit leaves the box during the release: SHOT ABORTED, the missile stays on the rail', not w['rel'] and w['ab'] == 1 and w['mrm'] == 1 and not w['msl'] and 'SHOT ABORTED' in w['side'], w)
+    # minimum range
+    await pg.evaluate(PLACE, [0, 1100, 0]); await pg.evaluate(FAST, 4); await pg.evaluate(DRAW, 3)
+    w = await pg.evaluate(W)
+    ok('a bandit 0.6 nm ahead: inside the MRM minimum, the box says MIN RNG and never locks', w['min'] and w['st'] == 'none' and w['radT'] == 'MIN RNG' and 'min' in w['rad'], w)
+    await finger(pg, '#bFox'); await pg.wait_for_timeout(100)
+    w = await pg.evaluate(W)
+    ok('FOX 3 inside the minimum: MIN RANGE, nothing fired', 'MIN RANGE' in w['side'] and not w['msl'] and w['mrm'] == 1, w)
+    await shot(pg, 'a2_mrm_min_844.png')
+    # the last MRM: the SRM comes up by itself
+    await pg.evaluate(PLACE, [0, 3 * 1852, 0]); await pg.evaluate(FAST, 25)
+    await finger(pg, '#bFox'); await pg.evaluate(FAST, 10); await pg.evaluate(DRAW, 3)
+    w = await pg.evaluate(W)
+    ok('the last MRM away: the SRM is selected by itself (FOX 2, SRM x2, no swap line)', w['mrm'] == 0 and w['wpn'] == 'srm' and w['L'] == 'FOX 2' and w['N'] == 'SRM x2' and w['Wt'] == '', w)
+    await pg.evaluate(PLACE, [0, 1500, 0]); await pg.evaluate(FAST, 18); await pg.evaluate(DRAW, 3)
+    w = await pg.evaluate(W)
+    ok('the SRM: its circle again, locks with the SRM tone (not the MRM one)', ' on' in w['seek'] and ' on' not in w['rad'] and w['st'] == 'lock' and w['v'][1] > 0 and w['v'][5] == 0, w)
+    await hold_fox(pg, 650)
+    w = await pg.evaluate(W)
+    ok('no MRM left: holding FOX does not swap', w['wpn'] == 'srm', w)
+    ok('no console errors (MRM)', not pg.errs, pg.errs[:3])
+    await pg.context.close()
+    # a one type rack reads exactly as before: FOX 2, x6, no swap line; holding does nothing
+    pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuType': 'f16', 'kgeuLoadout': '{"r":"std","g":"full"}'})
+    await start_rack(pg, 'pilot', 'std')
+    await hold_fox(pg, 650)
+    w = await pg.evaluate(W)
+    ok('STANDARD: FOX 2, x6, no swap line, the hold does not swap', w['L'] == 'FOX 2' and w['N'] == 'x6' and w['Wt'] == '' and w['wpn'] == 'srm' and w['mrm'] == 0, w)
+    await pg.context.close()
+    # the small phone: the button's three lines fit, the box on the boresight
+    pg = await page(b, url, vp={'width': 568, 'height': 320}, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuType': 'f16'})
+    await start_rack(pg, 'pilot', 'mixed')
+    await pg.evaluate(PLACE, [0, 3 * 1852, 1.6]); await pg.evaluate(FAST, 6)
+    await hold_fox(pg, 650)
+    ok('568x320: the hold swaps to the MRM', await pg.evaluate(f"()=>{K}.DF.wpn") == 'mrm')
+    await pg.evaluate(PLACE, [0, 5 * 1852, 0]); await pg.evaluate(FAST, 25); await pg.evaluate(DRAW, 6)
+    fit = await pg.evaluate("()=>{const f=document.getElementById('bFox').getBoundingClientRect();return [...document.querySelectorAll('#bFox b,#bFox i,#bFox u')].every(e=>{const r=e.getBoundingClientRect();return r.left>=f.left-1&&r.right<=f.right+1&&r.top>=f.top&&r.bottom<=f.bottom})}")
+    ok('568x320: FOX 3, MRM x2 and the swap line fit inside the button', fit)
+    await shot(pg, 'a2_mrm_lock_568.png')
+    ok('no console errors (568 MRM)', not pg.errs, pg.errs[:3])
+    await pg.context.close()
+
 async def main():
     srv, url = serve()
     async with async_playwright() as p:
@@ -87,6 +196,7 @@ async def main():
         ok("Easy STANDARD with the full gun: today's Easy fight (10 FOX 2, 510 rounds, 30 flares)", s['fox'] == 10 and s['rounds'] == 510 and s['flares'] == 30, s)
         ok('no console errors (844x390)', not pg.errs, pg.errs[:3])
         await pg.context.close()
+        await mrm_section(b, url)
         # ---- the small phones ----
         for vp, nm in (({'width': 667, 'height': 375}, '667'), ({'width': 568, 'height': 320}, '568'), ({'width': 932, 'height': 430}, '932')):
             pg = await page(b, url, vp=vp, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuType': 'f16'})
