@@ -31,4 +31,10 @@ for t in ab_check; do
   echo "== $t (exit $code)"; echo "$out" | grep -E "FAIL|passed|clear|FAILS" | tail -4
   [[ $code -ne 0 ]] && fail+=("$t")
 done
+# the Arsenal against the real Worker code (server/ under wrangler dev, port 8787)
+for t in arsenal_worker_check; do
+  out=$(node tests/$t.mjs 2>&1); code=$?
+  echo "== node $t (exit $code)"; echo "$out" | grep -E "FAIL|passed" | tail -4
+  [[ $code -ne 0 ]] && fail+=("node $t")
+done
 echo; echo "FAILED: ${fail[*]:-none}"

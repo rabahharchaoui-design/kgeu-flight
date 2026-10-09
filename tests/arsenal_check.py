@@ -197,7 +197,10 @@ async def balance_section(b, url):
     await pg.evaluate(f"()=>{{const T={K}.DF.test;T.noBanditFire=true;T.mSee=0;}}")
     # flares: an SRM with the decoy forced goes for the flare, an MRM ignores it
     await pg.evaluate(FRESH); await pg.evaluate(PLACE, [0, 2500, 0]); await pg.evaluate(f"()=>{{{K}.DF.test.decoy=1;}}")
+    await pg.evaluate(f"()=>{K}.hapLog(true)")
     await pg.evaluate(FIRE, 'srm'); await pg.evaluate(FAST, 7)
+    hl = [h['n'] for h in await pg.evaluate(f"()=>{K}.hapLog(true)")]
+    ok('haptics per type: an SRM launch is the sharp double (launch), never the MRM\'s heavy launch3', 'launch' in hl and 'launch3' not in hl, hl)
     m = await pg.evaluate(MS)
     ok('control: an SRM with the flare decoy forced rolls on the bandit\'s flares (decoyed)', any(x['k'] == 'srm' and x['dec'] for x in m['msl']), m)
     await pg.evaluate(FRESH); await pg.evaluate(PLACE, [0, 3 * 1852, 0])
