@@ -57,6 +57,7 @@ async def mrm_section(b, url):
     """item 2: the MRM (FOX 3): the swap, the radar box and its tones, the lock held until it is away, min range, the kill"""
     pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuType': 'f16'})
     await start_rack(pg, 'pilot', 'mixed')
+    await pg.evaluate(f"()=>{{{K}.DF.test.mSee=0;}}")   # item 4's bandit reaction off here (balance_section covers it)
     w = await pg.evaluate(W)
     ok('MIXED (Hard): 2 SRM + 2 MRM, SRM selected first; FOX reads FOX 2, SRM x2, and the swap line MRM 2', w['fox'] == 2 and w['mrm'] == 2 and w['wpn'] == 'srm' and w['L'] == 'FOX 2' and w['N'] == 'SRM x2' and 'MRM 2' in w['Wt'], w)
     await pg.evaluate(PLACE, [0, 3 * 1852, 1.6]); await pg.evaluate(FAST, 6)   # the wave's bandit off to the side: no lock (a press with a lock fires)
@@ -177,6 +178,107 @@ async def mult_section(b, url):
     ok('no console errors (multipliers)', not pg.errs, pg.errs[:3])
     await pg.context.close()
 
+FIRE = f"""(kind)=>{{const K={K},D=K.DF,b=D.bandits[0];return K.dfShoot(b,kind);}}"""
+MS = f"""()=>{{const D={K}.DF;return {{kills:D.kills,mk:D.mKills,def:D.mDef,masks:D.masks,lr:D.lrShots,hits:D.hits,rwr:D.rwr,
+  msl:D.msl.filter(m=>m.on).map(m=>({{k:m.kind,dec:m.dec,lost:m.lost,foe:m.foe}})),calls:D.calls.slice(-6),st:D.bandits[0]&&D.bandits[0].state,flN:D.bandits[0]&&D.bandits[0].flN}}}}"""
+FRESH = f"(n)=>{{const D={K}.DF;D.gap=0;D.kc=0;D.kcB=null;document.body.classList.remove('dfKc');for(const m of D.msl)if(m.on){{m.on=false;m.mesh.g.visible=false;}}D.test.wave(n||1);}}"
+
+async def until(pg, cond_js, secs):
+    for _ in range(int(secs * 2)):
+        await pg.evaluate(FAST, 5)
+        if await pg.evaluate(cond_js): return True
+    return False
+
+async def balance_section(b, url):
+    """item 4: flares and radar missiles, the bandit's break against our MRM, terrain, the Hard long shot and its counterplay"""
+    pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuType': 'f16'})
+    await start_rack(pg, 'pilot', 'mixed')
+    await pg.evaluate(f"()=>{{const T={K}.DF.test;T.noBanditFire=true;T.mSee=0;}}")
+    # flares: an SRM with the decoy forced goes for the flare, an MRM ignores it
+    await pg.evaluate(FRESH); await pg.evaluate(PLACE, [0, 2500, 0]); await pg.evaluate(f"()=>{{{K}.DF.test.decoy=1;}}")
+    await pg.evaluate(FIRE, 'srm'); await pg.evaluate(FAST, 7)
+    m = await pg.evaluate(MS)
+    ok('control: an SRM with the flare decoy forced rolls on the bandit\'s flares (decoyed)', any(x['k'] == 'srm' and x['dec'] for x in m['msl']), m)
+    await pg.evaluate(FRESH); await pg.evaluate(PLACE, [0, 3 * 1852, 0])
+    await pg.evaluate(FIRE, 'mrm'); await pg.evaluate(FAST, 15)
+    await pg.evaluate(f"()=>{{const D={K}.DF,b=D.bandits[0];b.flN=2;b.flT=0;}}")   # the bandit pops two flares at it
+    k0 = await pg.evaluate(f"()=>{K}.DF.kills")
+    hit = await until(pg, f"()=>{K}.DF.kills>{k0}", 20)
+    m = await pg.evaluate(MS)
+    ok('flares do not spoof the MRM (decoy forced, the bandit flared): it kills', hit and m['mk'] == 1, m)
+    # the bandit sees it go active and breaks: with the beat forced, it defeats the MRM
+    await pg.evaluate(f"()=>{{const T={K}.DF.test;T.decoy=0;T.mSee=1;T.mBeat=1;T.hold=false;}}")
+    await pg.evaluate(FRESH); await pg.evaluate(PLACE, [0, 5 * 1852, 0]); await pg.evaluate(f"()=>{{{K}.DF.test.hold=false;}}")
+    await pg.evaluate(FIRE, 'mrm')
+    ev = await until(pg, f"()=>{{const D={K}.DF;return D.bandits[0].state==='EVADE'}}", 15)
+    ok('our MRM goes active 5 s out: the bandit (notice forced) breaks hard (EVADE)', ev, await pg.evaluate(MS))
+    k0 = await pg.evaluate(f"()=>{K}.DF.kills")
+    await until(pg, f"()=>{{const D={K}.DF;return D.mDef>=1||D.kills>{k0}||!D.msl.some(m=>m.on&&!m.foe)}}", 20)
+    m = await pg.evaluate(MS)
+    ok('in the last 2 s the hard break beats it (beat forced): no kill, the missile flies on, "He beat it"', m['def'] == 1 and m['kills'] == k0 and 'mrmMiss' in m['calls'], m)
+    # the same with the beat refused: the hard break alone does not save him
+    await pg.evaluate(f"()=>{{const T={K}.DF.test;T.mBeat=0;}}")
+    await pg.evaluate(FRESH); await pg.evaluate(PLACE, [0, 5 * 1852, 0]); await pg.evaluate(f"()=>{{{K}.DF.test.hold=false;}}")
+    k0 = await pg.evaluate(f"()=>{K}.DF.kills")
+    await pg.evaluate(FIRE, 'mrm')
+    await until(pg, f"()=>{{const D={K}.DF;return D.kills>{k0}||!D.msl.some(m=>m.on&&!m.foe)}}", 25)
+    m = await pg.evaluate(MS)
+    ok('beat refused: the MRM gets him through his break', m['kills'] == k0 + 1, m)
+    # terrain: a target under the ridge line breaks the radar missile's track
+    ok('dfMask: a line through the ground is masked, one high above is not', await pg.evaluate(f"""()=>{{const K={K},s=K.state(),V=THREE.Vector3;
+      const a=new V(s.pos.x,s.pos.y,s.pos.z),lo=new V(s.pos.x+3000,-3000,s.pos.z),hi=new V(s.pos.x+3000,s.pos.y,s.pos.z);return K.dfMask(a,lo)&&!K.dfMask(a,hi)}}"""))
+    await pg.evaluate(f"()=>{{const T={K}.DF.test;T.mSee=0;T.mBeat=0;T.hold=true;}}")
+    await pg.evaluate(FRESH); await pg.evaluate(PLACE, [0, 4 * 1852, 0])
+    k0 = await pg.evaluate(f"()=>{K}.DF.kills")
+    await pg.evaluate(FIRE, 'mrm'); await pg.evaluate(FAST, 2)
+    await pg.evaluate(f"()=>{{const D={K}.DF,b=D.bandits[0];b.p.y=-2500;}}")   # the target behind (under) the terrain
+    await pg.evaluate(FAST, 5)
+    m = await pg.evaluate(MS)
+    ok('terrain between the MRM and its target: the track is lost (masks 1), no kill', m['masks'] >= 1 and m['kills'] == k0, m)
+    ok('no console errors (balance, ours)', not pg.errs, pg.errs[:3])
+    await pg.context.close()
+    # ---- the bandits' long shot (Hard) ----
+    pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuType': 'f16', 'kgeuLoadout': '{"r":"std","g":"full"}'})
+    await start_rack(pg, 'pilot', 'std')
+    HEAD_ON = f"""(d)=>{{const K={K},s=K.state(),D=K.DF,b=D.bandits[0],n=new THREE.Vector3(0,0,-1).applyQuaternion(s.quat);D.test.hold=true;
+      b.p.copy(s.pos).addScaledVector(n,d);b.hdg=Math.atan2(-n.x,n.z);b.gam=0;b.bank=0;b.spd=230;b.state='TURN';b.st=0;b.alive=true;b.cool=0;
+      b.v.set(Math.sin(b.hdg),0,-Math.cos(b.hdg)).multiplyScalar(b.spd);}}"""
+    await pg.evaluate(f"()=>{{const D={K}.DF;D.test.noBanditFire=false;D.test.lr=1;D.wave=2;D.gap=0;D.test.wave(1);D.waveT=10;}}")
+    lr = await pg.evaluate(f"()=>{K}.DF.bandits[0].lr")
+    ok('Hard, wave 2 (long shot forced): the bandit carries the long shot', lr == 1, lr)
+    await pg.evaluate(HEAD_ON, 7 * 1852)
+    await pg.evaluate(FAST, 10)
+    m = await pg.evaluate(MS)
+    ok('7 nm head on: its long range radar is on us (our warning reads search)', m['rwr'] == 'search', m)
+    await pg.evaluate(FAST, 22)
+    m = await pg.evaluate(MS)
+    ok('7 nm head on, us in its nose: its radar locks (our warning reads lock), out past the normal 4 nm', m['rwr'] in ('lock', 'launch'), m)
+    fired = await until(pg, f"()=>{K}.DF.lrShots>=1", 6)
+    m = await pg.evaluate(MS)
+    ok('after its wait: the long shot (a radar missile, emrm), the launch warning and the radar call', fired and any(x['k'] == 'emrm' for x in m['msl']) and m['rwr'] == 'launch' and 'launchLr' in m['calls'], m)
+    await pg.evaluate(f"()=>{{const D={K}.DF;D.test.decoy=1;{K}.dfPFlare(false);}}")
+    m = await pg.evaluate(MS)
+    ok('FLARES (decoy forced) do not fool it', any(x['k'] == 'emrm' and not x['dec'] for x in m['msl']), m)
+    await shot(pg, 'a4_longshot_844.png')
+    # BREAK when it is close: the hard turn beats its 20 g in the end game
+    near = await until(pg, f"""()=>{{const K={K},D=K.DF,s=K.state();const m=D.msl.find(m=>m.on&&m.kind==='emrm');if(!m)return true;
+      const R=m.p.distanceTo(s.pos);return R<2600}}""", 30)
+    await pg.evaluate(f"()=>{{const D={K}.DF;D.brkCd=0;D.brk=0;{K}.dfBreak();}}")
+    await until(pg, f"()=>{{const D={K}.DF;return !D.msl.some(m=>m.on&&m.kind==='emrm'&&!m.lost)}}", 12)
+    m = await pg.evaluate(MS)
+    ok('BREAK as it closes: the long shot overshoots (lost), no hit', near and m['hits'] == 0, m)
+    ok('no console errors (long shot)', not pg.errs, pg.errs[:3])
+    # Easy never sees one
+    await pg.evaluate(f"()=>{{const K={K};K.setSkill('rookie');}}")
+    n = await pg.evaluate(f"()=>{{const D={K}.DF;D.test.lr=null;let n=0;for(let i=0;i<40;i++){{D.wave=2+(i%3);D.test.wave(2);n+=D.bandits.filter(b=>b.lr).length;}}return n}}")
+    ok('Easy: 40 waves from wave 2 on, never a long shot', n == 0, n)
+    await pg.evaluate(f"()=>{{const K={K};K.setSkill('pilot');}}")
+    n = await pg.evaluate(f"()=>{{const D={K}.DF;D.test.lr=null;let n=0;for(let i=0;i<200;i++){{D.wave=2+(i%3);D.test.wave(2);n+=D.bandits.filter(b=>b.lr).length;}}return n}}")
+    ok('Hard: about 6 waves in 10 from wave 2 carry one (200 waves: 90 to 150)', 90 <= n <= 150, n)
+    n = await pg.evaluate(f"()=>{{const D={K}.DF;let n=0;for(let i=0;i<50;i++){{D.wave=1;D.test.wave(1);n+=D.bandits.filter(b=>b.lr).length;}}return n}}")
+    ok('Hard wave 1: never', n == 0, n)
+    await pg.context.close()
+
 async def main():
     srv, url = serve()
     async with async_playwright() as p:
@@ -238,6 +340,7 @@ async def main():
         await pg.context.close()
         await mrm_section(b, url)
         await mult_section(b, url)
+        await balance_section(b, url)
         # ---- the small phones ----
         for vp, nm in (({'width': 667, 'height': 375}, '667'), ({'width': 568, 'height': 320}, '568'), ({'width': 932, 'height': 430}, '932')):
             pg = await page(b, url, vp=vp, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuType': 'f16'})

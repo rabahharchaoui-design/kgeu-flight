@@ -11541,7 +11541,7 @@ function arcScore(id){
 const DF_KT0=250,DF_KT1=480,DF_G=7,DF_FLOOR=6000,DF_LOD=2*1852,DF_SPLINTER=['#5b7591','#8a9aab','#3e4e63'];
 // the waves ramp (dogfight2 item 4): the bandits' speed and g factors, their reaction time (on the overshoot wait), how
 // often they make the mistake (on cfg.mist) and the extra seconds their radar needs to lock, wave 1 to 4
-const DF_RAMP={spd:[0.9,0.94,0.97,1],g:[0.82,0.9,0.96,1],react:[1.6,1.3,1.1,1],mist:[1,0.85,0.7,0.55],rLock:[1.5,1,0.5,0]};
+const DF_RAMP={spd:[0.9,0.94,0.97,1],g:[0.82,0.9,0.96,1],react:[1.6,1.3,1.1,1],mist:[1,0.85,0.7,0.55],rLock:[1.5,1,0.5,0],beat:[0.8,0.9,1,1.1]};
 const dfWv=k=>DF_RAMP[k][clamp((DF.wave|0)-1,0,3)];
 // the g a wing like ours lifts at this indicated speed (CLmax 1.8, the bandits fly the same jet): 9 g at 345 KIAS
 const dfGLift=kt=>9*(kt/345)*(kt/345);
@@ -11607,8 +11607,11 @@ function dfWave(n){
     if(Math.abs(wrapPi(Math.atan2(x-st.pos.x,-(z-st.pos.z))-ph))>1.22){const d2=3.5*1852;x=st.pos.x+Math.sin(ph)*d2;z=st.pos.z-Math.cos(ph)*d2;}
     b.p.set(x,dfY(12000+dfR()*6000),z);b.hdg=Math.atan2(st.pos.x-x,-(st.pos.z-z));b.gam=0;b.bank=0;
     b.spd=dfTAS(440*DF.cfg().spd*dfWv('spd'),b.p.y);b.alive=true;b.fall=false;b.state='MERGE';b.hp=1;b.st=0;b.i=i;b.abOn=0;b.flN=0;b.flT=0;b.spk=0;b.rw=0;b.rwT=0;b.rwD=0;b.rwOut=0;b.cd=0;b.vr=0;b.vrB=0;b.vrN=0;b.six=0;
-    b.ov=0;b.ovT=0;b.ovRoll=false;b.cool=0;b.errT=0;b.errX=0;b.gP=1;
+    b.ov=0;b.ovT=0;b.ovRoll=false;b.cool=0;b.errT=0;b.errX=0;b.gP=1;b.lr=0;b.lrT=0;b.lrD=0;b.lrUsed=0;
     b.g.visible=true;b.body.visible=true;if(b.can)b.can.visible=true;dfPose(b);DF.bandits.push(b);}
+  // item 4: from wave 2, in Hard, one bandit of the wave may carry a long shot (DF.test.lr: 1 always, 0 never)
+  const c=DF.cfg(),T=DF.test,lr=T.lr===1?1:T.lr===0?0:DF.wave>=2&&dfR2()<c.lrP?1:0;
+  if(lr&&DF.bandits.length){const b=DF.bandits[0];b.lr=1;b.lrD=c.lrDel[0]+dfR2()*(c.lrDel[1]-c.lrDel[0]);}
 }
 function dfPose(b){
   b.v.set(Math.sin(b.hdg)*Math.cos(b.gam),Math.sin(b.gam),-Math.cos(b.hdg)*Math.cos(b.gam)).multiplyScalar(b.spd);
@@ -11784,7 +11787,7 @@ function dfStart(o){
   Object.assign(DF,{on:true,live:true,done:false,wave:1,t:DF.ROUND,bank:[],kills:0,gunKills:0,hits:0,clearT:0,fightT:0,flares:DF_FLARES,won:false,out:0,gap:0,why:'',
     rwr:'none',flareSaves:0,dmg:0,inv:0,deckG:0,below:0,puT:0,wTxt:'',ej:false,ejWhy:'',eShots:0,breaks:0,smk:0,paOk:false,
     tally:false,sixCallT:-99,altT:-99,ckRec:null,pic:null,gv:0,ach:[],sc:null,daily:daily,seed:daily?todayKey():null,lb:'',
-    ovs:0,revs:0,brk:0,brkCd:0,brks:0,revT:0,bankPk:0,lvlT:0,mShots:0,mKills:0,mAbort:0,rel:null});DF.pend.length=0;
+    ovs:0,revs:0,brk:0,brkCd:0,brks:0,revT:0,bankPk:0,lvlT:0,mShots:0,mKills:0,mAbort:0,rel:null,mDef:0,masks:0,lrShots:0});DF.pend.length=0;
   dfSeed(DF.test.seed!=null?DF.test.seed:DF.seed);
   for(const b of DF.pool){b.alive=false;b.fall=false;b.g.visible=false;}
   // the air is the fight's: the tower and the chatter go quiet (vqAdd drops them), the subtitle moves to the bottom strip
@@ -11989,15 +11992,20 @@ function dfStop(){
 // Arsenal item 2, the MRM (FOX 3, the AIM-120 style radar missile): mCone: the radar's lock box, degrees off the nose (the
 // bandit between DF_MRM_MIN and DF_MRM_MAX); mLock: seconds in the box to lock; mRel: seconds the lock must be held after
 // FOX 3 until the missile is away (the shot aborts if it drops); mG: its g limit (the SRM pulls 30).
+// Arsenal item 4, the balance: flares never decoy a radar missile (ours or theirs). mSee: the chance a bandit notices our
+// MRM when it goes active (DF_PIT seconds to go) and breaks hard; mBeat: the chance that hard break beats it in the last
+// 2 s (times the wave's beat ramp). Terrain between a radar missile and its target breaks its track (dfMask). lrP: the
+// chance a wave (from wave 2) has one bandit carrying a long shot, a radar missile fired from 4 to 8 nm after lrLock s
+// locked (plus a wait in lrDel), at most once a wave, lrG its g (so a BREAK or hard turn at the end beats it); Hard only.
 const DF_CFG={
   hard:{seek:6,lock:1.5,fox:6,decoy:0.3,decoyRear:0.1,flares:2,gunR:12,gunKill:0.35,spd:1,g:1,
     rLock:3,rDel:[2,4],rCd:12,eMax:2,eG:25,flrGood:0.65,flrEarly:0.25,flrG:0.15,autoFlr:0,gLim:9,eDrag:0.13,eAB:6,gv:1,turnT:25,extR:2,six:14,spread:0.6,outT:10,
     bBleed:0.2,ovG:5.5,ovT:0.8,mist:0.7,cool:6,err:0.08,brkCd:8,brkT:1.6,
-    mCone:10,mLock:2,mRel:0.8,mG:25},
+    mCone:10,mLock:2,mRel:0.8,mG:25,mSee:0.75,mBeat:0.5,lrP:0.6,lrLock:3,lrDel:[1,3],lrG:20},
   easy:{seek:11,lock:0.8,fox:10,decoy:0.1,decoyRear:0,flares:2,gunR:20,gunKill:0.2,spd:0.8,g:0.75,
     rLock:5,rDel:[4,6],rCd:20,eMax:1,eG:18,flrGood:0.85,flrEarly:0.25,flrG:0.15,autoFlr:2,gLim:9,eDrag:0,eAB:0,gv:0,turnT:10,extR:1,six:6,spread:0.3,outT:20,ezTurn:1,
     bBleed:0.22,ovG:4.2,ovT:0.45,mist:0.95,cool:9,err:0.22,brkCd:6,brkT:2.4,assist:4,
-    mCone:16,mLock:1.2,mRel:0.5,mG:28}};
+    mCone:16,mLock:1.2,mRel:0.5,mG:28,mSee:0.5,mBeat:0.3,lrP:0,lrLock:4,lrDel:[2,4],lrG:20}};
 DF.cfg=()=>rookie()?DF_CFG.easy:DF_CFG.hard;
 // ================= the Arsenal (arsenal items 1 to 3) =================
 // The loadout card between the briefing and FIGHT'S ON: a rack (missiles and flares) and the gun's ammo. Counts are
@@ -12061,18 +12069,24 @@ function arsOpen(){if(!DF.brief)return;$('dfBrief').classList.remove('on');
 // the run's dice: spawns, the bandits' choices and waits, every decoy roll. DF.test.seed (a number) makes each run the
 // same (dfStart seeds it); null is Math.random
 let dfRnd=Math.random;const dfR=()=>dfRnd();
-function dfSeed(n){if(n===null||n===undefined){dfRnd=Math.random;return;}let a=n>>>0;
-  dfRnd=()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
+// dfR2 (arsenal item 4): a second stream for the radar missiles' dice (the long shots, a bandit noticing and beating an MRM),
+// so a seeded fight flown with today's stores rolls the same dice as before
+let dfRnd2=Math.random;const dfR2=()=>dfRnd2();
+function dfSeed(n){if(n===null||n===undefined){dfRnd=Math.random;dfRnd2=Math.random;return;}
+  const mk=a=>()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};
+  dfRnd=mk(n>>>0);dfRnd2=mk((n^0x5bd1e995)>>>0);}
 // seek.state 'none' | 'search' (the growl) | 'lock' (the tone); test: noDecoy / decoy=1 force the flare roll (both sides'),
 // hold flies bandits straight, noBanditFire keeps the bandits' radars and missiles off, launchAt() makes bandit 0 shoot now.
 // rwr: the radar warning, 'none' | 'search' | 'lock' | 'launch'. pa: our own acceleration (smoothed), for the missiles' end game.
-Object.assign(DF,{fox:6,mrm:0,wpn:'srm',rel:null,mShots:0,mKills:0,mAbort:0,lo:null,flr0:30,rounds:510,seek:{state:'none',b:null,t:0,out:0},test:{noBrief:false,seed:null,wave:n=>dfWave(n),noDecoy:false,decoy:0,hold:false,noBanditFire:false,miss:false,noMiss:false,launchAt:()=>{const b=DF.bandits[0];if(b&&b.alive)dfLaunch(b);}},gunHeld:false,firing:false,
+Object.assign(DF,{fox:6,mrm:0,wpn:'srm',rel:null,mShots:0,mKills:0,mAbort:0,mDef:0,masks:0,lrShots:0,lo:null,flr0:30,rounds:510,seek:{state:'none',b:null,t:0,out:0},test:{noBrief:false,seed:null,wave:n=>dfWave(n),noDecoy:false,decoy:0,hold:false,noBanditFire:false,miss:false,noMiss:false,lr:null,mSee:null,mBeat:null,launchAt:()=>{const b=DF.bandits[0];if(b&&b.alive)dfLaunch(b);}},gunHeld:false,firing:false,
   gunCallT:-99,trAcc:0,kc:0,kcB:null,kcO:new V3(),lastCall:'',calls:[],shots:0,noLock:0,side:1,msl:[],trc:[],flr:[],wBuilt:false,
   rwr:'none',flareSaves:0,dmg:0,inv:0,deckG:0,below:0,puT:0,wTxt:'',ej:false,ejWhy:'',waveT:0,autoLeft:0,eShots:0,breaks:0,smk:0,
   pa:new V3(),pv:new V3(),paOk:false,subT:0,subAge:9,ovs:0,revs:0,brk:0,brkCd:0,brks:0,brkX:1,revT:0,bankPk:0,lvlT:0,six6:false,sixK:0,pdT:new V3(),pdO:new V3(),
   brief:false,pend:[],vlog:[],ckRec:null,pic:null,bbSaid:false,sixT:0,sixCallT:-99,tally:false,altT:-99});
 // the MRM: lock from 1 to 10 nm, a 4 s motor adding Mach 3, a long glide (less drag), 30 s of flight, guided after 0.5 s
 const DF_MRM_MIN=1852,DF_MRM_MAX=10*1852,DF_MRM_MACH=3*300,DF_MRM_BURN=4,DF_MRM_T=30,DF_MRM_DRAG=0.02,DF_MRM_GO=0.5;
+// item 4: the MRM goes active 5 s out; a bandit's long shot: 4 to 8 nm, 24 s of flight
+const DF_PIT=5,DF_LR_R=8*1852,DF_LR_T=24;
 const DF_ROUNDS=510,DF_RPS=100,DF_VB=1030,DF_SEEK_R=5*1852,DF_MACH=2.5*300,DF_BURN=2.2,DF_MSL_T=12,DF_FUZE=15,DF_MSL_G=30*9.81,DF_PN=4;
 // FLR 32: both sides' flares (a bandit pops 2 a missile, a FLARES tap 2) from one pool. The enemy missile: 10 s of
 // flight, a 20 m fuze. KREQ: in its last 2 s it needs about 5.6 times our acceleration across its line of sight to stay
@@ -12190,12 +12204,14 @@ function dfFlareAt(p,v){
 function dfFlare(b){
   dfFlareAt(b.p,b.v);
   const c=DF.cfg(),T=DF.test;
-  for(const m of DF.msl){if(!m.on||m.b!==b||m.rolled)continue;m.rolled=true;
+  for(const m of DF.msl){if(!m.on||m.b!==b||m.rolled||m.kind==='mrm')continue;m.rolled=true;   // a radar missile ignores flares (item 4)
     // turning hard across the missile's line of sight: banked past 50 degrees, flying more across it than along it
     _dfA.copy(b.p).sub(m.p).normalize();_dfB.copy(b.v).normalize();const across=Math.abs(b.bank)>0.87&&_dfC.crossVectors(_dfA,_dfB).length()>0.5;
     const p=T.noDecoy?0:T.decoy?1:m.rear?c.decoyRear:across?c.decoy:c.decoy*0.5;
     if(dfR()<p){m.dec=true;m.b=null;m.decT=2.5;}}
 }
+// terrain between a and b (item 4): seven points along the line, any under the ground (20 m)
+function dfMask(a,b){for(let k=1;k<8;k++){const t=k/8,x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t;if(a.y+(b.y-a.y)*t<groundHeight(x,z)+20)return true;}return false;}
 // a missile ends: hidden, with a small airburst when it self destructs
 function dfMslEnd(m,burst){m.on=false;m.b=null;m.fl=null;m.mesh.g.visible=false;m.mesh.glow.material.opacity=0;
   if(burst)explode(m.p.x,m.p.y,m.p.z,{scale:0.18,air:true,glow:false,smokeSec:2,boomDelay:camera.position.distanceTo(m.p)/340});}
@@ -12207,7 +12223,7 @@ function dfMsl(m,h,back){
   const B=m.burn||DF_BURN,MA=m.mach||DF_MACH,GO=m.go||0.2;   // the motor, the glide and when guidance starts (an MRM's own, arsenal item 2)
   if(m.t>0.15&&m.t<B+0.15)sp=Math.min(m.v0+MA,sp+MA/B*h);else if(m.t>=B+0.15)sp*=Math.exp(-(m.drag||0.05)*h);
   let tp=null,tv=null;
-  if(!m.foe){if(m.b&&m.b.alive){tp=m.b.p;tv=m.b.v;}}
+  if(!m.foe){if(m.b&&m.b.alive&&!m.lost){tp=m.b.p;tv=m.b.v;}}
   else if(m.dec){if(m.fl&&m.fl.on){tp=m.fl.p;tv=m.fl.v;}}
   else if(!m.lost&&!DF.ej){tp=st.pos;tv=st.vel;}
   if(tp&&m.t>GO){
@@ -12222,6 +12238,12 @@ function dfMsl(m,h,back){
       if(tgo<2&&tgo>0.3&&Math.hypot(ax,ay,az)*DF_KREQ>m.g)m.lt+=h;else m.lt=0;
       if(m.lt>0.25||(vc<0&&m.t>1.5&&R>DF_EFUZE)){m.lost=true;m.lostT=0.8;DF.breaks++;tp=null;}
     }
+    // our MRM (item 4): active DF_PIT s out, the bandit may see it and break hard (mSee); in the last 2 s a bandit in that
+    // hard break (over 2.5 g) may beat it (mBeat times the wave's ramp): it flies on past and self destructs
+    if(!m.foe&&m.kind==='mrm'&&tp){const R=Math.sqrt(r2),vc=-(_dfA.x*_dfB.x+_dfA.y*_dfB.y+_dfA.z*_dfB.z)/R,tgo=vc>1?R/vc:99,b=m.b,c=DF.cfg(),T=DF.test;
+      if(!m.pit&&tgo<DF_PIT){m.pit=true;if(T.mSee===1||(T.mSee!==0&&dfR2()<c.mSee)){b.state='EVADE';b.st=-1.5;}}
+      if(m.pit&&!m.beat&&tgo<2&&tgo>0.3){m.beat=true;
+        if(b.state==='EVADE'&&b.gP>2.5&&(T.mBeat===1||(T.mBeat!==0&&dfR2()<c.mBeat*dfWv('beat')))){m.lost=true;m.lostT=0.8;DF.mDef++;tp=null;dfCall('mrmMiss',null,{ttl:2});}}}
     if(tp){
       _dfC.crossVectors(_dfA,_dfB).divideScalar(r2);_dfC.crossVectors(_dfC,m.v).multiplyScalar(DF_PN);
       const a=_dfC.length();if(a>m.g)_dfC.multiplyScalar(m.g/a);
@@ -12244,15 +12266,17 @@ function dfMsl(m,h,back){
 function dfTti(m){const dx=st.pos.x-m.p.x,dy=st.pos.y-m.p.y,dz=st.pos.z-m.p.z,R=Math.hypot(dx,dy,dz)||1,
   vc=-(dx*(st.vel.x-m.v.x)+dy*(st.vel.y-m.v.y)+dz*(st.vel.z-m.v.z))/R;return vc>1?R/vc:99;}
 // a bandit shoots: a missile off its wing rail at us; RWR goes to launch, the cockpit call
-function dfLaunch(b){
+// kind 'emrm' (item 4): a long shot, the radar missile (lrG, the MRM's motor and glide, flares do not decoy it)
+function dfLaunch(b,kind){
   let m=null;for(const x of DF.msl)if(!x.on){m=x;break;}if(!m)return false;
-  const c=DF.cfg();b.side=-(b.side||1);
+  const c=DF.cfg(),lr=kind==='emrm';b.side=-(b.side||1);
   m.on=true;m.foe=true;m.b=null;m.fl=null;m.t=0;m.dec=false;m.decT=0;m.rolled=false;m.smk=0;m.lost=false;m.lostT=0;m.lt=0;m.pf=false;
-  m.g=c.eG*9.81;m.tMax=DF_EMSL_T;m.v0=b.spd;m.rear=false;m.src=b;m.kind='esrm';m.burn=DF_BURN;m.mach=DF_MACH;m.drag=0.05;m.go=0.2;m.pit=false;m.beat=false;m.mesh.g.scale.set(1,1,1);
+  m.g=(lr?c.lrG:c.eG)*9.81;m.tMax=lr?DF_LR_T:DF_EMSL_T;m.v0=b.spd;m.rear=false;m.src=b;m.kind=lr?'emrm':'esrm';m.burn=lr?DF_MRM_BURN:DF_BURN;m.mach=lr?DF_MRM_MACH:DF_MACH;
+  m.drag=lr?DF_MRM_DRAG:0.05;m.go=lr?DF_MRM_GO:0.2;m.pit=false;m.beat=false;m.mk=0;m.mesh.g.scale.set(1,1,lr?1.3:1);if(lr)DF.lrShots++;
   m.p.set(b.side*4.6,-0.25,0.4).applyQuaternion(b.g.quaternion).add(b.p);m.v.set(0,-5,0).applyQuaternion(b.g.quaternion).add(b.v);
   m.mesh.g.visible=true;m.mesh.g.position.copy(m.p);m.mesh.glow.material.opacity=0;
   b.cd=st.time+c.rCd;DF.eShots++;DF.rwr='launch';
-  dfCall('launch');hapPattern('launch');
+  dfCall(lr?'launchLr':'launch');hapPattern('launch');
   // about 4 in 10: the wingman calls the break, away from the side the shot came from, a second after the warning
   if(dfR()<0.4){_dfE.setFromQuaternion(st.quat,'YXZ');const rel=wrapPi(Math.atan2(b.p.x-st.pos.x,-(b.p.z-st.pos.z))+_dfE.y);DF.pend.push({t:1,id:rel>0?'breakL':'breakR'});}
   return true;
@@ -12274,6 +12298,9 @@ function dfWeap(dt){
   if(!DF.wBuilt)return;
   for(const b of DF.bandits){if(b.alive&&b.flN>0){b.flT-=dt;if(b.flT<=0){b.flN--;b.flT=0.55;dfFlare(b);}}}
   for(const m of DF.msl){if(!m.on)continue;
+    // a radar missile (ours or a long shot) with terrain between it and its target loses the track (item 4), checked 4 times a second
+    if((m.kind==='mrm'||m.kind==='emrm')&&!m.lost&&!m.dec){m.mk=(m.mk||0)-dt;if(m.mk<=0){m.mk=0.25;const tg=m.foe?st.pos:m.b&&m.b.alive?m.b.p:null;
+      if(tg&&dfMask(m.p,tg)){m.lost=true;m.lostT=0.8;DF.masks++;}}}
     const n=Math.max(1,Math.ceil(dt*120));for(let i=0;i<n&&m.on;i++)dfMsl(m,dt/n,dt*(n-1-i)/n);
     if(!m.on)continue;
     const burn=m.t>0.15&&m.t<(m.burn||DF_BURN)+0.15;m.mesh.glow.material.opacity=burn?0.85+0.15*Math.sin(m.t*50):0;
@@ -12303,6 +12330,12 @@ function dfDef(dt){
     if(!b.alive||quiet||b.cool>0){b.rw=0;b.rwT=0;continue;}
     const dx=st.pos.x-b.p.x,dy=st.pos.y-b.p.y,dz=st.pos.z-b.p.z,r=Math.hypot(dx,dy,dz)||1;
     const cone=r<DF_RWR_R&&(dx*b.v.x+dy*b.v.y+dz*b.v.z)/(r*Math.max(1,b.spd))>DF_RWR_COS;   // us within 30 deg of its nose, inside 4 nm
+    // the long shot (item 4): us in the same 30 degrees from 4 to 8 nm, held lrLock s (its lock lights our warning), then
+    // after its wait the one radar missile; turning out of its nose drops the lock
+    if(b.lr&&!b.lrUsed&&!cone&&r>=DF_RWR_R&&r<DF_LR_R&&(dx*b.v.x+dy*b.v.y+dz*b.v.z)/(r*Math.max(1,b.spd))>DF_RWR_COS){b.lrT+=dt;const k=b.lrT>=c.lrLock?2:1;if(k>rw)rw=k;
+      if(b.lrT>=c.lrLock+b.lrD&&st.time>=b.cd&&!(b.vr>0)&&nf<c.eMax&&DF.waveT>=DF_QUIET_T){if(dfLaunch(b,'emrm')){nf++;b.lrUsed=1;}}
+      continue;}
+    else if(b.lr)b.lrT=Math.max(0,b.lrT-dt*2);
     if(!cone){if(b.rw){b.rwOut+=dt;if(b.rwOut>0.6){b.rw=0;b.rwT=0;}}continue;}
     b.rwOut=0;if(!b.rw){b.rw=1;b.rwT=0;}b.rwT+=dt;
     if(b.rw===1&&b.rwT>=c.rLock+dfWv('rLock')){b.rw=2;b.rwT=0;b.rwD=c.rDel[0]+dfR()*(c.rDel[1]-c.rDel[0]);}
@@ -12340,6 +12373,7 @@ function dfPFlare(auto){
   dfPop();DFH.flPop=0.15;$('bFlr').classList.add('pop');
   const c=DF.cfg(),T=DF.test;let saved=false;
   for(const m of DF.msl){if(!m.on||!m.foe||m.dec||m.lost)continue;m.pf=true;
+    if(m.kind==='emrm')continue;   // a radar missile ignores flares (item 4): turn hard or BREAK
     const tti=dfTti(m);let p=auto?1:T.noDecoy?0:T.decoy?1:tti<0.4?0:tti<=2.5?c.flrGood:c.flrEarly;if(!auto&&st.gload>4)p+=c.flrG;
     if(dfR()<p){m.dec=true;m.fl=f;m.decT=2.5;saved=true;}}
   if(auto)dfCall('autoflare');
@@ -12402,6 +12436,8 @@ const DF_V={
   goodkill:['w',['d_w_goodkill'],'Good kill!','Nice shot!'],
   gunkill:['w',['d_w_goodkill'],'Good kill!','Great shooting!'],
   launch:['c',['d_c_launch'],'Missile launch','Missile! Tap FLARES, turn hard!'],
+  launchLr:['c',['d_c_launch'],'Missile launch, radar','Radar missile! Flares won\'t fool it: BREAK when it\'s close!'],
+  mrmMiss:['w',null,'He beat it','He dodged the radar missile!'],
   breakR:['w',['d_w_break_r'],'Break right!','Turn hard right!'],
   breakL:['w',['d_w_break_l'],'Break left!','Turn hard left!'],
   six:['w',['d_w_six'],'He\'s on your six!','Enemy behind you!'],
@@ -16620,7 +16656,7 @@ window.__kgeu.TCAS={levels:tcasLevels,state:()=>({ta:TCAS.list.some(o=>tcasLvl(o
 window.__kgeu.tcasConflict=tcasConflict;window.__kgeu.tcasVoiceLog=TCAS.voiceLog;
 window.__kgeu.LB=LB;try{LB.boot();}catch(e){console.warn('leaderboards',e);}
 // the Red Flag Dogfight (5.1)
-Object.assign(window.__kgeu,{dfScore:dfScore,dfStars:dfStars,dfGrade:dfGrade,dfAch:dfAch,dfPFlare:dfPFlare,ACH:ACH,SCORE:SCORE,scoreOf:scoreOf,DF:DF,DFM:DFM,dfStart:dfStart,dfKill:dfKill,dfHit:dfHit,dfEnd:dfEnd,dfStop:dfStop,dfFox:dfFox,dfCall:dfCall,DF_CFG:DF_CFG,dfWv:dfWv,DF_RAMP:DF_RAMP,dfBreak:dfBreak,musicTitle:musicTitle,ARS:ARS,ARS_RACKS:ARS_RACKS,ARS_GUNS:ARS_GUNS,arsLo:arsLo,arsPick:arsPick,arsApply:arsApply,arsOpen:arsOpen,dfWsel:dfWsel,dfWcycle:dfWcycle,dfShoot:dfShoot,DFA:DFA});
+Object.assign(window.__kgeu,{dfScore:dfScore,dfStars:dfStars,dfGrade:dfGrade,dfAch:dfAch,dfPFlare:dfPFlare,ACH:ACH,SCORE:SCORE,scoreOf:scoreOf,DF:DF,DFM:DFM,dfStart:dfStart,dfKill:dfKill,dfHit:dfHit,dfEnd:dfEnd,dfStop:dfStop,dfFox:dfFox,dfCall:dfCall,DF_CFG:DF_CFG,dfWv:dfWv,DF_RAMP:DF_RAMP,dfBreak:dfBreak,musicTitle:musicTitle,ARS:ARS,ARS_RACKS:ARS_RACKS,ARS_GUNS:ARS_GUNS,arsLo:arsLo,arsPick:arsPick,arsApply:arsApply,arsOpen:arsOpen,dfWsel:dfWsel,dfWcycle:dfWcycle,dfShoot:dfShoot,DFA:DFA,dfMask:dfMask,dfLaunch:dfLaunch});
 Object.defineProperty(window.__kgeu,'audioSessionSet',{get:()=>AUD_SESS,configurable:true});   // 5.4: navigator.audioSession set to playback
 // world regions (4.6a)
 Object.assign(window.__kgeu,{flySub:flySub,CHAT_R:CHAT_R,APTS:APTS,PLACES:PLACES,TERRAIN:TERRAIN,LANDMARKS:LANDMARKS,locShow:locShow,REGION:REGION,REGIONS:REGIONS,WORLD:WORLD,pickRegion:pickRegion,isWater:isWater,TERR:TERR,RUNWAYS:RUNWAYS,WB:WB,AL:AL,OBST:OBST,TKY:TKY,PARIS:PARIS,RIO:RIO,CITYBB:CITYBB,buildCityBillboard:buildCityBillboard,
