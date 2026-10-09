@@ -483,6 +483,56 @@ body.dfOn #uiroot > #dfSub{ display:flex; }
 #dfSub span.sm{ font-size:12px; padding:4px 6px; letter-spacing:-.01em; } #dfSub span.xs{ font-size:11px; padding:4px 5px; letter-spacing:-.02em; }   /* dfSay: a long line steps down to fit */
 @media (max-width:600px){ #uiroot > #dfSub{ right:calc(var(--padR) + var(--col) + 192px); } }   /* BREAK stacks over GUN there (see the cluster) */
 /* the briefing card before each run: the sim is held under it, FIGHT'S ON starts the run (and unlocks audio) */
+/* ---------- Taskings (tasking item 1) ----------
+   The briefing: the aircraft at its start behind it, the sim held. Kicker, name, aircraft and where; the situation and
+   its facts (par, wind, target) left, the numbered objectives right; ACCEPT TASKING where the dogfight's FIGHT'S ON is.
+   The replies: one or two buttons in the top bar right of pause (the centre column is 124 px at 568 wide and clipped
+   to one line on an approach), in the order read: the call under pause, the answer beside it. They come in from
+   .96 with the fade (180 ms, ease out), press to .97; nothing hovers on a phone. */
+#tkBrief{ z-index:30; }
+#tkBrief .sheet{ max-width:640px; padding:12px 18px 14px; background:rgba(18,13,9,.95); text-align:left; max-height:calc(var(--vvh) - 16px); overflow-y:auto; overscroll-behavior:contain; }
+#tkBrief .tkK{ margin:0; font:800 11px var(--font); letter-spacing:.14em; color:var(--orange); text-align:center; }
+#tkBrief h3{ margin:1px 0 0; font:800 24px/1.1 var(--font); letter-spacing:.06em; color:var(--sand); text-align:center; }
+#tkBrief h3 .modeTag{ vertical-align:4px; }
+#tkBrief .tkAc{ margin:2px 0 0; font-size:13px; color:var(--soft); text-align:center; }
+#tkBrief .tkBody{ display:grid; grid-template-columns:1.1fr 1fr; gap:10px 14px; margin:10px 0 8px; }
+#tkBrief .tkSit{ margin:0; font-size:14px; line-height:1.35; color:#fff; }
+#tkBrief .tkF{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+#tkBrief .tkF span{ display:flex; flex-direction:column; padding:4px 9px 5px; border-radius:9px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); }
+#tkBrief .tkF b{ font:800 10px var(--font); letter-spacing:.1em; color:var(--caution); }
+#tkBrief .tkF i{ font:700 15px/1.15 var(--font); font-style:normal; color:#fff; font-variant-numeric:tabular-nums; white-space:nowrap; }
+#tkBrief .tkSt{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; counter-reset:none; }
+#tkBrief .tkSt li{ display:flex; align-items:flex-start; gap:8px; font-size:13px; line-height:1.25; color:var(--soft); }
+#tkBrief .tkSt li i{ flex:none; width:20px; height:20px; border-radius:50%; display:grid; place-items:center; font:800 12px var(--font); font-style:normal; color:var(--night); background:var(--caution); }
+#tkBrief .tkSt li span{ padding-top:1px; }
+#tkBrief .tkHow{ margin:0 0 10px; font-size:12px; color:var(--soft); text-align:center; }
+#tkBrief .tkBtns{ display:flex; justify-content:center; gap:10px; }
+#tkBrief #tkGo{ min-height:60px; min-width:240px; font:800 22px var(--font); letter-spacing:.06em; border-radius:14px; }
+#tkBrief #tkBack{ min-height:60px; min-width:96px; border-radius:14px; }
+#tkBrief button{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:manipulation; }
+@media (max-height:360px){ #tkBrief .sheet{ padding:8px 14px 10px; } #tkBrief h3{ font-size:20px; } #tkBrief .tkBody{ margin:6px 0 6px; gap:6px 12px; }
+  #tkBrief .tkSit{ font-size:12.5px; line-height:1.28; } #tkBrief .tkSt{ gap:3px; } #tkBrief .tkSt li{ font-size:12px; } #tkBrief .tkSt li i{ width:18px; height:18px; font-size:11px; }
+  #tkBrief .tkF{ margin-top:5px; gap:4px; } #tkBrief .tkF span{ padding:2px 7px 3px; } #tkBrief .tkF i{ font-size:13px; }
+  #tkBrief .tkHow{ margin-bottom:6px; font-size:11px; } #tkBrief #tkGo, #tkBrief #tkBack{ min-height:48px; } #tkBrief #tkGo{ font-size:19px; } }
+@media (max-width:600px){ #tkBrief .tkBody{ grid-template-columns:1fr 1fr; } #tkBrief .tkSit{ font-size:12.5px; } }
+@media (orientation:portrait){ #tkBrief .tkBody{ grid-template-columns:1fr; } }
+#tkReply{ position:absolute; top:var(--padT); left:calc(50% + var(--icon) / 2 + 8px); width:min(268px, calc(50% - var(--icon) / 2 - 8px - var(--padR))); z-index:7;
+  display:flex; gap:6px; pointer-events:none; opacity:0; transform:translateY(-6px) scale(.96); transform-origin:left center;
+  transition:opacity 180ms cubic-bezier(.23,1,.32,1), transform 180ms cubic-bezier(.23,1,.32,1); }
+#tkReply.on{ opacity:1; transform:none; pointer-events:auto; }
+#tkReply button{ flex:1 1 0; min-width:0; min-height:var(--icon); padding:3px 8px; border-radius:12px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(26,16,9,.86); border:1.5px solid var(--radio); color:#fff; box-shadow:0 2px 10px rgba(0,0,0,.35);
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:manipulation; transition:transform 120ms cubic-bezier(.23,1,.32,1), background-color 150ms ease; }
+#tkReply button:active{ transform:scale(.97); background:rgba(127,212,255,.22); transition-duration:60ms; }
+#tkReply button b{ font:800 16px/1 var(--font); letter-spacing:.08em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+#tkReply button small{ font:600 10px/1.1 var(--font); letter-spacing:.04em; color:var(--soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+#tkReply button.act{ border-color:var(--caution); } #tkReply button.act b{ color:var(--caution); }
+#tkReply button.neg{ border-color:rgba(255,255,255,.28); } #tkReply button.neg b{ color:var(--soft); }
+@media (prefers-reduced-motion: reduce){ #tkReply{ transform:none; transition:opacity 150ms ease; } }
+/* the music ticker lives top right: it steps aside while a reply is up */
+body.tkReplyOn #uiroot > #tk, body.tkReplyOn #tkCtl{ visibility:hidden; }
+body:not(.touch) #tkReply{ width:min(268px, calc(50% - var(--icon) / 2 - 130px - var(--padR))); }
+.lbRow.lbLoc .c span{ white-space:normal; font-size:12px; color:var(--soft); }
 #dfBrief{ z-index:30; }
 #dfBrief .sheet{ max-width:600px; padding:12px 18px 14px; background:rgba(18,13,9,.95); text-align:center; }
 #dfBrief h3{ margin:0; font:800 22px/1.15 var(--font); letter-spacing:.06em; color:var(--sand); }
@@ -1471,6 +1521,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   <canvas id="fd" aria-hidden="true"></canvas>
   <div id="dfHud" aria-hidden="true"><div class="dfSeek"><b></b></div><div class="dfRad"><b></b><span></span></div><div class="dfLead"></div><div class="dfPip"><b></b><i></i><em></em></div><div class="dfMw"><b></b><span></span></div></div>
   <div id="dfSub" role="status" aria-live="polite"></div>
+  <div id="tkReply" role="group" aria-label="Answer the radio" aria-hidden="true"></div>
   <div id="lookPad" role="slider" aria-label="Free look, drag to swing the camera"><svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13c2-3.2 4.3-4.8 7-4.8s5 1.6 7 4.8c-2 3.2-4.3 4.8-7 4.8S8 16.2 6 13z"/><circle cx="13" cy="13" r="2" fill="currentColor"/><path d="M13 1.5v3M11.5 3l1.5-1.5L14.5 3M13 24.5v-3M11.5 23l1.5 1.5 1.5-1.5M1.5 13h3M3 11.5L1.5 13 3 14.5M24.5 13h-3M23 11.5l1.5 1.5-1.5 1.5"/></svg><i>LOOK</i></div>
   <!-- the centre column under pause: mission card, jump light, warning, toast, tower subtitle -->
   <div id="topCol"><div id="miss" class="card"><b id="missT"></b><span id="missS"></span></div><div id="dfSix" role="status"><i></i><span></span></div><div id="jumpLt" class="card"><i class="r"></i><i class="g"></i><b></b></div><div id="warn"></div><div id="toast"></div><div id="atc" class="card"></div></div>
@@ -1734,6 +1785,17 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
     </div>
   </div>
   <button class="primary" id="dfbGo">FIGHT'S ON</button>
+</div></div>
+<div class="overlay" id="tkBrief" role="dialog" aria-label="Tasking briefing"><div class="sheet">
+  <p class="tkK" id="tkbK">TASKING</p>
+  <h3 id="tkbT"></h3>
+  <p class="tkAc" id="tkbAc"></p>
+  <div class="tkBody">
+    <div class="tkL"><p class="tkSit" id="tkbSit"></p><div class="tkF" id="tkbF"></div></div>
+    <ol class="tkSt" id="tkbSt" aria-label="Objectives"></ol>
+  </div>
+  <p class="tkHow" id="tkbHow"></p>
+  <div class="tkBtns"><button id="tkBack">Back</button><button class="primary" id="tkGo">ACCEPT TASKING</button></div>
 </div></div>
 <div class="overlay res" id="gradeOv" role="dialog" aria-label="Lesson results"><div class="sheet">
   <div class="rHead"><p class="gLetter" id="gLetter">A</p><div class="rT"><p class="sub" id="gTitle"></p><p class="rScore" id="gScore"></p></div></div>
@@ -9437,6 +9499,7 @@ function runLog(kind,res){try{const L=JSON.parse(localStorage.getItem('kgeuRuns'
 function modeTag(id){const el=document.getElementById(id);if(!el)return;const t=document.createElement('span');t.className='modeTag '+runMode();t.textContent=runMode()==='easy'?'EASY':'HARD';el.appendChild(t);}
 function autoSmart(){if(!running||paused||st.crashed)return;
   if(LES.on){toast('No autopilot in flight school. Tap End to quit the lesson');return;}
+  if(TASK.on&&!TASK.done&&TASK.def.auto&&TASK.def.auto(TASK.d))return;   // a tasking's own AUTO (the orbit on the target, the escort slot)
   // Reaper, airborne, nothing engaged: the first tap parks it in an orbit, the next lands it
   if(!st.ap&&!st.onGround&&hasBall()){initAudio();orbitHere();return;}
   if(st.ap&&st.ap.mode==='orbit'){apToggle('land');return;}
@@ -10202,12 +10265,12 @@ function resBoard(o){
   if(o.rankUp){const d=add('Rank up',o.rankUp.toUpperCase(),'lbRk');if(LB&&LB.rankSVG)d.lastChild.insertAdjacentHTML('afterbegin',LB.rankSVG(LB.rankByName(o.rankUp))+' ');}
 }
 // MAIN MENU on any card: the run is over, the flight's mode state goes with it
-function resMenu(ov){resClose(ov);if(ARC.on)arcStop();if(MISS.on)missReset();openMenu();}
+function resMenu(ov){resClose(ov);if(ARC.on)arcStop();if(MISS.on)missReset();taskStop();openMenu();}
 $('lKeep').onclick=()=>{resClose(landOv);paused=false;};
 $('lMenu').onclick=()=>resMenu(landOv);
 $('lAgain').onclick=()=>{resClose(landOv);runRestart();};
 $('lRec').onclick=()=>{resClose(landOv);recOpen();};
-$('mFree').onclick=()=>{resClose(missOv);missReset();paused=false;};
+$('mFree').onclick=()=>{resClose(missOv);missReset();taskStop();paused=false;};
 $('mMenu').onclick=()=>resMenu(missOv);
 $('mRetry').onclick=()=>{resClose(missOv);runRestart();};
 $('aFree').onclick=()=>{resClose(arcOv);arcStop();dfStop();paused=false;};
@@ -11083,6 +11146,7 @@ function radioSpeak(clips,textLen){
 }
 const CLOCK_W=['ahead','ahead, a little right','ahead and to the right','to your right','behind you on the right','behind you on the right','behind you','behind you on the left','behind you on the left','to your left','ahead and to the left','ahead, a little left','ahead'];
 function plainOf(l){
+  if(l.task)return l.kind==='pilot'?'You: '+l.text.replace(/, [^,]*\.$/,'.'):l.plain||'';   // a tasking line says its own
   const t=l.text,mine=AC.cs&&(t.indexOf(AC.cs)>=0||(AC.csS&&t.indexOf(AC.csS)>=0)),who=/Ground/.test(l.who)?'Ground':/Range/.test(l.who)?'Range':/Approach/.test(l.who)?'Approach':'Tower';
   if(l.who==='Instructor')return '';
   if(l.who==='Loadmaster')return 'Crew: '+l.text;
@@ -11165,7 +11229,7 @@ function vqPump(){
   playLine(radioQ.shift());
 }
 function playLine(l){
-  l.cut=false;l.dead=false;
+  l.cut=false;l.dead=false;l.aired=true;
   const live=radioLive(),sp=l.who==='Instructor';
   RADIO.log.push({who:l.who,kind:l.kind,text:l.text,clips:Array.isArray(l.clips)?l.clips.slice():l.clips,t:st?+st.time.toFixed(2):0,amb:(REGION.az?CHAT:CHAT_R[REGION.id]||[]).some(p=>p.indexOf(l)>=0),type:AC.id});
   if(RADIO.log.length>200)RADIO.log.shift();
@@ -12947,6 +13011,192 @@ $('pPhoto').onclick=photoOpen;$('phX').onclick=photoClose;$('phSave').onclick=ph
 // ---------- menus ----------
 const menu=document.getElementById('menu'),crashEl=document.getElementById('crash'),crashTopEl=document.getElementById('crashTop');
 // How the run on screen was started, so every Restart (pause sheet), RETRY (crash card) and Try again
+// ================= Taskings: replayable missions with Mission Control =================
+// A tasking is a template (TASKS[id]): roll(R) draws the randomized elements from a seeded stream (where the target is,
+// when things happen, the wind, the par time), so no two replays are the same; brief(d) fills the briefing card;
+// spawn(d) puts the aircraft where the tasking starts; stages run one at a time (obj(d) the card's text, enter(d) once,
+// tick(d,dt) true when done); score(d) gives 0 to 100 and the card's lines. The radio is text through the existing
+// queue (vqAdd, the subtitle and its squelch; a readback uses the recorded Wilco or Roger where one fits), and the
+// player answers with one or two context buttons in the top bar (tkAsk). The boards are task:<id>: the Worker does not
+// know them (server/src/boards.js has no task: entry, it refuses an unknown board), so they live on this device
+// (LB.localAdd) and the XP is counted here (taskXp, the Worker's formula) until the Worker takes them.
+const TASK={on:false,id:null,def:null,d:null,R:null,seed:0,si:0,stage:null,t:0,st0:0,brief:false,ask:null,asks:[],done:false,res:null,
+  tgts:[],sens:false,objs:[],askN:0,test:{seed:null,noBrief:false},log:[]};
+const TASK_IDS=['overwatch','lifeline','shepherd','finder'];
+const TASKS={};
+const tkBoard=id=>'task:'+id;
+// mulberry32: the tasking's own stream, so a seed (tests, a shared replay) rolls the same tasking
+function tkRng(seed){let a=seed>>>0;return ()=>{a=a+0x6D2B79F5>>>0;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;};}
+const tkR=(R,a,b)=>a+R()*(b-a),tkPick=(R,a)=>a[Math.floor(R()*a.length)%a.length];
+const tkD=(x,z)=>Math.hypot(st.pos.x-x,st.pos.z-z);
+const tkMSL=()=>(st.pos.y-GEAR)*M2FT+FIELD_FT;
+const tkBrg=(fx,fz,tx,tz)=>(Math.atan2(tx-fx,-(tz-fz))*180/Math.PI+360)%360;
+const TK_DIR=['north','north-east','east','south-east','south','south-west','west','north-west'];
+const tkDir=b=>TK_DIR[Math.round(b/45)%8];
+const tkNm=m=>(m/1852).toFixed(1)+' nm',tkMi=m=>(m/1609.34).toFixed(1)+' mi';
+const tkClock=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
+const tkWind=(d,k)=>String(Math.round(d/10)*10||360).padStart(3,'0')+' at '+Math.round(k);
+// a position the way a crew reads it: degrees and decimal minutes (anchored on Luke AFB, 33.5350 N 112.3831 W)
+function tkLL(x,z){const la=33.5350-(z-LUKE.z)/110950,lo=112.3831-(x-LUKE.x)/92530;
+  const f=v=>{const d=Math.floor(v),m=(v-d)*60;return d+'°'+m.toFixed(1).padStart(4,'0')+'′';};return 'N'+f(la)+' W'+f(lo);}
+// the clock position of a point from the aircraft's nose, 1 to 12
+function tkClk(x,z){const h=-_euH.setFromQuaternion(st.quat,'YXZ').y;let r=Math.atan2(x-st.pos.x,-(z-st.pos.z))-h;r=((r%(2*Math.PI))+2*Math.PI)%(2*Math.PI);return Math.round(r/(Math.PI/6))%12||12;}
+
+// ---- the radio: Mission Control and the other stations, text through the one voice queue ----
+// o.plain: the plain English line Easy shows under it; o.clips: recorded clips when there are any (none: the squelch
+// and the text, the existing cue). Lines from one tasking keep their order (same priority, no cut).
+function tkSay(who,text,o){o=o||{};
+  const l={who:who,text:text,clips:o.clips||null,plain:o.plain!=null?o.plain:'',task:1};
+  TASK.log.push({t:+st.time.toFixed(1),who:who,text:text});
+  return vqAdd(l,{pri:o.pri!=null?o.pri:2,ttl:o.ttl||60});
+}
+const tkMC=(text,o)=>tkSay('Mission Control',text,o);
+// fn once the air is quiet: the tower's takeoff clearance and its readback are out and nothing waits (or after max s)
+function tkQuiet(fn,max){TASK.quiet={fn:fn,t:0,max:max||12};}
+function tkQuietTick(dt){const q=TASK.quiet;if(!q)return;q.t+=dt;
+  const busy=VQ.cur||radioQ.some(l=>l.pri<=2)||(st.mode==='runway'&&!A.tko&&st.time<3);
+  if(!busy||q.t>=q.max){TASK.quiet=null;q.fn();}}
+// our side of it: a readback in the pilot's voice (the recorded Wilco / Roger when that is the word)
+const TK_RB={WILCO:['Wilco, ','p_rb_wilco'],ROGER:['Roger, ','p_rb_roger']};
+function tkPilot(text,clip){const l={who:AC.cs,kind:'pilot',text:text,clips:clip?[clip,csP()]:null,task:1};
+  TASK.log.push({t:+st.time.toFixed(1),who:'You',text:text});return vqAdd(l,{pri:2,ttl:30});}
+// ask: shows the buttons once the line they answer is on the air (or right away without one). opts: [{k:'WILCO',
+// say:'text' (our readback, default 'Wilco, <cs>.'), fn}], o.line, o.wait (s before o.late runs, the asker's silence),
+// o.keep (stays up until answered, e.g. REPORT while watching). One ask at a time; a new one replaces the last.
+function tkAsk(opts,o){o=o||{};const a={opts:opts,line:o.line||null,wait:o.wait||18,late:o.late||null,keep:!!o.keep,shown:false,t:0,id:++TASK.askN,tag:o.tag||''};
+  TASK.ask=a;tkReplyUI();return a;}
+function tkAnswer(k){const a=TASK.ask;if(!a||!a.shown||!running||paused)return false;const op=a.opts.find(x=>x.k===k);if(!op)return false;
+  TASK.ask=null;tkReplyUI();hapPattern('tap');
+  const rb=TK_RB[k],txt=op.say!=null?op.say:rb?rb[0]+AC.csS+'.':k.charAt(0)+k.slice(1).toLowerCase()+', '+AC.csS+'.';
+  if(txt)tkPilot(txt,op.say==null&&rb?rb[1]:null);
+  TASK.d.replies=(TASK.d.replies||0)+1;TASK.d.replyT=(TASK.d.replyT||0)+a.t;
+  if(op.fn)op.fn(a.t);return true;}
+const tkReplyEl=document.getElementById('tkReply');
+let tkReplyKey='';
+function tkReplyUI(){const a=TASK.ask,on=!!(a&&a.shown&&TASK.on&&running&&!st.crashed);
+  const key=on?a.id+'|'+a.opts.map(o=>o.k).join(','):'';
+  if(key!==tkReplyKey){tkReplyKey=key;
+    if(on){tkReplyEl.innerHTML='';a.opts.forEach(o=>{const b=document.createElement('button');b.type='button';b.dataset.k=o.k;
+        b.className=o.k==='UNABLE'?'neg':o.k==='REPORT'||o.k==='MARK'?'act':'';b.innerHTML='<b></b>'+(o.sub?'<small></small>':'');
+        b.firstChild.textContent=o.label||o.k;if(o.sub)b.lastChild.textContent=o.sub;b.setAttribute('aria-label',(o.label||o.k)+(o.sub?', '+o.sub:''));
+        tapBtn(b,()=>tkAnswer(o.k),true);tkReplyEl.appendChild(b);});}}
+  if(on!==tkReplyEl.classList.contains('on')){tkReplyEl.classList.toggle('on',on);document.body.classList.toggle('tkReplyOn',on);tkReplyEl.setAttribute('aria-hidden',on?'false':'true');}
+}
+function tkAskTick(dt){const a=TASK.ask;if(!a)return;
+  if(!a.shown){const l=a.line;if(!l||l.aired||l.dead){a.shown=true;tkReplyUI();}return;}
+  a.t+=dt;if(!a.keep&&a.t>=a.wait){TASK.ask=null;tkReplyUI();TASK.d.missed=(TASK.d.missed||0)+1;if(a.late)a.late();}
+}
+
+// ---- the stage card: the existing mission card, in full for 3 s as each stage comes up, then a chip ----
+function tkObj(title,sub,warn){const n=TASK.def.stages.length,k=TASK.si+1;missHud(k+'/'+n+'  '+title,sub||'',!!warn);}
+function tkStageGo(i){const D=TASK.def;TASK.si=i;TASK.stage=D.stages[i];TASK.st0=st.time;
+  missEl.classList.remove('chip');APPR.missT0=st.time;APPR.missOn=true;   // a new stage: the full card again
+  if(i>0)hapPattern('green');
+  if(TASK.stage.enter)TASK.stage.enter(TASK.d);
+  TASK.log.push({t:+st.time.toFixed(1),stage:TASK.stage.id});
+}
+
+// ---- the 3D bits a tasking puts in the world, removed by taskStop ----
+function tkAdd(o){scene.add(o);TASK.objs.push(o);return o;}
+function tkClear(){for(const o of TASK.objs){scene.remove(o);o.traverse&&o.traverse(m=>{if(m.isMesh&&m.geometry&&!m.geometry.userData.keep)m.geometry.dispose();});}TASK.objs.length=0;TASK.tgts.length=0;}
+
+// ---- start, stop, the frame ----
+// id: a tasking; from a world region it switches to Arizona first (the taskings fly around Luke and the White Tanks)
+function taskStart(id,o){const D=TASKS[id];if(!D)return;
+  if(!REGION.az){pickRegion('az',{resume:{task:id,region:'az',type:D.ac,tod:TOD.id}});return;}
+  if(!WORLD.ready){toast('Loading '+REGION.city+'…');return;}
+  const seed=(o&&o.seed!=null)?o.seed:TASK.test.seed!=null?TASK.test.seed:(Math.random()*4294967296)>>>0;
+  pickType(D.ac,1);
+  start('runway',D.base||'luke');RUNSTART={k:'task',id:id};
+  // no haboob for a tasking: the day sky for this run, the saved choice comes back on the next start() (as the dogfight)
+  if(TOD.id==='haboob'){const p=TOD.id;setTOD('day');try{localStorage.setItem('kgeuTOD',p);}catch(e){}ARC.prevTod=p;hbSync(true);}
+  Object.assign(TASK,{on:true,id:id,def:D,seed:seed,R:tkRng(seed),si:0,stage:null,t:0,brief:false,ask:null,quiet:null,done:false,res:null,sens:false,log:[]});
+  tkClear();
+  const d=TASK.d={id:id,seed:seed,mode:runMode(),t0:0,replies:0,replyT:0,missed:0};
+  D.roll(TASK.R,d);
+  st.windBase=st.windDir=d.wdir;st.windKt=d.wkt;st.windPh=TASK.R()*6.28;
+  D.spawn(d);
+  st.mode=D.airStart?'task':st.mode;if(D.airStart){A.tko=1;A.land=1;A.pattern=1;A.ground=0;}
+  chatT=40;
+  runLog('tasking',{task:id,seed:seed,start:1});
+  if(TASK.test.noBrief){taskGo();return;}
+  tkBriefShow(d);
+}
+// ACCEPT TASKING: the briefing goes, the clock and the stages start
+function taskGo(){if(!TASK.on||TASK.done)return;audioSess();initAudio();
+  const ov=$('tkBrief');ov.classList.remove('on');TASK.brief=false;paused=false;
+  TASK.d.t0=st.time;tkStageGo(0);
+}
+function taskStop(){if(!TASK.on&&!TASK.objs.length)return;
+  const D=TASK.def;if(D&&D.cleanup)try{D.cleanup(TASK.d);}catch(e){console.warn(e);}
+  TASK.on=false;TASK.brief=false;TASK.ask=null;TASK.quiet=null;TASK.sens=false;tkReplyUI();tkClear();
+  $('tkBrief').classList.remove('on');
+  if(DEST&&DEST.task){DEST=null;document.body.classList.remove('hasDest');destUI(true);}
+  for(let i=radioQ.length-1;i>=0;i--)if(radioQ[i].task){radioQ[i].dead=true;radioQ.splice(i,1);}
+}
+// a destination for the map, its arrow and the readout (Easy and Hard: a tasking always says where)
+function tkDest(x,z,name,short){const e={x:x,z:z,name:name,short:short||name,kind:'task',task:true};DEST=e;document.body.classList.add('hasDest');destUI(true);return e;}
+function taskUpdate(dt){
+  if(!TASK.on||TASK.brief||!running)return;
+  tkReplyUI();
+  if(paused||st.crashed){if(st.crashed&&!TASK.done){TASK.done=true;TASK.ask=null;tkReplyUI();}return;}
+  if(TASK.done)return;
+  TASK.t+=dt;
+  const D=TASK.def,d=TASK.d;
+  if(D.always)D.always(d,dt);
+  tkQuietTick(dt);tkAskTick(dt);
+  const S=TASK.stage;if(!S)return;
+  if(S.obj){const o=S.obj(d);if(o){const k=o.join('|');if(k!==TASK.objK){TASK.objK=k;tkObj(o[0],o[1],o[2]);}}}
+  if(S.tick&&S.tick(d,dt)){if(TASK.si+1<D.stages.length)tkStageGo(TASK.si+1);else taskEnd();}
+  // the overall cap: a tasking is 3 to 6 minutes; past its limit Mission Control calls it
+  if(!TASK.done&&D.limit&&st.time-d.t0>D.limit){d.timeout=1;tkMC(AC.csS+', Mission Control, we are out of time on this one. Knock it off, RTB.',{plain:'Time is up. The tasking ends here.'});taskEnd();}
+}
+// the end: score, the device board, the XP, the card (after the last call has had a moment)
+function taskEnd(){if(TASK.done)return;TASK.done=true;TASK.ask=null;tkReplyUI();
+  const D=TASK.def,d=TASK.d;d.secs=st.time-d.t0;
+  const r=D.score(d);r.score=Math.max(0,Math.min(100,Math.round(r.score)));
+  r.letter=r.score>=90?'A':r.score>=75?'B':r.score>=60?'C':r.score>=40?'D':'F';
+  TASK.res=r;
+  const b=tkBoard(TASK.id),L=LB?LB.localAdd(b,r.score,d.secs):null;
+  const pb=!!(L&&L.pb),xp=taskXp(r.score,d.mode,pb);r.xp=xp;r.lb=L;
+  runLog('tasking',{task:TASK.id,seed:d.seed,score:r.score,secs:Math.round(d.secs),letter:r.letter,xp:xp});
+  tkBest(TASK.id,r);
+  TASK.endT=setTimeout(()=>tkCard(r,d),r.wait!=null?r.wait:2600);
+}
+// XP for a tasking, the Worker's own formula (xpFor in server/src/boards.js): 10 for flying it, up to 40 for the score,
+// x1.25 in Hard, +15 for a best on this device. Kept on this device (kgeuTaskXP) until the Worker takes task: boards.
+function taskXp(score,mode,pb){return Math.round((10+40*Math.max(0,Math.min(1,score/100)))*(mode==='hard'?1.25:1))+(pb?15:0);}
+function tkBest(id,r){try{const B=JSON.parse(localStorage.getItem('kgeuTaskBest')||'{}'),o=B[id];
+  if(!o||r.score>o.score)B[id]={score:r.score,letter:r.letter,when:Date.now()};
+  localStorage.setItem('kgeuTaskBest',JSON.stringify(B));
+  localStorage.setItem('kgeuTaskXP',String((+localStorage.getItem('kgeuTaskXP')||0)+(r.xp||0)));}catch(e){}}
+function tkCard(r,d){if(!TASK.on||!running)return;
+  missHud(null);
+  const L=r.lb,lines=r.lines.slice();
+  lines.push(['Time',tkClock(d.secs)+(d.par?'  (par '+tkClock(d.par)+')':'')]);
+  resOpen(missOv,{letter:r.letter,title:TASKS[TASK.id].name+': '+r.title,score:r.score,sub:'of 100',stats:lines,board:'',tip:r.tip||'',retry:TASKS[TASK.id].name.toUpperCase()});
+  // the board line: this device's runs (the global boards need the Worker to know task: boards)
+  const box=missOv.querySelector('.rLines'),row=document.createElement('div');row.className='gl lbLine';
+  row.innerHTML='<span>Board, this device</span><b></b>';
+  row.lastChild.textContent=L?'#'+L.rank+' of '+L.total+'  +'+r.xp+' XP':'+'+r.xp+' XP';
+  if(L&&L.pb){const e=document.createElement('em');e.textContent=L.total>1?'PERSONAL BEST':'FIRST RUN';row.lastChild.appendChild(e);}
+  box.appendChild(row);resMore(box);
+  xpPop(r.xp,'Tasking: '+TASKS[TASK.id].name+(L&&L.pb&&L.total>1?'  ·  Personal best':''));
+}
+
+// ---- the briefing: over the aircraft at its start, the sim held until ACCEPT TASKING ----
+function tkBriefShow(d){const D=TASK.def,B=D.brief(d),ov=$('tkBrief');
+  $('tkbK').textContent='TASKING · '+D.role.toUpperCase();
+  const h=$('tkbT');h.textContent=D.name.toUpperCase();const mt=document.createElement('span');mt.className='modeTag '+runMode();mt.textContent=runMode()==='easy'?'EASY':'HARD';h.appendChild(mt);
+  $('tkbAc').textContent=B.ac;$('tkbSit').textContent=B.sit;
+  $('tkbSt').innerHTML='';D.stages.forEach((s,i)=>{const li=document.createElement('li');li.innerHTML='<i></i><span></span>';li.firstChild.textContent=String(i+1);li.lastChild.textContent=s.name;$('tkbSt').appendChild(li);});
+  $('tkbF').innerHTML='';B.facts.forEach(f=>{const s=document.createElement('span');s.innerHTML='<b></b><i></i>';s.firstChild.textContent=f[0];s.lastChild.textContent=f[1];$('tkbF').appendChild(s);});
+  $('tkbHow').textContent=B.how||'Mission Control calls on the radio. Answer with the buttons at the top of the screen.';
+  TASK.brief=true;paused=true;pauseOv.classList.remove('on');ov.classList.add('on');
+}
+tapBtn($('tkGo'),()=>taskGo());
+tapBtn($('tkBack'),()=>{taskStop();openMenu('sArc');});
+
 // (results cards) flies exactly the same start: a free flight / segment / mission start keeps its spawn
 // (final1 is not final), base and aircraft; an arcade game, lesson or dogfight goes back through its own
 // starter (arcStart, startLesson, dfStart), which sets its own position. Each starter stamps it after start().
@@ -12958,11 +13208,13 @@ function runName(){const R=RUNSTART;
   if(R.k==='arc')return R.kind==='apt'?String(REGION.base||'AIRPORT').toUpperCase()+' LANDING':RUN_NAMES[R.kind]||'CHALLENGE';
   if(R.k==='les')return RUN_NAMES[R.id]||'LESSON';
   if(R.k==='df')return R.daily?'DAILY DOGFIGHT':'DOGFIGHT';
+  if(R.k==='task')return TASKS[R.id]?TASKS[R.id].name.toUpperCase():'TASKING';
   return RUN_NAMES[R.mode]||'FLIGHT';}
 function runRestart(){const R=RUNSTART;
   if(R.k==='arc'){arcStart(R.kind);return;}
   if(R.k==='les'){startLesson(R.id);return;}
   if(R.k==='df'){dfStart(R.daily?{daily:1}:null);return;}
+  if(R.k==='task'){taskStart(R.id);return;}   // a fresh roll: a replay differs
   if(R.type&&R.type!==acType)pickType(R.type,1);
   start(R.mode||'runway',R.base||undefined);}
 function start(mode,base){
@@ -13004,7 +13256,7 @@ function start(mode,base){
 // (pauseGo: Missions, Arcade, School, Boards, Settings) keep the flight for Back and Resume: they
 // do not come here, the flight's overlays are only hidden under them (body.menuOn).
 function hudClear(){
-  resCloseAll();for(const id of ['recOv','storyOv'])$(id).classList.remove('on');
+  resCloseAll();taskStop();for(const id of ['recOv','storyOv'])$(id).classList.remove('on');
   STRIKE.active=false;tgtMarkHide();
   if(camMode>1)camMode=0;   // the ball view is entered in flight, where its autopilot can take over
   if(sensOn){sensOn=false;hudSens.classList.remove('on');document.body.classList.remove('sensorOn');glc.style.filter='';}
@@ -13020,7 +13272,7 @@ function hudClear(){
 const pauseOv=$('pauseOv');
 function openMenu(scr){if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.forced=null;hudClear();pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
 // the pause button, P and a backgrounded app all land here; the sheet shows while paused
-function togglePause(){if(DF.brief)return;   // the dogfight briefing holds the sim itself; FIGHT'S ON is the way on
+function togglePause(){if(DF.brief||TASK.brief)return;   // the dogfight briefing holds the sim itself; FIGHT'S ON is the way on
   if(RES.brief)resClose(RES.brief);paused=!paused;pauseOv.classList.toggle('on',paused);if(paused){radioFade(120);CARP.sync();PZ0={t:savedType,b:SPAWN_BASE,p:SPAWN_POS};PZ_LOC=null;locSel();pzApplyUI();requestAnimationFrame(locShow);if(window.stickReset)stickReset();musicUI();}}
 $('pResume').onclick=()=>{paused=false;pauseOv.classList.remove('on');initAudio();radioVolApply();};
 // Restart and Apply are one button: it restarts this flight (same start, mission or range) until
@@ -13119,7 +13371,7 @@ function hapInit(){
     try{const mo=new MutationObserver(ms=>{const seen=new Set();for(const m of ms){
         const t=m.target.nodeType===1&&m.target.closest?m.target.closest(HAP_SEL):null;if(t&&!seen.has(t)){seen.add(t);hapArm(t);}
         for(const n of m.addedNodes)if(n.nodeType===1&&!n.classList.contains('hapL')&&!seen.has(n)){seen.add(n);hapArmAll(n);}}});
-      ['menu','pauseOv','arcOv','gradeOv','landOv','missOv','recOv','crash','funnel','csOv','tkCtl','tk','dfBrief','dfLo','photoOv','mapOv'].forEach(id=>{const e=document.getElementById(id);if(e)mo.observe(e,{childList:true,subtree:true});});}catch(e){}
+      ['menu','pauseOv','arcOv','gradeOv','landOv','missOv','recOv','crash','funnel','csOv','tkCtl','tk','dfBrief','dfLo','tkBrief','tkReply','photoOv','mapOv'].forEach(id=>{const e=document.getElementById(id);if(e)mo.observe(e,{childList:true,subtree:true});});}catch(e){}
     // a real tap on an overlay: the native tick has played, so the scripted tick for the same tap is skipped
     document.addEventListener('click',e=>{const t=e.target,L=t&&t.classList&&t.classList.contains('hapL');
       // hapShield: after a tapBtn tap on an overlay only that overlay's click (and the switch it forwards to) gets through
@@ -13128,7 +13380,7 @@ function hapInit(){
   }
 }
 // the controls a finger taps: flight buttons, weapons, pause, the throttle's detent labels, every menu, sheet and card button
-const HAP_SEL='#dock button,#dfW button,#bPause,#thr .det,#menu button,#menu .mcard,#menu .lrow,#pauseOv button,.overlay button,#crash button,#funnel button,#csOv button,#tkCtl button,#tk,#hDest';
+const HAP_SEL='#dock button,#dfW button,#tkReply button,#bPause,#thr .det,#menu button,#menu .mcard,#menu .lrow,#pauseOv button,.overlay button,#crash button,#funnel button,#csOv button,#tkCtl button,#tk,#hDest';
 function hapArm(el){
   if(!el||el.querySelector(':scope > .hapL'))return;
   if(getComputedStyle(el).position==='static')el.classList.add('hapRel');
@@ -13654,7 +13906,11 @@ const ICONS={
   landing:svgI([[ICO_PARTS.runway,'translate(20 26) scale(1.1 1.35)'],[ICO_PARTS.watch,'translate(46 24) scale(1.1)']]),
   landing1:svgI([[ICO_PARTS.runway,'translate(20 26) scale(1.1 1.35)'],['<text x="0" y="6" text-anchor="middle" font-size="17" font-weight="800" fill="#F6C177" font-family="sans-serif">1</text><circle r="10.5" fill="none" stroke="#D98A3D" stroke-width="2.2"/>','translate(46 24) scale(1.05)']]),
   daily:svgI([['<g><rect x="-12" y="-10" width="24" height="22" rx="3" fill="none" stroke="#D98A3D" stroke-width="2.2"/><path d="M-12-4 H12" stroke="#D98A3D" stroke-width="2.2"/><rect x="-7" y="-14" width="2.6" height="6" rx="1" fill="#F6C177"/><rect x="4.4" y="-14" width="2.6" height="6" rx="1" fill="#F6C177"/></g>','translate(20 25)'],[SIL.f16,'translate(46 26) rotate(30) scale(.75)']]),
-  dogfight:svgI([[SIL.f16,'translate(20 28) rotate(40) scale(.9)'],[SIL.f16,'translate(44 20) rotate(-140) scale(.9)']])};
+  dogfight:svgI([[SIL.f16,'translate(20 28) rotate(40) scale(.9)'],[SIL.f16,'translate(44 20) rotate(-140) scale(.9)']]),
+  'tk-overwatch':svgI([['<g><ellipse rx="11" ry="7" fill="none" stroke="#D98A3D" stroke-width="1.8" stroke-dasharray="3 2.4"/><rect x="-3.2" y="-2.6" width="6.4" height="5.2" rx=".8" fill="#F6C177"/></g>','translate(44 32)'],[SIL.mq9,'translate(24 20) rotate(-20) scale(.8)']]),
+  'tk-lifeline':svgI([[SIL.c130,'translate(22 18) rotate(-60) scale(.72)'],[ICO_PARTS.chute,'translate(46 28) scale(.9)']]),
+  'tk-shepherd':svgI([[SIL.c130,'translate(26 26) rotate(-45) scale(.7)'],[SIL.f16,'translate(46 16) rotate(-45) scale(.55)']]),
+  'tk-finder':svgI([[SIL.cessna,'translate(22 22) rotate(-30) scale(.9)'],['<g><path d="M0-9 L1.8-1.8 L9 0 L1.8 1.8 L0 9 L-1.8 1.8 L-9 0 L-1.8-1.8Z" fill="#F6C177"/><circle r="2.2" fill="#fff"/></g>','translate(46 32)']])};
 // ---- stars and best score, from the records store ----
 const stars=n=>'<i class="stars" aria-label="'+n+' of 3 stars">'+'★'.repeat(n)+'<u>'+'★'.repeat(3-n)+'</u></i>';
 const L2S={A:3,B:2,C:1,D:1,F:0};
@@ -13669,6 +13925,7 @@ function scoreOf(id){
   if(id==='school'){const g=LESSONS.map(l=>schoolBest[schoolAc+':'+l.id]).filter(Boolean),pass=g.filter(x=>x!=='F').length,a=g.filter(x=>x==='A').length;
     return g.length?[a>=5?3:a>=3?2:pass?1:0,pass+' of 5 passed']:[0,''];}
   if(id==='landing'||id==='landing1'||id==='daily')return arcScore(id);
+  if(/^tk-/.test(id)){try{r=JSON.parse(localStorage.getItem('kgeuTaskBest')||'{}')[id.slice(3)];}catch(e){r=null;}return r?[L2S[r.letter]||0,'Best '+r.score+' of 100']:[0,''];}
   if(id==='dogfight'){r=B[dfKey(rookie()?'easy':'hard')];return r?[r.stars,'Best '+resNum(r.pts)+' \u00b7 '+r.kills+' kills']:[0,''];}   // the mode being flown
   return [0,''];
 }
@@ -13707,8 +13964,17 @@ function arcList(){
     dailyCard(),
     {id:'range',lb:'arc:strike',ac:'MQ-9A Reaper',name:'Strike range',desc:'Find the targets, lock on, four missiles.',go:()=>{pickType('reaper',1);start('range');}},
     {id:'drop',lb:'arc:drop',ac:'C-130H Hercules',name:'Airdrop',desc:'Put the bundle on the drop zone.',go:()=>{pickType('c130',1);start('drop');}},
-    {id:'short',lb:'mission:short',ac:'C-130H Hercules',name:'Short field landing',desc:'Stop a Hercules on a 3,000 ft dirt strip.',go:()=>{pickType('c130',1);start('short');}}]);
+    {id:'short',lb:'mission:short',ac:'C-130H Hercules',name:'Short field landing',desc:'Stop a Hercules on a 3,000 ft dirt strip.',go:()=>{pickType('c130',1);start('short');}},
+    ].concat(tkCards()));
 }
+// the Taskings group under the five (the list scrolls to it), a card for each tasking that is in
+function tkCards(){const C=TASK_CARDS.filter(c=>TASKS[c[0]]);
+  return C.length?[{head:'Taskings'}].concat(C.map(c=>({id:'tk-'+c[0],lb:'task:'+c[0],icon:'tk-'+c[0],cls:'tk',ac:c[1],name:c[2],desc:c[3],go:()=>taskStart(c[0])}))):[];}
+// tasking item 1: the four Taskings, each replayable (a fresh roll every start)
+const TASK_CARDS=[['overwatch','MQ-9B SkyGuardian','Overwatch','Watch a compound, call the vehicle out, follow it.'],
+  ['lifeline','C-130H Hercules','Lifeline','Resupply a ground team on their smoke.'],
+  ['shepherd','F-16C Viper','Shepherd','Escort a C-130 through the corridor.'],
+  ['finder','Cessna 172','Finder','Search the White Tanks for a missing hiker.']];
 // ---- first launch: one screen, two big buttons ----
 function funnelPick(v){setSkill(v);$('funnel').classList.remove('on');startHereUI();if(v==='rookie')startLesson('first');}
 $('fRookie').onclick=()=>funnelPick('rookie');$('fPilot').onclick=()=>funnelPick('pilot');
@@ -15898,7 +16164,7 @@ function tick(t,skipRender){
     if(ev.type==='liftoff') clusters.forEach(c=>{if(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)<1500){c.cheer=4;}});
   }
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.classList.remove('on');}
-  missUpdate(dt);dzUpdate(dt);if(running&&!paused)arcTick();apprTick();dfTick(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);if(LB)LB.frame();
+  missUpdate(dt);dzUpdate(dt);taskUpdate(dt);if(running&&!paused)arcTick();apprTick();dfTick(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);if(LB)LB.frame();
   {const show=!rookie()&&camMode===1&&(AC.id==='cessna'||AC.id==='alpha'||AC.id==='archer')&&running&&!st.crashed;
    if(spCan){spCan.classList.toggle('on',show);if(show)drawSixPack();}}
   radioUpdate(dt);cfgUpdate(dt);resTick(dt);
@@ -16045,6 +16311,20 @@ const APP_VER='2026-10-10-arsenal';          // keep version.json in step when s
   board('arc:gunrun',{name:'A-10 gun run',group:'Arcade',go:()=>{pickType('a10',1);start('range');},how:'0 to 100: hits 45%, average miss 30%, time on target 25%'});
   LESSONS.forEach(l=>board('lesson:'+l.id,{name:l.name,group:'Flight school',how:'The lesson score, 0 to 100'}));
   board('free:landing',{name:'Free flight landing',group:'Free flight',how:'The landing grade points, 0 to 100'});
+  // Taskings: one board each, 0 to 100. local: the Worker refuses an id it does not know (boardOf in server/src/boards.js
+  // has no task: entry), so these rank the runs flown on this device until it does; nothing is sent
+  [['overwatch','Overwatch','time on target, standoff, report timing, on station'],['lifeline','Lifeline','drop accuracy, time, smoke call, pickup pass'],
+   ['shepherd','Shepherd','station keeping, the lane, the join'],['finder','Finder','find time, mark accuracy, the orbit, the report']].forEach(([id,n,how])=>
+    board('task:'+id,{name:n,group:'Taskings',local:1,go:()=>taskStart(id),how:'0 to 100: '+how+'. Runs on this device'}));
+  // a tasking's score on this device's board: rank among its runs here, a personal best
+  function localAdd(b,score,secs){const A=load('kgeuTaskLB',{}),L=A[b]||(A[b]=[]),B=BOARDS[b]||{dir:1},better=(x,y)=>B.dir>0?x>y:x<y;
+    const pb=!L.length||L.every(x=>better(score,x.s));
+    L.push({s:score,secs:Math.round(secs*10)/10,ac:acType,mode:runMode(),when:Date.now()});
+    L.sort((a,c)=>(B.dir>0?c.s-a.s:a.s-c.s)||a.when-c.when);if(L.length>60)L.length=60;save('kgeuTaskLB',A);
+    return {rank:1+L.filter(x=>better(x.s,score)).length,total:L.length,pb:pb};}
+  function localRows(b,p){const A=load('kgeuTaskLB',{}),now=Date.now(),day=utcDay();
+    const L=(A[b]||[]).filter(x=>p==='today'?utcDay(x.when)===day:p==='week'?now-x.when<7*864e5:true);
+    return {local:1,rows:L.slice(0,30).map((x,i)=>({r:i+1,score:x.s,ac:x.ac,mode:x.mode,when:x.when,secs:x.secs})),total:L.length};}
   // the world airports: the 5 mile landing challenge to each region's home runway (aptStart switches region when needed)
   APT_IDS.forEach(id=>board(aptBoard(id),{name:REGIONS[id].base+' landing',group:'World airports',ghost:1,go:()=>aptStart(id),
     how:'Points: 1,000 x par / your time (up to 1.5x), x the landing grade. Runway '+REGIONS[id].main}));
@@ -16433,7 +16713,7 @@ const APP_VER='2026-10-10-arsenal';          // keep version.json in step when s
   // with its EASY or HARD chip. Hidden boards (the landing challenges, the dash, the gun run, the world airports) keep
   // their rows on the server and still open from code (lbOpen), they just have no entry
   const V={b:'daily',p:'today',seq:0,cache:{},dm:null,ds:'score'};
-  const PICK=[['Challenges',['daily','df','arc:strike','arc:drop','mission:short']],['Free flight',['free:landing']],['Flight school',LESSONS.map(l=>'lesson:'+l.id)]];
+  const PICK=[['Challenges',['daily','df','arc:strike','arc:drop','mission:short']],['Taskings',TASK_IDS.map(id=>'task:'+id)],['Free flight',['free:landing']],['Flight school',LESSONS.map(l=>'lesson:'+l.id)]];
   const PNAME={daily:'Daily challenge',df:'Red Flag Dogfight','arc:strike':'Strike range','arc:drop':'Airdrop','mission:short':'Short field landing','free:landing':'Landings'};
   const DF_STAT={score:'Score',kills:'Kills',clear:'Clear time',guns:'Gun kills'};
   const isDf=b=>/^df:/.test(b),entryOf=b=>isDf(b)?'df':b;
@@ -16491,7 +16771,15 @@ const APP_VER='2026-10-10-arsenal';          // keep version.json in step when s
     let off=false;if(r){const a=r.getBoundingClientRect(),b=rows.getBoundingClientRect();off=a.top>=b.top-1&&a.bottom<=b.bottom-56+1;}
     if(me.classList.contains('off')!==off)me.classList.toggle('off',off);}
   $('lbRows').addEventListener('scroll',lbPin,{passive:true});
+  // a device board: this device's runs, best first, the date under the callsign; works offline
+  function lbLocal(j){const inn=$('lbRowsIn'),me=$('lbMe'),P=E.P,cs=P?P.cs:'You',ri=P?rankIdx(P.xp||0):0,cr=P&&P.creator;
+    const dt=w=>new Date(w).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    inn.innerHTML=j.rows.length?j.rows.map(r=>'<div class="lbRow'+(r.r===1?' top1 me':'')+(r.r<=3?' pod p'+r.r:'')+'" data-full="'+esc(cs+'  ·  #'+r.r+'  ·  '+fmtS(V.b,r.score)+'  ·  '+(AC_TAG[r.ac]||'')+'  ·  '+(r.mode==='easy'?'Easy':'Hard')+'  ·  '+dt(r.when))+'"><span class="n">'+(r.r<=3?'<b>'+r.r+'</b>':num(r.r))+'</span><span class="c">'+csTag(cs,ri,cr,dt(r.when))+'</span>'+lbMode(r.mode)+'<span class="s">'+esc(fmtS(V.b,r.score))+'</span><span class="a">'+lbAc(r.ac)+'</span></div>').join('')
+      :'<div class="lbMsg"><b>No runs yet</b>'+(V.p==='today'?'Nothing flown today. ':'')+'Fly this tasking from Challenges.</div>';
+    me.innerHTML='<div class="lbRow me lbLoc"><span class="c"><span>On this device. Global Taskings boards are coming.</span></span></div>';me.classList.remove('off');
+    $('lbTotal').textContent=num(j.total)+' run'+(j.total===1?'':'s');$('lbRace').hidden=true;$('lbRows').scrollTop=0;}
   function lbFetch(force){
+    if(BOARDS[V.b]&&BOARDS[V.b].local){++V.seq;lbLocal(localRows(V.b,V.p));return Promise.resolve();}
     const key=V.b+'|'+V.p,seq=++V.seq,c=V.cache[key];
     if(c)lbRows(c);else $('lbRowsIn').innerHTML='<div class="lbMsg">Loading...</div>';
     if(!E.enabled){lbRows(null);return Promise.resolve();}
@@ -16571,10 +16859,13 @@ const APP_VER='2026-10-10-arsenal';          // keep version.json in step when s
   return {E:E,BOARDS:BOARDS,ORDER:ORDER,board:board,runStart:runStart,runEnd:runEnd,runCancel:runCancel,frame:frame,reset:reset,armFree:armFree,
     boot:boot,homeRank:homeRank,sheet:sheet,sheetOn:()=>!$('lbSheet').hidden,csHold:()=>csHold,paintModel:paintModel,paintAll:paintAll,lbOpen:lbOpen,lbRender:lbRender,race:race,ui:ui,flush:flush,csOpen:csOpen,dice:dice,
     fameDraw:fameDraw,fameFetch:fameFetch,fameApply:fameApply,fameApplyCity:fameApplyCity,ghostStart:ghostStart,decodePath:decodePath,rankSVG:rankSVG,rankByName:rankByName,utcDay:utcDay,fmtS:fmtS,showBadge:showBadge,ghostOff:ghostOff,runBoard:runBoard,
+    localAdd:localAdd,localRows:localRows,
     get P(){return E.P;}};
 })();
 
-window.__kgeu={tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
+window.__kgeu={TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tkAnswer(k),taskXp:taskXp,tkLL:tkLL,tkMC:(t,o)=>tkMC(t,o),tkAsk:(a,o)=>tkAsk(a,o),tkQuiet:(f,m)=>tkQuiet(f,m),
+  task:()=>({on:TASK.on,id:TASK.id,stage:TASK.stage&&TASK.stage.id,si:TASK.si,brief:TASK.brief,done:TASK.done,res:TASK.res,ask:TASK.ask&&{shown:TASK.ask.shown,opts:TASK.ask.opts.map(o=>o.k),t:TASK.ask.t},d:TASK.d,log:TASK.log.slice(),seed:TASK.seed}),
+  tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
   lights:()=>({KGEU:AL.KGEU.count(),KLUF:AL.KLUF.count(),uLights:AL_MAT.uniforms.uLights.value,
@@ -16676,6 +16967,7 @@ worldLoad();
   const go=()=>{const sp=$('splash');if(!WORLD.ready||(sp&&!sp.classList.contains('done'))){if(!WORLD.err)setTimeout(go,200);return;}
     if(r.start){const S=r.start;if(S.skill&&S.skill!==SKILL)setSkill(S.skill);if(S.tod&&TOD_SET[S.tod])setTOD(S.tod);
       if(S.df)dfStart(S.daily?{daily:1}:null);
+      else if(S.task)taskStart(S.task);
       else if(S.arc){if(S.type&&TYPES[S.type])pickType(S.type);arcStart(S.arc);}
       else if(S.lesson)startLesson(S.lesson);
       else if(S.mode==='free'){if(S.type&&TYPES[S.type])pickType(S.type);if(S.base)pickBase(S.base);freeStart(S.pos);}   // the pause sheet's Apply

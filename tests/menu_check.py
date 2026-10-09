@@ -40,6 +40,9 @@ ARC_SCROLLED = """()=>{const g=document.getElementById('arcCards');g.scrollTop=1
     if(Math.min(a.right,b.right)-Math.max(a.left,b.left)>1&&Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>1)bad.push('overlap '+vis[i][0].dataset.m+' / '+vis[j][0].dataset.m);}
   g.scrollTop=0;return bad;}"""
 
+# tasking item 1: the Taskings cards after scrolling the Challenges list to the end
+TK_SCROLLED = ARC_SCROLLED.replace("const cards=[...g.querySelectorAll('.mcard.apt')];if(cards.length!==3)bad.push('apt cards '+cards.length);","const cards=[...g.querySelectorAll('.mcard.tk')];")
+
 async def main():
     srv, url = serve()
     async with async_playwright() as p:
@@ -51,8 +54,14 @@ async def main():
                 await pg.evaluate(f"()=>{{window.__kgeu.openFly();window.__kgeu.nav('{sid}')}}"); await pg.wait_for_timeout(250)
                 if sid == 'sArc':
                     sc = await pg.evaluate("()=>{const g=document.getElementById('arcCards');return [g.scrollHeight>g.clientHeight+1,g.querySelectorAll('.mcard').length]}")
-                    ok(f'{tag} sArc (ui1): the five Challenges cards, the list does not scroll', sc == [False, 5], sc)
-                bad = await pg.evaluate(FIT, [sid, None])
+                    # tasking item 1: the Taskings group comes after the five, so the list scrolls to it once a tasking is in
+                    ntk = await pg.evaluate("()=>document.querySelectorAll('#arcCards .mcard.tk').length")
+                    ok(f'{tag} sArc (ui1): the five Challenges cards first; tasking: the list scrolls only to its Taskings group', sc == [ntk > 0, 5 + ntk], (sc, ntk))
+                    if ntk:
+                        tb = await pg.evaluate(TK_SCROLLED)
+                        ok(f'{tag} sArc: the Taskings cards, scrolled to, inside the list and the screen, 44 px, no overlaps', not tb, tb[:4])
+                bad = await pg.evaluate(FIT, [sid, '.mcard.tk,.cgrp'] if sid == 'sArc' else [sid, None])
+                if sid == 'sArc': bad = [x for x in bad if not x.startswith('scrolls')]
                 ok(f'{tag} {sid} fits with no scrolling, 44 px targets, no overlaps', not bad, bad[:4])
             if vp['width'] == 667:
                 home = await pg.evaluate("""()=>{window.__kgeu.nav('sHome',true);return [...document.querySelectorAll('#sHome button')].map(b=>b.id)}""")

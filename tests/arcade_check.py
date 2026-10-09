@@ -16,10 +16,14 @@ async def main():
         ok('featured Red Flag Dogfight is first, playable (no Coming soon)', cards[0]['id'] == 'dogfight' and not cards[0]['soon'] and cards[0]['t'] == 'Red Flag Dogfight', cards[:1])
         ok('ui1: then the daily, strike range, airdrop and short field cards, in that order', [c['id'] for c in cards[1:5]] == ['daily', 'range', 'drop', 'short'], [c['id'] for c in cards])
         ok('ui1: no 5 mile, 1 mile, dash or gun run card', not {'landing', 'landing1', 'dash', 'gunrun'} & {c['id'] for c in cards}, [c['id'] for c in cards])
-        ok('ui1: no World airports group (they are FLY destinations)', len(cards) == 5 and not await pg.evaluate("()=>!!document.querySelector('#arcCards .cgrp')"), [c['id'] for c in cards])
+        # tasking item 1: the five, then one Taskings group of four (the only group; no World airports group)
+        grp = await pg.evaluate("()=>[...document.querySelectorAll('#arcCards .cgrp')].map(e=>e.textContent)")
+        built = await pg.evaluate(f"()=>['overwatch','lifeline','shepherd','finder'].filter(t=>{K}.TASKS[t]).map(t=>'tk-'+t)")
+        ok('ui1: no World airports group; tasking: one Taskings group after the five, a card per tasking', grp == (['Taskings'] if built else []) and [c['id'] for c in cards[5:]] == built, (grp, [c['id'] for c in cards]))
+        cards = cards[:5]
         ok('every game card has an icon and a 1 to 3 star rating', all(c['ico'] and c['stars'] for c in cards))
-        r = await pg.evaluate("()=>{const s=document.getElementById('sArc');const bad=[];if(s.scrollHeight>s.clientHeight+1)bad.push('scrolls');s.querySelectorAll('#arcCards .mcard:not(.apt):not(.more)').forEach(e=>{const r=e.getBoundingClientRect();if(r.bottom>innerHeight+0.5||r.right>innerWidth+0.5)bad.push('off '+e.textContent.slice(0,12));if(r.height<43.5)bad.push('small')});return bad}")
-        ok('the five Challenges cards fit one iPhone landscape screen, the screen does not scroll', not r, r)
+        r = await pg.evaluate("()=>{const s=document.getElementById('sArc');const bad=[];[...s.querySelectorAll('#arcCards .mcard:not(.apt):not(.more)')].slice(0,5).forEach(e=>{const r=e.getBoundingClientRect();if(r.bottom>innerHeight+0.5||r.right>innerWidth+0.5)bad.push('off '+e.textContent.slice(0,12));if(r.height<43.5)bad.push('small')});return bad}")
+        ok('the five Challenges cards fit one iPhone landscape screen (the Taskings group is below them)', not r, r)
         d1 = await pg.evaluate(f"()=>{K}.dailySpec()"); d2 = await pg.evaluate(f"()=>{K}.dailySpec()")
         ok('the daily challenge is the same all day', d1 == d2, d1)
         # landing challenge, flown by autoland so it finishes
