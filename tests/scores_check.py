@@ -177,7 +177,7 @@ async def main():
             n1 = await A.evaluate(f"()=>performance.getEntriesByType('resource').filter(e=>e.name.includes('/board?')).length")
             ok('pull to refresh fetches the board again', n1 > n0, (n0, n1))
             await A.click('[data-lbp=today]'); await A.wait_for_timeout(1200)
-            ok('one list per board: no Easy/Hard chips in the header', await A.evaluate("()=>!document.querySelector('#sLb [data-lbm]')&&!document.querySelector('#sLb .mh .modeSeg')"))
+            ok('one list per board: no EASY/HARD chip in the bar', await A.evaluate("()=>document.getElementById('lbMode').hidden"))
             chips = await A.evaluate("()=>[...document.querySelectorAll('#lbRowsIn .lbRow, #lbMe .lbRow')].map(r=>{const t=r.querySelector('.modeTag');return t?t.textContent:''})")
             ok('every row carries its EASY or HARD chip (this run was Hard)', chips and all(c == 'HARD' for c in chips), chips)
             # ---------------- race the leader

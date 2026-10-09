@@ -8,7 +8,7 @@ from harness import serve, launch, page, Checks, finger
 ok = Checks()
 CAR = ['cessna','alpha','f16','reaper','mq9b','c130']
 CAR_AFTER_10 = CAR[(CAR.index('c130') + 10) % 6]
-SCREENS = ['sHome', 'sFly', 'sSchool', 'sArc', 'sSet', 'sHelp']   # ui1: six tabs (Missions joined Challenges, sArc)
+SCREENS = ['sHome', 'sFly', 'sSchool', 'sArc', 'sLb', 'sSet', 'sHelp']   # ui1: six tabs (Missions joined Challenges, sArc)
 # ARCADE scrolls by design (World airports): its first screen is checked without the three .apt cards, then ARC_SCROLLED
 FIT = """(arg)=>{const [id,skip]=Array.isArray(arg)?arg:[arg,null];const s=document.getElementById(id);const W=innerWidth,H=innerHeight;const bad=[];
   if(s.scrollHeight>s.clientHeight+1||s.scrollWidth>s.clientWidth+1)bad.push('scrolls '+s.scrollWidth+'x'+s.scrollHeight);

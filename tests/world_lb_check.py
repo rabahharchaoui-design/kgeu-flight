@@ -115,7 +115,7 @@ async def main():
                   ['apt:SBRJ', 'Rio Santos Dumont landing', 'World airports', True, 'function', True]], bd)
         await pg.evaluate(f"()=>{{{K}.openMenu();{K}.LB.lbOpen()}}"); await pg.wait_for_timeout(600)
         lbt = await pg.evaluate("()=>[...document.querySelectorAll('#lbList h3, #lbList [data-lbb]')].map(e=>e.textContent).join('|')")
-        ok('(a) the Boards screen lists the World airports group and its three boards', 'World airports|Tokyo Haneda landing|Paris CDG landing|Rio Santos Dumont landing' in lbt, lbt[-120:])
+        ok('(a) ui1: the board picker has no World airports entries (their boards stay on the server)', 'World airports' not in lbt and 'Tokyo' not in lbt and 'Daily challenge' in lbt, lbt[-160:])
         await pg.evaluate(f"()=>{{{K}.openMenu();{K}.nav('sArc')}}"); await pg.wait_for_timeout(400)
         cards = await pg.evaluate(ARCCARDS)
         ok('(a) ui1 CHALLENGES: no World airports group and no airport cards (they are FLY destinations now)',

@@ -789,8 +789,8 @@ label.sens b{ color:var(--ink); min-width:74px; }
 #menu .mBack.fl span{ display:inline; font-size:16px; font-weight:800; letter-spacing:.04em; }
 #menu .mBack[hidden]{ display:none; }
 .mtX{ flex:1; min-width:0; display:flex; align-items:center; justify-content:flex-end; gap:10px; overflow:hidden; }
-.mtX > *{ display:none; }
-#menu[data-scr=sFly] #flyCs, #menu[data-scr=sFly] #sumLine, #menu[data-scr=sLb] #lbCs{ display:inline-flex; }
+#menu .mtX > *{ display:none; }
+#menu[data-scr=sFly] #flyCs{ display:inline-flex; }
 #menu #sumLine{ display:none; max-width:none; min-width:0; flex:0 1 auto; }
 #menu[data-scr=sFly] #sumLine{ display:block; }
 @media (max-width:1000px){ #menu[data-scr=sFly] #sumLine{ display:none; } }
@@ -1152,20 +1152,50 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 #hRec{ display:flex; align-items:center; justify-content:center; gap:8px; }
 #hRec svg{ width:20px; height:20px; }
 /* the leaderboard screen */
-.lbBody{ flex:1; min-height:0; display:flex; gap:10px; }
-.lbList{ flex:0 0 clamp(170px,30vw,270px); overflow-y:auto; touch-action:pan-y; display:flex; flex-direction:column; gap:4px; padding-bottom:8px; -webkit-overflow-scrolling:touch; }
-.lbList h3{ margin:6px 4px 0; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--brown); }
-#menu .lbList button{ text-align:left; min-height:44px; padding:0 12px; font-size:16px; font-weight:800; background:rgba(42,22,8,.1); color:var(--night); flex:none; }
-#menu .lbList button.sel{ background:var(--night); color:var(--sand); }
-.lbMain{ flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; gap:6px; background:var(--night); color:var(--sand); border-radius:14px; padding:8px 10px; }
-.lbHead{ display:flex; align-items:center; gap:8px; flex:none; }
-.lbHead b{ flex:1; min-width:0; font-size:19px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.lbTabs{ display:flex; gap:4px; flex:none; }
-#menu .lbTabs button{ min-height:44px; padding:0 10px; font-size:14px; font-weight:800; background:rgba(246,193,119,.1); color:var(--sand); border-radius:10px; }
-#menu .lbTabs button.sel{ background:var(--sand); color:var(--night); }
+.lbMain{ flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; gap:6px; background:var(--night); color:var(--sand); border-radius:16px; padding:6px 10px 8px; }
+/* ui1 boards: a bar (the board picker, the dogfight's EASY/HARD and stat chips, Today / This week / All time) over the
+   full width board; the picker opens a sheet of the twelve boards that still have a card or a mode */
+#sLb{ position:relative; }
+.lbBar{ display:flex; align-items:center; gap:8px; flex:none; min-width:0; }
+#menu .lbPick{ flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:8px; padding:0 12px 0 14px; min-height:48px; border-radius:14px; text-align:left;
+  background:var(--night); color:var(--sand); transition:transform 140ms cubic-bezier(.23,1,.32,1); }
+#menu .lbPick:active{ transform:scale(.98); }
+.lbPickT{ flex:1; min-width:0; display:flex; flex-direction:column; line-height:1.05; }
+.lbPickT i{ font-style:normal; font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--orange); }
+.lbPickT b{ font-size:19px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#menu .lbPick svg{ width:20px; height:20px; flex:none; transition:transform 180ms cubic-bezier(.23,1,.32,1); }
+#menu .lbPick[aria-expanded=true] svg{ transform:rotate(180deg); }
+.lbSeg{ display:flex; gap:2px; padding:3px; border-radius:14px; background:rgba(42,22,8,.1); flex:none; }
+.lbSeg[hidden]{ display:none; }
+#menu .lbSeg button{ min-height:44px; min-width:44px; padding:0 11px; font-size:15px; font-weight:800; background:transparent; color:var(--night); border-radius:11px; white-space:nowrap; }
+#menu .lbSeg button i{ font-style:normal; } #menu .lbSeg button i.sm{ display:none; }
+#menu .lbSeg button.sel{ background:var(--night); color:var(--sand); }
+#menu .lbModeSeg button{ letter-spacing:.06em; font-size:14px; }
+#menu .lbModeSeg button[data-lbmode=easy].sel{ background:#2f8a4a; color:#fff; }
+#menu .lbModeSeg button[data-lbmode=hard].sel{ background:#b8322a; color:#fff; }
+.lbWrap{ position:relative; flex:1; min-height:0; display:flex; flex-direction:column; }
+.lbRows{ padding-bottom:58px; }
+/* my row: pinned over the bottom of the board only while my row in the list is off screen (or not in the top) */
+.lbMe{ position:absolute; left:0; right:0; bottom:2px; z-index:1; transition:transform 200ms cubic-bezier(.23,1,.32,1), opacity 160ms ease; box-shadow:0 -10px 18px rgba(20,10,4,.55); border-radius:12px; }
+.lbMe.off{ transform:translateY(14px); opacity:0; pointer-events:none; }
+.lbMe:empty{ display:none; }
+@media (prefers-reduced-motion:reduce){ .lbMe{ transition:opacity 160ms ease; } .lbMe.off{ transform:none; } }
+/* the picker sheet: drops from the picker (origin top left), three groups of chips */
+.lbSheet{ position:absolute; z-index:3; left:var(--padL); right:var(--padR); top:calc(var(--padT) + var(--tabH) + 8px + 54px); max-height:calc(100% - var(--padT) - var(--tabH) - 70px - var(--padB));
+  overflow-y:auto; overscroll-behavior:contain; touch-action:pan-y; background:var(--night); color:var(--sand); border-radius:16px; padding:10px 12px 12px;
+  box-shadow:0 14px 34px rgba(20,10,4,.45), 0 0 0 1px rgba(246,193,119,.14); transform-origin:top left; transition:transform 180ms cubic-bezier(.23,1,.32,1), opacity 150ms ease; }
+.lbSheet[hidden]{ display:none; }
+.lbSheet.in{ transform:scale(.97) translateY(-4px); opacity:0; }
+@media (prefers-reduced-motion:reduce){ .lbSheet{ transition:opacity 150ms ease; } .lbSheet.in{ transform:none; } }
+.lbList{ display:flex; flex-direction:column; gap:8px; }
+.lbList h3{ margin:0; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--orange); }
+.lbList .lbG{ display:flex; flex-wrap:wrap; gap:6px; }
+#menu .lbList button{ min-height:44px; padding:0 14px; font-size:16px; font-weight:800; background:rgba(246,193,119,.1); color:var(--sand); border-radius:12px; white-space:nowrap; }
+#menu .lbList button.sel{ background:var(--sand); color:var(--night); }
+.lbScrim{ position:absolute; inset:0; z-index:2; }
 #menu #lbRace{ flex:none; min-height:44px; padding:0 12px; background:var(--rust); color:#fff4e0; font-size:14px; letter-spacing:.04em; border-radius:10px; }
 .lbRows{ flex:1; min-height:0; overflow-y:auto; touch-action:pan-y; -webkit-overflow-scrolling:touch; position:relative; overscroll-behavior:contain; }
-.lbRow{ display:flex; align-items:center; gap:10px; min-height:44px; padding:0 8px; border-bottom:1px solid rgba(246,193,119,.1); font-size:18px; font-weight:700; }
+.lbRow{ display:flex; align-items:center; gap:10px; min-height:52px; padding:0 10px; border-bottom:1px solid rgba(246,193,119,.1); font-size:19px; font-weight:700; }
 .lbRow .n{ flex:none; width:3.2em; text-align:right; font-weight:900; color:var(--orange); font-variant-numeric:tabular-nums; }
 .lbRow .c{ flex:1; min-width:0; display:flex; align-items:center; gap:8px; white-space:nowrap; overflow:hidden; }
 .lbRow .c span{ overflow:hidden; text-overflow:ellipsis; }
@@ -1176,12 +1206,23 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 .lbRow.me{ background:var(--sand); color:var(--night); border-radius:10px; border:none; }
 .lbRow.me .n,.lbRow.me.top1 .n{ color:var(--rust); } .lbRow.me .a{ color:var(--brown); }
 .lbRow.top1 .n{ color:#ffd257; }
+/* the podium: a medal for 1, 2 and 3, a warm wash on the leader's row */
+.lbRow.pod .n{ display:flex; justify-content:flex-end; }
+.lbRow.pod .n b{ display:grid; place-items:center; width:30px; height:30px; border-radius:50%; font-size:16px; color:#2A1608; box-shadow:inset 0 -2px 0 rgba(0,0,0,.22); }
+.lbRow.p1 .n b{ background:linear-gradient(180deg,#ffe28a,#e0a91c); } .lbRow.p2 .n b{ background:linear-gradient(180deg,#f1f4f7,#aab3bd); } .lbRow.p3 .n b{ background:linear-gradient(180deg,#f0b583,#b86a2e); }
+.lbRow.p1:not(.me){ background:linear-gradient(90deg,rgba(255,210,87,.16),rgba(255,210,87,0) 70%); border-radius:12px; }
+.lbRow.pod{ min-height:56px; }
 /* narrow boards (SE landscape, any portrait): tighter rows so the callsign keeps room beside the EASY/HARD chip */
 /* a narrow phone: the CREATOR badge is a gold star, my row drops its "of N" (the header has the total);
    a tap on a row reads it out in full */
 @media (max-width:700px){ .lbRow .creator{ font-size:0; padding:0; width:18px; height:18px; line-height:18px; text-align:center; flex:none; margin-left:2px; vertical-align:0; }
   .lbRow .creator::before{ content:'\2605'; font-size:12px; letter-spacing:0; } .lbRow.me .c i{ display:none; } }
-@media (max-width:700px){ .lbRow{ gap:6px; padding:0 6px; font-size:16px; } .lbRow .n{ width:auto; min-width:1.4em; } .lbRow .a{ width:4.9em; font-size:12px; } }
+@media (max-width:700px){ .lbRow{ gap:6px; padding:0 6px; font-size:17px; min-height:48px; } .lbRow .n{ width:auto; min-width:1.4em; } .lbRow .a{ width:4.9em; font-size:12px; } .lbRow.pod{ min-height:50px; } .lbRow.pod .n b{ width:26px; height:26px; font-size:14px; } }
+/* narrow: the period tabs read Today / week / time, the dogfight's chips wrap to a second bar line */
+.lbBr{ display:none; }
+@media (max-width:760px){ #menu .lbSeg button i.lg{ display:none; } #menu .lbSeg button i.sm{ display:inline; } .lbBar{ flex-wrap:wrap; row-gap:6px; }
+  .lbBar .lbTabs{ order:1; } .lbBar .lbBr{ order:2; display:block; flex-basis:100%; height:0; } .lbBar #lbMode{ order:3; } .lbBar #lbStat{ order:4; } .lbBar .lbBr[hidden]{ display:none; } #menu .lbPick{ min-height:44px; } .lbPickT b{ font-size:17px; } .lbSheet{ top:calc(var(--padT) + var(--tabH) + 8px + 50px); } #menu .lbSeg button{ padding:0 9px; font-size:14px; } }
+@media (max-height:340px){ .lbFoot #lbHow{ display:none; } }
 /* portrait: the board list becomes one scrolling line above the board, which gets the full width */
 @media (orientation:portrait){
   #menu .modeCards{ flex-direction:column; gap:8px; }
@@ -1196,13 +1237,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   .setCol{ display:contents; }
   .setFoot{ flex-wrap:wrap; justify-content:flex-start; }
   .helpBody{ align-items:flex-start; overflow-y:auto; }
-  .lbBody{ flex-direction:column; gap:8px; }
-  .lbList{ flex:none; flex-direction:row; overflow-x:auto; overflow-y:hidden; touch-action:pan-x; padding-bottom:2px; }
-  .lbList h3{ display:none; }
-  #menu .lbList button{ white-space:nowrap; }
-  .lbHead{ flex-wrap:wrap; row-gap:6px; }
 }
-.lbMe{ flex:none; }
 .lbMsg{ padding:18px 10px; text-align:center; font-size:17px; font-weight:700; color:#f0d6ad; line-height:1.35; }
 .lbMsg b{ display:block; font-size:22px; color:var(--sand); margin-bottom:4px; }
 .lbPull{ height:0; overflow:hidden; text-align:center; font-size:13px; font-weight:800; letter-spacing:.08em; color:var(--orange); transition:height .15s; }
@@ -1481,16 +1516,20 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   </div>
  </div>
  <div class="scr" id="sLb">
-    <div class="lbBody">
-   <div class="lbList" id="lbList"></div>
-   <div class="lbMain">
-    <div class="lbHead"><b id="lbTitle"></b>
-     <div class="lbTabs" role="tablist"><button data-lbp="today" role="tab">Today</button><button data-lbp="week" role="tab">This week</button><button data-lbp="all" role="tab">All time</button></div></div>
-    <div class="lbRows" id="lbRows"><div class="lbPull" id="lbPull">PULL TO REFRESH</div><div id="lbRowsIn"></div></div>
-    <div class="lbMe" id="lbMe"></div>
-    <div class="lbFoot"><span id="lbHow"></span><span id="lbTotal"></span><button id="lbRace" hidden>Race the leader</button></div>
-   </div>
+  <div class="lbBar">
+   <button class="lbPick" id="lbPick" aria-haspopup="listbox" aria-expanded="false" aria-controls="lbSheet"><span class="lbPickT"><i>Board</i><b id="lbTitle"></b></span><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+   <i class="lbBr" aria-hidden="true"></i><div class="lbSeg lbModeSeg" id="lbMode" role="radiogroup" aria-label="Easy or Hard board" hidden><button data-lbmode="easy" role="radio">EASY</button><button data-lbmode="hard" role="radio">HARD</button></div>
+   <div class="lbSeg" id="lbStat" role="radiogroup" aria-label="Dogfight board" hidden><button data-lbstat="score" role="radio">Score</button><button data-lbstat="kills" role="radio">Kills</button><button data-lbstat="clear" role="radio">Clear</button><button data-lbstat="guns" role="radio">Guns</button></div>
+   <div class="lbTabs lbSeg" role="tablist"><button data-lbp="today" role="tab" aria-label="Today">Today</button><button data-lbp="week" role="tab" aria-label="This week"><i class="lg">This week</i><i class="sm">Week</i></button><button data-lbp="all" role="tab" aria-label="All time"><i class="lg">All time</i><i class="sm">All</i></button></div>
   </div>
+  <div class="lbMain">
+   <div class="lbWrap">
+    <div class="lbRows" id="lbRows"><div class="lbPull" id="lbPull">PULL TO REFRESH</div><div id="lbRowsIn"></div></div>
+    <div class="lbMe off" id="lbMe"></div>
+   </div>
+   <div class="lbFoot"><span id="lbHow"></span><span id="lbTotal"></span><button id="lbRace" hidden>Race the leader</button></div>
+  </div>
+  <div class="lbSheet" id="lbSheet" hidden><div class="lbList" id="lbList" role="listbox" aria-label="Leaderboards"></div></div>
  </div>
 </div>
 <div class="overlay" id="funnel"><div class="fun">
@@ -9396,7 +9435,7 @@ window.addEventListener('keydown',e=>{
   if(k==='m'){setMuted(!muted);toast(muted?'Sound off':'Sound on');}
   if(k==='t'){setRadioOn(!RADIO.on);toast(RADIO.on?'Radio on':'Radio off');}
   if(k==='enter'&&menu.classList.contains('on')&&curScr.startsWith('sFly')) freeStart();
-  if(k==='escape'){if(menu.classList.contains('on'))navBack();else openMenu();}
+  if(k==='escape'){if(menu.classList.contains('on')){if(LB&&LB.sheetOn())LB.sheet(false);else navBack();}else openMenu();}
 });
 window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
 window.addEventListener('blur',()=>{for(const k in keys)keys[k]=false;});
@@ -13116,7 +13155,7 @@ function showScr(id){
   menu.classList.toggle('see3d',id==='sFly');SHOW.on=id==='sFly'&&menu.classList.contains('on');
   if(id==='sFly'){CARM.sync();sumUI();requestAnimationFrame(locShow);}
   if(id==='sSchool')schoolList();if(id==='sHome')startHereUI();if(id==='sArc')arcList();
-  if(LB){if(id==='sLb')LB.lbRender();if(id==='sSet'||id==='sFly'||id==='sHome')LB.ui();}
+  if(LB){if(id==='sLb')LB.lbRender();else LB.sheet(false);if(id==='sSet'||id==='sFly'||id==='sHome')LB.ui();}
   tabsUI();
 }
 const TAB_OF={sHelp:'sSet',sCredits:'sSet'};
@@ -16027,39 +16066,69 @@ const APP_VER='2026-10-07-dogfight2';          // keep version.json in step when
   };
   function welcome(isNew){paintAll();ui();topUpPool();flush();fameFetch();toast((isNew?'Welcome, ':'Welcome back, ')+E.P.cs,3);}
 
-  // ---- the leaderboard screen
-  // one list per board: every player's best run across Easy and Hard, each row carries an EASY or HARD chip
-  const V={b:'daily',p:'today',seq:0,cache:{}};
+  // ---- the leaderboard screen (ui1): a picker of the boards that still have a card or a mode, the dogfight as one entry
+  // with an EASY/HARD chip and a stat chip; one list per board, every player's best run across Easy and Hard, each row
+  // with its EASY or HARD chip. Hidden boards (the landing challenges, the dash, the gun run, the world airports) keep
+  // their rows on the server and still open from code (lbOpen), they just have no entry
+  const V={b:'daily',p:'today',seq:0,cache:{},dm:null,ds:'score'};
+  const PICK=[['Challenges',['daily','df','arc:strike','arc:drop','mission:short']],['Free flight',['free:landing']],['Flight school',LESSONS.map(l=>'lesson:'+l.id)]];
+  const PNAME={daily:'Daily challenge',df:'Red Flag Dogfight','arc:strike':'Strike range','arc:drop':'Airdrop','mission:short':'Short field landing','free:landing':'Landings'};
+  const DF_STAT={score:'Score',kills:'Kills',clear:'Clear time',guns:'Gun kills'};
+  const isDf=b=>/^df:/.test(b),entryOf=b=>isDf(b)?'df':b;
+  const dfB=()=>'df:'+V.ds+':'+(V.dm||(rookie()?'easy':'hard'));
   function lbOpen(b,m){['arcOv','missOv','gradeOv','landOv'].forEach(id=>{const e=$(id);if(e)e.classList.remove('on');});
-    if(b&&BOARDS[b])V.b=b;if(curScr!=='sLb')nav('sLb');else lbRender();}
-  // the EASY/HARD chip on a row of a merged board; a single mode board (the dogfight's) carries none, its name says it
+    if(b==='df')b=dfB();
+    if(b&&BOARDS[b]){V.b=b;if(isDf(b)){const q=b.split(':');V.ds=q[1];V.dm=q[2];}}
+    sheet(false);if(curScr!=='sLb')nav('sLb');else lbRender();}
+  // the EASY/HARD chip on a row of a merged board; a single mode board (the dogfight's) carries none, its bar says it
   const lbMode=m=>BOARDS[V.b]&&BOARDS[V.b].mode?'':m==='easy'?'<span class="modeTag easy">EASY</span>':m==='hard'?'<span class="modeTag hard">HARD</span>':'';
-  function lbList(){const el=$('lbList');let html='',grp='';
-    ORDER.forEach(id=>{const B=BOARDS[id];if(B.group!==grp){grp=B.group;html+='<h3>'+esc(grp)+'</h3>';}
-      html+='<button data-lbb="'+esc(id)+'" class="'+(id===V.b?'sel':'')+'">'+esc(B.name)+'</button>';});
-    el.innerHTML=html;el.querySelectorAll('[data-lbb]').forEach(b=>b.onclick=()=>{V.b=b.dataset.lbb;lbRender();});
-    const s=el.querySelector('.sel');if(s&&s.scrollIntoView)try{s.scrollIntoView({block:'nearest'});}catch(e){}}
+  function lbList(){const el=$('lbList'),cur=entryOf(V.b);let html='';
+    PICK.forEach(([g,ids])=>{html+='<h3>'+esc(g)+'</h3><div class="lbG">'+ids.map(id=>'<button role="option" data-lbb="'+esc(id)+'" class="'+(id===cur?'sel':'')+'" aria-selected="'+(id===cur)+'">'+esc(PNAME[id]||(BOARDS[id]&&BOARDS[id].name)||id)+'</button>').join('')+'</div>';});
+    el.innerHTML=html;el.querySelectorAll('[data-lbb]').forEach(b=>b.onclick=()=>{const id=b.dataset.lbb;V.b=id==='df'?dfB():id;sheet(false);lbRender();});}
+  // the picker sheet: opens from the picker (scale .97 to 1, 180 ms), any tap outside or a pick closes it
+  let scrim=null;
+  function sheet(on){const sh=$('lbSheet'),pk=$('lbPick');if(!sh)return;
+    if(on===undefined)on=sh.hidden;
+    if(!on){sh.hidden=true;sh.classList.remove('in');pk.setAttribute('aria-expanded','false');if(scrim){scrim.remove();scrim=null;}return;}
+    lbList();sh.classList.add('in');sh.hidden=false;pk.setAttribute('aria-expanded','true');
+    scrim=document.createElement('div');scrim.className='lbScrim';scrim.addEventListener('click',()=>sheet(false));$('sLb').insertBefore(scrim,sh);
+    requestAnimationFrame(()=>requestAnimationFrame(()=>sh.classList.remove('in')));
+    const s0=sh.querySelector('.sel');if(s0&&s0.scrollIntoView)try{s0.scrollIntoView({block:'nearest'});}catch(e){}}
+  $('lbPick').onclick=()=>sheet();
+  document.querySelectorAll('[data-lbmode]').forEach(b=>b.onclick=()=>{V.dm=b.dataset.lbmode;V.b=dfB();lbRender();});
+  document.querySelectorAll('[data-lbstat]').forEach(b=>b.onclick=()=>{V.ds=b.dataset.lbstat;V.b=dfB();lbRender();});
   function lbRender(){
-    lbList();const B=BOARDS[V.b];
+    const B=BOARDS[V.b],df=isDf(V.b);
     document.querySelectorAll('[data-lbp]').forEach(b=>{b.classList.toggle('sel',b.dataset.lbp===V.p);b.setAttribute('aria-selected',b.dataset.lbp===V.p);});
-    $('lbTitle').textContent=B.name;$('lbHow').textContent=B.how||'';$('lbRace').hidden=true;
+    $('lbMode').hidden=!df;$('lbStat').hidden=!df;$('lbMode').previousElementSibling.hidden=!df;
+    if(df){const q=V.b.split(':');document.querySelectorAll('[data-lbmode]').forEach(b=>{const on=b.dataset.lbmode===q[2];b.classList.toggle('sel',on);b.setAttribute('aria-checked',on);});
+      document.querySelectorAll('[data-lbstat]').forEach(b=>{const on=b.dataset.lbstat===q[1];b.classList.toggle('sel',on);b.setAttribute('aria-checked',on);});}
+    $('lbTitle').textContent=df?'Red Flag Dogfight'+(V.ds==='score'?'':', '+DF_STAT[V.ds].toLowerCase()):PNAME[V.b]?(PNAME[V.b]==='Landings'?'Free flight landings':PNAME[V.b]):B.name;
+    $('lbHow').textContent=B.how||'';$('lbRace').hidden=true;
     $('lbCs').innerHTML=E.P?csTag(E.P.cs,rankIdx(E.P.xp||0),E.P.creator):'';
+    lbList();
     lbFetch(false);
   }
   // a tap on a row reads it out in full (a 12 letter callsign is cut on a narrow phone; nothing hovers on a phone)
   ['lbRowsIn','lbMe'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('click',ev=>{const r=ev.target.closest('.lbRow[data-full]');if(r)toast(r.dataset.full,3);});});
   function lbRows(j){
     const inn=$('lbRowsIn'),me=$('lbMe'),B=BOARDS[V.b];
-    if(!j){inn.innerHTML='<div class="lbMsg"><b>Offline</b>Leaderboards need a connection. Runs you fly now are saved and sent when you are back online.</div>';me.innerHTML='';$('lbTotal').textContent='';return;}
+    if(!j){inn.innerHTML='<div class="lbMsg"><b>Offline</b>Leaderboards need a connection. Runs you fly now are saved and sent when you are back online.</div>';me.innerHTML='';me.classList.add('off');$('lbTotal').textContent='';return;}
     const mine=E.P?E.P.cs:'',myRow=j.rows.find(r=>r.cs===mine),myAc=j.me&&(j.me.ac||myRow&&myRow.ac);
-    inn.innerHTML=j.rows.length?j.rows.map(r=>'<div class="lbRow'+(r.cs===mine?' me':'')+(r.r===1?' top1':'')+'" data-full="'+esc(r.cs+'  ·  #'+num(r.r)+'  ·  '+fmtS(V.b,r.score)+'  ·  '+(AC_TAG[r.ac]||'')+'  ·  '+(r.mode==='easy'?'Easy':'Hard'))+'"><span class="n">'+num(r.r)+'</span><span class="c">'+csTag(r.cs,rankByName(r.rank),r.creator)+'</span>'+lbMode(r.mode)+'<span class="s">'+esc(fmtS(V.b,r.score))+'</span><span class="a">'+lbAc(r.ac)+'</span></div>').join('')
+    inn.innerHTML=j.rows.length?j.rows.map(r=>'<div class="lbRow'+(r.cs===mine?' me':'')+(r.r===1?' top1':'')+(r.r<=3?' pod p'+r.r:'')+'" data-full="'+esc(r.cs+'  ·  #'+num(r.r)+'  ·  '+fmtS(V.b,r.score)+'  ·  '+(AC_TAG[r.ac]||'')+'  ·  '+(r.mode==='easy'?'Easy':'Hard'))+'"><span class="n">'+(r.r<=3?'<b>'+r.r+'</b>':num(r.r))+'</span><span class="c">'+csTag(r.cs,rankByName(r.rank),r.creator)+'</span>'+lbMode(r.mode)+'<span class="s">'+esc(fmtS(V.b,r.score))+'</span><span class="a">'+lbAc(r.ac)+'</span></div>').join('')
       :'<div class="lbMsg"><b>No scores yet</b>'+(V.p==='today'?'Nobody has flown this one today. ':'')+'Be the first on the board.</div>';
     me.innerHTML=j.me?'<div class="lbRow me" data-full="'+esc(j.me.cs+'  ·  #'+num(j.me.r)+' of '+num(j.total)+'  ·  '+fmtS(V.b,j.me.score))+'"><span class="n">#'+num(j.me.r)+'</span><span class="c">'+csTag(j.me.cs,rankByName(j.me.rank),j.me.creator,'of '+num(j.total))+'</span>'+lbMode(j.me.mode)+'<span class="s">'+esc(fmtS(V.b,j.me.score))+'</span><span class="a">'+(myAc&&AC_TAG[myAc]?lbAc(myAc):'YOU')+'</span></div>'
       :E.P?'<div class="lbRow me"><span class="n">&ndash;</span><span class="c">'+csTag(E.P.cs,rankIdx(E.P.xp||0),E.P.creator,'no score '+(V.p==='today'?'today':V.p==='week'?'this week':'yet'))+'</span><span class="s"></span><span class="a">YOU</span></div>'
       :'<div class="lbRow me"><span class="c"><span>Pick a callsign in Settings to get on the boards</span></span></div>';
     $('lbTotal').textContent=num(j.total)+' pilot'+(j.total===1?'':'s');
     const rb=$('lbRace');rb.hidden=!(B.ghost&&j.ghost);if(j.ghost){rb.textContent='Race the leader: '+j.ghost.cs;}
+    $('lbRows').scrollTop=0;lbPin();requestAnimationFrame(lbPin);
   }
+  // my row pinned at the bottom: shown while my row in the list is off screen, or when I am not in the list at all
+  function lbPin(){const me=$('lbMe'),rows=$('lbRows'),r=$('lbRowsIn').querySelector('.lbRow.me');if(!me||!rows)return;
+    let off=false;if(r){const a=r.getBoundingClientRect(),b=rows.getBoundingClientRect();off=a.top>=b.top-1&&a.bottom<=b.bottom-56+1;}
+    if(me.classList.contains('off')!==off)me.classList.toggle('off',off);}
+  $('lbRows').addEventListener('scroll',lbPin,{passive:true});
   function lbFetch(force){
     const key=V.b+'|'+V.p,seq=++V.seq,c=V.cache[key];
     if(c)lbRows(c);else $('lbRowsIn').innerHTML='<div class="lbMsg">Loading...</div>';
@@ -16123,7 +16192,7 @@ const APP_VER='2026-10-07-dogfight2';          // keep version.json in step when
   }
   function armFree(){E.armed=true;}
   return {E:E,BOARDS:BOARDS,ORDER:ORDER,board:board,runStart:runStart,runEnd:runEnd,runCancel:runCancel,frame:frame,reset:reset,armFree:armFree,
-    boot:boot,csHold:()=>csHold,paintModel:paintModel,paintAll:paintAll,lbOpen:lbOpen,lbRender:lbRender,race:race,ui:ui,flush:flush,csOpen:csOpen,dice:dice,
+    boot:boot,sheet:sheet,sheetOn:()=>!$('lbSheet').hidden,csHold:()=>csHold,paintModel:paintModel,paintAll:paintAll,lbOpen:lbOpen,lbRender:lbRender,race:race,ui:ui,flush:flush,csOpen:csOpen,dice:dice,
     fameDraw:fameDraw,fameFetch:fameFetch,fameApply:fameApply,fameApplyCity:fameApplyCity,ghostStart:ghostStart,decodePath:decodePath,rankSVG:rankSVG,rankByName:rankByName,utcDay:utcDay,fmtS:fmtS,showBadge:showBadge,ghostOff:ghostOff,runBoard:runBoard,
     get P(){return E.P;}};
 })();

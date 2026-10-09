@@ -109,11 +109,15 @@ async def main():
         await pg.evaluate(f"()=>{{{K}.openMenu();{K}.LB.lbOpen('df:kills:hard')}}"); await pg.wait_for_timeout(800)
         try: await pg.wait_for_selector('#lbRowsIn .lbRow', timeout=6000, state='attached')
         except Exception: pass
-        lbt = await pg.evaluate("()=>[...document.querySelectorAll('#lbList h3, #lbList [data-lbb]')].map(e=>e.textContent).join('|')")
-        ok('(a) the Boards screen lists the eight under Red Flag Dogfight, Easy and Hard separate',
-           'Red Flag Dogfight|Dogfight score (Hard)|Dogfight kills (Hard)|Dogfight clear time (Hard)|Dogfight gun kills (Hard)|Dogfight score (Easy)|Dogfight kills (Easy)|Dogfight clear time (Easy)|Dogfight gun kills (Easy)' in lbt, lbt[-300:])
+        lbt = await pg.evaluate("()=>[...document.querySelectorAll('#lbList [data-lbb]')].map(e=>e.dataset.lbb+'='+e.textContent)")
+        bar = await pg.evaluate("()=>({mode:!document.getElementById('lbMode').hidden&&document.querySelector('[data-lbmode].sel').dataset.lbmode,stat:!document.getElementById('lbStat').hidden&&document.querySelector('[data-lbstat].sel').dataset.lbstat,sel:(document.querySelector('#lbList .sel')||{}).dataset})")
+        ok('(a) ui1: the picker has one Red Flag Dogfight entry; the bar shows EASY/HARD (Hard) and the stat (Kills)',
+           [x for x in lbt if 'Dogfight' in x] == ['df=Red Flag Dogfight'] and bar['mode'] == 'hard' and bar['stat'] == 'kills' and bar['sel'] and bar['sel']['lbb'] == 'df', (lbt, bar))
         rw = await pg.evaluate("()=>({n:document.querySelectorAll('#lbRowsIn .lbRow').length,chip:document.querySelectorAll('#lbRowsIn .modeTag').length,s:(document.querySelector('#lbRowsIn .lbRow .s')||{}).textContent,t:document.getElementById('lbTitle').textContent})")
-        ok('(a) a dogfight board: rows without the EASY/HARD chip, kills formatted', rw['n'] == 1 and rw['chip'] == 0 and rw['s'] == '1,700 kills' and rw['t'] == 'Dogfight kills (Hard)', rw)
+        ok('(a) a dogfight board: rows without the EASY/HARD chip, kills formatted', rw['n'] == 1 and rw['chip'] == 0 and rw['s'] == '1,700 kills' and rw['t'] == 'Red Flag Dogfight, kills', rw)
+        await pg.evaluate("()=>document.querySelector('[data-lbmode=easy]').click()"); await pg.wait_for_timeout(300)
+        ez = await pg.evaluate("()=>[document.querySelector('[data-lbmode].sel').dataset.lbmode,document.getElementById('lbTitle').textContent]")
+        ok('(a) ui1: the EASY chip switches to the Easy kills board', ez == ['easy', 'Red Flag Dogfight, kills'], ez)
         await pg.screenshot(path=os.path.join(os.path.dirname(__file__), '..', 'overnight-screenshots', 'dogfight_lb_boards.png'))
 
         # ---------------- (b) a Hard win ----------------

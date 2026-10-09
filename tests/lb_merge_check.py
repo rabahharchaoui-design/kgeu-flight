@@ -52,14 +52,14 @@ async def main():
                 await pg.evaluate("()=>{window.__kgeu.openMenu();window.__kgeu.LB.lbOpen('daily','easy')}")
                 await pg.wait_for_function("()=>document.querySelectorAll('#lbRowsIn .lbRow').length>=10", timeout=10000)
                 await pg.wait_for_timeout(400)
-                ok(name + ': no Easy/Hard tabs on the leaderboard header', await pg.evaluate("()=>!document.querySelector('#sLb [data-lbm]')&&!document.querySelector('#sLb .mh .modeSeg')"))
-                ok(name + ': Today / This week / All time kept', await pg.evaluate("()=>[...document.querySelectorAll('#sLb [data-lbp]')].map(b=>b.textContent).join('|')") == 'Today|This week|All time')
+                ok(name + ': a merged board: no EASY/HARD chip in the bar (ui1: only the dogfight has one)', await pg.evaluate("()=>document.getElementById('lbMode').hidden&&!document.querySelector('#sLb [data-lbm]')"))
+                ok(name + ': Today / This week / All time kept', await pg.evaluate("()=>[...document.querySelectorAll('#sLb [data-lbp]')].map(b=>b.getAttribute('aria-label')).join('|')") == 'Today|This week|All time')
                 bu = [u for u in seen if '/board?' in u]
                 ok(name + ': the board is fetched with no mode', bu and all('&m=' not in u and '?m=' not in u for u in bu), bu[-1:])
                 f = await pg.evaluate(FIT)
                 want = [r['mode'].upper() for r in ROWS] + [MEROW['mode'].upper()]
                 ok(name + ': every row and my row carry the chip of their run', [x.get('m') for x in f] == want, [x.get('m') for x in f])
-                bad = [x for x in f if not (x.get('inside') and x.get('nowrap') and x.get('next') and x.get('rowfit') and x.get('h', 99) <= 50)]
+                bad = [x for x in f if not (x.get('inside') and x.get('nowrap') and x.get('next') and x.get('rowfit') and x.get('h', 99) <= 58)]
                 ok(name + ': the chip sits right next to the score, one line, inside the row', not bad, bad[:3])
                 await pg.screenshot(path=os.path.join(SHOTS, 'lb_' + name + '.png'))
                 ok(name + ': no page errors', not pg.errs, pg.errs[:3])

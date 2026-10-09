@@ -36,6 +36,11 @@ async def main():
                 await pg.evaluate(f"(s)=>{{const K={K};K.openMenu();(K.tabGo||K.nav)(s)}}", scr)
                 await shot(pg, scr, vp)
             await pg.evaluate(f"()=>{{const K={K};K.openMenu();K.LB.lbOpen('df:score:hard')}}"); await shot(pg, 'sLb_df', vp)
+            if await pg.evaluate("()=>!!document.getElementById('lbPick')"):
+                await pg.evaluate("()=>document.getElementById('lbPick').click()"); await shot(pg, 'sLb_sheet', vp)
+                await pg.evaluate("()=>document.getElementById('lbPick').click()")
+                await pg.evaluate(f"()=>{{const K={K};K.LB.lbOpen('free:landing');document.querySelector('[data-lbp=all]').click()}}"); await shot(pg, 'sLb_all', vp)
+                await pg.evaluate("()=>{document.getElementById('lbRows').scrollTop=1e4}"); await shot(pg, 'sLb_all_end', vp)
             await pg.evaluate(f"()=>{{const K={K};K.pick('cessna');K.pickBase('kgeu');K.start('runway')}}"); await pg.wait_for_timeout(600)
             await pg.evaluate(f"()=>{K}.togglePause()"); await shot(pg, 'pause', vp)
             await pg.context.close()
