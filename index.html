@@ -1084,6 +1084,17 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 #fRookie{ background:var(--rust); } #fRookie span{ color:#ffe9cc; }
 #storyOv .sheet{ background:var(--night); color:var(--sand); } #storyOv .reg{ font-size:30px; text-shadow:none; }
 #storyOv .sub{ color:#f0d6ad; font-size:16px; }
+/* ui1: the XP pop. A centre screen burst over everything but the splash: "+37 XP" counts up with a short scale and
+   glow, the reason under it, then it lifts away. Two close together stack (the older one steps up and dims). It never
+   takes a touch (pointer-events none all the way down) and keeps inside the safe area. */
+#xpPops{ position:fixed; z-index:50; left:var(--padL); right:var(--padR); top:max(var(--padT), 30%); height:0; pointer-events:none; display:flex; justify-content:center; }
+.xpPop{ position:absolute; top:0; display:flex; flex-direction:column; align-items:center; pointer-events:none; transition:transform 260ms cubic-bezier(.23,1,.32,1), opacity 260ms ease; will-change:transform; }
+.xpPop .xpIn{ display:flex; flex-direction:column; align-items:center; gap:2px; padding:8px 22px 9px; border-radius:22px; background:radial-gradient(closest-side,rgba(42,22,8,.62),rgba(42,22,8,.34) 68%,rgba(42,22,8,0)); }
+.xpPop .xpN{ font:800 clamp(40px,12vh,64px)/1 var(--font); color:#ffe2a3; letter-spacing:.01em; white-space:nowrap; font-variant-numeric:tabular-nums;
+  text-shadow:0 0 18px rgba(255,170,60,.55), 0 2px 0 rgba(42,22,8,.65); transition:text-shadow 220ms ease; }
+.xpPop .xpN small{ font-size:.46em; margin-left:.18em; letter-spacing:.08em; color:var(--orange); }
+.xpPop.done .xpN{ text-shadow:0 0 28px rgba(255,190,80,.95), 0 0 6px rgba(255,236,190,.9), 0 2px 0 rgba(42,22,8,.65); }
+.xpPop .xpR{ font:800 13px/1.2 var(--font); letter-spacing:.12em; text-transform:uppercase; color:var(--sand); white-space:nowrap; max-width:min(80vw,520px); overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 2px rgba(0,0,0,.6); }
 #splash{ position:fixed; inset:0; z-index:60; background:#F6C177; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:clamp(8px,3vh,16px);
   padding:var(--padT) var(--padR) var(--padB) var(--padL); transition:opacity .45s ease; }
 #splash.done{ opacity:0; pointer-events:none; }
@@ -12778,7 +12789,7 @@ const HAP_PAT={
   green:[[0,'m'],[110,'m']],release:[[0,'m'],[110,'m']],                 // green light, pallet away
   gradeA:[[0,'m'],[130,'m'],[260,'h']],pb:[[0,'l'],[120,'m'],[240,'h']],  // an A landing, a personal best or top 10
   break:[[0,'h'],[60,'m'],[130,'m']],                                    // BREAK: a heavy thump and two taps (the flares)
-  button:[[0,'l']]};                                                     // menu buttons: very light
+  button:[[0,'l']],xp:[[0,'l']]};                                       // menu buttons, an XP pop: very light
 const HAP_COOL={button:90,detent:120,trim:160,stall:700,ab:3000,gun:40,launch:300,impact:200};
 function hapInit(){
   try{HAP.on=localStorage.getItem('kgeuHaptics')!=='0';}catch(e){}
@@ -13397,6 +13408,31 @@ startHereUI();pickType(acType);pickBase(SPAWN_BASE);pickPos(SPAWN_POS);setType(a
 tapBtn($('bPause'),()=>{if(running&&!st.crashed&&!paused)togglePause();});
 const toastEl=document.getElementById('toast');let toastT=0;
 function toast(msg,dur){if(DF_QUIET){dfSay(msg,dur);return;}toastEl.textContent=msg;toastEl.classList.add('on');toastT=dur||3;}
+// ================= ui1: xpPop(amount, reason), the XP burst =================
+// One call from anywhere: a centre screen "+N XP" that counts up from 0 (720 ms, ease out) with a scale and a glow,
+// the reason under it in small capitals, held a moment and lifted away (2.2 s in all). Pops landing close together
+// stack: the older ones step up 62 px and dim, at most three on screen. Real time, so it plays at any frame rate and
+// while paused. Nothing in it takes a touch. A light haptic where the platform ticks without a tap (iOS needs one).
+// XPP.log keeps what was shown for the tests; XPP.off silences it (screenshots).
+const XPP={log:[],live:[],off:false};
+function xpPop(amount,reason,o){amount=Math.round(+amount||0);if(amount<=0||XPP.off)return null;o=o||{};
+  let box=document.getElementById('xpPops');if(!box){box=document.createElement('div');box.id='xpPops';box.setAttribute('aria-live','polite');document.body.appendChild(box);}
+  const el=document.createElement('div');el.className='xpPop';el.setAttribute('role','status');
+  el.innerHTML='<div class="xpIn"><div class="xpN">+<b>0</b><small>XP</small></div>'+(reason?'<div class="xpR"></div>':'')+'</div>';
+  if(reason)el.querySelector('.xpR').textContent=reason;el.setAttribute('aria-label','+'+amount+' XP'+(reason?', '+reason:''));
+  box.appendChild(el);XPP.live.unshift(el);XPP.log.push({amount:amount,reason:reason||'',t:Date.now()});if(XPP.log.length>40)XPP.log.shift();
+  while(XPP.live.length>3){const x=XPP.live.pop();x.remove();}
+  XPP.live.forEach((x,i)=>{x.style.transform=i?'translateY('+(-62*i)+'px) scale('+(1-0.12*i)+')':'';x.style.opacity=i?String(1-0.3*i):'';});
+  const rm=matchMedia('(prefers-reduced-motion: reduce)').matches,inn=el.firstChild,num=el.querySelector('.xpN b'),T0=performance.now(),DUR=o.dur||720;
+  if(inn.animate)inn.animate(rm?[{opacity:0},{opacity:1}]:[{opacity:0,transform:'scale(.82)'},{opacity:1,transform:'scale(1.08)',offset:.6},{opacity:1,transform:'scale(1)'}],
+    {duration:rm?180:320,easing:'cubic-bezier(.23,1,.32,1)',fill:'both'});
+  const step=()=>{if(!el.isConnected)return;const k=rm?1:Math.min(1,(performance.now()-T0)/DUR),v=Math.round(amount*(1-Math.pow(1-k,3)));num.textContent=v.toLocaleString('en-US');
+    if(k<1)requestAnimationFrame(step);else{el.classList.add('done');if(inn.animate&&!rm)inn.animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:240,easing:'cubic-bezier(.23,1,.32,1)'});}};
+  requestAnimationFrame(step);setTimeout(()=>{num.textContent=amount.toLocaleString('en-US');el.classList.add('done');},DUR+400);   // a background tab or a 3 fps frame still lands on the full number
+  try{hapPattern('xp');}catch(e){}
+  setTimeout(()=>{if(inn.animate)inn.animate(rm?[{opacity:1},{opacity:0}]:[{opacity:1,transform:'translateY(0)'},{opacity:0,transform:'translateY(-18px)'}],{duration:240,easing:'ease-in',fill:'both'});
+    setTimeout(()=>{el.remove();const i=XPP.live.indexOf(el);if(i>=0)XPP.live.splice(i,1);},250);},o.hold||2200);
+  return el;}
 
 let dpr=1;const TAU=Math.PI*2;
 // ---------- six pack: the round gauges on a 172 panel ----------
@@ -16197,7 +16233,7 @@ const APP_VER='2026-10-07-dogfight2';          // keep version.json in step when
     get P(){return E.P;}};
 })();
 
-window.__kgeu={tabGo:id=>tabGo(id),resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
+window.__kgeu={tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
   lights:()=>({KGEU:AL.KGEU.count(),KLUF:AL.KLUF.count(),uLights:AL_MAT.uniforms.uLights.value,
