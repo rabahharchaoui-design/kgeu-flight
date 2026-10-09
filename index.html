@@ -11909,18 +11909,25 @@ function dfEnd(why){
   if(!DF.on||DF.done)return;DF.done=true;DF.xpBank=null;DF.why=why;DF.on=false;
   if(why==='win')dfCall('kioWin',null,{ttl:6});else if(why!=='crash')dfCall('kio',null,{ttl:6});
   const r=dfScore(),stars=dfStars(r.score),letter=dfGrade(r.score),better=dfRecord(r,stars);DF.sc=r;
-  runLog('dogfight',{score:r.score,kills:r.kills,gunKills:r.gunKills,waves:r.waves,hits:r.hits,won:r.won,why:why,secs:r.secs,clearT:r.clearT,flareSaves:r.flareSaves,stars:stars,ach:DF.ach.slice(),breaks:DF.brks,overshoots:DF.ovs});
+  runLog('dogfight',{score:r.score,kills:r.kills,gunKills:r.gunKills,waves:r.waves,hits:r.hits,won:r.won,why:why,secs:r.secs,clearT:r.clearT,flareSaves:r.flareSaves,stars:stars,ach:DF.ach.slice(),breaks:DF.brks,overshoots:DF.ovs,
+    loadout:DF.lo?DF.lo.r+'/'+DF.lo.g:'std/full',mult:r.mult,base:r.base,mrmShots:DF.mShots,mrmKills:DF.mKills,mrmBeaten:DF.mDef,longShots:DF.lrShots});
   missHud(null);
   // the boards: one submission with the whole run (a run with no points and no kills is not sent). The daily's points
   // are half the run's, up to 1,500; the Worker fans a df:score run out to the kills, clear and guns boards
-  const bonus=dfBonus(DF),dp=Math.min(1500,Math.round(r.score/2)),dpB=Math.min(1500,Math.round(r.base/2)),send=r.score>0||r.kills>0,lb=DF.daily?'daily':'df:score:'+r.mode;
+  const L=DF.lo,bonus=dfBonus(DF),dp=Math.min(1500,Math.round(r.score/2)),dpB=Math.min(1500,Math.round(r.base/2)),send=r.score>0||r.kills>0,lb=DF.daily?'daily':'df:score:'+r.mode;
   if(DF.daily&&send)scRecord('arc:daily:'+todayKey(),{pts:dp,secs:r.secs,letter:letter,stars:stars,ac:AC.name,df:1});
   if(LB&&DF.lb){if(send)LB.runEnd(DF.lb,DF.daily?dpB:r.base,{secs:Math.round(DF.fightT*100)/100,df:{kills:r.kills,guns:r.gunKills,hits:r.hits,waves:r.waves,won:r.won,
-      clear:r.won?r.clearT:null,bank:bonus/DF_PTS.sec,flares:(DF.flr0||DF_FLARES)-DF.flares,ach:DF.ach.slice(),brk:DF.brks,ov:DF.ovs}});else LB.runCancel(DF.lb);}
+      clear:r.won?r.clearT:null,bank:bonus/DF_PTS.sec,flares:(DF.flr0||DF_FLARES)-DF.flares,ach:DF.ach.slice(),brk:DF.brks,ov:DF.ovs,
+      // arsenal item 5: the loadout flown, its multiplier and the card's points (pts); the Worker reads only the fields above
+      // (boards.js dfProblem) and ignores these, the score sent is the base it can check
+      lo:L?L.r+'/'+L.g:'std/full',mult:r.mult,pts:DF.daily?dp:r.score,srm:L?L.srm:DF_CFG[r.mode==='easy'?'easy':'hard'].fox,mrm:L?L.mrm:0,msh:DF.mShots,mk:DF.mKills,lr:DF.lrShots}});else LB.runCancel(DF.lb);}
   if(why==='crash')return;
   const B=SCORE.best[dfKey(r.mode)];
   const stats=[['Kills',r.kills+(r.gunKills?' ('+r.gunKills+' by gun)':'')],['Waves cleared',r.waves+'/'+DF.waves.length],['Hits taken',r.hits+' of 3'],['Time bonus','+'+resNum(bonus)]];
   if(r.won)stats.push(['Clear time',dfClock(r.clearT)]);
+  // item 5: the loadout flown, always (STANDARD · 6 SRM · 510 rds), and its MRM kills when it had any
+  if(L)stats.push(['Loadout',L.name+' · '+arsTxt(L)+' · '+L.rds+' rds']);
+  if(DF.mShots)stats.push(['Radar missiles',DF.mKills+' of '+DF.mShots+' hit']);
   if(r.mult!==1)stats.push(['Multiplier',arsX(r.mult)+', board points '+resNum(DF.daily?dpB:r.base)]);   // the boards rank the base (above)
   if(DF.brks||DF.ovs)stats.push(['Defence',DF.brks+(DF.brks===1?' break, ':' breaks, ')+DF.ovs+' overshoot'+(DF.ovs===1?'':'s')+' forced']);
   if(DF.daily)stats.push(['Daily points',resNum(dp)+' (half the score)']);

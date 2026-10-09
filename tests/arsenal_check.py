@@ -4,6 +4,7 @@
 import asyncio, os, sys
 from playwright.async_api import async_playwright
 from harness import serve, launch, page, Checks, finger, IPHONE_15
+from ui1_mock import Mock
 ok = Checks()
 K = "window.__kgeu"
 OUT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'overnight-screenshots', 'arsenal'))
@@ -279,6 +280,58 @@ async def balance_section(b, url):
     ok('Hard wave 1: never', n == 0, n)
     await pg.context.close()
 
+async def submit_section(b, url):
+    """item 5: the run submission carries the loadout and multiplier with the base score; the card shows the loadout; the XP burst"""
+    m = Mock(gain=37)
+    st = {'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuType': 'f16'}; st.update(m.storage())
+    pg = await page(b, url, vp=IPHONE_15, storage=st, pre=m.install)
+    await start_rack(pg, 'pilot', 'light', 'half')
+    r = await end_run(pg, 3)
+    for _ in range(20):
+        if m.subs: break
+        await pg.wait_for_timeout(300)
+    sub = m.subs[-1] if m.subs else {}
+    df = sub.get('df') or {}
+    sc = r['sc']
+    ok('the submission: df:score:hard, the BASE score (what the Worker can check), the stats as before', sub.get('board') == 'df:score:hard' and sub.get('score') == sc['base'] and df.get('kills') == 3 and 'bank' in df, {k: sub.get(k) for k in ('board', 'score', 'mode')})
+    ok('the df block carries the loadout (light/half), the multiplier (1.15) and the card points', df.get('lo') == 'light/half' and df.get('mult') == 1.15 and df.get('pts') == sc['score'] and df.get('srm') == 4 and df.get('mrm') == 0, df)
+    await pg.wait_for_timeout(2500)
+    card = await pg.evaluate("()=>{const x=document.querySelector('#arcOv .rXp');return {lines:document.getElementById('aLines').innerText,xp:x&&x.textContent,done:!!(x&&x.classList.contains('done'))}}")
+    ok('the results card shows the loadout used (LIGHT · 4 SRM · 250 rds) and the Multiplier row', 'Loadout' in card['lines'] and 'LIGHT · 4 SRM · 250 rds' in card['lines'] and 'x1.15' in card['lines'], card['lines'])
+    ok('the XP count up from ui1 still plays on the card (+37 XP, done)', card['xp'] and '+37' in card['xp'] and card['done'], card)
+    await shot(pg, 'a5_results_xp_844.png')
+    # an MRM run: the card counts the radar missiles
+    await pg.evaluate(f"()=>{{{K}.arsPick('mixed','full');}}")
+    await start_rack(pg, 'pilot', 'mixed')
+    await pg.evaluate(f"()=>{{const D={K}.DF;D.test.mSee=0;D.test.noBanditFire=true;}}")
+    await pg.evaluate(f"()=>{{const D={K}.DF;D.gap=0;D.kc=0;D.test.wave(1);}}"); await pg.evaluate(PLACE, [0, 4 * 1852, 0])
+    await pg.evaluate(FIRE, 'mrm')
+    await until(pg, f"()=>{K}.DF.kills>=1", 25)
+    n0 = len(m.subs)
+    r = await end_run(pg, 0)
+    for _ in range(20):
+        if len(m.subs) > n0: break
+        await pg.wait_for_timeout(300)
+    df = (m.subs[-1] if len(m.subs) > n0 else {}).get('df') or {}
+    ok('an MRM kill: the df block counts it (msh 1, mk 1, lo mixed/full, mult 1.05)', df.get('msh') == 1 and df.get('mk') == 1 and df.get('lo') == 'mixed/full' and df.get('mult') == 1.05, df)
+    lines = await pg.evaluate("()=>document.getElementById('aLines').innerText")
+    ok('the card: Loadout MIXED · 2 SRM + 2 MRM · 510 rds and Radar missiles 1 of 1 hit', 'MIXED · 2 SRM + 2 MRM · 510 rds' in lines and 'Radar missiles' in lines and '1 of 1 hit' in lines, lines)
+    ok('no console errors (submission)', not pg.errs, pg.errs[:3])
+    await pg.context.close()
+    # the small phone: the results card with the extra rows still fits
+    m = Mock(gain=37)
+    st = {'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuType': 'f16'}; st.update(m.storage())
+    pg = await page(b, url, vp={'width': 568, 'height': 320}, storage=st, pre=m.install)
+    await start_rack(pg, 'pilot', 'light', 'half')
+    await end_run(pg, 3); await pg.wait_for_timeout(2500)
+    fit = await pg.evaluate("""()=>{const o=document.getElementById('arcOv'),sh=o.querySelector('.sheet').getBoundingClientRect(),L=document.getElementById('aLines');
+      const btn=[...o.querySelectorAll('.rBtns button')].map(e=>e.getBoundingClientRect());
+      return {inView:sh.top>=-0.5&&sh.bottom<=innerHeight+0.5,btns:btn.every(r=>r.bottom<=innerHeight&&r.height>=44),scroll:L.scrollHeight>L.clientHeight+1,clip:[...L.querySelectorAll('*')].filter(e=>e.children.length===0&&e.scrollWidth>e.clientWidth+1).map(e=>e.textContent)}}""")
+    ok('568x320: the results card with Loadout and Multiplier fits (sheet in view, buttons reachable; the rows may scroll inside)', fit['inView'] and fit['btns'], fit)
+    await shot(pg, 'a5_results_568.png')
+    ok('no console errors (568 results)', not pg.errs, pg.errs[:3])
+    await pg.context.close()
+
 async def main():
     srv, url = serve()
     async with async_playwright() as p:
@@ -341,6 +394,7 @@ async def main():
         await mrm_section(b, url)
         await mult_section(b, url)
         await balance_section(b, url)
+        await submit_section(b, url)
         # ---- the small phones ----
         for vp, nm in (({'width': 667, 'height': 375}, '667'), ({'width': 568, 'height': 320}, '568'), ({'width': 932, 'height': 430}, '932')):
             pg = await page(b, url, vp=vp, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuType': 'f16'})
