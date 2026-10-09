@@ -50,11 +50,8 @@ async def main():
             for sid in SCREENS:
                 await pg.evaluate(f"()=>{{window.__kgeu.openFly();window.__kgeu.nav('{sid}')}}"); await pg.wait_for_timeout(250)
                 if sid == 'sArc':
-                    bad = await pg.evaluate(FIT, [sid, '.mcard.apt,.mcard.more'])
-                    ok(f'{tag} sArc: the six Arizona cards and the daily fit with no scrolling, 44 px targets, no overlaps', not bad, bad[:4])
-                    bad = await pg.evaluate(ARC_SCROLLED)
-                    ok(f'{tag} sArc: the three World airports cards scroll into view, 44 px targets, no overlaps', not bad, bad[:4])
-                    continue
+                    sc = await pg.evaluate("()=>{const g=document.getElementById('arcCards');return [g.scrollHeight>g.clientHeight+1,g.querySelectorAll('.mcard').length]}")
+                    ok(f'{tag} sArc (ui1): the five Challenges cards, the list does not scroll', sc == [False, 5], sc)
                 bad = await pg.evaluate(FIT, [sid, None])
                 ok(f'{tag} {sid} fits with no scrolling, 44 px targets, no overlaps', not bad, bad[:4])
             if vp['width'] == 667:

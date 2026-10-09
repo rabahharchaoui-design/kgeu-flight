@@ -118,22 +118,15 @@ async def main():
         ok('(a) the Boards screen lists the World airports group and its three boards', 'World airports|Tokyo Haneda landing|Paris CDG landing|Rio Santos Dumont landing' in lbt, lbt[-120:])
         await pg.evaluate(f"()=>{{{K}.openMenu();{K}.nav('sArc')}}"); await pg.wait_for_timeout(400)
         cards = await pg.evaluate(ARCCARDS)
-        apt = [c for c in cards if c['id'].startswith('apt:')]
-        grp = await pg.evaluate("()=>{const h=[...document.querySelectorAll('#arcCards .cgrp')].pop();return h&&[h.textContent,[...h.parentElement.children].indexOf(h)]}")
-        ok('(a) CHALLENGES: a World airports group after the six arcade cards and the missions', grp == ['World airports', 10], grp)
-        ok('(a) ARCADE: Tokyo, Paris and Rio cards with their one line and runway, not flown yet, no ARIZONA tag',
-           [(c['id'], c['name']) for c in apt] == [('apt:RJTT', 'Tokyo Haneda'), ('apt:LFPG', 'Paris CDG'), ('apt:SBRJ', 'Rio Santos Dumont')]
-           and [c['d'] for c in apt] == ['5 mile landing challenge at Tokyo Haneda, runway 34R.', '5 mile landing challenge at Paris CDG, runway 26L.', '5 mile landing challenge at Rio Santos Dumont, runway 20L.']
-           and all('Not flown yet' in c['sc'] and not c['tag'] for c in apt), apt)
-        await pg.evaluate("()=>{const c=document.getElementById('arcCards');c.scrollTop=1e4;}"); await pg.wait_for_timeout(200)
-        await pg.screenshot(path=os.path.join(os.path.dirname(__file__), '..', 'overnight-screenshots', 'world_lb_arcade.png'))
+        ok('(a) ui1 CHALLENGES: no World airports group and no airport cards (they are FLY destinations now)',
+           not [c for c in cards if c['id'].startswith('apt:')] and not await pg.evaluate("()=>!!document.querySelector('#arcCards .cgrp')"), [c['id'] for c in cards])
 
-        # ---------------- (b) the Tokyo card: region switch, then the run ----------------
+        # ---------------- (b) the Tokyo landing challenge (no card since ui1, the mode stays): region switch, then the run ----------------
         await pg.evaluate(STUB)
-        await finger(pg, '#arcCards .mcard[data-m="apt:RJTT"]'); await pg.wait_for_timeout(300)
+        await pg.evaluate(f"()=>{K}.aptStart('rjtt')"); await pg.wait_for_timeout(300)
         k = await pg.evaluate("()=>({r:localStorage.getItem('kgeuRegion'),res:JSON.parse(sessionStorage.getItem('kgeuResume')||'null'),rl:window.__reloaded||0})")
         s0 = (k['res'] or {}).get('start') or {}
-        ok('(b) tapping Tokyo from Arizona: kgeuRegion rjtt and a resume with arc apt, reloads', k['r'] == 'rjtt' and k['rl'] == 1 and s0.get('arc') == 'apt' and s0.get('type') == 'cessna', k)
+        ok('(b) aptStart(rjtt) from Arizona: kgeuRegion rjtt and a resume with arc apt, reloads', k['r'] == 'rjtt' and k['rl'] == 1 and s0.get('arc') == 'apt' and s0.get('type') == 'cessna', k)
         await pg.evaluate("()=>{delete window.__kgeuReload;location.reload();}")
         await after_reload(pg, f"()=>window.__kgeu&&{K}.REGION.id==='rjtt'&&{K}.WORLD.ready&&{K}.ARC.on&&{K}.running()")
         await pg.wait_for_timeout(400)

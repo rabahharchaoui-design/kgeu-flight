@@ -878,6 +878,8 @@ label.sens b{ color:var(--ink); min-width:74px; }
 .frows .chip b{ display:block; font-size:clamp(13px,2.2vw,17px); font-weight:800; overflow:hidden; text-overflow:ellipsis; }
 .frows .go{ flex:1; min-height:44px; border-radius:14px; font-size:26px; font-weight:900; letter-spacing:.08em; background:var(--rust) !important; color:#fff4e0 !important; box-shadow:0 5px 0 var(--brown); border:none; }
 .frows .go:active{ transform:translateY(3px); box-shadow:0 2px 0 var(--brown); }
+.frows .go small{ display:block; font-size:13px; font-weight:800; letter-spacing:.04em; line-height:1; margin-top:-2px; text-transform:none; opacity:.9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.frows .go:has(small){ line-height:1; }
 #menu .chip{ background:rgba(42,22,8,.1); color:var(--night); border:2px solid rgba(42,22,8,.18); border-radius:12px; line-height:1.1; }
 #menu .chip.sel{ background:var(--night); color:var(--sand); border-color:var(--night); }
 .chips{ display:flex; gap:8px; align-items:center; }
@@ -13056,6 +13058,9 @@ const LOCS=[{reg:'az',g:'Arizona',a:[['kgeu','Glendale','KGEU, the home field, 7
   {reg:'lfpg',g:'France',a:[['lfpg','Paris CDG','LFPG, four parallel runways']]},
   {reg:'sbrj',g:'Brazil',a:[['sbrj','Rio Santos Dumont','SBRJ, 4,340 ft on Guanabara Bay']]}];
 let PZ_LOC=null;   // the pause sheet: an airport in another region, picked, not applied yet
+// ui1: FLY the same way. Tokyo Haneda, Paris CDG or Rio (or Arizona from a world region) is a destination: picked, the
+// summary names it, and GO reloads into that region and starts the free flight there (free:landing as anywhere)
+let FLY_LOC=null;
 function locBuild(el,pz){if(!el)return;el.innerHTML='';
   for(const G of LOCS){const g=document.createElement('div');g.className='lgrp';g.dataset.reg=G.reg;
     const h=document.createElement('span');h.className=pz?'glbl':'gcap';h.textContent=G.g.toUpperCase();g.appendChild(h);
@@ -13067,12 +13072,11 @@ function locBuild(el,pz){if(!el)return;el.innerHTML='';
 locBuild($('locFly'),false);locBuild($('locPz'),true);
 function locPick(b,reg,pz){
   if(!baseOK(savedType,b)){toast(AC_INFO[savedType][1]+' needs a longer runway');return;}
-  if(reg===REGION_ID){if(pz)PZ_LOC=null;pickBase(b);return;}
+  if(reg===REGION_ID){if(pz)PZ_LOC=null;else FLY_LOC=null;pickBase(b);return;}
   if(pz){PZ_LOC={reg:reg,b:b};locSel();pzApplyUI();return;}
-  try{localStorage.setItem('kgeuBase',b);}catch(e){}
-  pickRegion(reg,{resume:{screen:'fly'}});}
+  FLY_LOC={reg:reg,b:b};locSel();sumUI();}
 // the highlighted card: the base flown from, or in the pause sheet the other region's airport waiting for Apply
-function locSel(){document.querySelectorAll('.pick[data-b]').forEach(c=>{const on=PZ_LOC&&c.closest('#pauseOv')?c.dataset.b===PZ_LOC.b:c.dataset.b===SPAWN_BASE;
+function locSel(){document.querySelectorAll('.pick[data-b]').forEach(c=>{const pz=!!c.closest('#pauseOv'),P=pz?PZ_LOC:FLY_LOC,on=P?c.dataset.b===P.b:c.dataset.b===SPAWN_BASE;
   c.classList.toggle('sel',on);c.setAttribute('aria-checked',String(on));const off=!baseOK(savedType,c.dataset.b);c.classList.toggle('off',off);c.setAttribute('aria-disabled',String(off));});}
 // bring the highlighted card into view in each row (only the rows that are showing have a width)
 function locShow(){document.querySelectorAll('.locs').forEach(L=>{const c=L.querySelector('.pick.sel');if(c&&L.clientWidth){
@@ -13142,7 +13146,8 @@ function creditsRender(){
     ul.innerHTML=items.map(e=>`<li><b>${e.title.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</b>${e.tag?`<span>${e.tag}</span>`:''}</li>`).join('');
   }).catch(()=>{creditsLoaded=true;ul.innerHTML='<li><b>Music credits unavailable offline</b></li>';});
 }
-$('bGo').onclick=()=>freeStart();
+$('bGo').onclick=()=>{if(FLY_LOC){const P=FLY_LOC;FLY_LOC=null;try{localStorage.setItem('kgeuBase',P.b);}catch(e){}
+  pickRegion(P.reg,{resume:{mode:'free',base:P.b,pos:SPAWN_POS,type:savedType,tod:TOD.id}});return;}freeStart();};
 // from the pause sheet straight to a menu screen; its back button comes back to the sheet
 function pauseGo(id){pauseOv.classList.remove('on');menu.classList.add('on');nav(id,true);fromPause=true;tabsUI();}
 $('pSet').onclick=()=>pauseGo('sSet');$('pArc').onclick=()=>pauseGo('sArc');$('pSch').onclick=()=>pauseGo('sSchool');
@@ -13250,7 +13255,11 @@ $('pApply').onclick=()=>{pauseOv.classList.remove('on');
     pickRegion(P.reg,{resume:{mode:'free',base:P.b,pos:SPAWN_POS,type:savedType,tod:TOD.id}});return;}
   if(pzChanged())freeStart();else pzRestart();};
 function sumUI(){pzApplyUI();const el=$('sumLine');if(!el)return;const I=AC_INFO[savedType]||AC_INFO.cessna;
-  el.textContent=I[1]+' at '+(!REGION.az?BASES[BASE0].name:SPAWN_BASE==='luke'?'Luke AFB':SPAWN_BASE==='phx'?'Sky Harbor':'Glendale')+', '+TOD.name.toLowerCase()+', '+POS_TXT[SPAWN_POS];}
+  const at=FLY_LOC?(REGIONS[FLY_LOC.reg]&&FLY_LOC.reg!=='az'?REGIONS[FLY_LOC.reg].base:FLY_LOC.b==='luke'?'Luke AFB':FLY_LOC.b==='phx'?'Sky Harbor':'Glendale')
+    :!REGION.az?BASES[BASE0].name:SPAWN_BASE==='luke'?'Luke AFB':SPAWN_BASE==='phx'?'Sky Harbor':'Glendale';
+  el.textContent=I[1]+' at '+at+', '+TOD.name.toLowerCase()+', '+POS_TXT[SPAWN_POS];
+  const g=$('bGo');if(g){const to=FLY_LOC?(REGIONS[FLY_LOC.reg]&&FLY_LOC.reg!=='az'?REGIONS[FLY_LOC.reg].short:at):'';
+    if(g.dataset.to!==to){g.dataset.to=to;g.innerHTML='GO'+(to?'<small></small>':'');if(to)g.lastChild.textContent='to '+to;}}}
 
 // ---- missions: everything that is not an arcade game ----
 // ---- card icons: simple silhouettes in the palette, inline SVG ----
@@ -13330,18 +13339,16 @@ function dailyLeft(){const n=Date.now(),d=new Date(n),nx=Date.UTC(d.getUTCFullYe
 setInterval(()=>{if(!menu.classList.contains('on')||curScr!=='sArc')return;const t=dailyLeft();document.querySelectorAll('.mcard .cd').forEach(e=>e.textContent=t);},1000);
 // ui1: one Challenges list, five cards (the dogfight featured across the top, then the daily, the strike range, the
 // airdrop and the short field). The 5 and 1 mile landing challenges, the Luke to Glendale dash and the A-10 gun run keep
-// their modes, boards and starters (arcStart, start('range') with the A-10, the daily's rotation) but no card; the
-// world airports below stay until the Fly tab takes them (item 3)
+// their modes, boards and starters (arcStart, start('range') with the A-10, the daily's rotation) but no card. The
+// world airports are destinations on FLY (free flight there); their apt: landing challenges (aptStart) keep their code
+// and boards with no card
 function arcList(){
   fillCards($('arcCards'),[
     {id:'dogfight',lb:'df:score:'+(rookie()?'easy':'hard'),ac:'Featured',name:'Red Flag Dogfight',desc:'Your F-16 against aggressor F-16s over the Goldwater Range.',cls:'feat',go:()=>dfStart()},
     dailyCard(),
     {id:'range',lb:'arc:strike',ac:'MQ-9A Reaper',name:'Strike range',desc:'Find the targets, lock on, four missiles.',go:()=>{pickType('reaper',1);start('range');}},
     {id:'drop',lb:'arc:drop',ac:'C-130H Hercules',name:'Airdrop',desc:'Put the bundle on the drop zone.',go:()=>{pickType('c130',1);start('drop');}},
-    {id:'short',lb:'mission:short',ac:'C-130H Hercules',name:'Short field landing',desc:'Stop a Hercules on a 3,000 ft dirt strip.',go:()=>{pickType('c130',1);start('short');}},
-    // the world airports, below: each flies in its own region (tapping one from elsewhere switches there)
-    {head:'World airports'}].concat(APT_IDS.map(id=>{const R=REGIONS[id],b=aptBoard(id);
-      return {id:b,lb:b,icon:'landing',here:1,cls:'apt',ac:AC_INFO[savedType][1],name:R.base,score:arcScore(b),desc:'5 mile landing challenge at '+R.base+', runway '+R.main+'.',go:()=>aptStart(id)};})));
+    {id:'short',lb:'mission:short',ac:'C-130H Hercules',name:'Short field landing',desc:'Stop a Hercules on a 3,000 ft dirt strip.',go:()=>{pickType('c130',1);start('short');}}]);
 }
 // ---- first launch: one screen, two big buttons ----
 function funnelPick(v){setSkill(v);$('funnel').classList.remove('on');startHereUI();if(v==='rookie')startLesson('first');}
