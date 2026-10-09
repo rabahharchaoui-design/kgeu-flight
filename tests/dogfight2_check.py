@@ -38,7 +38,7 @@ async def fight(pg, mode):
     await pg.evaluate(f"()=>{{{K}.setSkill('{mode}');{K}.openMenu();{K}.nav('sArc')}}"); await pg.wait_for_timeout(300)
     await finger(pg, '#arcCards [data-m="dogfight"]'); await pg.wait_for_timeout(600)
     await pg.evaluate(f"()=>{{{K}.DF.test.noBanditFire=true;{K}.DF.test.hold=true;}}")
-    await finger(pg, '#dfbGo'); await pg.wait_for_timeout(200)
+    await finger(pg, '#dfbNext'); await pg.wait_for_timeout(150); await finger(pg, '#dfbGo'); await pg.wait_for_timeout(200)
 
 async def main():
     srv, url = serve()

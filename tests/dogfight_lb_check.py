@@ -124,7 +124,7 @@ async def main():
         seen.clear()
         await start(pg, 'pilot', brief=True)
         t0 = calls('/token')
-        await finger(pg, '#dfbGo'); await pg.wait_for_timeout(600)
+        await finger(pg, '#dfbNext'); await pg.wait_for_timeout(150); await finger(pg, '#dfbGo'); await pg.wait_for_timeout(600)
         t1 = calls('/token')
         ok("(b) no token under the briefing card; FIGHT'S ON asks for exactly one, for df:score:hard",
            not t0 and len(t1) == 1 and t1[0][1] == 'df:score:hard' and t1[0][2].get('mode') == 'hard', [(x[1], x[2].get('mode')) for x in t1])

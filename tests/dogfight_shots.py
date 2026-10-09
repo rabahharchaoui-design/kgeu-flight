@@ -421,7 +421,7 @@ async def dfopen_brief(pg):
 
 async def shot54b_brief(pg, name):
     await dfopen_brief(pg)
-    r = await pg.evaluate("""()=>{const g=document.getElementById('dfbGo').getBoundingClientRect();
+    r = await pg.evaluate("""()=>{const g=document.getElementById('dfbNext').getBoundingClientRect();
       return {mode:document.getElementById('dfbMode').textContent,fits:g.bottom<=innerHeight&&g.top>=0,btn:[g.width,g.height]}}""")
     print(f'  {name}: state', r)
     path = os.path.join(OUT, name)
