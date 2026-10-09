@@ -507,6 +507,11 @@ body.dfOn #uiroot > #dfSub{ display:flex; }
 #dfLo .loJet{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:6px 6px 8px; border-radius:12px;
   background:radial-gradient(ellipse at 50% 40%, rgba(255,255,255,.09), rgba(255,255,255,.02) 70%); border:1px solid rgba(255,255,255,.1); }
 #loJet{ display:block; width:100%; max-width:150px; height:auto; aspect-ratio:200/224; }
+#dfLo .sheet{ position:relative; }
+#dfLo .loX{ position:absolute; right:18px; top:12px; margin:0; display:flex; align-items:baseline; gap:5px; color:var(--soft); }
+#dfLo .loX b{ display:inline-block; font:800 20px/1 var(--font); color:#fff; font-variant-numeric:tabular-nums; } #dfLo .loX span{ font:700 11px var(--font); letter-spacing:.08em; text-transform:uppercase; }
+#dfLo .loX.up b{ color:var(--caution); }
+#dfLo .loSum span{ white-space:nowrap; }
 #dfLo .loSum{ margin:0; font:700 11px/1.25 var(--font); letter-spacing:.03em; color:var(--soft); text-align:center; }
 #dfLo .loRacks{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 #dfLo .loR, #dfLo .loG{ position:relative; margin:0; text-align:left; color:var(--soft); background:rgba(255,255,255,.05); border:1.5px solid rgba(255,255,255,.12); border-radius:10px;
@@ -524,7 +529,7 @@ body.dfOn #uiroot > #dfSub{ display:flex; }
 #dfLo .loG{ flex:1; min-height:44px; padding:5px 10px; display:flex; flex-direction:column; justify-content:center; }
 #dfLo .loG b{ font:800 15px/1.1 var(--font); color:#fff; } #dfLo .loG small{ font-size:11px; }
 #dfLo #dfbGo, #dfBrief #dfbNext{ min-height:64px; min-width:240px; font:800 24px var(--font); letter-spacing:.06em; border-radius:14px; }
-@media (max-height:340px){ #dfLo .sheet{ padding:8px 14px 10px; } #dfLo .loBody{ grid-template-columns:132px 1fr; margin:6px 0 8px; gap:8px; }
+@media (max-height:340px){ #dfLo .sheet{ padding:8px 14px 10px; } #dfLo .loX{ top:8px; right:14px; } #dfLo .loBody{ grid-template-columns:132px 1fr; margin:6px 0 8px; gap:8px; }
   #loJet{ max-width:104px; } #dfLo .loR{ min-height:46px; padding:4px 8px; } #dfLo .loR .c{ font-size:15px; } #dfLo .loR .f{ font-size:11px; }
   #dfLo .loRacks{ gap:6px; } #dfLo .loGun{ margin-top:6px; } }
 @media (max-width:600px){ #dfLo .loBody{ grid-template-columns:120px 1fr; } #loJet{ max-width:96px; } #dfLo .loR .c{ font-size:14px; } }
@@ -1720,7 +1725,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   <button class="primary" id="dfbNext">LOADOUT</button>
 </div></div>
 <div class="overlay" id="dfLo" role="dialog" aria-label="Red Flag Dogfight loadout"><div class="sheet">
-  <h3>LOADOUT<span class="modeTag" id="dfloMode"></span></h3>
+  <h3>LOADOUT<span class="modeTag" id="dfloMode"></span></h3><p class="loX" id="loX"><b>x1.00</b><span>score</span></p>
   <div class="loBody">
     <div class="loJet"><svg id="loJet" viewBox="0 0 200 224" aria-hidden="true"></svg><p class="loSum" id="loSum"></p></div>
     <div class="loPick">
@@ -11874,10 +11879,13 @@ function dfTick(dt){
 // over the four waves (breathers, kill cams and the briefing out), only when won; secs: the whole run's fight time.
 const DF_PTS={fox:100,gun:200,sec:2,hit:75,win:250},DF_STARS=[300,900,1500];
 const dfBonus=S=>{let t=0;for(const x of S.bank||[])t+=Math.ceil(Math.max(0,x||0));return t*DF_PTS.sec;};
+// Arsenal item 3: score is the run's points times the loadout's multiplier (S.mult, 1 without one); base is the points
+// before it, what the boards rank
 function dfScore(S){S=S||DF;
   const kills=S.kills|0,gun=S.gunKills|0,hits=S.hits|0,won=!!S.won,waves=won?DF.waves.length:typeof S.waves==='number'?S.waves:(S.bank||[]).length;
   const score=Math.max(0,(kills-gun)*DF_PTS.fox+gun*DF_PTS.gun+dfBonus(S)-hits*DF_PTS.hit+(won?DF_PTS.win:0));
-  return {score:score,kills:kills,gunKills:gun,hits:hits,waves:waves,won:won,clearT:won?+(+S.clearT||0).toFixed(1):null,
+  const mult=typeof S.mult==='number'&&S.mult>=1&&S.mult<=1.15?S.mult:1;
+  return {score:Math.round(score*mult),base:score,mult:mult,lo:S.lo?S.lo.r+'/'+S.lo.g:null,kills:kills,gunKills:gun,hits:hits,waves:waves,won:won,clearT:won?+(+S.clearT||0).toFixed(1):null,
     secs:Math.round(S.fightT!==undefined?S.fightT:S.secs||0),flareSaves:S.flareSaves|0,mode:S.mode||runMode()};}
 const dfStars=p=>p>=DF_STARS[2]?3:p>=DF_STARS[1]?2:p>=DF_STARS[0]?1:0;
 const dfGrade=p=>p>=1500?'A':p>=1100?'B':p>=700?'C':p>=300?'D':'F';
@@ -11902,14 +11910,15 @@ function dfEnd(why){
   missHud(null);
   // the boards: one submission with the whole run (a run with no points and no kills is not sent). The daily's points
   // are half the run's, up to 1,500; the Worker fans a df:score run out to the kills, clear and guns boards
-  const bonus=dfBonus(DF),dp=Math.min(1500,Math.round(r.score/2)),send=r.score>0||r.kills>0,lb=DF.daily?'daily':'df:score:'+r.mode;
+  const bonus=dfBonus(DF),dp=Math.min(1500,Math.round(r.score/2)),dpB=Math.min(1500,Math.round(r.base/2)),send=r.score>0||r.kills>0,lb=DF.daily?'daily':'df:score:'+r.mode;
   if(DF.daily&&send)scRecord('arc:daily:'+todayKey(),{pts:dp,secs:r.secs,letter:letter,stars:stars,ac:AC.name,df:1});
-  if(LB&&DF.lb){if(send)LB.runEnd(DF.lb,DF.daily?dp:r.score,{secs:Math.round(DF.fightT*100)/100,df:{kills:r.kills,guns:r.gunKills,hits:r.hits,waves:r.waves,won:r.won,
+  if(LB&&DF.lb){if(send)LB.runEnd(DF.lb,DF.daily?dpB:r.base,{secs:Math.round(DF.fightT*100)/100,df:{kills:r.kills,guns:r.gunKills,hits:r.hits,waves:r.waves,won:r.won,
       clear:r.won?r.clearT:null,bank:bonus/DF_PTS.sec,flares:(DF.flr0||DF_FLARES)-DF.flares,ach:DF.ach.slice(),brk:DF.brks,ov:DF.ovs}});else LB.runCancel(DF.lb);}
   if(why==='crash')return;
   const B=SCORE.best[dfKey(r.mode)];
   const stats=[['Kills',r.kills+(r.gunKills?' ('+r.gunKills+' by gun)':'')],['Waves cleared',r.waves+'/'+DF.waves.length],['Hits taken',r.hits+' of 3'],['Time bonus','+'+resNum(bonus)]];
   if(r.won)stats.push(['Clear time',dfClock(r.clearT)]);
+  if(r.mult!==1)stats.push(['Multiplier',arsX(r.mult)+', board points '+resNum(DF.daily?dpB:r.base)]);   // the boards rank the base (above)
   if(DF.brks||DF.ovs)stats.push(['Defence',DF.brks+(DF.brks===1?' break, ':' breaks, ')+DF.ovs+' overshoot'+(DF.ovs===1?'':'s')+' forced']);
   if(DF.daily)stats.push(['Daily points',resNum(dp)+' (half the score)']);
   stats.push(['Best',B?resNum(B.pts)+' pts, '+B.kills+' kills'+(B.clr!=null?', '+dfClock(B.clr):''):'none yet']);
@@ -11992,21 +12001,26 @@ const DF_CFG={
 DF.cfg=()=>rookie()?DF_CFG.easy:DF_CFG.hard;
 // ================= the Arsenal (arsenal items 1 to 3) =================
 // The loadout card between the briefing and FIGHT'S ON: a rack (missiles and flares) and the gun's ammo. Counts are
-// [Hard, Easy]. STANDARD with the FULL gun is today's fight (DF_CFG fox, DF_FLARES, DF_ROUNDS) and every install's first
-// pick; the pick is kept (kgeuLoadout). arsApply puts the stores on the jet (dfStart, and again at FIGHT'S ON).
+// [Hard, Easy]. STANDARD with the FULL gun is today's fight (DF_CFG fox, DF_FLARES, DF_ROUNDS) and every install's
+// first pick; the pick is kept (kgeuLoadout). arsApply puts the stores on the jet (dfStart, and again at FIGHT'S ON).
+// Item 3, the score multiplier: m per rack [Hard, Easy] plus the gun's (HALF +0.05), so a full rack is not strictly best;
+// at most x1.15. The run's points times it are the card's score, the stars, the grade and the local best. The boards
+// rank the base points: the Worker caps a dogfight score at what its kills, bank and hits allow (boards.js dfProblem,
+// not changed here), so a multiplied score would be refused; the loadout and its multiplier ride along with the run.
 const ARS_RACKS=[
-  {id:'std',name:'STANDARD',srm:[6,10],mrm:[0,0],flr:30},
-  {id:'light',name:'LIGHT',srm:[4,6],mrm:[0,0],flr:30},
-  {id:'mixed',name:'MIXED',srm:[2,4],mrm:[2,2],flr:30},
-  {id:'bold',name:'LOW FLARES',srm:[6,10],mrm:[0,0],flr:12}];
-const ARS_GUNS=[{id:'full',name:'FULL',rds:510},{id:'half',name:'HALF',rds:250}];
+  {id:'std',name:'STANDARD',srm:[6,10],mrm:[0,0],flr:30,m:[1,1]},
+  {id:'light',name:'LIGHT',srm:[4,6],mrm:[0,0],flr:30,m:[1.1,1.1]},
+  {id:'mixed',name:'MIXED',srm:[2,4],mrm:[2,2],flr:30,m:[1.05,1.05]},
+  {id:'bold',name:'LOW FLARES',srm:[6,10],mrm:[0,0],flr:12,m:[1.1,1.05]}];
+const ARS_GUNS=[{id:'full',name:'FULL',rds:510,m:0},{id:'half',name:'HALF',rds:250,m:0.05}];
+const arsX=m=>'x'+m.toFixed(2);
 const ARS={r:'std',g:'full'};
 try{const o=JSON.parse(localStorage.getItem('kgeuLoadout')||'null');if(o){if(ARS_RACKS.some(x=>x.id===o.r))ARS.r=o.r;if(ARS_GUNS.some(x=>x.id===o.g))ARS.g=o.g;}}catch(e){}
 // the stores of a pick (the kept one by default) in the mode flown
 function arsLo(r,g){const R=ARS_RACKS.find(x=>x.id===(r||ARS.r))||ARS_RACKS[0],G=ARS_GUNS.find(x=>x.id===(g||ARS.g))||ARS_GUNS[0],k=rookie()?1:0;
-  return {r:R.id,g:G.id,name:R.name,gun:G.name,srm:R.srm[k],mrm:R.mrm[k],flr:R.flr,rds:G.rds};}
+  return {r:R.id,g:G.id,name:R.name,gun:G.name,srm:R.srm[k],mrm:R.mrm[k],flr:R.flr,rds:G.rds,rm:R.m[k],gm:G.m,m:Math.round((R.m[k]+G.m)*100)/100};}
 const arsTxt=L=>L.srm+' SRM'+(L.mrm?' + '+L.mrm+' MRM':'');
-function arsApply(){const L=arsLo();DF.lo=L;DF.fox=L.srm;DF.mrm=L.mrm;DF.wpn=L.srm>0?'srm':'mrm';DF.rel=null;DF.rounds=L.rds;DF.flares=L.flr;DF.flr0=L.flr;DFH.ui=-1;DFH.fl=-1;}
+function arsApply(){const L=arsLo();DF.lo=L;DF.mult=L.m;DF.fox=L.srm;DF.mrm=L.mrm;DF.wpn=L.srm>0?'srm':'mrm';DF.rel=null;DF.rounds=L.rds;DF.flares=L.flr;DF.flr0=L.flr;DFH.ui=-1;DFH.fl=-1;}
 function arsPick(r,g){if(r)ARS.r=r;if(g)ARS.g=g;try{localStorage.setItem('kgeuLoadout',JSON.stringify({r:ARS.r,g:ARS.g}));}catch(e){}
   arsApply();arsUI();hapPattern('button');}
 // the jet from above, nose up: the planform (one path, mirrored) and the stores on the six missile stations, wingtips
@@ -12027,15 +12041,18 @@ function arsUI(){
   const L=arsLo(),racks=$('loRacks'),guns=$('loGuns');
   if(racks.dataset.k!==String(rookie())){racks.dataset.k=String(rookie());racks.innerHTML='';guns.innerHTML='';
     for(const R of ARS_RACKS){const l=arsLo(R.id),e=document.createElement('button');e.className='loR';e.dataset.r=R.id;e.setAttribute('role','radio');
-      e.innerHTML='<b>'+R.name+'</b><span class="c">'+arsTxt(l)+'</span><span class="f">'+l.flr+' flares</span><em></em>';
-      e.setAttribute('aria-label',R.name+': '+arsTxt(l)+', '+l.flr+' flares');tapBtn(e,()=>arsPick(R.id,null));racks.appendChild(e);}
+      e.innerHTML='<b>'+R.name+'</b><span class="c">'+arsTxt(l)+'</span><span class="f">'+l.flr+' flares</span><em>'+arsX(l.rm)+'</em>';
+      e.setAttribute('aria-label',R.name+': '+arsTxt(l)+', '+l.flr+' flares, score '+arsX(l.rm));tapBtn(e,()=>arsPick(R.id,null));racks.appendChild(e);}
     for(const G of ARS_GUNS){const e=document.createElement('button');e.className='loG';e.dataset.g=G.id;e.setAttribute('role','radio');
-      e.innerHTML='<b>'+G.rds+' rds</b><small>'+G.name+'</small><em></em>';e.setAttribute('aria-label','Gun, '+G.name.toLowerCase()+', '+G.rds+' rounds');
+      e.innerHTML='<b>'+G.rds+' rds</b><small>'+G.name+'</small><em>'+(G.m?'+'+G.m.toFixed(2):'')+'</em>';e.setAttribute('aria-label','Gun, '+G.name.toLowerCase()+', '+G.rds+' rounds'+(G.m?', score plus '+G.m.toFixed(2):''));
       tapBtn(e,()=>arsPick(null,G.id));guns.appendChild(e);}}
   for(const e of racks.children)e.setAttribute('aria-checked',e.dataset.r===L.r?'true':'false');
   for(const e of guns.children)e.setAttribute('aria-checked',e.dataset.g===L.g?'true':'false');
   const k=L.r+L.g+rookie();if(ARS.jk!==k){ARS.jk=k;$('loJet').innerHTML=arsJet(L);}
-  $('loSum').textContent=[arsTxt(L),L.flr+' flares',L.rds+' rds'].map(t=>t.replace(/ /g,'\u00a0')).join(' · ');   // no item split over two lines
+  const x=$('loX');if(x.dataset.m!==String(L.m)){const up=x.dataset.m&&+x.dataset.m<L.m;x.dataset.m=String(L.m);x.firstChild.textContent=arsX(L.m);x.classList.toggle('up',L.m>1);
+    // a change of the multiplier: the number gives a small nudge (transform only, 180 ms), up or down
+    if(x.animate&&!matchMedia('(prefers-reduced-motion: reduce)').matches)x.firstChild.animate([{transform:'translateY('+(up?4:-4)+'px)',opacity:.4},{transform:'none',opacity:1}],{duration:180,easing:'cubic-bezier(.23,1,.32,1)'});}
+  $('loSum').innerHTML=[arsTxt(L),L.flr+' flares',L.rds+' rds'].map(t=>'<span>'+t+'</span>').join(' · ');   // no item split over two lines (CSS)
 }
 // the briefing's LOADOUT: the briefing gives way to the card (the sim stays held, DF.brief)
 function arsOpen(){if(!DF.brief)return;$('dfBrief').classList.remove('on');

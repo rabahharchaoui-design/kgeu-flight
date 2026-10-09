@@ -137,6 +137,46 @@ async def mrm_section(b, url):
     ok('no console errors (568 MRM)', not pg.errs, pg.errs[:3])
     await pg.context.close()
 
+async def end_run(pg, kills):
+    """kill `kills` bandits of wave 1 (test kills count as missile kills), then let the round clock run out; the card"""
+    await pg.evaluate(f"(n)=>{{const D={K}.DF;D.test.noBanditFire=true;for(let i=0;i<n;i++){{D.gap=0;D.kc=0;D.test.wave(1);{K}.dfKill(D.bandits[0],'test');}}D.gap=0;D.kc=0;D.test.wave(1);D.t=1.5;}}", kills)
+    await pg.evaluate(FAST, 40); await pg.wait_for_timeout(400)
+    return await pg.evaluate(f"()=>({{sc:{K}.DF.sc,card:document.getElementById('arcOv').classList.contains('on'),lines:document.getElementById('aLines').innerText,score:document.getElementById('aScore').textContent,best:{K}.SCORE.best['arc:dogfight:hard']}})")
+
+async def mult_section(b, url):
+    """item 3: the multipliers on the card, the score they make, the base the boards get"""
+    pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuType': 'f16'})
+    await open_brief(pg, 'pilot'); await finger(pg, '#dfbNext'); await pg.wait_for_timeout(300)
+    em = await pg.evaluate("()=>Object.fromEntries([...document.querySelectorAll('#dfLo .loR,#dfLo .loG')].map(e=>[e.dataset.r||e.dataset.g,e.querySelector('em').textContent]))")
+    ok('Hard: each rack shows its multiplier (STANDARD x1.00, LIGHT x1.10, MIXED x1.05, LOW FLARES x1.10), the HALF gun +0.05', em == {'std': 'x1.00', 'light': 'x1.10', 'mixed': 'x1.05', 'bold': 'x1.10', 'full': '', 'half': '+0.05'}, em)
+    x = await pg.evaluate("()=>{const e=document.getElementById('loX');return [e.firstChild.textContent,e.className]}")
+    ok('the card total reads x1.00 for STANDARD with the full gun (not highlighted)', x[0] == 'x1.00' and 'up' not in x[1], x)
+    await finger(pg, '#loRacks [data-r="light"]'); await finger(pg, '#loGuns [data-g="half"]'); await pg.wait_for_timeout(250)
+    x = await pg.evaluate("()=>{const e=document.getElementById('loX');return [e.firstChild.textContent,e.className]}")
+    ok('LIGHT with the HALF gun: x1.15, highlighted', x[0] == 'x1.15' and 'up' in x[1], x)
+    f = await pg.evaluate(FIT)
+    ok('844x390: still fits with the multipliers', not f['off'] and not f['scroll'] and not f['ov'] and not f['small'] and not f['clip'], f)
+    await shot(pg, 'a3_card_mult_844.png')
+    await finger(pg, '#dfbGo'); await pg.wait_for_timeout(200); await pg.evaluate(FAST, 3)
+    r = await end_run(pg, 3)
+    sc = r['sc']
+    want = round(sc['base'] * 1.15)
+    ok('a run with LIGHT + HALF: score = base x 1.15 (3 kills and the wave bank), base kept for the boards', sc['base'] >= 300 and sc['score'] == want and sc['mult'] == 1.15 and sc['lo'] == 'light/half', sc)
+    ok('the results card shows the multiplied score and the Multiplier row (x1.15, board points = base)', r['card'] and r['score'].startswith(format(want, ',')) and 'Multiplier' in r['lines'] and 'x1.15' in r['lines'] and ('board points ' + format(sc['base'], ',')) in r['lines'], (r['score'], r['lines']))
+    ok('the local best keeps the card score', r['best'] and r['best']['pts'] == want, r['best'])
+    await shot(pg, 'a3_results_844.png')
+    # the default: no multiplier row, the score is the base
+    await pg.evaluate(f"()=>{{{K}.arsPick('std','full');}}")
+    await open_brief(pg, 'pilot'); await finger(pg, '#dfbNext'); await pg.wait_for_timeout(300); await finger(pg, '#dfbGo'); await pg.wait_for_timeout(200); await pg.evaluate(FAST, 3)
+    r = await end_run(pg, 2)
+    ok("STANDARD + FULL: the score is the base, no Multiplier row (today's card)", r['sc']['score'] == r['sc']['base'] >= 200 and r['sc']['mult'] == 1 and 'Multiplier' not in r['lines'], (r['sc'], r['lines']))
+    # Easy's LOW FLARES is x1.05 (the auto flares soften it)
+    await open_brief(pg, 'rookie'); await finger(pg, '#dfbNext'); await pg.wait_for_timeout(300)
+    em = await pg.evaluate("()=>document.querySelector('#dfLo .loR[data-r=bold] em').textContent")
+    ok('Easy: LOW FLARES is x1.05 (Easy flares by itself twice a wave)', em == 'x1.05', em)
+    ok('no console errors (multipliers)', not pg.errs, pg.errs[:3])
+    await pg.context.close()
+
 async def main():
     srv, url = serve()
     async with async_playwright() as p:
@@ -154,7 +194,7 @@ async def main():
         ok('the card: LOADOUT, HARD, the racks (STANDARD, LIGHT, LOW FLARES), the gun (510 and 250 rds), FIGHT\'S ON', all(t in txt for t in ('LOADOUT', 'HARD', 'STANDARD', 'LIGHT', 'LOW FLARES', '510 rds', '250 rds', "FIGHT'S ON")), txt)
         ck = await pg.evaluate("()=>[...document.querySelectorAll('#dfLo [aria-checked=true]')].map(e=>e.dataset.r||e.dataset.g)")
         ok('a new install picks STANDARD and the FULL gun', ck == ['std', 'full'], ck)
-        ok('the summary under the jet says today\'s stores: 6 SRM, 30 flares, 510 rds', (await pg.inner_text('#loSum')).replace('\xa0',' ') == '6 SRM · 30 flares · 510 rds', (await pg.inner_text('#loSum')).replace('\xa0',' '))
+        ok('the summary under the jet says today\'s stores: 6 SRM, 30 flares, 510 rds', (await pg.inner_text('#loSum')) == '6 SRM · 30 flares · 510 rds', (await pg.inner_text('#loSum')))
         ok('the jet drawing shows six missiles on the stations', await pg.evaluate("()=>document.querySelectorAll('#loJet g').length") == 6)
         ok('844x390: the card fits (nothing off screen, no scroll, no overlap, every target 44 px, no clipped text)', not f['off'] and not f['scroll'] and not f['ov'] and not f['small'] and not f['clip'], f)
         gc = [(f['go'][0] + f['go'][2]) / 2, (f['go'][1] + f['go'][3]) / 2]
@@ -171,7 +211,7 @@ async def main():
         await finger(pg, '#loGuns [data-g="half"]'); await pg.wait_for_timeout(150)
         ck = await pg.evaluate("()=>[...document.querySelectorAll('#dfLo [aria-checked=true]')].map(e=>e.dataset.r||e.dataset.g)")
         ok('a tap picks a rack and a gun (one each)', ck == ['light', 'half'], ck)
-        ok('the summary and the drawing follow the pick: 4 SRM, 250 rds, four missiles', (await pg.inner_text('#loSum')).replace('\xa0',' ') == '4 SRM · 30 flares · 250 rds' and await pg.evaluate("()=>document.querySelectorAll('#loJet g').length") == 4, (await pg.inner_text('#loSum')).replace('\xa0',' '))
+        ok('the summary and the drawing follow the pick: 4 SRM, 250 rds, four missiles', (await pg.inner_text('#loSum')) == '4 SRM · 30 flares · 250 rds' and await pg.evaluate("()=>document.querySelectorAll('#loJet g').length") == 4, (await pg.inner_text('#loSum')))
         await shot(pg, 'a1_light_844.png')
         await finger(pg, '#dfbGo'); await pg.wait_for_timeout(200); await pg.evaluate(STEP, 5)
         s = await pg.evaluate(STORES)
@@ -197,6 +237,7 @@ async def main():
         ok('no console errors (844x390)', not pg.errs, pg.errs[:3])
         await pg.context.close()
         await mrm_section(b, url)
+        await mult_section(b, url)
         # ---- the small phones ----
         for vp, nm in (({'width': 667, 'height': 375}, '667'), ({'width': 568, 'height': 320}, '568'), ({'width': 932, 'height': 430}, '932')):
             pg = await page(b, url, vp=vp, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuType': 'f16'})
