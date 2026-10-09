@@ -97,8 +97,13 @@ async def main():
         await pg.evaluate(f"()=>{{{K}.pick('cessna');{K}.setTOD('sunset');{K}.pickPos('ramp');const c=document.querySelector('#sFly .pick[data-b=rjtt]'),L=c.closest('.locs');L.scrollLeft=c.closest('.lgrp').offsetLeft;}}")
         await pg.wait_for_timeout(200)
         await finger(pg, '#sFly .pick[data-b="rjtt"]'); await pg.wait_for_timeout(300)
+        k = await pg.evaluate("()=>({r:localStorage.getItem('kgeuRegion'),rl:window.__reloaded||0,sel:document.querySelector('#sFly .pick[data-b=rjtt]').classList.contains('sel'),go:document.getElementById('bGo').innerText.replace(/\\s+/g,' '),sum:document.getElementById('sumLine').textContent})")
+        ok('FLY (ui1): tapping Tokyo Haneda picks it as the destination, no reload yet, GO names it', k['rl'] == 0 and k['r'] != 'rjtt' and k['sel'] and k['go'] == 'GO to Haneda' and 'at Tokyo Haneda' in k['sum'], k)
+        await finger(pg, '#bGo'); await pg.wait_for_timeout(300)
         k = await pg.evaluate("()=>({r:localStorage.getItem('kgeuRegion'),b:localStorage.getItem('kgeuBase'),res:JSON.parse(sessionStorage.getItem('kgeuResume')||'null'),rl:window.__reloaded,t:localStorage.getItem('kgeuType'),tod:localStorage.getItem('kgeuTOD'),pos:localStorage.getItem('kgeuPos')})")
-        ok('FLY: tapping Tokyo Haneda saves kgeuRegion rjtt, a FLY resume, and reloads', k['r'] == 'rjtt' and k['res'] == {'screen': 'fly'} and k['rl'] == 1 and k['b'] == 'rjtt', k)
+        s0 = (k['res'] or {}).get('start') or {}
+        ok('FLY GO: kgeuRegion rjtt, a free flight resume at Haneda (aircraft, start, time), reloads', k['r'] == 'rjtt' and k['rl'] == 1 and k['b'] == 'rjtt'
+           and s0.get('mode') == 'free' and s0.get('base') == 'rjtt' and s0.get('type') == 'cessna' and s0.get('pos') == 'ramp' and s0.get('tod') == 'sunset', k)
         ok('the aircraft, time and start stay saved', k['t'] == 'cessna' and k['tod'] == 'sunset' and k['pos'] == 'ramp', k)
         await pg.evaluate("()=>{localStorage.setItem('kgeuRegion','az');localStorage.setItem('kgeuBase','kgeu');sessionStorage.removeItem('kgeuResume');}")
         # (g) credits
@@ -133,6 +138,10 @@ async def main():
         ok('after the real reload: the Alpha flies the 1 mile final at Santos Dumont, day',
            s['reg'] == 'sbrj' and s['type'] == 'alpha' and s['base'] == 'sbrj' and s['mode'] == 'final' and s['agl'] > 60 and not s['menu'] and s['tod'] == 'day', s)
         await region_radio_map(pg, 'sbrj')
+        for _ in range(10):
+            runs = await pg.evaluate(f"()=>{{const K={K};for(let i=0;i<6;i++)K.stepFrame(1/30,false,true);return Object.keys(K.LB.E.runs)}}")
+            if 'free:landing' in runs: break
+        ok('ui1: a free flight in Rio is a free:landing run, like anywhere', 'free:landing' in runs, runs)
         ok('Arizona and Rio: no console errors', not pg.errs, pg.errs[:4])
         await pg.context.close()
 
@@ -168,27 +177,27 @@ async def main():
         ok('pause (rjtt): Glendale picked, Apply pending, no reload yet', r == ['Apply', 0], r)
         await finger(pg, '#pResume'); await pg.wait_for_timeout(300)
         # (d) Arizona tags; the airdrop switches back to Arizona
-        await pg.evaluate(f"()=>{K}.openMenu('sMis')"); await pg.wait_for_timeout(300)
-        m = await pg.evaluate("()=>[...document.querySelectorAll('#misCards .mcard')].map(c=>[c.dataset.m,!!c.querySelector('.azTag')&&c.querySelector('.azTag').textContent])")
-        ok('rjtt MISSIONS: every card tagged ARIZONA but the daily, which names its airport instead', m and all(x[1] == 'ARIZONA' for x in m if x[0] != 'daily') and [x[1] for x in m if x[0] == 'daily'] == [False], m)
+        await pg.evaluate(f"()=>{K}.openMenu('sArc')"); await pg.wait_for_timeout(300)
+        m = await pg.evaluate("()=>[...document.querySelectorAll('#arcCards .mcard')].filter(c=>!c.dataset.m.startsWith('apt:')).map(c=>[c.dataset.m,!!c.querySelector('.azTag')&&c.querySelector('.azTag').textContent])")
+        ok('rjtt CHALLENGES: every card tagged ARIZONA but the daily, which names its airport instead', m and all(x[1] == 'ARIZONA' for x in m if x[0] != 'daily') and [x[1] for x in m if x[0] == 'daily'] == [False], m)
         await pg.evaluate(f"()=>{K}.nav('sSchool')"); await pg.wait_for_timeout(300)
         sch = await pg.evaluate("()=>[...document.querySelectorAll('#school .lrow')].map(c=>!!c.querySelector('.azTag'))")
         ok('rjtt SCHOOL: every lesson tagged ARIZONA', sch and all(sch), sch)
         await pg.evaluate(f"()=>{K}.nav('sArc')"); await pg.wait_for_timeout(300)
         a = await pg.evaluate("()=>[...document.querySelectorAll('#arcCards .mcard')].map(c=>[c.dataset.m,!!c.querySelector('.azTag')])")
-        ok('rjtt ARCADE: every Arizona card tagged ARIZONA, the strike too; the daily and the world airports not', a and all(x[1] for x in a if x[0] != 'daily' and not x[0].startswith('apt:'))
-           and not any(x[1] for x in a if x[0] == 'daily' or x[0].startswith('apt:')) and any(x[0] == 'range' for x in a) and sum(x[0].startswith('apt:') for x in a) == 3, a)
+        ok('rjtt CHALLENGES: every Arizona card tagged ARIZONA, the strike too; the daily not; no airport cards (ui1)', a and all(x[1] for x in a if x[0] != 'daily')
+           and not any(x[1] for x in a if x[0] == 'daily') and any(x[0] == 'range' for x in a) and not any(x[0].startswith('apt:') for x in a), a)
         await finger(pg, '#arcCards .mcard[data-m="drop"]'); await pg.wait_for_timeout(300)
         k = await pg.evaluate("()=>({r:localStorage.getItem('kgeuRegion'),res:JSON.parse(sessionStorage.getItem('kgeuResume')||'null'),rl:window.__reloaded})")
         s0 = (k['res'] or {}).get('start') or {}
         ok('rjtt airdrop: kgeuRegion az and a resume with the mission (drop, C-130, time, Hard)',
            k['r'] == 'az' and k['rl'] == 1 and s0.get('mode') == 'drop' and s0.get('type') == 'c130' and s0.get('tod') == 'day' and s0.get('skill') == 'pilot', k)
         await pg.evaluate("()=>localStorage.setItem('kgeuRegion','rjtt')")
-        for kind, sel, check in (('landing challenge', '#arcCards .mcard[data-m="landing"]', lambda s: s.get('arc') == 'landing'),):
+        for kind, sel, check in (('strike range', '#arcCards .mcard[data-m="range"]', lambda s: s.get('mode') == 'range' and s.get('type') == 'reaper'),):   # ui1: no landing card
             await pg.evaluate(f"()=>{K}.nav('sArc')"); await pg.wait_for_timeout(200)
             await finger(pg, sel); await pg.wait_for_timeout(300)
             s1 = (await pg.evaluate("()=>JSON.parse(sessionStorage.getItem('kgeuResume')||'null')") or {}).get('start') or {}
-            ok(f'rjtt {kind}: the resume carries the arcade kind, aircraft and start', check(s1) and s1.get('type') == 'cessna' and 'pos' in s1, s1)
+            ok(f'rjtt {kind}: the resume carries the mode, aircraft and start', check(s1) and 'pos' in s1, s1)
         await pg.evaluate(f"()=>{{localStorage.setItem('kgeuRegion','rjtt');{K}.nav('sSchool')}}"); await pg.wait_for_timeout(200)
         await finger(pg, '#school .lrow[data-l="steep"]'); await pg.wait_for_timeout(300)
         s1 = (await pg.evaluate("()=>JSON.parse(sessionStorage.getItem('kgeuResume')||'null')") or {}).get('start') or {}

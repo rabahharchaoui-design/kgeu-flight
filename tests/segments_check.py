@@ -47,7 +47,7 @@ async def main():
             fit = await pg.evaluate("()=>{const s=document.getElementById('sFly'),r=document.getElementById('bGo').getBoundingClientRect();return s.scrollHeight<=s.clientHeight+1&&r.right<=innerWidth&&r.bottom<=innerHeight&&r.height>=44}")
             ok(f'{W}: the fly screen fits with GO on screen', fit)
             no_nest = await pg.evaluate("()=>document.querySelectorAll('#menu .scr').length")
-            ok(f'{W}: no new menu screen', no_nest == 9, no_nest)
+            ok(f'{W}: no new menu screen (ui1: eight, Missions folded into Challenges)', no_nest == 8, no_nest)
             await pg.screenshot(path=f'{SHOTS}/after_fly_{W}x{vp["height"]}.png')
             await finger(pg, '#sFly [data-pos="final"]'); await pg.wait_for_timeout(200)
             line = await pg.evaluate("()=>document.getElementById('sumLine').textContent")

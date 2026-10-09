@@ -29,14 +29,14 @@ AUDIT = """()=>{const ov=document.getElementById('pauseOv'),pz=ov.querySelector(
     else{const g=ox?gy:oy?gx:Math.max(gx,gy);const same=grp(bs[i])&&grp(bs[i])===grp(bs[j]);if(same){if(g<minIn)minIn=g;}else if(g<minGap)minGap=g;}}
   const scroll=[...ov.querySelectorAll('*')].some(e=>{const cs=getComputedStyle(e);return (cs.overflowY==='auto'||cs.overflowY==='scroll')&&e.scrollHeight>e.clientHeight+1;})||ov.scrollHeight>ov.clientHeight+1;
   const r=id=>{const e=document.getElementById(id);const q=e.getBoundingClientRect();return {x:q.x,y:q.y,w:q.width,h:q.height,r:q.right,b:q.bottom};};
-  const order=['pResume','pApply','pMenu','pMis','pArc','pSch','pLb','pSound','pInv','pSens','pPrev','pMusic','pMnext','pPhoto','pSet'].map(r);
+  const order=['pResume','pApply','pMenu','pArc','pSch','pLb','pSet','pSound','pInv','pSens','pPrev','pMusic','pMnext','pPhoto'].map(r);
   const menu=r('pMenu'),res=r('pResume');
   const near=bs.filter(b=>b.id!=='pMenu').map(b=>{const q=R(b);const gx=Math.max(q.left,menu.x)-Math.min(q.right,menu.r),gy=Math.max(q.top,menu.y)-Math.min(q.bottom,menu.b);return Math.max(gx,gy);});
   return {bad:bad,minGap:+minGap.toFixed(1),minIn:+minIn.toFixed(1),scroll:scroll,n:bs.length,
     resumeTop:res.y<=Math.min(...order.map(o=>o.y))+0.5,resumeBig:res.w>=1.4*r('pApply').w,
     menuRight:menu.r>=Math.max(...order.map(o=>o.r))-0.5,menuApart:Math.min(...near),menuSecondary:getComputedStyle(document.getElementById('pMenu')).backgroundColor!==getComputedStyle(document.getElementById('pResume')).backgroundColor,
-    navRow:['pMis','pArc','pSch','pLb'].map(id=>r(id)),tiles:['pSound','pInv','pSens'].map(id=>r(id)),music:['pPrev','pMusic','pMnext'].map(id=>r(id)),
-    acChips:document.querySelectorAll('#pAc .pick').length,labels:['pMis','pArc','pSch','pLb','pMenu','pResume'].map(id=>document.getElementById(id).textContent.trim())}}"""
+    navRow:['pArc','pSch','pLb','pSet'].map(id=>r(id)),tiles:['pSound','pInv','pSens'].map(id=>r(id)),music:['pPrev','pMusic','pMnext'].map(id=>r(id)),
+    acChips:document.querySelectorAll('#pAc .pick').length,labels:['pArc','pSch','pLb','pSet','pMenu','pResume'].map(id=>document.getElementById(id).textContent.trim())}}"""
 
 async def main():
     srv, url = serve()
@@ -54,7 +54,7 @@ async def main():
             ok(f'{tag}: no scrolling', not a['scroll'])
             ok(f'{tag}: RESUME is the big one at the top', a['resumeTop'] and a['resumeBig'])
             ok(f'{tag}: MAIN MENU sits on its own at the far right, secondary style, clear of everything', a['menuRight'] and a['menuApart'] >= 11.5 and a['menuSecondary'], (a['menuRight'], a['menuApart'], a['menuSecondary']))
-            ok(f'{tag}: nav row Missions, Arcade, School, Boards; MAIN MENU and RESUME labelled', a['labels'] == ['Missions', 'Arcade', 'School', 'Boards', 'MAIN MENU', 'RESUME'], a['labels'])
+            ok(f'{tag}: nav (ui1) Challenges, School, Boards, Settings; MAIN MENU and RESUME labelled', a['labels'] == ['Challenges', 'School', 'Boards', 'Settings', 'MAIN MENU', 'RESUME'], a['labels'])
             ok(f'{tag}: the quick tiles and the music row are rows (same top)', len({round(t['y']) for t in a['tiles']}) == 1 and len({round(t['y']) for t in a['music']}) == 1, (a['tiles'], a['music']))
             ok(f'{tag}: a chip for every aircraft', a['acChips'] == await pg.evaluate(f'()=>{K}.CAR.length'), a['acChips'])
             # order: nav above tiles above music (left panel); mode row above aircraft above base/time above starts (right)

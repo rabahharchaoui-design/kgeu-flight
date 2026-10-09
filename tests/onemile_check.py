@@ -99,8 +99,7 @@ async def main():
         pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'rookie', 'kgeuTut': '1'})
         await pg.evaluate(f"()=>{{{K}.openMenu();{K}.nav('sArc')}}"); await pg.wait_for_timeout(500)
         cards = await pg.evaluate("()=>[...document.querySelectorAll('#arcCards .mcard b')].map(b=>b.textContent)")
-        ok('arcade lists the 1 mile landing challenge next to the 5 mile one', 'Landing challenge' in cards and '1 mile landing challenge' in cards
-           and cards.index('1 mile landing challenge') == cards.index('Landing challenge') + 1, cards)
+        ok('ui1: Challenges has no landing challenge cards (the modes stay, started from code)', 'Landing challenge' not in cards and '1 mile landing challenge' not in cards and 'Red Flag Dogfight' in cards, cards)
         await shot(pg, 'arcade')
         await pg.evaluate(f"()=>{{{K}.pick('cessna');{K}.arcStart('landing1')}}"); await pg.evaluate(STEP, 2)
         g = await pg.evaluate("""()=>{const K=window.__kgeu,s=K.state(),e=K.RWY_ENDS.find(e=>e.rwy.code==='KGEU'&&e.num==='1'),d=Math.hypot(s.pos.x-e.x,s.pos.z-e.z);

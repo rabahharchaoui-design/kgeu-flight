@@ -109,11 +109,15 @@ async def main():
         await pg.evaluate(f"()=>{{{K}.openMenu();{K}.LB.lbOpen('df:kills:hard')}}"); await pg.wait_for_timeout(800)
         try: await pg.wait_for_selector('#lbRowsIn .lbRow', timeout=6000, state='attached')
         except Exception: pass
-        lbt = await pg.evaluate("()=>[...document.querySelectorAll('#lbList h3, #lbList [data-lbb]')].map(e=>e.textContent).join('|')")
-        ok('(a) the Boards screen lists the eight under Red Flag Dogfight, Easy and Hard separate',
-           'Red Flag Dogfight|Dogfight score (Hard)|Dogfight kills (Hard)|Dogfight clear time (Hard)|Dogfight gun kills (Hard)|Dogfight score (Easy)|Dogfight kills (Easy)|Dogfight clear time (Easy)|Dogfight gun kills (Easy)' in lbt, lbt[-300:])
+        lbt = await pg.evaluate("()=>[...document.querySelectorAll('#lbList [data-lbb]')].map(e=>e.dataset.lbb+'='+e.textContent)")
+        bar = await pg.evaluate("()=>({mode:!document.getElementById('lbMode').hidden&&document.querySelector('[data-lbmode].sel').dataset.lbmode,stat:!document.getElementById('lbStat').hidden&&document.querySelector('[data-lbstat].sel').dataset.lbstat,sel:(document.querySelector('#lbList .sel')||{}).dataset})")
+        ok('(a) ui1: the picker has one Red Flag Dogfight entry; the bar shows EASY/HARD (Hard) and the stat (Kills)',
+           [x for x in lbt if 'Dogfight' in x] == ['df=Red Flag Dogfight'] and bar['mode'] == 'hard' and bar['stat'] == 'kills' and bar['sel'] and bar['sel']['lbb'] == 'df', (lbt, bar))
         rw = await pg.evaluate("()=>({n:document.querySelectorAll('#lbRowsIn .lbRow').length,chip:document.querySelectorAll('#lbRowsIn .modeTag').length,s:(document.querySelector('#lbRowsIn .lbRow .s')||{}).textContent,t:document.getElementById('lbTitle').textContent})")
-        ok('(a) a dogfight board: rows without the EASY/HARD chip, kills formatted', rw['n'] == 1 and rw['chip'] == 0 and rw['s'] == '1,700 kills' and rw['t'] == 'Dogfight kills (Hard)', rw)
+        ok('(a) a dogfight board: rows without the EASY/HARD chip, kills formatted', rw['n'] == 1 and rw['chip'] == 0 and rw['s'] == '1,700 kills' and rw['t'] == 'Red Flag Dogfight, kills', rw)
+        await pg.evaluate("()=>document.querySelector('[data-lbmode=easy]').click()"); await pg.wait_for_timeout(300)
+        ez = await pg.evaluate("()=>[document.querySelector('[data-lbmode].sel').dataset.lbmode,document.getElementById('lbTitle').textContent]")
+        ok('(a) ui1: the EASY chip switches to the Easy kills board', ez == ['easy', 'Red Flag Dogfight, kills'], ez)
         await pg.screenshot(path=os.path.join(os.path.dirname(__file__), '..', 'overnight-screenshots', 'dogfight_lb_boards.png'))
 
         # ---------------- (b) a Hard win ----------------
@@ -141,6 +145,12 @@ async def main():
         ok('(b) the results card: the rank line #3 of 40 (TOP 10)', card['on'] and 'Leaderboard\n#3 of 40 +60 XP' in card['lines'] and 'TOP 10' in card['lines'], card['lines'])
         ok('(b) the results card: the personal bests line, "+150 XP  ACE", the rank up to Wingman',
            'Also: kills (TOP 10), clear time #14' in card['lines'] and '+150 XP ACE' in card['lines'] and 'Rank up\n' in card['lines'] and 'WINGMAN' in card['lines'], card['lines'])
+        await pg.wait_for_timeout(1600)
+        xp = await pg.evaluate(f"""()=>{{const x=document.querySelector('#arcOv .rXp'),L=document.querySelector('#arcOv .rLines');return {{
+          t:x&&x.innerText.replace(/\\s+/g,' ').trim(),above:!!(x&&L&&(x.compareDocumentPosition(L)&Node.DOCUMENT_POSITION_FOLLOWING)),done:!!(x&&x.classList.contains('done')),
+          pops:{K}.XPP.log.filter(e=>!e.card).length,card:{K}.XPP.log.filter(e=>e.card).map(e=>e.amount)}}}}""")
+        ok('(b) ui1: the fight\'s XP (60 for the run + 150 for ACE) counts up once on the card, above the stats', xp['t'] and xp['t'].replace(' ', '').startswith('+210XP') and 'achievements +150' in xp['t'].lower() and xp['above'] and xp['done'] and xp['card'] == [210], xp)
+        ok('(b) ui1: no XP pop at all during or after the fight (the card is the one place)', xp['pops'] == 0, xp)
         await pg.screenshot(path=os.path.join(os.path.dirname(__file__), '..', 'overnight-screenshots', 'dogfight_lb_card.png'))
         await pg.evaluate("()=>document.getElementById('aHub').click()"); await pg.wait_for_timeout(300)
 
@@ -175,13 +185,12 @@ async def main():
         ok("(e) K.dailyKind('dogfight') forces it; K.dailyRegion('az') pins a landing daily", kinds == ['dogfight', 'landing'], kinds)
         await pg.evaluate(f"()=>{{const K={K};K.dailyRegion(null);K.dailyKind('dogfight');K.setSkill('pilot');K.openMenu();K.nav('sArc')}}"); await pg.wait_for_timeout(400)
         ca = await pg.evaluate("()=>document.querySelector('#arcCards .mcard[data-m=daily]').innerText")
-        await pg.evaluate(f"()=>{K}.nav('sMis')"); await pg.wait_for_timeout(300)
-        cm = await pg.evaluate("()=>document.querySelector('#misCards .mcard[data-m=daily]').innerText")
-        ok('(e) the daily card on ARCADE and MISSIONS: Red Flag Dogfight, Barry M. Goldwater Range, F-16, the mode, the countdown',
+        cm = ca   # ui1: one Challenges list, one daily card
+        ok('(e) the daily card on CHALLENGES: Red Flag Dogfight, Barry M. Goldwater Range, F-16, the mode, the countdown',
            all('Red Flag Dogfight' in c and 'Barry M. Goldwater Range, F-16' in c and 'Hard mode' in c and 'Next in' in c for c in (ca, cm)), (ca, cm))
         await pg.screenshot(path=os.path.join(os.path.dirname(__file__), '..', 'overnight-screenshots', 'dogfight_lb_daily_card.png'))
         await pg.evaluate(f"()=>{{const D={K}.DF;D.test.noBrief=true;D.test.noBanditFire=true;D.test.seed=null;}}")
-        await finger(pg, '#misCards .mcard[data-m="daily"]'); await pg.wait_for_timeout(500); await pg.evaluate(STEP, 1)
+        await finger(pg, '#arcCards .mcard[data-m="daily"]'); await pg.wait_for_timeout(500); await pg.evaluate(STEP, 1)
         s1 = await pg.evaluate(f"()=>{{const K={K},D=K.DF;return {{daily:D.daily,seed:D.seed,day:K.dailySpec().day,on:D.on,p:D.bandits.map(b=>[Math.round(b.p.x),Math.round(b.p.z)])}}}}")
         tk = calls('/token')
         ok('(e) GO starts the seeded fight: DF.daily, DF.seed the UTC day, one token for daily', s1['on'] and s1['daily'] and s1['seed'] == s1['day'] and len(tk) == 1 and tk[0][1] == 'daily', (s1, [x[1] for x in tk]))

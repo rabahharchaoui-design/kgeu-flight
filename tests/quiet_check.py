@@ -49,7 +49,7 @@ async def main():
 
         # (a) the home screen and every menu screen, 40 simulated seconds each
         n0 = await pg.evaluate(LOGN)
-        for sid in ['sHome', 'sFly', 'sSchool', 'sMis', 'sArc', 'rec', 'sSet']:
+        for sid in ['sHome', 'sFly', 'sSchool', 'sArc', 'rec', 'sSet']:
             if sid == 'rec':
                 await pg.evaluate("()=>{window.__kgeu.nav('sHome',true);document.getElementById('hRec').click()}")
             elif sid == 'sFly':
@@ -93,7 +93,7 @@ async def main():
         await pg.evaluate("()=>window.__kgeu.openMenu()")
         await fade_checks(pg, 'main menu')
         n2 = await pg.evaluate(LOGN)
-        for sid in ['sHome', 'sFly', 'sSchool', 'sMis', 'sArc', 'sSet']:
+        for sid in ['sHome', 'sFly', 'sSchool', 'sArc', 'sSet']:
             await pg.evaluate(f"()=>window.__kgeu.nav('{sid}')")
             await step(pg, 40 / 6)
         await step(pg, 5)

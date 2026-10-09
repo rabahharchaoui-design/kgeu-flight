@@ -584,6 +584,13 @@ body.lookOn:not(.touch) #badges{ top:calc(var(--padT) + var(--icon) + 80px); }
 .rScore small{ font-size:14px; font-weight:700; color:var(--soft); margin-left:6px; }
 .rScore:empty{ display:none; }
 .aStars{ margin:2px 0 0; font-size:22px; line-height:1; color:var(--orange); letter-spacing:3px; } .aStars u{ text-decoration:none; color:rgba(246,193,119,.22); } .aStars:empty{ display:none; }
+.rXp{ display:flex; align-items:baseline; justify-content:center; gap:10px; margin:0 0 6px; padding:2px 10px 4px; border-radius:12px; flex:none;
+  background:radial-gradient(closest-side,rgba(217,138,61,.28),rgba(217,138,61,0)); transform-origin:center; }
+.rXp .n{ font:800 clamp(30px,10vh,46px)/1 var(--font); color:#ffe2a3; font-variant-numeric:tabular-nums; text-shadow:0 0 14px rgba(255,170,60,.45); transition:text-shadow 220ms ease; }
+.rXp .n i{ font-style:normal; }
+.rXp .n small{ font-size:.5em; margin-left:.16em; letter-spacing:.08em; color:var(--orange); }
+.rXp.done .n{ text-shadow:0 0 24px rgba(255,190,80,.95), 0 0 5px rgba(255,236,190,.85); }
+.rXp .why{ font:800 12px/1.2 var(--font); letter-spacing:.1em; text-transform:uppercase; color:var(--sand); opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
 .rTip{ margin:0 0 6px; padding:5px 10px; border-radius:9px; background:rgba(246,193,119,.1); border-left:3px solid var(--orange); font-size:14px; font-weight:700; line-height:1.25; color:var(--sand); }
 .rTip.good{ border-left-color:#4cd97b; } .rTip:empty{ display:none; }
 .rLines{ margin:0 0 10px; font-size:14px; line-height:1.4; display:grid; grid-template-columns:1fr 1fr; gap:0 18px; }
@@ -769,12 +776,50 @@ label.sens b{ color:var(--ink); min-width:74px; }
 .mh .steps{ font-size:14px; font-weight:700; color:var(--brown); }
 #menu .back{ width:44px; min-width:44px; flex:none; height:44px; padding:0; display:grid; place-items:center; }
 #menu .back svg{ width:22px; height:22px; }
+/* ui1: the tab bar. Six sections in one segmented row at the top of every menu screen; the selected tab is the dark
+   pill (no slide: it is tapped tens of times a session). Icons drop out below 700 px wide, "Flight" below 760. */
+#menu{ --tabH:50px; }
+#menu .scr{ padding-top:calc(var(--padT) + var(--tabH) + 8px); }
+.mtabs{ position:absolute; z-index:2; top:var(--padT); left:var(--padL); right:var(--padR); height:var(--tabH); display:flex; align-items:center; gap:8px; pointer-events:none; }
+.mtabs > *{ pointer-events:auto; }
+.mtRow{ display:flex; gap:2px; padding:3px; border-radius:15px; background:rgba(42,22,8,.1); flex:none; min-width:0; max-width:100%; overflow-x:auto; scrollbar-width:none; touch-action:pan-x; }
+.mtRow::-webkit-scrollbar{ display:none; }
+#menu .mtRow button{ flex:none; display:flex; align-items:center; justify-content:center; gap:6px; min-height:44px; min-width:48px; padding:0 13px; border-radius:12px; background:transparent; color:var(--night);
+  font-size:16px; font-weight:800; letter-spacing:.02em; white-space:nowrap; transition:transform 120ms cubic-bezier(.23,1,.32,1); -webkit-user-select:none; user-select:none; }
+#menu .mtRow button svg{ width:18px; height:18px; flex:none; }
+#menu .mtRow button i{ font-style:normal; }
+#menu .mtRow button.sel{ background:var(--night); color:var(--sand); box-shadow:0 1px 0 rgba(42,22,8,.25); }
+#menu .mtRow button:active{ transform:scale(.96); }
+#menu .mBack{ flex:none; }
+#menu .mBack span{ display:none; }
+#menu .mBack.fl{ width:auto; padding:0 14px 0 8px; gap:4px; display:flex; align-items:center; background:var(--rust); color:#fff4e0; }
+#menu .mBack.fl span{ display:inline; font-size:16px; font-weight:800; letter-spacing:.04em; }
+#menu .mBack[hidden]{ display:none; }
+.mtX{ flex:1; min-width:0; display:flex; align-items:center; justify-content:flex-end; gap:10px; overflow:hidden; }
+#menu .mtX > *{ display:none; }
+#menu[data-scr=sFly] #flyCs{ display:inline-flex; }
+#menu #sumLine{ display:none; max-width:none; min-width:0; flex:0 1 auto; }
+#menu[data-scr=sFly] #sumLine{ display:block; }
+@media (max-width:1000px){ #menu[data-scr=sFly] #sumLine{ display:none; } #flyCs i{ display:none; } }
+#menu .mtRow button i.sm{ display:none; }
+@media (max-width:759px){ #menu .mtRow button i.lg{ display:none; } #menu .mtRow button i.sm{ display:inline; } }
+@media (max-width:699px){ #menu .mtRow button svg{ display:none; } #menu .mtRow button{ padding:0 11px; font-size:15px; } .mtX{ display:none; } }
+@media (max-width:580px){ #menu .mtRow button{ padding:0 9px; } }
+@media (max-width:420px){ .mtRow{ gap:0; } #menu .mtRow button{ padding:0 7px; font-size:14px; min-width:44px; } }
+@media (prefers-reduced-motion:reduce){ #menu .mtRow button{ transition:none; } }
+/* Settings: Controls help and Music credits are rows that open a page */
+#menu .slink{ display:flex; align-items:center; gap:8px; }
+#menu .slink .chev{ width:8px; height:8px; border-right:2.4px solid currentColor; border-top:2.4px solid currentColor; transform:rotate(45deg); margin-left:2px; opacity:.8; }
+/* flight school: the aircraft to train in and the progress, above the lessons */
+.schHead{ display:flex; align-items:center; gap:10px; flex:none; min-height:44px; }
+.schHead .gcap{ font-size:12px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--brown); }
+.schProg{ margin-left:auto; font-size:14px; font-weight:800; color:var(--brown); white-space:nowrap; }
 /* home */
 #sHome{ align-items:center; justify-content:center; }
 #sHome .dunes{ position:absolute; left:0; right:0; bottom:0; width:100%; height:46%; pointer-events:none; }
 #sHome .sun{ position:absolute; right:14%; top:12%; width:13vh; height:13vh; border-radius:50%; background:var(--sun); pointer-events:none; }
-.homeC{ position:relative; display:flex; flex-direction:column; align-items:center; gap:clamp(10px,4vh,26px); margin-top:-6vh; }
-.title{ margin:0; font-size:clamp(44px,14vh,88px); text-align:center; font-weight:800; line-height:.9; letter-spacing:.01em; color:var(--night); }
+.homeC{ position:relative; display:flex; flex-direction:column; align-items:center; gap:clamp(8px,3.4vh,22px); margin-top:-2vh; }
+.title{ margin:0; font-size:clamp(38px,12.5vh,84px); text-align:center; font-weight:800; line-height:.9; letter-spacing:.01em; color:var(--night); }
 .homeRow{ display:flex; gap:clamp(10px,2vw,16px); align-items:stretch; }
 .homeCol{ display:flex; flex-direction:column; gap:clamp(6px,1.6vh,10px); }
 #menu .midB{ position:relative; min-width:clamp(170px,26vw,240px); min-height:44px; flex:1; font-size:clamp(15px,4.4vh,19px); font-weight:800; letter-spacing:.06em; border-radius:12px; background:var(--brown); color:var(--sand); }
@@ -788,7 +833,7 @@ label.sens b{ color:var(--ink); min-width:74px; }
 #menu .corner svg{ width:24px; height:24px; }
 .corner.tl{ left:var(--padL); } .corner.tr{ right:var(--padR); }
 /* no connection: a small chip beside Settings (the game still flies; board runs wait in the queue) */
-.offChip{ position:absolute; top:calc(var(--padT) + 10px); right:calc(var(--padR) + 60px); display:inline-flex; align-items:center; gap:5px; height:28px; padding:0 10px 0 8px; border-radius:14px;
+.offChip{ position:absolute; bottom:var(--padB); right:var(--padR); display:inline-flex; align-items:center; gap:5px; height:28px; padding:0 10px 0 8px; border-radius:14px;
   background:rgba(42,22,8,.82); color:var(--sand); font:800 12px/1 var(--font); letter-spacing:.08em; text-transform:uppercase; pointer-events:none; }
 .offChip[hidden]{ display:none; } .offChip svg{ width:15px; height:15px; }
 /* fly: one screen. The carousel window is drawn by the game renderer through a transparent hole. */
@@ -841,6 +886,8 @@ label.sens b{ color:var(--ink); min-width:74px; }
 .frows .chip b{ display:block; font-size:clamp(13px,2.2vw,17px); font-weight:800; overflow:hidden; text-overflow:ellipsis; }
 .frows .go{ flex:1; min-height:44px; border-radius:14px; font-size:26px; font-weight:900; letter-spacing:.08em; background:var(--rust) !important; color:#fff4e0 !important; box-shadow:0 5px 0 var(--brown); border:none; }
 .frows .go:active{ transform:translateY(3px); box-shadow:0 2px 0 var(--brown); }
+.frows .go small{ display:block; font-size:13px; font-weight:800; letter-spacing:.04em; line-height:1; margin-top:-2px; text-transform:none; opacity:.9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.frows .go:has(small){ line-height:1; }
 #menu .chip{ background:rgba(42,22,8,.1); color:var(--night); border:2px solid rgba(42,22,8,.18); border-radius:12px; line-height:1.1; }
 #menu .chip.sel{ background:var(--night); color:var(--sand); border-color:var(--night); }
 .chips{ display:flex; gap:8px; align-items:center; }
@@ -912,6 +959,14 @@ label.sens b{ color:var(--ink); min-width:74px; }
 .mcard .sc em{ font-style:normal; color:#f0d6ad; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .stars{ font-style:normal; color:var(--orange); letter-spacing:1px; font-size:13px; } .stars u{ text-decoration:none; color:rgba(246,193,119,.22); }
 #arcCards{ grid-template-columns:1fr 1fr; align-content:start; overflow-y:auto; touch-action:pan-y; }
+/* ui1: the featured dogfight across the top, bigger; the daily marked out with a warm ring; every card presses in */
+#menu #arcCards .mcard.feat{ grid-column:1 / -1; min-height:72px; }
+#menu #arcCards .mcard.feat b{ font-size:21px; }
+#menu #arcCards .mcard.feat .ico{ width:70px; height:50px; }
+#menu #arcCards .mcard[data-m=daily]{ box-shadow:inset 0 0 0 2px rgba(217,138,61,.6); }
+#menu .mcard{ transition:transform 140ms cubic-bezier(.23,1,.32,1); }
+#menu .mcard:active{ transform:scale(.98); }
+@media (prefers-reduced-motion:reduce){ #menu .mcard{ transition:none; } }
 /* the World airports group under the arcade cards: the six Arizona games fill the first screen, the group scrolls up below them */
 .cards .cgrp{ grid-column:1 / -1; font-size:11px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--brown); padding:6px 2px 0; }
 #misCards{ grid-template-columns:1fr 1fr; } #misCards .mcard[data-m=daily]{ grid-column:1 / -1; }
@@ -1037,6 +1092,17 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 #fRookie{ background:var(--rust); } #fRookie span{ color:#ffe9cc; }
 #storyOv .sheet{ background:var(--night); color:var(--sand); } #storyOv .reg{ font-size:30px; text-shadow:none; }
 #storyOv .sub{ color:#f0d6ad; font-size:16px; }
+/* ui1: the XP pop. A centre screen burst over everything but the splash: "+37 XP" counts up with a short scale and
+   glow, the reason under it, then it lifts away. Two close together stack (the older one steps up and dims). It never
+   takes a touch (pointer-events none all the way down) and keeps inside the safe area. */
+#xpPops{ position:fixed; z-index:50; left:var(--padL); right:var(--padR); top:max(var(--padT), 30%); height:0; pointer-events:none; display:flex; justify-content:center; }
+.xpPop{ position:absolute; top:0; display:flex; flex-direction:column; align-items:center; pointer-events:none; transition:transform 260ms cubic-bezier(.23,1,.32,1), opacity 260ms ease; will-change:transform; }
+.xpPop .xpIn{ display:flex; flex-direction:column; align-items:center; gap:2px; padding:8px 22px 9px; border-radius:22px; background:radial-gradient(closest-side,rgba(42,22,8,.62),rgba(42,22,8,.34) 68%,rgba(42,22,8,0)); }
+.xpPop .xpN{ font:800 clamp(40px,12vh,64px)/1 var(--font); color:#ffe2a3; letter-spacing:.01em; white-space:nowrap; font-variant-numeric:tabular-nums;
+  text-shadow:0 0 18px rgba(255,170,60,.55), 0 2px 0 rgba(42,22,8,.65); transition:text-shadow 220ms ease; }
+.xpPop .xpN small{ font-size:.46em; margin-left:.18em; letter-spacing:.08em; color:var(--orange); }
+.xpPop.done .xpN{ text-shadow:0 0 28px rgba(255,190,80,.95), 0 0 6px rgba(255,236,190,.9), 0 2px 0 rgba(42,22,8,.65); }
+.xpPop .xpR{ font:800 13px/1.2 var(--font); letter-spacing:.12em; text-transform:uppercase; color:var(--sand); white-space:nowrap; max-width:min(80vw,520px); overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 2px rgba(0,0,0,.6); }
 #splash{ position:fixed; inset:0; z-index:60; background:#F6C177; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:clamp(8px,3vh,16px);
   padding:var(--padT) var(--padR) var(--padB) var(--padL); transition:opacity .45s ease; }
 #splash.done{ opacity:0; pointer-events:none; }
@@ -1092,7 +1158,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 /* the boards' header: my callsign gives way (ellipsis) before it pushes off the screen */
 #sLb .mh h2{ flex:none; } #lbCs{ min-width:0; flex:0 1 auto; margin-left:auto; } #lbCs > span{ min-width:0; overflow:hidden; text-overflow:ellipsis; } #lbCs svg{ flex:none; }
 .csTag i{ font-style:normal; font-size:12px; color:var(--brown); font-weight:700; }
-#flyCs{ flex:none; }
+#flyCs{ min-width:0; flex:0 1 auto; } #flyCs > span{ min-width:0; overflow:hidden; text-overflow:ellipsis; } #flyCs svg{ flex:none; }
 /* trophy on cards and lesson rows */
 .tro{ position:absolute; right:4px; top:4px; width:40px; height:40px; display:grid; place-items:center; border-radius:10px; color:var(--orange); }
 .tro svg{ width:20px; height:20px; }
@@ -1102,23 +1168,68 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 .lrow .tro{ top:50%; transform:translateY(-50%); color:var(--rust); }
 #menu .lrow.next .tro{ color:var(--orange); }
 .mcard .cd{ font-style:normal; color:var(--orange); font-weight:800; }
-#hLb{ display:flex; align-items:center; justify-content:center; gap:8px; }
-#hLb svg{ width:20px; height:20px; }
+/* ui1: the rank card on Home: insignia, callsign and rank, total XP, a bar to the next rank (it fills from where it was
+   last seen, 900 ms, transform only), Records as an icon at its corner */
+.hRank{ position:relative; display:grid; grid-template-columns:auto minmax(0,1fr) auto 44px; grid-template-rows:auto auto auto; align-items:center; column-gap:10px; row-gap:4px;
+  min-width:clamp(230px,30vw,300px); padding:8px 6px 8px 12px; border-radius:14px; background:var(--night); color:var(--sand); box-shadow:0 4px 0 rgba(42,22,8,.22); }
+.hRank .rkI{ grid-row:1 / 3; width:clamp(34px,10vh,44px); height:clamp(34px,10vh,44px); }
+.hRank .rkI svg{ width:100%; height:100%; display:block; }
+.hRank .rkT{ min-width:0; display:flex; flex-direction:column; line-height:1.05; }
+.hRank .rkT b{ min-width:0; font-size:17px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hRank .rkT span{ font-size:12px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--orange); white-space:nowrap; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.hRank .rkX{ font-size:15px; font-weight:800; white-space:nowrap; font-variant-numeric:tabular-nums; }
+#menu .hRank .rkRec{ grid-row:1 / 3; grid-column:4; width:44px; height:44px; min-height:44px; padding:0; display:grid; place-items:center; background:rgba(246,193,119,.1); color:var(--sand); border-radius:11px; }
+.hRank .rkRec svg{ width:20px; height:20px; }
+.hRank .rkBar{ grid-column:2 / 4; grid-row:2; height:8px; border-radius:4px; background:rgba(246,193,119,.16); overflow:hidden; }
+.hRank .rkBar i{ display:block; height:100%; border-radius:4px; background:linear-gradient(90deg,var(--orange),#ffd88f); transform-origin:left center; transform:scaleX(0); transition:transform 900ms cubic-bezier(.23,1,.32,1); }
+.hRank .rkNext{ grid-column:1 / 5; grid-row:3; font-size:12px; font-weight:700; color:#e3c08f; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hRank.none .rkBar{ display:none; }
+@media (prefers-reduced-motion:reduce){ .hRank .rkBar i{ transition:none; } }
 /* the leaderboard screen */
-.lbBody{ flex:1; min-height:0; display:flex; gap:10px; }
-.lbList{ flex:0 0 clamp(170px,30vw,270px); overflow-y:auto; touch-action:pan-y; display:flex; flex-direction:column; gap:4px; padding-bottom:8px; -webkit-overflow-scrolling:touch; }
-.lbList h3{ margin:6px 4px 0; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--brown); }
-#menu .lbList button{ text-align:left; min-height:44px; padding:0 12px; font-size:16px; font-weight:800; background:rgba(42,22,8,.1); color:var(--night); flex:none; }
-#menu .lbList button.sel{ background:var(--night); color:var(--sand); }
-.lbMain{ flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; gap:6px; background:var(--night); color:var(--sand); border-radius:14px; padding:8px 10px; }
-.lbHead{ display:flex; align-items:center; gap:8px; flex:none; }
-.lbHead b{ flex:1; min-width:0; font-size:19px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.lbTabs{ display:flex; gap:4px; flex:none; }
-#menu .lbTabs button{ min-height:44px; padding:0 10px; font-size:14px; font-weight:800; background:rgba(246,193,119,.1); color:var(--sand); border-radius:10px; }
-#menu .lbTabs button.sel{ background:var(--sand); color:var(--night); }
+.lbMain{ flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; gap:6px; background:var(--night); color:var(--sand); border-radius:16px; padding:6px 10px 8px; }
+/* ui1 boards: a bar (the board picker, the dogfight's EASY/HARD and stat chips, Today / This week / All time) over the
+   full width board; the picker opens a sheet of the twelve boards that still have a card or a mode */
+#sLb{ position:relative; }
+.lbBar{ display:flex; align-items:center; gap:8px; flex:none; min-width:0; }
+#menu .lbPick{ flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:8px; padding:0 12px 0 14px; min-height:48px; border-radius:14px; text-align:left;
+  background:var(--night); color:var(--sand); transition:transform 140ms cubic-bezier(.23,1,.32,1); }
+#menu .lbPick:active{ transform:scale(.98); }
+.lbPickT{ flex:1; min-width:0; display:flex; flex-direction:column; line-height:1.05; }
+.lbPickT i{ font-style:normal; font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--orange); }
+.lbPickT b{ font-size:19px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#menu .lbPick svg{ width:20px; height:20px; flex:none; transition:transform 180ms cubic-bezier(.23,1,.32,1); }
+#menu .lbPick[aria-expanded=true] svg{ transform:rotate(180deg); }
+.lbSeg{ display:flex; gap:2px; padding:3px; border-radius:14px; background:rgba(42,22,8,.1); flex:none; }
+.lbSeg[hidden]{ display:none; }
+#menu .lbSeg button{ min-height:44px; min-width:44px; padding:0 11px; font-size:15px; font-weight:800; background:transparent; color:var(--night); border-radius:11px; white-space:nowrap; }
+#menu .lbSeg button i{ font-style:normal; } #menu .lbSeg button i.sm{ display:none; }
+#menu .lbSeg button.sel{ background:var(--night); color:var(--sand); }
+#menu .lbModeSeg button{ letter-spacing:.06em; font-size:14px; }
+#menu .lbModeSeg button[data-lbmode=easy].sel{ background:#2f8a4a; color:#fff; }
+#menu .lbModeSeg button[data-lbmode=hard].sel{ background:#b8322a; color:#fff; }
+.lbWrap{ position:relative; flex:1; min-height:0; display:flex; flex-direction:column; }
+.lbRows{ padding-bottom:58px; }
+/* my row: pinned over the bottom of the board only while my row in the list is off screen (or not in the top) */
+.lbMe{ position:absolute; left:0; right:0; bottom:2px; z-index:1; transition:transform 200ms cubic-bezier(.23,1,.32,1), opacity 160ms ease; box-shadow:0 -10px 18px rgba(20,10,4,.55); border-radius:12px; }
+.lbMe.off{ transform:translateY(14px); opacity:0; pointer-events:none; }
+.lbMe:empty{ display:none; }
+@media (prefers-reduced-motion:reduce){ .lbMe{ transition:opacity 160ms ease; } .lbMe.off{ transform:none; } }
+/* the picker sheet: drops from the picker (origin top left), three groups of chips */
+.lbSheet{ position:absolute; z-index:3; left:var(--padL); right:var(--padR); top:calc(var(--padT) + var(--tabH) + 8px + 54px); max-height:calc(100% - var(--padT) - var(--tabH) - 70px - var(--padB));
+  overflow-y:auto; overscroll-behavior:contain; touch-action:pan-y; background:var(--night); color:var(--sand); border-radius:16px; padding:10px 12px 12px;
+  box-shadow:0 14px 34px rgba(20,10,4,.45), 0 0 0 1px rgba(246,193,119,.14); transform-origin:top left; transition:transform 180ms cubic-bezier(.23,1,.32,1), opacity 150ms ease; }
+.lbSheet[hidden]{ display:none; }
+.lbSheet.in{ transform:scale(.97) translateY(-4px); opacity:0; }
+@media (prefers-reduced-motion:reduce){ .lbSheet{ transition:opacity 150ms ease; } .lbSheet.in{ transform:none; } }
+.lbList{ display:flex; flex-direction:column; gap:8px; }
+.lbList h3{ margin:0; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--orange); }
+.lbList .lbG{ display:flex; flex-wrap:wrap; gap:6px; }
+#menu .lbList button{ min-height:44px; padding:0 14px; font-size:16px; font-weight:800; background:rgba(246,193,119,.1); color:var(--sand); border-radius:12px; white-space:nowrap; }
+#menu .lbList button.sel{ background:var(--sand); color:var(--night); }
+.lbScrim{ position:absolute; inset:0; z-index:2; }
 #menu #lbRace{ flex:none; min-height:44px; padding:0 12px; background:var(--rust); color:#fff4e0; font-size:14px; letter-spacing:.04em; border-radius:10px; }
 .lbRows{ flex:1; min-height:0; overflow-y:auto; touch-action:pan-y; -webkit-overflow-scrolling:touch; position:relative; overscroll-behavior:contain; }
-.lbRow{ display:flex; align-items:center; gap:10px; min-height:44px; padding:0 8px; border-bottom:1px solid rgba(246,193,119,.1); font-size:18px; font-weight:700; }
+.lbRow{ display:flex; align-items:center; gap:10px; min-height:52px; padding:0 10px; border-bottom:1px solid rgba(246,193,119,.1); font-size:19px; font-weight:700; }
 .lbRow .n{ flex:none; width:3.2em; text-align:right; font-weight:900; color:var(--orange); font-variant-numeric:tabular-nums; }
 .lbRow .c{ flex:1; min-width:0; display:flex; align-items:center; gap:8px; white-space:nowrap; overflow:hidden; }
 .lbRow .c span{ overflow:hidden; text-overflow:ellipsis; }
@@ -1129,12 +1240,23 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 .lbRow.me{ background:var(--sand); color:var(--night); border-radius:10px; border:none; }
 .lbRow.me .n,.lbRow.me.top1 .n{ color:var(--rust); } .lbRow.me .a{ color:var(--brown); }
 .lbRow.top1 .n{ color:#ffd257; }
+/* the podium: a medal for 1, 2 and 3, a warm wash on the leader's row */
+.lbRow.pod .n{ display:flex; justify-content:flex-end; }
+.lbRow.pod .n b{ display:grid; place-items:center; width:30px; height:30px; border-radius:50%; font-size:16px; color:#2A1608; box-shadow:inset 0 -2px 0 rgba(0,0,0,.22); }
+.lbRow.p1 .n b{ background:linear-gradient(180deg,#ffe28a,#e0a91c); } .lbRow.p2 .n b{ background:linear-gradient(180deg,#f1f4f7,#aab3bd); } .lbRow.p3 .n b{ background:linear-gradient(180deg,#f0b583,#b86a2e); }
+.lbRow.p1:not(.me){ background:linear-gradient(90deg,rgba(255,210,87,.16),rgba(255,210,87,0) 70%); border-radius:12px; }
+.lbRow.pod{ min-height:56px; }
 /* narrow boards (SE landscape, any portrait): tighter rows so the callsign keeps room beside the EASY/HARD chip */
 /* a narrow phone: the CREATOR badge is a gold star, my row drops its "of N" (the header has the total);
    a tap on a row reads it out in full */
 @media (max-width:700px){ .lbRow .creator{ font-size:0; padding:0; width:18px; height:18px; line-height:18px; text-align:center; flex:none; margin-left:2px; vertical-align:0; }
   .lbRow .creator::before{ content:'\2605'; font-size:12px; letter-spacing:0; } .lbRow.me .c i{ display:none; } }
-@media (max-width:700px){ .lbRow{ gap:6px; padding:0 6px; font-size:16px; } .lbRow .n{ width:auto; min-width:1.4em; } .lbRow .a{ width:4.9em; font-size:12px; } }
+@media (max-width:700px){ .lbRow{ gap:6px; padding:0 6px; font-size:17px; min-height:48px; } .lbRow .n{ width:auto; min-width:1.4em; } .lbRow .a{ width:4.9em; font-size:12px; } .lbRow.pod{ min-height:50px; } .lbRow.pod .n b{ width:26px; height:26px; font-size:14px; } }
+/* narrow: the period tabs read Today / week / time, the dogfight's chips wrap to a second bar line */
+.lbBr{ display:none; }
+@media (max-width:760px){ #menu .lbSeg button i.lg{ display:none; } #menu .lbSeg button i.sm{ display:inline; } .lbBar{ flex-wrap:wrap; row-gap:6px; }
+  .lbBar .lbTabs{ order:1; } .lbBar .lbBr{ order:2; display:block; flex-basis:100%; height:0; } .lbBar #lbMode{ order:3; } .lbBar #lbStat{ order:4; } .lbBar .lbBr[hidden]{ display:none; } #menu .lbPick{ min-height:44px; } .lbPickT b{ font-size:17px; } .lbSheet{ top:calc(var(--padT) + var(--tabH) + 8px + 50px); } #menu .lbSeg button{ padding:0 9px; font-size:14px; } }
+@media (max-height:340px){ .lbFoot #lbHow{ display:none; } }
 /* portrait: the board list becomes one scrolling line above the board, which gets the full width */
 @media (orientation:portrait){
   #menu .modeCards{ flex-direction:column; gap:8px; }
@@ -1149,13 +1271,13 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   .setCol{ display:contents; }
   .setFoot{ flex-wrap:wrap; justify-content:flex-start; }
   .helpBody{ align-items:flex-start; overflow-y:auto; }
-  .lbBody{ flex-direction:column; gap:8px; }
-  .lbList{ flex:none; flex-direction:row; overflow-x:auto; overflow-y:hidden; touch-action:pan-x; padding-bottom:2px; }
-  .lbList h3{ display:none; }
-  #menu .lbList button{ white-space:nowrap; }
-  .lbHead{ flex-wrap:wrap; row-gap:6px; }
+  /* Home stacks: FLY on top, full width, then the rank card and the two buttons */
+  .title{ font-size:clamp(34px,9vh,60px); }
+  .homeC{ width:100%; margin-top:0; }
+  .homeRow{ flex-direction:column; align-items:stretch; width:min(100%, 380px); }
+  #menu .bigB{ min-width:0; min-height:clamp(88px,14vh,130px); }
+  #menu .midB, .hRank{ min-width:0; }
 }
-.lbMe{ flex:none; }
 .lbMsg{ padding:18px 10px; text-align:center; font-size:17px; font-weight:700; color:#f0d6ad; line-height:1.35; }
 .lbMsg b{ display:block; font-size:22px; color:var(--sand); margin-bottom:4px; }
 .lbPull{ height:0; overflow:hidden; text-align:center; font-size:13px; font-weight:800; letter-spacing:.08em; color:var(--orange); transition:height .15s; }
@@ -1332,31 +1454,46 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 <div id="yoke"><div id="yokeK"></div></div>
 <div id="rotate"><div>Turn your phone sideways</div><div style="font-size:16px;font-weight:500;color:var(--soft)">Landscape gives you the stick, throttle, and a wider view.</div><button id="rotOk">Play in portrait anyway</button></div>
 <div class="overlay on" id="menu">
+ <nav class="mtabs" id="mTabs" aria-label="Menu">
+  <button class="back mBack" id="mBack" aria-label="Back" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg><span>Flight</span></button>
+  <div class="mtRow" role="tablist">
+   <button role="tab" data-go="sHome" id="tHome"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7v9h-5.5v-6h-6v6H3.5z"/></svg><span>Home</span></button>
+   <button role="tab" data-go="sFly" id="tFly"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 15.5v-2l-7.5-4.6V4a1.5 1.5 0 0 0-3 0v4.9L3 13.5v2l7.5-2.3V18l-2 1.4V21l3.5-1 3.5 1v-1.6L13.5 18v-4.8z"/></svg><span>Fly</span></button>
+   <button role="tab" data-go="sArc" id="tChal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg><span>Challenges</span></button>
+   <button role="tab" data-go="sSchool" id="tSch" aria-label="Flight school"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M2.5 9.5 12 5l9.5 4.5L12 14z"/><path d="M6.5 11.5v4.6c3.2 2.2 7.8 2.2 11 0v-4.6M21.5 9.5v5"/></svg><span><i class="lg">Flight school</i><i class="sm">School</i></span></button>
+   <button role="tab" data-go="sLb" id="tLb" aria-label="Leaderboards"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4M12 14v4M8 20h8"/></svg><span>Boards</span></button>
+   <button role="tab" data-go="sSet" id="tSet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg><span>Settings</span></button>
+  </div>
+  <div class="mtX" id="mtX"><span class="csTag" id="flyCs"></span><span class="steps" id="sumLine"></span><span class="csTag" id="lbCs"></span></div>
+ </nav>
  <div class="scr on" id="sHome">
   <div class="sun" aria-hidden="true"></div>
   <svg class="dunes" viewBox="0 0 1000 300" preserveAspectRatio="none" aria-hidden="true">
     <path d="M0 110 C160 60 300 70 470 95 S800 60 1000 35 L1000 300 L0 300Z" fill="#D98A3D"/>
     <path d="M0 175 C200 145 380 160 560 170 S850 140 1000 150 L1000 300 L0 300Z" fill="#A8592A"/>
     <path d="M0 240 C220 215 430 230 640 225 S900 205 1000 215 L1000 300 L0 300Z" fill="#6B3517"/></svg>
-  <button class="corner tl" id="hRec" aria-label="Records"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2.5h6V4M8.5 10h7M8.5 14h7M8.5 18h4"/></svg></button>
   <span id="hOff" class="offChip" role="status" hidden><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M2 8.5a15 15 0 0 1 20 0M5.5 12.5a10 10 0 0 1 13 0M9 16.4a5 5 0 0 1 6 0"/><circle cx="12" cy="20" r="1.2" fill="currentColor"/><path d="M3 3l18 18"/></svg>Offline</span>
-  <button class="corner tr" id="hSet" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></button>
   <div class="homeC">
    <h1 class="title">Pocket Flight Sim</h1>
    <div class="homeRow">
     <button class="bigB" id="hFly">FLY</button>
     <div class="homeCol">
+     <div class="hRank" id="hRank" role="group" aria-label="Your rank">
+      <div class="rkI" id="hRkI" aria-hidden="true"></div>
+      <div class="rkT"><b id="hRkCs"></b><span id="hRkN"></span></div>
+      <b class="rkX" id="hRkX"></b>
+      <button class="rkRec" id="hRec" aria-label="Records"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2.5h6V4M8.5 10h7M8.5 14h7M8.5 18h4"/></svg></button>
+      <div class="rkBar" role="progressbar" id="hRkBar" aria-valuemin="0" aria-valuemax="100"><i id="hRkF"></i></div>
+      <span class="rkNext" id="hRkNext"></span>
+     </div>
      <button class="midB" id="hSch">FLIGHT SCHOOL<span class="startHere" id="startHere">Start here</span></button>
-     <button class="midB" id="hMis">MISSIONS</button>
-     <button class="midB" id="hArc">ARCADE</button>
-     <button class="midB" id="hLb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4M12 14v4M8 20h8"/></svg>LEADERBOARDS</button>
+     <button class="midB" id="hChal">CHALLENGES</button>
     </div>
    </div>
   </div>
  </div>
  <div class="scr" id="sFly">
-  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Fly</h2><span class="csTag" id="flyCs"></span><span class="steps" id="sumLine"></span></header>
-  <div class="modeCards" role="radiogroup" aria-label="Mode">
+    <div class="modeCards" role="radiogroup" aria-label="Mode">
    <button class="chip modeCard" data-skill="rookie" role="radio"><b>EASY</b><span>The plane helps you fly. Auto leveling, stall protection, and a glowing path to the runway.</span></button>
    <button class="chip modeCard" data-skill="pilot" role="radio"><b>HARD</b><span>Real flying. No assists, full gauges, and full radio calls.</span></button>
   </div>
@@ -1372,21 +1509,15 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
     <button class="go" id="bGo">GO</button></div>
   </div>
  </div>
- <div class="scr" id="sMis">
-  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Missions</h2><span class="steps"></span></header>
-  <div class="cards" id="misCards"></div>
- </div>
  <div class="scr" id="sSchool">
-  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Flight school</h2><div class="chips schAc"><button class="pick chip" data-sch="cessna"><b>Cessna 172</b></button><button class="pick chip" data-sch="alpha"><b>Pipistrel Alpha</b></button></div></header>
+  <div class="schHead"><span class="gcap">Train in</span><div class="chips schAc"><button class="pick chip" data-sch="cessna"><b>Cessna 172</b></button><button class="pick chip" data-sch="alpha"><b>Pipistrel Alpha</b></button></div><span class="schProg" id="schProg"></span></div>
   <div class="lessons" id="school"></div>
  </div>
  <div class="scr" id="sArc">
-  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Arcade</h2><span class="steps"></span></header>
-  <div class="cards" id="arcCards"></div>
+    <div class="cards" id="arcCards"></div>
  </div>
  <div class="scr" id="sSet">
-  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Settings</h2><span class="steps"></span></header>
-  <div class="setGrid">
+    <div class="setGrid">
    <div class="setCol">
     <div class="srow"><span>Mode</span><div class="chips modeSeg" role="radiogroup" aria-label="Mode"><button class="pick chip sk" data-skill="rookie" role="radio"><b>Easy</b></button><button class="pick chip sk" data-skill="pilot" role="radio"><b>Hard</b></button><p class="modeDesc"></p></div></div>
     <div class="srow"><span>Radio</span><div class="chips"><button class="tog" id="oRadio">Radio: On</button>
@@ -1400,8 +1531,8 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
     <div class="srow"><span>Stick</span><div class="chips"><label class="sens"><input type="range" class="oSens" min="0" max="4" step="1" value="2" aria-label="Stick sensitivity"><b class="oSensV">Medium</b></label></div></div>
     <div class="srow"><span>Flying</span><div class="chips"><button class="tog oInv">Invert pitch: Off</button><button class="tog oTcas" id="oTcas">TCAS: On</button></div></div>
     <div class="srow"><span>Sound</span><div class="chips"><button class="tog oSound" id="oSound">Sound: On</button><button class="tog oHap" id="oHap">Haptics: On</button></div></div>
-    <div class="srow"><span>Help</span><div class="chips" id="helpRow"><button id="bHelp">Controls</button><button id="bReplay">Replay lesson 1</button></div></div>
-    <div class="srow"><span></span><div class="chips"><button id="bCredits">Music credits</button></div></div>
+    <div class="srow"><span>Help</span><div class="chips" id="helpRow"><button class="slink" id="bHelp">Controls help<i class="chev" aria-hidden="true"></i></button><button id="bReplay">Replay lesson 1</button></div></div>
+    <div class="srow"><span>About</span><div class="chips"><button class="slink" id="bCredits">Music credits<i class="chev" aria-hidden="true"></i></button></div></div>
    </div>
   </div>
   <div class="setFoot"><a class="credit" href="https://www.youtube.com/@OhRabah" target="_blank" rel="noopener"><svg class="yt" viewBox="0 0 28 20" aria-hidden="true"><path d="M27.4 3.1A3.5 3.5 0 0 0 24.9.6C22.7 0 14 0 14 0S5.3 0 3.1.6A3.5 3.5 0 0 0 .6 3.1C0 5.3 0 10 0 10s0 4.7.6 6.9a3.5 3.5 0 0 0 2.5 2.5C5.3 20 14 20 14 20s8.7 0 10.9-.6a3.5 3.5 0 0 0 2.5-2.5C28 14.7 28 10 28 10s0-4.7-.6-6.9Z" fill="#FF0000"/><path d="M11.2 14.3 18.4 10l-7.2-4.3v8.6Z" fill="#FFFFFF"/></svg><span>Made by @OhRabah</span></a>
@@ -1409,7 +1540,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   <p id="a2hs"><b>Play it full screen.</b> Tap <span class="shr"></span> <b>Share</b> in Safari, then <b>Add to Home Screen</b>.</p></div>
  </div>
  <div class="scr" id="sHelp">
-  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Controls help</h2><span class="steps"></span></header>
+  <header class="mh"><h2>Controls help</h2></header>
   <div class="helpBody">
    <p class="touchnote">Left thumb anywhere on the left half: a stick appears there. Push to roll and climb or dive, let go and it springs back. Right edge: the throttle, slide it or tap IDLE, CLIMB, FULL. BRAKE above it, hold on the ground. Top right: Auto takes off or lands for you, then gear, flaps and camera. Pause is top centre. Tap the grade badge after a landing to see the details.</p>
    <dl class="keys">
@@ -1426,23 +1557,26 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   </div>
  </div>
  <div class="scr" id="sCredits">
-  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Music credits</h2><span class="steps"></span></header>
+  <header class="mh"><h2>Music credits</h2></header>
   <div class="helpBody">
    <ul class="creditsList" id="creditsList"></ul>
   </div>
  </div>
  <div class="scr" id="sLb">
-  <header class="mh"><button class="back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Leaderboards</h2><span class="csTag" id="lbCs"></span></header>
-  <div class="lbBody">
-   <div class="lbList" id="lbList"></div>
-   <div class="lbMain">
-    <div class="lbHead"><b id="lbTitle"></b>
-     <div class="lbTabs" role="tablist"><button data-lbp="today" role="tab">Today</button><button data-lbp="week" role="tab">This week</button><button data-lbp="all" role="tab">All time</button></div></div>
-    <div class="lbRows" id="lbRows"><div class="lbPull" id="lbPull">PULL TO REFRESH</div><div id="lbRowsIn"></div></div>
-    <div class="lbMe" id="lbMe"></div>
-    <div class="lbFoot"><span id="lbHow"></span><span id="lbTotal"></span><button id="lbRace" hidden>Race the leader</button></div>
-   </div>
+  <div class="lbBar">
+   <button class="lbPick" id="lbPick" aria-haspopup="listbox" aria-expanded="false" aria-controls="lbSheet"><span class="lbPickT"><i>Board</i><b id="lbTitle"></b></span><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+   <i class="lbBr" aria-hidden="true"></i><div class="lbSeg lbModeSeg" id="lbMode" role="radiogroup" aria-label="Easy or Hard board" hidden><button data-lbmode="easy" role="radio">EASY</button><button data-lbmode="hard" role="radio">HARD</button></div>
+   <div class="lbSeg" id="lbStat" role="radiogroup" aria-label="Dogfight board" hidden><button data-lbstat="score" role="radio">Score</button><button data-lbstat="kills" role="radio">Kills</button><button data-lbstat="clear" role="radio">Clear</button><button data-lbstat="guns" role="radio">Guns</button></div>
+   <div class="lbTabs lbSeg" role="tablist"><button data-lbp="today" role="tab" aria-label="Today">Today</button><button data-lbp="week" role="tab" aria-label="This week"><i class="lg">This week</i><i class="sm">Week</i></button><button data-lbp="all" role="tab" aria-label="All time"><i class="lg">All time</i><i class="sm">All</i></button></div>
   </div>
+  <div class="lbMain">
+   <div class="lbWrap">
+    <div class="lbRows" id="lbRows"><div class="lbPull" id="lbPull">PULL TO REFRESH</div><div id="lbRowsIn"></div></div>
+    <div class="lbMe off" id="lbMe"></div>
+   </div>
+   <div class="lbFoot"><span id="lbHow"></span><span id="lbTotal"></span><button id="lbRace" hidden>Race the leader</button></div>
+  </div>
+  <div class="lbSheet" id="lbSheet" hidden><div class="lbList" id="lbList" role="listbox" aria-label="Leaderboards"></div></div>
  </div>
 </div>
 <div class="overlay" id="funnel"><div class="fun">
@@ -1490,12 +1624,12 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   </div>
   <div class="pzBody">
    <div class="pzL">
-    <div class="pzNav" role="group" aria-label="Go to"><button id="pMis">Missions</button><button id="pArc">Arcade</button><button id="pSch" aria-label="Flight school">School</button><button id="pLb" aria-label="Leaderboards">Boards</button></div>
+    <div class="pzNav" role="group" aria-label="Go to"><button id="pArc">Challenges</button><button id="pSch" aria-label="Flight school">School</button><button id="pLb" aria-label="Leaderboards">Boards</button><button id="pSet">Settings</button></div>
     <div class="pzQ"><button class="qs oSound" id="pSound" aria-label="Sound on or off"><i>Sound</i><b>On</b></button><button class="qs oInv" id="pInv" aria-label="Invert pitch"><i>Invert</i><b>Off</b></button><button class="qs" id="pSens" aria-label="Stick sensitivity, tap for the next step"><i>Stick</i><b class="oSensV">Medium</b></button><button class="qs oHap" id="pHap" aria-label="Haptics on or off"><i><span class="lg">Haptics</span><span class="sm">Haptic</span></i><b>On</b></button></div>
     <div class="pzMusic"><span class="mbTitle" id="pMusTitle">&mdash;</span><div class="pzMus"><button id="pPrev" aria-label="Previous song">Prev</button><button class="tog playPause" id="pMusic" aria-label="Play or pause music">Pause</button><button class="oMnext" id="pMnext">Next</button></div></div>
    </div>
    <div class="pzR">
-    <div class="pzRow"><div class="modeSeg" role="radiogroup" aria-label="Mode"><button class="chip sk" data-skill="rookie" role="radio"><b>Easy</b></button><button class="chip sk" data-skill="pilot" role="radio"><b>Hard</b></button></div><button id="pPhoto" class="ph" aria-label="Action Shot"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Action Shot</span></button><button id="pSet">Settings</button></div>
+    <div class="pzRow"><div class="modeSeg" role="radiogroup" aria-label="Mode"><button class="chip sk" data-skill="rookie" role="radio"><b>Easy</b></button><button class="chip sk" data-skill="pilot" role="radio"><b>Hard</b></button></div><button id="pPhoto" class="ph" aria-label="Action Shot"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Action Shot</span></button></div>
     <div class="pzRow acRow locs" id="pAc" role="radiogroup" aria-label="Aircraft"></div>
     <div class="frows">
     <div class="frow locRow"><div class="grp locG"><div class="locs" id="locPz" role="radiogroup" aria-label="Location"></div></div>
@@ -9348,7 +9482,7 @@ window.addEventListener('keydown',e=>{
   if(k==='m'){setMuted(!muted);toast(muted?'Sound off':'Sound on');}
   if(k==='t'){setRadioOn(!RADIO.on);toast(RADIO.on?'Radio on':'Radio off');}
   if(k==='enter'&&menu.classList.contains('on')&&curScr.startsWith('sFly')) freeStart();
-  if(k==='escape'){if(menu.classList.contains('on'))navBack();else openMenu();}
+  if(k==='escape'){if(menu.classList.contains('on')){if(LB&&LB.sheetOn())LB.sheet(false);else navBack();}else openMenu();}
 });
 window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
 window.addEventListener('blur',()=>{for(const k in keys)keys[k]=false;});
@@ -9949,6 +10083,7 @@ function resTick(dt){
 // o: letter, title, score, sub (small text after the score), stats [[label,value]] or lines (html),
 // stars (0-3, the challenges), board (the LB board id, for the rank line)
 function resFill(ov,o){
+  {const x=ov.querySelector('.rXp');if(x)x.remove();}
   const L=ov.querySelector('.gLetter');L.textContent=o.letter;L.className='gLetter g'+o.letter;
   const t=ov.querySelector('.sub');t.textContent=o.title;if(t.id)modeTag(t.id);
   const sc=ov.querySelector('.rScore');sc.textContent=o.score||'';
@@ -11697,7 +11832,7 @@ function dfRecord(r,stars){
 const DF_WHY={win:'All bandits down',time:'Out of time',hits:'Shot down, you ejected',arena:'Left the range',crash:'Crashed'};
 // the end of a run: the record, the run log and the results card (a crash keeps the crash card instead)
 function dfEnd(why){
-  if(!DF.on||DF.done)return;DF.done=true;DF.why=why;DF.on=false;
+  if(!DF.on||DF.done)return;DF.done=true;DF.xpBank=null;DF.why=why;DF.on=false;
   if(why==='win')dfCall('kioWin',null,{ttl:6});else if(why!=='crash')dfCall('kio',null,{ttl:6});
   const r=dfScore(),stars=dfStars(r.score),letter=dfGrade(r.score),better=dfRecord(r,stars);DF.sc=r;
   runLog('dogfight',{score:r.score,kills:r.kills,gunKills:r.gunKills,waves:r.waves,hits:r.hits,won:r.won,why:why,secs:r.secs,clearT:r.clearT,flareSaves:r.flareSaves,stars:stars,ach:DF.ach.slice(),breaks:DF.brks,overshoots:DF.ovs});
@@ -11716,8 +11851,28 @@ function dfEnd(why){
   if(DF.daily)stats.push(['Daily points',resNum(dp)+' (half the score)']);
   stats.push(['Best',B?resNum(B.pts)+' pts, '+B.kills+' kills'+(B.clr!=null?', '+dfClock(B.clr):''):'none yet']);
   resArm(()=>{if(!running||!DF.live)return;RES.kind='df';
-    resOpen(arcOv,{letter:letter,title:(DF.daily?'Daily dogfight: ':'Red Flag Dogfight: ')+DF_WHY[why]+(better?', new best':''),score:resNum(r.score)+' pts',stars:stars,stats:stats,board:send&&DF.lb?lb:''});},DF.won?3:2.2);   // time for the knock it off call
+    resOpen(arcOv,{letter:letter,title:(DF.daily?'Daily dogfight: ':'Red Flag Dogfight: ')+DF_WHY[why]+(better?', new best':''),score:resNum(r.score)+' pts',stars:stars,stats:stats,board:send&&DF.lb?lb:''});dfXpShow();},DF.won?3:2.2);   // time for the knock it off call
 }
+// ui1 item 7: the fight's XP. Nothing shows while it lasts (the kills bank silently: the Worker works out the run's XP
+// from the whole run when it is sent). The accepted answer (gain + achXp) is kept in DF.xpBank and plays as one count
+// up burst on the results card, above the stats, when both are there (the card opens 2 to 3 s after the run ends; the
+// answer can come before or after it). No answer (no callsign, practice, offline, refused): no XP on the card.
+function dfXpBank(xp,j,b){
+  if(DF.why==='crash'&&!DF.on){xpPop(xp,'Red Flag Dogfight');return;}   // a crash keeps the crash card: the XP pops over it instead
+  DF.xpBank={xp:Math.round(xp),gain:Math.round(+j.gain||0),ach:Math.round(+j.achXp||0),played:false};dfXpShow();}
+function dfXpShow(){const X=DF.xpBank;if(!X||X.played||RES.kind!=='df'||!arcOv.classList.contains('on'))return;X.played=true;
+  const sh=arcOv.querySelector('.sheet'),lines=sh.querySelector('.rLines');let el=sh.querySelector('.rXp');
+  if(!el){el=document.createElement('div');el.className='rXp';el.setAttribute('role','status');sh.insertBefore(el,lines);}
+  el.innerHTML='<b class="n">+<i>0</i><small>XP</small></b>'+(X.ach?'<span class="why"></span>':'');el.classList.remove('done');
+  if(X.ach)el.querySelector('.why').textContent='Run +'+X.gain+'  \u00b7  achievements +'+X.ach;
+  el.setAttribute('aria-label','+'+X.xp+' XP');
+  const num=el.querySelector('i'),rm=matchMedia('(prefers-reduced-motion: reduce)').matches,T0=performance.now(),DUR=1000;
+  if(el.animate&&!rm)el.animate([{opacity:0,transform:'scale(.85)'},{opacity:1,transform:'scale(1.07)',offset:.55},{opacity:1,transform:'scale(1)'}],{duration:380,easing:'cubic-bezier(.23,1,.32,1)',fill:'both'});
+  const step=()=>{if(!el.isConnected)return;const k=rm?1:Math.min(1,(performance.now()-T0)/DUR);num.textContent=Math.round(X.xp*(1-Math.pow(1-k,3))).toLocaleString('en-US');
+    if(k<1)requestAnimationFrame(step);else{el.classList.add('done');if(el.animate&&!rm)el.animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:240,easing:'cubic-bezier(.23,1,.32,1)'});}};
+  requestAnimationFrame(step);setTimeout(()=>{if(el.isConnected){num.textContent=X.xp.toLocaleString('en-US');el.classList.add('done');}},DUR+400);
+  try{hapPattern('xp');}catch(e){}
+  XPP.log.push({amount:X.xp,reason:'dogfight card',t:Date.now(),card:1});}
 // an achievement in the fight: listed for this run (DF.ach, every time it is earned) and granted (its first time, in the strip)
 function dfAch(id){if(DF.ach.indexOf(id)<0)DF.ach.push(id);achGrant(id);}
 // the mode is over: bandits hidden, the music back to the playlist
@@ -12691,7 +12846,7 @@ const HAP_PAT={
   green:[[0,'m'],[110,'m']],release:[[0,'m'],[110,'m']],                 // green light, pallet away
   gradeA:[[0,'m'],[130,'m'],[260,'h']],pb:[[0,'l'],[120,'m'],[240,'h']],  // an A landing, a personal best or top 10
   break:[[0,'h'],[60,'m'],[130,'m']],                                    // BREAK: a heavy thump and two taps (the flares)
-  button:[[0,'l']]};                                                     // menu buttons: very light
+  button:[[0,'l']],xp:[[0,'l']]};                                       // menu buttons, an XP pop: very light
 const HAP_COOL={button:90,detent:120,trim:160,stall:700,ab:3000,gun:40,launch:300,impact:200};
 function hapInit(){
   try{HAP.on=localStorage.getItem('kgeuHaptics')!=='0';}catch(e){}
@@ -12834,6 +12989,7 @@ function schoolList(){
   const el=document.getElementById('school');el.innerHTML='';
   document.querySelectorAll('[data-sch]').forEach(b=>b.classList.toggle('sel',b.dataset.sch===schoolAc));
   const nx=nextLesson();
+  const nd=LESSONS.filter(l=>lessonDone(l.id)).length;$('schProg').textContent=nd+' of '+LESSONS.length+' done';
   LESSONS.forEach((l,i)=>{const b=document.createElement('button');const g=lessonGrade(l.id),done=lessonDone(l.id);
     b.className='lrow'+(done?' done':'')+(nx&&nx.id===l.id?' next':'');b.dataset.l=l.id;
     b.innerHTML='<span class="ln">'+(done?'\u2713':i+1)+'</span><div class="lt"><b></b><span></span></div><span class="lg">'+(g&&g!=='F'?g:'')+'<i class="go1">START</i></span>'+troHTML('lesson:'+l.id);
@@ -13009,6 +13165,9 @@ const LOCS=[{reg:'az',g:'Arizona',a:[['kgeu','Glendale','KGEU, the home field, 7
   {reg:'lfpg',g:'France',a:[['lfpg','Paris CDG','LFPG, four parallel runways']]},
   {reg:'sbrj',g:'Brazil',a:[['sbrj','Rio Santos Dumont','SBRJ, 4,340 ft on Guanabara Bay']]}];
 let PZ_LOC=null;   // the pause sheet: an airport in another region, picked, not applied yet
+// ui1: FLY the same way. Tokyo Haneda, Paris CDG or Rio (or Arizona from a world region) is a destination: picked, the
+// summary names it, and GO reloads into that region and starts the free flight there (free:landing as anywhere)
+let FLY_LOC=null;
 function locBuild(el,pz){if(!el)return;el.innerHTML='';
   for(const G of LOCS){const g=document.createElement('div');g.className='lgrp';g.dataset.reg=G.reg;
     const h=document.createElement('span');h.className=pz?'glbl':'gcap';h.textContent=G.g.toUpperCase();g.appendChild(h);
@@ -13020,12 +13179,11 @@ function locBuild(el,pz){if(!el)return;el.innerHTML='';
 locBuild($('locFly'),false);locBuild($('locPz'),true);
 function locPick(b,reg,pz){
   if(!baseOK(savedType,b)){toast(AC_INFO[savedType][1]+' needs a longer runway');return;}
-  if(reg===REGION_ID){if(pz)PZ_LOC=null;pickBase(b);return;}
+  if(reg===REGION_ID){if(pz)PZ_LOC=null;else FLY_LOC=null;pickBase(b);return;}
   if(pz){PZ_LOC={reg:reg,b:b};locSel();pzApplyUI();return;}
-  try{localStorage.setItem('kgeuBase',b);}catch(e){}
-  pickRegion(reg,{resume:{screen:'fly'}});}
+  FLY_LOC={reg:reg,b:b};locSel();sumUI();}
 // the highlighted card: the base flown from, or in the pause sheet the other region's airport waiting for Apply
-function locSel(){document.querySelectorAll('.pick[data-b]').forEach(c=>{const on=PZ_LOC&&c.closest('#pauseOv')?c.dataset.b===PZ_LOC.b:c.dataset.b===SPAWN_BASE;
+function locSel(){document.querySelectorAll('.pick[data-b]').forEach(c=>{const pz=!!c.closest('#pauseOv'),P=pz?PZ_LOC:FLY_LOC,on=P?c.dataset.b===P.b:c.dataset.b===SPAWN_BASE;
   c.classList.toggle('sel',on);c.setAttribute('aria-checked',String(on));const off=!baseOK(savedType,c.dataset.b);c.classList.toggle('off',off);c.setAttribute('aria-disabled',String(off));});}
 // bring the highlighted card into view in each row (only the rows that are showing have a width)
 function locShow(){document.querySelectorAll('.locs').forEach(L=>{const c=L.querySelector('.pick.sel');if(c&&L.clientWidth){
@@ -13054,7 +13212,9 @@ function pickType(id,temp){acType=TYPES[id]?id:'reaper';best=loadBest();
   if(!baseOK(acType,SPAWN_BASE))pickBase(HOME(acType));else locSel();   // an airliner moves to a long runway
   sumUI();}
 // ================= menu screens =================
-// One screen at a time with a back button. Everything fits an iPhone in landscape
+// ui1: six tabs along the top (Home, Fly, Challenges, Flight school, Boards, Settings), one screen each; Controls help
+// and Music credits open from Settings rows. The one back button (#mBack) shows on those two and when the menu came
+// from the pause sheet, where it goes back to the flight. Everything fits an iPhone in landscape
 // without scrolling. The aircraft carousel shows the real models, drawn by the game
 // renderer behind a transparent screen, so there is no second WebGL context.
 const NAV=[];let curScr='sHome',fromPause=false;
@@ -13062,9 +13222,17 @@ function showScr(id){
   curScr=id;document.body.classList.toggle('menuOn',menu.classList.contains('on'));document.querySelectorAll('#menu .scr').forEach(e=>e.classList.toggle('on',e.id===id));
   menu.classList.toggle('see3d',id==='sFly');SHOW.on=id==='sFly'&&menu.classList.contains('on');
   if(id==='sFly'){CARM.sync();sumUI();requestAnimationFrame(locShow);}
-  if(id==='sSchool')schoolList();if(id==='sHome')startHereUI();if(id==='sArc')arcList();if(id==='sMis')misList();
-  if(LB){if(id==='sLb')LB.lbRender();if(id==='sSet'||id==='sFly')LB.ui();}
+  if(id==='sSchool')schoolList();if(id==='sHome')startHereUI();if(id==='sArc')arcList();
+  if(LB){if(id==='sLb')LB.lbRender();else LB.sheet(false);if(id==='sSet'||id==='sFly'||id==='sHome')LB.ui();}
+  tabsUI();
 }
+const TAB_OF={sHelp:'sSet',sCredits:'sSet'};
+function tabsUI(){const t=TAB_OF[curScr]||curScr;menu.dataset.scr=curScr;
+  document.querySelectorAll('#mTabs [data-go]').forEach(b=>{const on=b.dataset.go===t;b.classList.toggle('sel',on);b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1;});
+  const bk=$('mBack');bk.hidden=!(fromPause||NAV.length);bk.classList.toggle('fl',fromPause&&!NAV.length);bk.setAttribute('aria-label',fromPause&&!NAV.length?'Back to the flight':'Back');}
+// a tab: the top of that section (the stack goes, the way back to a paused flight stays)
+function tabGo(id){if(curScr===id&&!NAV.length)return;NAV.length=0;showScr(id);}
+document.querySelectorAll('#mTabs [data-go]').forEach(b=>b.addEventListener('click',()=>tabGo(b.dataset.go)));
 function nav(id,reset){if(reset){NAV.length=0;fromPause=false;}else if(curScr!==id)NAV.push(curScr);showScr(id);}
 function navBack(){
   if(fromPause&&!NAV.length){fromPause=false;menuClose();pauseOv.classList.add('on');CARP.sync();return;}
@@ -13072,8 +13240,8 @@ function navBack(){
 }
 function menuClose(){fromPause=false;menu.classList.remove('on','see3d');SHOW.on=false;document.body.classList.remove('menuOn');}
 document.querySelectorAll('#menu .back').forEach(b=>b.onclick=navBack);
-$('hFly').onclick=()=>nav('sFly');$('hSch').onclick=()=>nav('sSchool');$('hMis').onclick=()=>nav('sMis');$('hArc').onclick=()=>nav('sArc');
-$('hRec').onclick=()=>recOpen();$('hSet').onclick=()=>nav('sSet');$('bHelp').onclick=()=>nav('sHelp');
+$('hFly').onclick=()=>tabGo('sFly');$('hSch').onclick=()=>tabGo('sSchool');$('hChal').onclick=()=>tabGo('sArc');
+$('hRec').onclick=()=>recOpen();$('bHelp').onclick=()=>nav('sHelp');
 $('bCredits').onclick=()=>{creditsRender();nav('sCredits');};
 let creditsLoaded=false;
 function creditsRender(){
@@ -13085,10 +13253,11 @@ function creditsRender(){
     ul.innerHTML=items.map(e=>`<li><b>${e.title.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</b>${e.tag?`<span>${e.tag}</span>`:''}</li>`).join('');
   }).catch(()=>{creditsLoaded=true;ul.innerHTML='<li><b>Music credits unavailable offline</b></li>';});
 }
-$('bGo').onclick=()=>freeStart();
+$('bGo').onclick=()=>{if(FLY_LOC){const P=FLY_LOC;FLY_LOC=null;try{localStorage.setItem('kgeuBase',P.b);}catch(e){}
+  pickRegion(P.reg,{resume:{mode:'free',base:P.b,pos:SPAWN_POS,type:savedType,tod:TOD.id}});return;}freeStart();};
 // from the pause sheet straight to a menu screen; its back button comes back to the sheet
-function pauseGo(id){pauseOv.classList.remove('on');menu.classList.add('on');nav(id,true);fromPause=true;}
-$('pSet').onclick=()=>pauseGo('sSet');$('pMis').onclick=()=>pauseGo('sMis');$('pArc').onclick=()=>pauseGo('sArc');$('pSch').onclick=()=>pauseGo('sSchool');
+function pauseGo(id){pauseOv.classList.remove('on');menu.classList.add('on');nav(id,true);fromPause=true;tabsUI();}
+$('pSet').onclick=()=>pauseGo('sSet');$('pArc').onclick=()=>pauseGo('sArc');$('pSch').onclick=()=>pauseGo('sSchool');
 $('pLb').onclick=()=>{pauseGo('sLb');if(LB)LB.lbOpen();};
 $('storyX').onclick=()=>$('storyOv').classList.remove('on');
 
@@ -13193,7 +13362,11 @@ $('pApply').onclick=()=>{pauseOv.classList.remove('on');
     pickRegion(P.reg,{resume:{mode:'free',base:P.b,pos:SPAWN_POS,type:savedType,tod:TOD.id}});return;}
   if(pzChanged())freeStart();else pzRestart();};
 function sumUI(){pzApplyUI();const el=$('sumLine');if(!el)return;const I=AC_INFO[savedType]||AC_INFO.cessna;
-  el.textContent=I[1]+' at '+(!REGION.az?BASES[BASE0].name:SPAWN_BASE==='luke'?'Luke AFB':SPAWN_BASE==='phx'?'Sky Harbor':'Glendale')+', '+TOD.name.toLowerCase()+', '+POS_TXT[SPAWN_POS];}
+  const at=FLY_LOC?(REGIONS[FLY_LOC.reg]&&FLY_LOC.reg!=='az'?REGIONS[FLY_LOC.reg].base:FLY_LOC.b==='luke'?'Luke AFB':FLY_LOC.b==='phx'?'Sky Harbor':'Glendale')
+    :!REGION.az?BASES[BASE0].name:SPAWN_BASE==='luke'?'Luke AFB':SPAWN_BASE==='phx'?'Sky Harbor':'Glendale';
+  el.textContent=I[1]+' at '+at+', '+TOD.name.toLowerCase()+', '+POS_TXT[SPAWN_POS];
+  const g=$('bGo');if(g){const to=FLY_LOC?(REGIONS[FLY_LOC.reg]&&FLY_LOC.reg!=='az'?REGIONS[FLY_LOC.reg].short:at):'';
+    if(g.dataset.to!==to){g.dataset.to=to;g.innerHTML='GO'+(to?'<small></small>':'');if(to)g.lastChild.textContent='to '+to;}}}
 
 // ---- missions: everything that is not an arcade game ----
 // ---- card icons: simple silhouettes in the palette, inline SVG ----
@@ -13270,26 +13443,19 @@ function dailyCard(wide){const D=dailySpec(),DI=AC_INFO[D.type];let used=false;t
     desc:DI[1]+', '+D.tod+', wind '+String(D.wdir).padStart(3,'0')+' at '+D.wkt+'. '+(used?'Official attempt flown, practice only. ':wide?'Same worldwide. One official attempt. ':'One official attempt. ')+'Next in <i class="cd">'+dailyLeft()+'</i>',go:()=>arcStart('daily')};}
 function dailyLeft(){const n=Date.now(),d=new Date(n),nx=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()+1),s=Math.max(0,Math.floor((nx-n)/1000));
   return Math.floor(s/3600)+':'+String(Math.floor(s/60)%60).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
-setInterval(()=>{if(!menu.classList.contains('on')||(curScr!=='sMis'&&curScr!=='sArc'))return;const t=dailyLeft();document.querySelectorAll('.mcard .cd').forEach(e=>e.textContent=t);},1000);
-function misList(){
-  const B=SCORE.best;
-  fillCards($('misCards'),[dailyCard(1),
-    {id:'short',lb:'mission:short',ac:'C-130H Hercules',name:'Short field landing',desc:'Stop a Hercules on a 3,000 ft dirt strip.',go:()=>{pickType('c130',1);start('short');}},
-    {id:'dash',lb:'mission:dash',ac:'F-16C Viper',name:'Luke to Glendale dash',desc:'Wheels up at Luke, down at Glendale. Beat 3 minutes.',go:()=>{pickType('f16',1);start('runway','luke');}},
-    {id:'gunrun',lb:'arc:gunrun',ac:'A-10C Thunderbolt II',name:'A-10 gun run',desc:'Four Mavericks and the 30 mm gun on the Gila range.',go:()=>{pickType('a10',1);start('range');}}]);
-}
+setInterval(()=>{if(!menu.classList.contains('on')||curScr!=='sArc')return;const t=dailyLeft();document.querySelectorAll('.mcard .cd').forEach(e=>e.textContent=t);},1000);
+// ui1: one Challenges list, five cards (the dogfight featured across the top, then the daily, the strike range, the
+// airdrop and the short field). The 5 and 1 mile landing challenges, the Luke to Glendale dash and the A-10 gun run keep
+// their modes, boards and starters (arcStart, start('range') with the A-10, the daily's rotation) but no card. The
+// world airports are destinations on FLY (free flight there); their apt: landing challenges (aptStart) keep their code
+// and boards with no card
 function arcList(){
-  const D=dailySpec(),DI=AC_INFO[D.type];
   fillCards($('arcCards'),[
     {id:'dogfight',lb:'df:score:'+(rookie()?'easy':'hard'),ac:'Featured',name:'Red Flag Dogfight',desc:'Your F-16 against aggressor F-16s over the Goldwater Range.',cls:'feat',go:()=>dfStart()},
     dailyCard(),
-    {id:'landing',lb:'arc:landing',ac:AC_INFO[savedType][1],name:'Landing challenge',desc:'Start 5 miles out. Beat the clock to runway 1.',go:()=>arcStart('landing')},
-    {id:'landing1',lb:'arc:landing1',ac:AC_INFO[savedType][1],name:'1 mile landing challenge',desc:'Lined up, 300 ft, 1 mile out. Beat the clock to runway 1.',go:()=>arcStart('landing1')},
-    {id:'drop',lb:'arc:drop',ac:'C-130H Hercules',name:'Airdrop challenge',desc:'Put the bundle on the drop zone.',go:()=>{pickType('c130',1);start('drop');}},
     {id:'range',lb:'arc:strike',ac:'MQ-9A Reaper',name:'Strike range',desc:'Find the targets, lock on, four missiles.',go:()=>{pickType('reaper',1);start('range');}},
-    // the world airports, below: each flies in its own region (tapping one from elsewhere switches there)
-    {head:'World airports'}].concat(APT_IDS.map(id=>{const R=REGIONS[id],b=aptBoard(id);
-      return {id:b,lb:b,icon:'landing',here:1,cls:'apt',ac:AC_INFO[savedType][1],name:R.base,score:arcScore(b),desc:'5 mile landing challenge at '+R.base+', runway '+R.main+'.',go:()=>aptStart(id)};})));
+    {id:'drop',lb:'arc:drop',ac:'C-130H Hercules',name:'Airdrop',desc:'Put the bundle on the drop zone.',go:()=>{pickType('c130',1);start('drop');}},
+    {id:'short',lb:'mission:short',ac:'C-130H Hercules',name:'Short field landing',desc:'Stop a Hercules on a 3,000 ft dirt strip.',go:()=>{pickType('c130',1);start('short');}}]);
 }
 // ---- first launch: one screen, two big buttons ----
 function funnelPick(v){setSkill(v);$('funnel').classList.remove('on');startHereUI();if(v==='rookie')startLesson('first');}
@@ -13299,6 +13465,32 @@ startHereUI();pickType(acType);pickBase(SPAWN_BASE);pickPos(SPAWN_POS);setType(a
 tapBtn($('bPause'),()=>{if(running&&!st.crashed&&!paused)togglePause();});
 const toastEl=document.getElementById('toast');let toastT=0;
 function toast(msg,dur){if(DF_QUIET){dfSay(msg,dur);return;}toastEl.textContent=msg;toastEl.classList.add('on');toastT=dur||3;}
+// ================= ui1: xpPop(amount, reason), the XP burst =================
+// One call from anywhere: a centre screen "+N XP" that counts up from 0 (720 ms, ease out) with a scale and a glow,
+// the reason under it in small capitals, held a moment and lifted away (2.2 s in all). Pops landing close together
+// stack: the older ones step up 62 px and dim, at most three on screen. Real time, so it plays at any frame rate and
+// while paused. Nothing in it takes a touch. A light haptic where the platform ticks without a tap (iOS needs one).
+// XPP.log keeps what was shown for the tests; XPP.off silences it (screenshots).
+const XPP={log:[],live:[],off:false};
+function xpPop(amount,reason,o){amount=Math.round(+amount||0);if(amount<=0||XPP.off)return null;o=o||{};
+  if(typeof DF!=='undefined'&&DF.on&&!o.force)return null;   // ui1 item 7: never a pop in the fight
+  let box=document.getElementById('xpPops');if(!box){box=document.createElement('div');box.id='xpPops';box.setAttribute('aria-live','polite');document.body.appendChild(box);}
+  const el=document.createElement('div');el.className='xpPop';el.setAttribute('role','status');
+  el.innerHTML='<div class="xpIn"><div class="xpN">+<b>0</b><small>XP</small></div>'+(reason?'<div class="xpR"></div>':'')+'</div>';
+  if(reason)el.querySelector('.xpR').textContent=reason;el.setAttribute('aria-label','+'+amount+' XP'+(reason?', '+reason:''));
+  box.appendChild(el);XPP.live.unshift(el);XPP.log.push({amount:amount,reason:reason||'',t:Date.now()});if(XPP.log.length>40)XPP.log.shift();
+  while(XPP.live.length>3){const x=XPP.live.pop();x.remove();}
+  XPP.live.forEach((x,i)=>{x.style.transform=i?'translateY('+(-62*i)+'px) scale('+(1-0.12*i)+')':'';x.style.opacity=i?String(1-0.3*i):'';});
+  const rm=matchMedia('(prefers-reduced-motion: reduce)').matches,inn=el.firstChild,num=el.querySelector('.xpN b'),T0=performance.now(),DUR=o.dur||720;
+  if(inn.animate)inn.animate(rm?[{opacity:0},{opacity:1}]:[{opacity:0,transform:'scale(.82)'},{opacity:1,transform:'scale(1.08)',offset:.6},{opacity:1,transform:'scale(1)'}],
+    {duration:rm?180:320,easing:'cubic-bezier(.23,1,.32,1)',fill:'both'});
+  const step=()=>{if(!el.isConnected)return;const k=rm?1:Math.min(1,(performance.now()-T0)/DUR),v=Math.round(amount*(1-Math.pow(1-k,3)));num.textContent=v.toLocaleString('en-US');
+    if(k<1)requestAnimationFrame(step);else{el.classList.add('done');if(inn.animate&&!rm)inn.animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:240,easing:'cubic-bezier(.23,1,.32,1)'});}};
+  requestAnimationFrame(step);setTimeout(()=>{num.textContent=amount.toLocaleString('en-US');el.classList.add('done');},DUR+400);   // a background tab or a 3 fps frame still lands on the full number
+  try{hapPattern('xp');}catch(e){}
+  setTimeout(()=>{if(inn.animate)inn.animate(rm?[{opacity:1},{opacity:0}]:[{opacity:1,transform:'translateY(0)'},{opacity:0,transform:'translateY(-18px)'}],{duration:240,easing:'ease-in',fill:'both'});
+    setTimeout(()=>{el.remove();const i=XPP.live.indexOf(el);if(i>=0)XPP.live.splice(i,1);},250);},o.hold||2200);
+  return el;}
 
 let dpr=1;const TAU=Math.PI*2;
 // ---------- six pack: the round gauges on a 172 panel ----------
@@ -15571,11 +15763,11 @@ function tick(t,skipRender){
 // it switched off, so nothing is fetched and no request can fail in their console.
 var LB=null;
 LB=(function(){
-const APP_VER='2026-10-07-dogfight2';          // keep version.json in step when shipping
+const APP_VER='2026-10-09-ui1';          // keep version.json in step when shipping
   const ORIGINS=['https://rabahharchaoui-design.github.io','http://localhost:8765'];
   let over='';try{over=localStorage.getItem('kgeuLBUrl')||'';}catch(e){}
   const E={url:over||'https://pfs-scores.rabahharchaoui.workers.dev',enabled:!!over||ORIGINS.includes(location.origin),online:null,
-    P:null,Q:[],pool:[],fame:null,runs:{},rec:null,ghost:null,ghostModels:{},armed:false,last:null};
+    P:null,Q:[],pool:[],fame:null,runs:{},rec:null,ghost:null,ghostModels:{},armed:false,last:null,xpLater:[]};
   const load=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k)||'null');return v===null?d:v;}catch(e){return d;}};
   const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}};
   E.P=load('kgeuLB',null);E.Q=load('kgeuLBQ',[]);E.pool=load('kgeuLBPool',[]);E.fame=load('kgeuFame',null);
@@ -15696,11 +15888,27 @@ const APP_VER='2026-10-07-dogfight2';          // keep version.json in step when
       if(j._s>=500){if(live)showBadge({queued:1,b:it.board});return;}
       E.Q.shift();saveQ();
       if(j.ok){const r0=rankIdx(E.P.xp||0),r1=rankIdx(j.xp||0);if(r1>r0)j.rankUp=RANKS[r1][0];   // the rank display on the card
-        E.P.xp=j.xp;saveP();ui();if(live)showBadge(Object.assign({b:it.board},j));else toast('Queued run sent: '+BOARDS[it.board].name+', #'+j.rank+' of '+num(j.total));}
+        E.P.xp=j.xp;saveP();ui();if(live)showBadge(Object.assign({b:it.board},j));else toast('Queued run sent: '+BOARDS[it.board].name+', #'+j.rank+' of '+num(j.total));
+        xpGrant(it.board,j,live);}
       else if(live)showBadge({rejected:j.reason||j.error||'refused',b:it.board});
       if(E.Q.length)setTimeout(flush,300);else topUpPool();
     },()=>{flushing=false;if(live)showBadge({queued:1,b:it.board});});
   }
+
+  // ---- ui1: XP pops at the moment the Worker grants it, with its own number: /submit answers gain (xpFor: 10 for
+  // flying it, up to 40 for how good, x1.25 Hard, +15 personal best, +25 top 10) and, for a dogfight, achXp (each
+  // achievement once ever). Nothing pops for a practice daily, no callsign, no token, a queued or refused run: the server
+  // granted nothing. A dogfight (its boards, or the daily on a dogfight day: the answer carries ach) banks to its
+  // results card instead (dfXpBank), never a pop in the fight; a queued run that lands mid fight waits for the card too.
+  const XP_WHY={'free:landing':'Landing graded',daily:'Daily challenge','arc:strike':'Strike range','arc:drop':'Airdrop','mission:short':'Short field landing'};
+  function xpWhy(b,j,live){const B=BOARDS[b]||{name:''};let w=XP_WHY[b]||(/^lesson:/.test(b)?'Lesson: '+B.name:B.name);
+    if(!live)w='Sent: '+w;
+    if(j.rankUp)w+='  \u00b7  Rank up: '+j.rankUp;else if(j.top10&&j.rank<=10)w+='  \u00b7  Top 10';else if(j.pb)w+='  \u00b7  Personal best';
+    return w;}
+  function xpGrant(b,j,live){const xp=(+j.gain||0)+(+j.achXp||0);if(xp<=0)return;
+    if((/^df:/.test(b)||Array.isArray(j.ach))&&live){if(typeof dfXpBank==='function')dfXpBank(xp,j,b);return;}
+    if(typeof DF!=='undefined'&&DF.live){E.xpLater.push([xp,xpWhy(b,j,live)]);return;}   // another run's XP: after the fight
+    xpPop(xp,xpWhy(b,j,live));}
 
   // ---- the end of run badge: a slide-in like the landing badge, never pauses, a tap opens the board
   let badgeEl=null;
@@ -15968,39 +16176,69 @@ const APP_VER='2026-10-07-dogfight2';          // keep version.json in step when
   };
   function welcome(isNew){paintAll();ui();topUpPool();flush();fameFetch();toast((isNew?'Welcome, ':'Welcome back, ')+E.P.cs,3);}
 
-  // ---- the leaderboard screen
-  // one list per board: every player's best run across Easy and Hard, each row carries an EASY or HARD chip
-  const V={b:'daily',p:'today',seq:0,cache:{}};
+  // ---- the leaderboard screen (ui1): a picker of the boards that still have a card or a mode, the dogfight as one entry
+  // with an EASY/HARD chip and a stat chip; one list per board, every player's best run across Easy and Hard, each row
+  // with its EASY or HARD chip. Hidden boards (the landing challenges, the dash, the gun run, the world airports) keep
+  // their rows on the server and still open from code (lbOpen), they just have no entry
+  const V={b:'daily',p:'today',seq:0,cache:{},dm:null,ds:'score'};
+  const PICK=[['Challenges',['daily','df','arc:strike','arc:drop','mission:short']],['Free flight',['free:landing']],['Flight school',LESSONS.map(l=>'lesson:'+l.id)]];
+  const PNAME={daily:'Daily challenge',df:'Red Flag Dogfight','arc:strike':'Strike range','arc:drop':'Airdrop','mission:short':'Short field landing','free:landing':'Landings'};
+  const DF_STAT={score:'Score',kills:'Kills',clear:'Clear time',guns:'Gun kills'};
+  const isDf=b=>/^df:/.test(b),entryOf=b=>isDf(b)?'df':b;
+  const dfB=()=>'df:'+V.ds+':'+(V.dm||(rookie()?'easy':'hard'));
   function lbOpen(b,m){['arcOv','missOv','gradeOv','landOv'].forEach(id=>{const e=$(id);if(e)e.classList.remove('on');});
-    if(b&&BOARDS[b])V.b=b;if(curScr!=='sLb')nav('sLb');else lbRender();}
-  // the EASY/HARD chip on a row of a merged board; a single mode board (the dogfight's) carries none, its name says it
+    if(b==='df')b=dfB();
+    if(b&&BOARDS[b]){V.b=b;if(isDf(b)){const q=b.split(':');V.ds=q[1];V.dm=q[2];}}
+    sheet(false);if(curScr!=='sLb')nav('sLb');else lbRender();}
+  // the EASY/HARD chip on a row of a merged board; a single mode board (the dogfight's) carries none, its bar says it
   const lbMode=m=>BOARDS[V.b]&&BOARDS[V.b].mode?'':m==='easy'?'<span class="modeTag easy">EASY</span>':m==='hard'?'<span class="modeTag hard">HARD</span>':'';
-  function lbList(){const el=$('lbList');let html='',grp='';
-    ORDER.forEach(id=>{const B=BOARDS[id];if(B.group!==grp){grp=B.group;html+='<h3>'+esc(grp)+'</h3>';}
-      html+='<button data-lbb="'+esc(id)+'" class="'+(id===V.b?'sel':'')+'">'+esc(B.name)+'</button>';});
-    el.innerHTML=html;el.querySelectorAll('[data-lbb]').forEach(b=>b.onclick=()=>{V.b=b.dataset.lbb;lbRender();});
-    const s=el.querySelector('.sel');if(s&&s.scrollIntoView)try{s.scrollIntoView({block:'nearest'});}catch(e){}}
+  function lbList(){const el=$('lbList'),cur=entryOf(V.b);let html='';
+    PICK.forEach(([g,ids])=>{html+='<h3>'+esc(g)+'</h3><div class="lbG">'+ids.map(id=>'<button role="option" data-lbb="'+esc(id)+'" class="'+(id===cur?'sel':'')+'" aria-selected="'+(id===cur)+'">'+esc(PNAME[id]||(BOARDS[id]&&BOARDS[id].name)||id)+'</button>').join('')+'</div>';});
+    el.innerHTML=html;el.querySelectorAll('[data-lbb]').forEach(b=>b.onclick=()=>{const id=b.dataset.lbb;V.b=id==='df'?dfB():id;sheet(false);lbRender();});}
+  // the picker sheet: opens from the picker (scale .97 to 1, 180 ms), any tap outside or a pick closes it
+  let scrim=null;
+  function sheet(on){const sh=$('lbSheet'),pk=$('lbPick');if(!sh)return;
+    if(on===undefined)on=sh.hidden;
+    if(!on){sh.hidden=true;sh.classList.remove('in');pk.setAttribute('aria-expanded','false');if(scrim){scrim.remove();scrim=null;}return;}
+    lbList();sh.classList.add('in');sh.hidden=false;pk.setAttribute('aria-expanded','true');
+    scrim=document.createElement('div');scrim.className='lbScrim';scrim.addEventListener('click',()=>sheet(false));$('sLb').insertBefore(scrim,sh);
+    requestAnimationFrame(()=>requestAnimationFrame(()=>sh.classList.remove('in')));
+    const s0=sh.querySelector('.sel');if(s0&&s0.scrollIntoView)try{s0.scrollIntoView({block:'nearest'});}catch(e){}}
+  $('lbPick').onclick=()=>sheet();
+  document.querySelectorAll('[data-lbmode]').forEach(b=>b.onclick=()=>{V.dm=b.dataset.lbmode;V.b=dfB();lbRender();});
+  document.querySelectorAll('[data-lbstat]').forEach(b=>b.onclick=()=>{V.ds=b.dataset.lbstat;V.b=dfB();lbRender();});
   function lbRender(){
-    lbList();const B=BOARDS[V.b];
+    const B=BOARDS[V.b],df=isDf(V.b);
     document.querySelectorAll('[data-lbp]').forEach(b=>{b.classList.toggle('sel',b.dataset.lbp===V.p);b.setAttribute('aria-selected',b.dataset.lbp===V.p);});
-    $('lbTitle').textContent=B.name;$('lbHow').textContent=B.how||'';$('lbRace').hidden=true;
+    $('lbMode').hidden=!df;$('lbStat').hidden=!df;$('lbMode').previousElementSibling.hidden=!df;
+    if(df){const q=V.b.split(':');document.querySelectorAll('[data-lbmode]').forEach(b=>{const on=b.dataset.lbmode===q[2];b.classList.toggle('sel',on);b.setAttribute('aria-checked',on);});
+      document.querySelectorAll('[data-lbstat]').forEach(b=>{const on=b.dataset.lbstat===q[1];b.classList.toggle('sel',on);b.setAttribute('aria-checked',on);});}
+    $('lbTitle').textContent=df?'Red Flag Dogfight'+(V.ds==='score'?'':', '+DF_STAT[V.ds].toLowerCase()):PNAME[V.b]?(PNAME[V.b]==='Landings'?'Free flight landings':PNAME[V.b]):B.name;
+    $('lbHow').textContent=B.how||'';$('lbRace').hidden=true;
     $('lbCs').innerHTML=E.P?csTag(E.P.cs,rankIdx(E.P.xp||0),E.P.creator):'';
+    lbList();
     lbFetch(false);
   }
   // a tap on a row reads it out in full (a 12 letter callsign is cut on a narrow phone; nothing hovers on a phone)
   ['lbRowsIn','lbMe'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('click',ev=>{const r=ev.target.closest('.lbRow[data-full]');if(r)toast(r.dataset.full,3);});});
   function lbRows(j){
     const inn=$('lbRowsIn'),me=$('lbMe'),B=BOARDS[V.b];
-    if(!j){inn.innerHTML='<div class="lbMsg"><b>Offline</b>Leaderboards need a connection. Runs you fly now are saved and sent when you are back online.</div>';me.innerHTML='';$('lbTotal').textContent='';return;}
+    if(!j){inn.innerHTML='<div class="lbMsg"><b>Offline</b>Leaderboards need a connection. Runs you fly now are saved and sent when you are back online.</div>';me.innerHTML='';me.classList.add('off');$('lbTotal').textContent='';return;}
     const mine=E.P?E.P.cs:'',myRow=j.rows.find(r=>r.cs===mine),myAc=j.me&&(j.me.ac||myRow&&myRow.ac);
-    inn.innerHTML=j.rows.length?j.rows.map(r=>'<div class="lbRow'+(r.cs===mine?' me':'')+(r.r===1?' top1':'')+'" data-full="'+esc(r.cs+'  ·  #'+num(r.r)+'  ·  '+fmtS(V.b,r.score)+'  ·  '+(AC_TAG[r.ac]||'')+'  ·  '+(r.mode==='easy'?'Easy':'Hard'))+'"><span class="n">'+num(r.r)+'</span><span class="c">'+csTag(r.cs,rankByName(r.rank),r.creator)+'</span>'+lbMode(r.mode)+'<span class="s">'+esc(fmtS(V.b,r.score))+'</span><span class="a">'+lbAc(r.ac)+'</span></div>').join('')
+    inn.innerHTML=j.rows.length?j.rows.map(r=>'<div class="lbRow'+(r.cs===mine?' me':'')+(r.r===1?' top1':'')+(r.r<=3?' pod p'+r.r:'')+'" data-full="'+esc(r.cs+'  ·  #'+num(r.r)+'  ·  '+fmtS(V.b,r.score)+'  ·  '+(AC_TAG[r.ac]||'')+'  ·  '+(r.mode==='easy'?'Easy':'Hard'))+'"><span class="n">'+(r.r<=3?'<b>'+r.r+'</b>':num(r.r))+'</span><span class="c">'+csTag(r.cs,rankByName(r.rank),r.creator)+'</span>'+lbMode(r.mode)+'<span class="s">'+esc(fmtS(V.b,r.score))+'</span><span class="a">'+lbAc(r.ac)+'</span></div>').join('')
       :'<div class="lbMsg"><b>No scores yet</b>'+(V.p==='today'?'Nobody has flown this one today. ':'')+'Be the first on the board.</div>';
     me.innerHTML=j.me?'<div class="lbRow me" data-full="'+esc(j.me.cs+'  ·  #'+num(j.me.r)+' of '+num(j.total)+'  ·  '+fmtS(V.b,j.me.score))+'"><span class="n">#'+num(j.me.r)+'</span><span class="c">'+csTag(j.me.cs,rankByName(j.me.rank),j.me.creator,'of '+num(j.total))+'</span>'+lbMode(j.me.mode)+'<span class="s">'+esc(fmtS(V.b,j.me.score))+'</span><span class="a">'+(myAc&&AC_TAG[myAc]?lbAc(myAc):'YOU')+'</span></div>'
       :E.P?'<div class="lbRow me"><span class="n">&ndash;</span><span class="c">'+csTag(E.P.cs,rankIdx(E.P.xp||0),E.P.creator,'no score '+(V.p==='today'?'today':V.p==='week'?'this week':'yet'))+'</span><span class="s"></span><span class="a">YOU</span></div>'
       :'<div class="lbRow me"><span class="c"><span>Pick a callsign in Settings to get on the boards</span></span></div>';
     $('lbTotal').textContent=num(j.total)+' pilot'+(j.total===1?'':'s');
     const rb=$('lbRace');rb.hidden=!(B.ghost&&j.ghost);if(j.ghost){rb.textContent='Race the leader: '+j.ghost.cs;}
+    $('lbRows').scrollTop=0;lbPin();requestAnimationFrame(lbPin);
   }
+  // my row pinned at the bottom: shown while my row in the list is off screen, or when I am not in the list at all
+  function lbPin(){const me=$('lbMe'),rows=$('lbRows'),r=$('lbRowsIn').querySelector('.lbRow.me');if(!me||!rows)return;
+    let off=false;if(r){const a=r.getBoundingClientRect(),b=rows.getBoundingClientRect();off=a.top>=b.top-1&&a.bottom<=b.bottom-56+1;}
+    if(me.classList.contains('off')!==off)me.classList.toggle('off',off);}
+  $('lbRows').addEventListener('scroll',lbPin,{passive:true});
   function lbFetch(force){
     const key=V.b+'|'+V.p,seq=++V.seq,c=V.cache[key];
     if(c)lbRows(c);else $('lbRowsIn').innerHTML='<div class="lbMsg">Loading...</div>';
@@ -16020,7 +16258,21 @@ const APP_VER='2026-10-07-dogfight2';          // keep version.json in step when
     rows.addEventListener('mousedown',e=>down(e.clientY));addEventListener('mousemove',e=>{if(y0!==null)move(e.clientY);});addEventListener('mouseup',up);}
 
   // ---- the callsign everywhere it shows: FLY, Settings, the leaderboard header
+  // ui1 item 8: the Home rank card, from the XP the Worker keeps (E.P.xp: /me at launch, every /submit answer)
+  let rkShown=null;
+  function homeRank(){const el=$('hRank');if(!el)return;const P=E.P,xp=P?Math.max(0,+P.xp||0):0,i=rankIdx(xp),nx=RANKS[i+1];
+    $('hRkI').innerHTML=rankSVG(i);$('hRkCs').textContent=P?P.cs:'No callsign yet';$('hRkN').textContent=RANKS[i][0];
+    $('hRkX').textContent=P?num(xp)+' XP':'';el.classList.toggle('none',!P);
+    const f=nx?Math.max(0,Math.min(1,(xp-RANKS[i][1])/(nx[1]-RANKS[i][1]))):1;
+    $('hRkNext').textContent=!P?(E.enabled?'Pick a callsign in Settings to earn XP':'XP and ranks need the online game'):nx?num(nx[1]-xp)+' XP to '+nx[0]:'Top rank. Keep flying';
+    const bar=$('hRkBar');bar.setAttribute('aria-valuenow',String(Math.round(f*100)));bar.setAttribute('aria-label',nx?Math.round(f*100)+' percent of the way to '+nx[0]:'Top rank');
+    // the bar fills from where it was last seen: on Home only, so the move is seen (the first time from empty)
+    const F=$('hRkF'),show=()=>{F.style.transform='scaleX('+f.toFixed(4)+')';rkShown=f;};
+    if(curScr==='sHome'&&menu.classList.contains('on')){if(rkShown!==f){if(rkShown===null)F.style.transform='scaleX(0)';requestAnimationFrame(()=>requestAnimationFrame(show));}}
+    else if(rkShown===null){}   // not on Home yet: it animates when Home shows
+  }
   function ui(){
+    homeRank();
     const P=E.P,fc=$('flyCs'),oc=$('oCs');
     if(fc)fc.innerHTML=P?csTag(P.cs,rankIdx(P.xp||0),P.creator,RANKS[rankIdx(P.xp||0)][0]):'';
     if(oc){oc.innerHTML=P?csTag(P.cs,rankIdx(P.xp||0),P.creator,num(P.xp||0)+' XP'):'<span>None yet</span>';
@@ -16030,7 +16282,6 @@ const APP_VER='2026-10-07-dogfight2';          // keep version.json in step when
   }
   $('oCsCh').onclick=()=>{if(!E.enabled){toast('Callsigns need the online version of the game');return;}csOpen(E.P?'rename':'pick','settings');};
   $('oCsRe').onclick=()=>{if(!E.enabled){toast('Callsigns need the online version of the game');return;}csOpen('restore','settings');};
-  $('hLb').onclick=()=>lbOpen();
 
   // ---- start up: see if the Worker answers; ask for a callsign after the splash if there is none
   function boot(){
@@ -16061,16 +16312,17 @@ const APP_VER='2026-10-07-dogfight2';          // keep version.json in step when
     if(E.armed&&running&&!paused&&!st.crashed){E.armed=false;if(!ARC.on&&!LES.on&&!MISS.on&&!STRIKE.active&&!DF.live&&st.mode!=='school')runStart('free:landing');}
     if(E.rec&&running&&!paused)recTick();
     if(E.ghost)ghostTick();
+    if(E.xpLater.length&&!DF.live){const x=E.xpLater.shift();xpPop(x[0],x[1]);}
     if(fameBB)fameBB.mat.emissiveIntensity=EGG.litMat.emissiveIntensity;
   }
   function armFree(){E.armed=true;}
   return {E:E,BOARDS:BOARDS,ORDER:ORDER,board:board,runStart:runStart,runEnd:runEnd,runCancel:runCancel,frame:frame,reset:reset,armFree:armFree,
-    boot:boot,csHold:()=>csHold,paintModel:paintModel,paintAll:paintAll,lbOpen:lbOpen,lbRender:lbRender,race:race,ui:ui,flush:flush,csOpen:csOpen,dice:dice,
+    boot:boot,homeRank:homeRank,sheet:sheet,sheetOn:()=>!$('lbSheet').hidden,csHold:()=>csHold,paintModel:paintModel,paintAll:paintAll,lbOpen:lbOpen,lbRender:lbRender,race:race,ui:ui,flush:flush,csOpen:csOpen,dice:dice,
     fameDraw:fameDraw,fameFetch:fameFetch,fameApply:fameApply,fameApplyCity:fameApplyCity,ghostStart:ghostStart,decodePath:decodePath,rankSVG:rankSVG,rankByName:rankByName,utcDay:utcDay,fmtS:fmtS,showBadge:showBadge,ghostOff:ghostOff,runBoard:runBoard,
     get P(){return E.P;}};
 })();
 
-window.__kgeu={resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
+window.__kgeu={tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
   lights:()=>({KGEU:AL.KGEU.count(),KLUF:AL.KLUF.count(),uLights:AL_MAT.uniforms.uLights.value,

@@ -57,7 +57,7 @@ async def main():
         seed = {'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'}
         pg = await page(b, url, storage=seed)
         await pg.evaluate("(l)=>window.__kgeu.musicLoad(l)", TONES)
-        await pg.touchscreen.tap(330, 8)
+        await pg.touchscreen.tap(330, 3)
         s = await wait_for(pg, lambda s: s['allowed'])
         await pg.wait_for_timeout(1200); s = await m(pg)
         ok('home: the first tap opens the gate, the menu stays silent', s['allowed'] and s['playing'] is None, s['playing'])

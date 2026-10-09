@@ -38,7 +38,7 @@ async def main():
             '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'])
         pg = await page(b, url, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3', 'kgeuMusicFree': '1'})
         await pg.evaluate("(l)=>window.__kgeu.musicLoad(l)", TONES)
-        await pg.touchscreen.tap(330, 8)
+        await pg.touchscreen.tap(330, 3)
         await wait_for(pg, m, lambda s: s['allowed'])
         t = await tk(pg)
         ok('home screen: no ticker (menus hide it, and are silent)', not t['vis'], t)

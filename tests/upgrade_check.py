@@ -89,8 +89,8 @@ async def main():
             await pg.click('#csGo'); await pg.wait_for_function("()=>!document.getElementById('csCode').hidden", timeout=10000); await pg.click('#csGo')
             # the old data still drives the menus
             await pg.evaluate(f"()=>{{{K}.openMenu();{K}.nav('sArc')}}"); await pg.wait_for_timeout(300)
-            em = await pg.evaluate("()=>document.querySelector('#arcCards [data-m=landing] .sc em').textContent")
-            ok('local best still on its card', '777 pts' in em, em)
+            em = await pg.evaluate(f"()=>{K}.SCORE.best['arc:landing']&&{K}.SCORE.best['arc:landing'].pts")
+            ok('local best still in the records (ui1: the landing challenge has no card)', em == 777, em)
             await pg.evaluate(f"()=>{K}.nav('sSchool')"); await pg.wait_for_timeout(300)
             sch = await pg.evaluate("()=>[...document.querySelectorAll('#school .lrow')].map(r=>r.className.includes('done'))")
             ok('lesson progress still ticked', sch[:2] == [True, True], sch)

@@ -82,10 +82,10 @@ async def main():
             # ---- from app launch into flight (home screen) ----
             for name, steps, chk in (
                 ('launch: free flight (FLY, GO)', ['#hFly', '#bGo'], f"()=>{K}.running()&&!{K}.paused()&&{K}.state().mode==='runway'"),
-                ('launch: a mission (MISSIONS, card)', ['#hMis', '#misCards [data-m="short"]'], f"()=>{K}.running()&&{K}.MISS.kind==='short'"),
-                ('launch: an arcade game (ARCADE, card)', ['#hArc', '#arcCards .mcard[data-m=range]'], f"()=>{K}.running()&&{K}.state().mode==='range'"),
+                ('launch: a challenge (CHALLENGES, card)', ['#hChal', '#arcCards .mcard[data-m=drop]'], f"()=>{K}.running()&&{K}.MISS.kind==='drop'"),
+                ('launch: a challenge (Challenges tab, card)', ['#tChal', '#arcCards .mcard[data-m=range]'], f"()=>{K}.running()&&{K}.state().mode==='range'"),
                 ('launch: a lesson (FLIGHT SCHOOL, lesson)', ['#hSch', '#school .lrow[data-l=steep]'], f"()=>{K}.running()&&{K}.LES.on==='steep'"),
-                ('launch: leaderboards (1 tap)', ['#hLb'], f"()=>{K}.curScr()==='sLb'"),
+                ('launch: leaderboards (1 tap, the Boards tab)', ['#tLb'], f"()=>{K}.curScr()==='sLb'"),
             ):
                 await pg.evaluate(f"()=>{{const K={K};K.pick('cessna');K.pickBase('kgeu');K.pickPos('runway');K.openMenu()}}"); await pg.wait_for_timeout(400)
                 t = Taps(pg)
@@ -114,20 +114,20 @@ async def main():
             await pg.evaluate(f"()=>{{const K={K};K.TOUCH.sens=2;localStorage.setItem('kgeuStickSens','2')}}")
             await run(pg, tag, 'full Settings (radio, volumes, callsign)', ['#bPause', '#pSet'], f"()=>{K}.curScr()==='sSet'&&document.getElementById('menu').classList.contains('on')")
             await run(pg, tag, 'leaderboards', ['#bPause', '#pLb'], f"()=>{K}.curScr()==='sLb'&&document.getElementById('menu').classList.contains('on')&&document.getElementById('lbList').children.length>0")
-            t = Taps(pg); await t('#sLb .back')
+            t = Taps(pg); await t('#mBack')
             ok(f'{tag} leaderboards: back returns to the pause sheet', await pg.evaluate("()=>document.getElementById('pauseOv').classList.contains('on')&&!document.getElementById('menu').classList.contains('on')"))
             await run(pg, tag, 'quit to the main menu', ['#bPause', '#pMenu'], f"()=>{K}.curScr()==='sHome'&&document.getElementById('menu').classList.contains('on')")
 
             # a mission, an arcade game, a lesson: the list in 2 taps, the card starts it
             for name, btn, scr, card, chk in (
-                ('missions', '#pMis', 'sMis', '#misCards [data-m="short"]', f"()=>{K}.MISS.kind==='short'&&{K}.running()"),
-                ('arcade', '#pArc', 'sArc', '#arcCards .mcard[data-m=range]', f"()=>{K}.state().mode==='range'&&{K}.running()"),
+                ('challenges', '#pArc', 'sArc', '#arcCards .mcard[data-m=drop]', f"()=>{K}.MISS.kind==='drop'&&{K}.running()"),
+                ('challenges 2', '#pArc', 'sArc', '#arcCards .mcard[data-m=range]', f"()=>{K}.state().mode==='range'&&{K}.running()"),
                 ('flight school', '#pSch', 'sSchool', '#school .lrow[data-l=steep]', f"()=>{K}.LES.on==='steep'&&{K}.running()"),
             ):
                 t = await run(pg, tag, name + ' list', ['#bPause', btn], f"()=>{K}.curScr()==='{scr}'&&document.getElementById('menu').classList.contains('on')")
-                if name == 'missions':
-                    await t('.scr.on .back')
-                    ok(f'{tag} missions: back returns to the pause sheet', await pg.evaluate("()=>document.getElementById('pauseOv').classList.contains('on')"))
+                if name == 'challenges':
+                    await t('#mBack')
+                    ok(f'{tag} challenges: back returns to the pause sheet', await pg.evaluate("()=>document.getElementById('pauseOv').classList.contains('on')"))
                     await t(btn)
                 try:
                     await t(card, 1200); got = await pg.evaluate(chk)
