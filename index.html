@@ -15709,7 +15709,7 @@ const APP_VER='2026-10-07-dogfight2';          // keep version.json in step when
   const ORIGINS=['https://rabahharchaoui-design.github.io','http://localhost:8765'];
   let over='';try{over=localStorage.getItem('kgeuLBUrl')||'';}catch(e){}
   const E={url:over||'https://pfs-scores.rabahharchaoui.workers.dev',enabled:!!over||ORIGINS.includes(location.origin),online:null,
-    P:null,Q:[],pool:[],fame:null,runs:{},rec:null,ghost:null,ghostModels:{},armed:false,last:null};
+    P:null,Q:[],pool:[],fame:null,runs:{},rec:null,ghost:null,ghostModels:{},armed:false,last:null,xpLater:[]};
   const load=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k)||'null');return v===null?d:v;}catch(e){return d;}};
   const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}};
   E.P=load('kgeuLB',null);E.Q=load('kgeuLBQ',[]);E.pool=load('kgeuLBPool',[]);E.fame=load('kgeuFame',null);
@@ -15830,11 +15830,27 @@ const APP_VER='2026-10-07-dogfight2';          // keep version.json in step when
       if(j._s>=500){if(live)showBadge({queued:1,b:it.board});return;}
       E.Q.shift();saveQ();
       if(j.ok){const r0=rankIdx(E.P.xp||0),r1=rankIdx(j.xp||0);if(r1>r0)j.rankUp=RANKS[r1][0];   // the rank display on the card
-        E.P.xp=j.xp;saveP();ui();if(live)showBadge(Object.assign({b:it.board},j));else toast('Queued run sent: '+BOARDS[it.board].name+', #'+j.rank+' of '+num(j.total));}
+        E.P.xp=j.xp;saveP();ui();if(live)showBadge(Object.assign({b:it.board},j));else toast('Queued run sent: '+BOARDS[it.board].name+', #'+j.rank+' of '+num(j.total));
+        xpGrant(it.board,j,live);}
       else if(live)showBadge({rejected:j.reason||j.error||'refused',b:it.board});
       if(E.Q.length)setTimeout(flush,300);else topUpPool();
     },()=>{flushing=false;if(live)showBadge({queued:1,b:it.board});});
   }
+
+  // ---- ui1: XP pops at the moment the Worker grants it, with its own number: /submit answers gain (xpFor: 10 for
+  // flying it, up to 40 for how good, x1.25 Hard, +15 personal best, +25 top 10) and, for a dogfight, achXp (each
+  // achievement once ever). Nothing pops for a practice daily, no callsign, no token, a queued or refused run: the server
+  // granted nothing. A dogfight (its boards, or the daily on a dogfight day: the answer carries ach) banks to its
+  // results card instead (dfXpBank), never a pop in the fight; a queued run that lands mid fight waits for the card too.
+  const XP_WHY={'free:landing':'Landing graded',daily:'Daily challenge','arc:strike':'Strike range','arc:drop':'Airdrop','mission:short':'Short field landing'};
+  function xpWhy(b,j,live){const B=BOARDS[b]||{name:''};let w=XP_WHY[b]||(/^lesson:/.test(b)?'Lesson: '+B.name:B.name);
+    if(!live)w='Sent: '+w;
+    if(j.rankUp)w+='  \u00b7  Rank up: '+j.rankUp;else if(j.top10&&j.rank<=10)w+='  \u00b7  Top 10';else if(j.pb)w+='  \u00b7  Personal best';
+    return w;}
+  function xpGrant(b,j,live){const xp=(+j.gain||0)+(+j.achXp||0);if(xp<=0)return;
+    if(/^df:/.test(b)||Array.isArray(j.ach)){if(typeof dfXpBank==='function')dfXpBank(xp,j,b);return;}
+    if(typeof DF!=='undefined'&&DF.live){E.xpLater.push([xp,xpWhy(b,j,live)]);return;}   // another run's XP: after the fight
+    xpPop(xp,xpWhy(b,j,live));}
 
   // ---- the end of run badge: a slide-in like the landing badge, never pauses, a tap opens the board
   let badgeEl=null;
@@ -16224,6 +16240,7 @@ const APP_VER='2026-10-07-dogfight2';          // keep version.json in step when
     if(E.armed&&running&&!paused&&!st.crashed){E.armed=false;if(!ARC.on&&!LES.on&&!MISS.on&&!STRIKE.active&&!DF.live&&st.mode!=='school')runStart('free:landing');}
     if(E.rec&&running&&!paused)recTick();
     if(E.ghost)ghostTick();
+    if(E.xpLater.length&&!DF.live){const x=E.xpLater.shift();xpPop(x[0],x[1]);}
     if(fameBB)fameBB.mat.emissiveIntensity=EGG.litMat.emissiveIntensity;
   }
   function armFree(){E.armed=true;}

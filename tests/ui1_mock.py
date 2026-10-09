@@ -59,6 +59,9 @@ class Mock:
                 from urllib.parse import unquote
                 b = unquote(q.get('b', 'daily')); self.boards.append((b, q.get('p')))
                 out = self.board(b, q.get('p', 'today'))
+            elif path == '/submit' and self.extra.get('reject'):
+                self.subs.append(body)
+                await route.fulfill(status=400, content_type='application/json', body=json.dumps({'ok': False, 'reason': self.extra['reject']}), headers={'Access-Control-Allow-Origin': '*'}); return
             elif path == '/submit':
                 self.subs.append(body)
                 g = self.extra.get('gain', self.gain)

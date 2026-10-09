@@ -2,11 +2,14 @@
 #  (a) xpPop(amount, reason): a centre screen burst that counts up to the amount, the reason under it, inside the safe
 #      area (a 47 px notch stood in), never takes a touch (the stick under it still gets the finger), two close together
 #      stack (the older one steps up), gone after about 2.5 s; 568x320 and 844x390.
+#  (b) the pops fire only when the (mocked) Worker grants XP, with its number: a free flight landing, a lesson, a
+#      challenge and the daily; none with no callsign, for a practice daily, a refused run or no connection.
 # Run: .venv/bin/python tests/xp_check.py
 import asyncio, os, sys
 from playwright.async_api import async_playwright
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from harness import serve, launch, page, Checks, ROOT
+from ui1_mock import Mock
 ok = Checks()
 K = 'window.__kgeu'
 SHOTS = os.path.join(ROOT, 'overnight-screenshots', 'ui1')
@@ -58,6 +61,55 @@ async def main():
             ok(f'{tag} (a) the light haptic was asked for', await pg.evaluate(f"()=>{K}.HAP?{K}.HAP.log.some(x=>x.n==='xp'):true"))
             ok(f'{tag} no page errors', not pg.errs, pg.errs[:3])
             await pg.context.close()
+        # ---------------- (b) the pops follow the server's grant ----------------
+        m = Mock(gain=37)
+        st = {'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'}; st.update(m.storage())
+        pg = await page(b, url, vp={'width': 844, 'height': 390}, storage=st, pre=m.install)
+        await pg.wait_for_timeout(800)
+        LAST = f"()=>{{const L={K}.XPP.log;return L.length?L[L.length-1]:null}}"
+        async def run(board, prep, score, gain, opt='{}'):
+            m.extra['gain'] = gain; n0 = len(m.subs); l0 = await pg.evaluate(f"()=>{K}.XPP.log.length")
+            await pg.evaluate(prep); await pg.wait_for_timeout(300)
+            for _ in range(20):
+                if await pg.evaluate(f"(b)=>!!{K}.LB.E.runs[b]", board): break
+                await pg.evaluate(f"()=>{{for(let i=0;i<3;i++){K}.stepFrame(1/30,false,true)}}")
+            await pg.wait_for_timeout(300)
+            await pg.evaluate(f"([b,s])=>{K}.LB.runEnd(b,s,{opt})", [board, score])
+            for _ in range(30):
+                await pg.wait_for_timeout(200)
+                if len(m.subs) > n0 and await pg.evaluate(f"()=>{K}.XPP.log.length") > l0: break
+            return (len(m.subs) > n0, await pg.evaluate(LAST) if await pg.evaluate(f"()=>{K}.XPP.log.length") > l0 else None)
+        sent, last = await run('free:landing', f"()=>{{const K={K};K.pick('cessna');K.pickBase('kgeu');K.start('runway')}}", 88, 37)
+        ok('(b) free flight landing graded: the pop shows the 37 XP the server granted', sent and last and last['amount'] == 37 and last['reason'].startswith('Landing graded'), last)
+        ok('(b) the reason says why the bonus (the server answered top 10)', last and 'Top 10' in last['reason'], last)
+        xp = await pg.evaluate(f"()=>{K}.LB.P.xp")
+        ok('(b) the local XP follows the server total', xp == m.xp, (xp, m.xp))
+        sent, last = await run('lesson:steep', f"()=>{K}.startLesson('steep')", 80, 22)
+        ok('(b) a lesson: +22 (whatever the server says), "Lesson: Steep turns"', sent and last and last['amount'] == 22 and last['reason'].startswith('Lesson: Steep turns'), last)
+        sent, last = await run('arc:drop', f"()=>{{const K={K};K.pick('c130',1);K.start('drop')}}", 12.5, 41)
+        ok('(b) a challenge (the airdrop): +41 "Airdrop"', sent and last and last['amount'] == 41 and last['reason'].startswith('Airdrop'), last)
+        sent, last = await run('daily', f"()=>{{const K={K};K.dailyRegion('az');K.dailyKind('landing');localStorage.removeItem('kgeuDaily');K.arcStart('daily')}}", 900, 55, "{secs:120}")
+        ok('(b) the daily (a landing day): +55 "Daily challenge"', sent and last and last['amount'] == 55 and last['reason'].startswith('Daily challenge'), last)
+        sent, last = await run('daily', f"()=>{{const K={K};K.arcStart('daily')}}", 900, 55, "{secs:120}")
+        ok('(b) a practice daily (the official attempt used): nothing sent, no pop', not sent and last is None, (sent, last))
+        m.extra['reject'] = 'run of 2.0 s is under the 8 s minimum'
+        sent, last = await run('free:landing', f"()=>{{const K={K};K.start('runway')}}", 90, 37)
+        ok('(b) a refused run: no pop', sent and last is None, (sent, last))
+        m.extra.pop('reject')
+        m.offline = True
+        sent, last = await run('free:landing', f"()=>{{const K={K};K.start('runway')}}", 90, 37)
+        ok('(b) no connection (queued): no pop', not sent and last is None, (sent, last))
+        m.offline = False
+        ok('(b) no page errors', not [e for e in pg.errs if 'pfs-mock' not in e and 'Failed to fetch' not in e and 'status of 400' not in e], pg.errs[:3])
+        await pg.context.close()
+        m = Mock(cs=None, gain=37)
+        st = {'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'}; st.update(m.storage())
+        pg = await page(b, url, vp={'width': 844, 'height': 390}, storage=st, pre=m.install)
+        await pg.wait_for_timeout(600)
+        await pg.evaluate("()=>{const o=document.getElementById('csOv');if(o)o.classList.remove('on')}")
+        sent, last = await run('free:landing', f"()=>{{const K={K};K.pick('cessna');K.start('runway')}}", 88, 37)
+        ok('(b) no callsign: nothing sent, no pop', not sent and last is None, (sent, last))
+        await pg.context.close()
         await b.close()
     sys.exit(ok.done('xp_check'))
 
