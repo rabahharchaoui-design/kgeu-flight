@@ -45,8 +45,10 @@ async def main():
             await pg.wait_for_timeout(900)
             a = await pg.evaluate(POP)
             ok(f'{tag} (a) the number counted up to 37 and glows', a and a[0]['n'] == '37' and a[0]['done'], a)
-            await pg.evaluate(f"()=>{K}.xpPop(15,'Personal best')"); await pg.wait_for_timeout(800)
-            a = await pg.evaluate(POP)   # DOM order: the older pop first
+            await pg.evaluate(f"()=>{K}.xpPop(15,'Personal best')")
+            for _ in range(12):   # the step up is a 260 ms transition: at 3 fps under load it can take a few frames
+                await pg.wait_for_timeout(250); a = await pg.evaluate(POP)   # DOM order: the older pop first
+                if len(a) == 2 and a[0]['cy'] < a[1]['cy'] - 30: break
             ok(f'{tag} (a) a second pop stacks: the new one in the centre, the older one stepped up and smaller', len(a) == 2 and a[0]['cy'] < a[1]['cy'] - 30 and 'translateY' in a[0]['tr'] and abs(a[1]['cx'] - W / 2) < 6, a)
             await pg.screenshot(path=os.path.join(SHOTS, f'xp_stack_{tag}.png'))
             await pg.wait_for_timeout(2600)
