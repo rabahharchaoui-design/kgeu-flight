@@ -145,6 +145,12 @@ async def main():
         ok('(b) the results card: the rank line #3 of 40 (TOP 10)', card['on'] and 'Leaderboard\n#3 of 40 +60 XP' in card['lines'] and 'TOP 10' in card['lines'], card['lines'])
         ok('(b) the results card: the personal bests line, "+150 XP  ACE", the rank up to Wingman',
            'Also: kills (TOP 10), clear time #14' in card['lines'] and '+150 XP ACE' in card['lines'] and 'Rank up\n' in card['lines'] and 'WINGMAN' in card['lines'], card['lines'])
+        await pg.wait_for_timeout(1600)
+        xp = await pg.evaluate(f"""()=>{{const x=document.querySelector('#arcOv .rXp'),L=document.querySelector('#arcOv .rLines');return {{
+          t:x&&x.innerText.replace(/\\s+/g,' ').trim(),above:!!(x&&L&&(x.compareDocumentPosition(L)&Node.DOCUMENT_POSITION_FOLLOWING)),done:!!(x&&x.classList.contains('done')),
+          pops:{K}.XPP.log.filter(e=>!e.card).length,card:{K}.XPP.log.filter(e=>e.card).map(e=>e.amount)}}}}""")
+        ok('(b) ui1: the fight\'s XP (60 for the run + 150 for ACE) counts up once on the card, above the stats', xp['t'] and xp['t'].replace(' ', '').startswith('+210XP') and 'achievements +150' in xp['t'].lower() and xp['above'] and xp['done'] and xp['card'] == [210], xp)
+        ok('(b) ui1: no XP pop at all during or after the fight (the card is the one place)', xp['pops'] == 0, xp)
         await pg.screenshot(path=os.path.join(os.path.dirname(__file__), '..', 'overnight-screenshots', 'dogfight_lb_card.png'))
         await pg.evaluate("()=>document.getElementById('aHub').click()"); await pg.wait_for_timeout(300)
 

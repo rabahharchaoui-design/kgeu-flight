@@ -584,6 +584,13 @@ body.lookOn:not(.touch) #badges{ top:calc(var(--padT) + var(--icon) + 80px); }
 .rScore small{ font-size:14px; font-weight:700; color:var(--soft); margin-left:6px; }
 .rScore:empty{ display:none; }
 .aStars{ margin:2px 0 0; font-size:22px; line-height:1; color:var(--orange); letter-spacing:3px; } .aStars u{ text-decoration:none; color:rgba(246,193,119,.22); } .aStars:empty{ display:none; }
+.rXp{ display:flex; align-items:baseline; justify-content:center; gap:10px; margin:0 0 6px; padding:2px 10px 4px; border-radius:12px; flex:none;
+  background:radial-gradient(closest-side,rgba(217,138,61,.28),rgba(217,138,61,0)); transform-origin:center; }
+.rXp .n{ font:800 clamp(30px,10vh,46px)/1 var(--font); color:#ffe2a3; font-variant-numeric:tabular-nums; text-shadow:0 0 14px rgba(255,170,60,.45); transition:text-shadow 220ms ease; }
+.rXp .n i{ font-style:normal; }
+.rXp .n small{ font-size:.5em; margin-left:.16em; letter-spacing:.08em; color:var(--orange); }
+.rXp.done .n{ text-shadow:0 0 24px rgba(255,190,80,.95), 0 0 5px rgba(255,236,190,.85); }
+.rXp .why{ font:800 12px/1.2 var(--font); letter-spacing:.1em; text-transform:uppercase; color:var(--sand); opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
 .rTip{ margin:0 0 6px; padding:5px 10px; border-radius:9px; background:rgba(246,193,119,.1); border-left:3px solid var(--orange); font-size:14px; font-weight:700; line-height:1.25; color:var(--sand); }
 .rTip.good{ border-left-color:#4cd97b; } .rTip:empty{ display:none; }
 .rLines{ margin:0 0 10px; font-size:14px; line-height:1.4; display:grid; grid-template-columns:1fr 1fr; gap:0 18px; }
@@ -10047,6 +10054,7 @@ function resTick(dt){
 // o: letter, title, score, sub (small text after the score), stats [[label,value]] or lines (html),
 // stars (0-3, the challenges), board (the LB board id, for the rank line)
 function resFill(ov,o){
+  {const x=ov.querySelector('.rXp');if(x)x.remove();}
   const L=ov.querySelector('.gLetter');L.textContent=o.letter;L.className='gLetter g'+o.letter;
   const t=ov.querySelector('.sub');t.textContent=o.title;if(t.id)modeTag(t.id);
   const sc=ov.querySelector('.rScore');sc.textContent=o.score||'';
@@ -11795,7 +11803,7 @@ function dfRecord(r,stars){
 const DF_WHY={win:'All bandits down',time:'Out of time',hits:'Shot down, you ejected',arena:'Left the range',crash:'Crashed'};
 // the end of a run: the record, the run log and the results card (a crash keeps the crash card instead)
 function dfEnd(why){
-  if(!DF.on||DF.done)return;DF.done=true;DF.why=why;DF.on=false;
+  if(!DF.on||DF.done)return;DF.done=true;DF.xpBank=null;DF.why=why;DF.on=false;
   if(why==='win')dfCall('kioWin',null,{ttl:6});else if(why!=='crash')dfCall('kio',null,{ttl:6});
   const r=dfScore(),stars=dfStars(r.score),letter=dfGrade(r.score),better=dfRecord(r,stars);DF.sc=r;
   runLog('dogfight',{score:r.score,kills:r.kills,gunKills:r.gunKills,waves:r.waves,hits:r.hits,won:r.won,why:why,secs:r.secs,clearT:r.clearT,flareSaves:r.flareSaves,stars:stars,ach:DF.ach.slice(),breaks:DF.brks,overshoots:DF.ovs});
@@ -11814,8 +11822,28 @@ function dfEnd(why){
   if(DF.daily)stats.push(['Daily points',resNum(dp)+' (half the score)']);
   stats.push(['Best',B?resNum(B.pts)+' pts, '+B.kills+' kills'+(B.clr!=null?', '+dfClock(B.clr):''):'none yet']);
   resArm(()=>{if(!running||!DF.live)return;RES.kind='df';
-    resOpen(arcOv,{letter:letter,title:(DF.daily?'Daily dogfight: ':'Red Flag Dogfight: ')+DF_WHY[why]+(better?', new best':''),score:resNum(r.score)+' pts',stars:stars,stats:stats,board:send&&DF.lb?lb:''});},DF.won?3:2.2);   // time for the knock it off call
+    resOpen(arcOv,{letter:letter,title:(DF.daily?'Daily dogfight: ':'Red Flag Dogfight: ')+DF_WHY[why]+(better?', new best':''),score:resNum(r.score)+' pts',stars:stars,stats:stats,board:send&&DF.lb?lb:''});dfXpShow();},DF.won?3:2.2);   // time for the knock it off call
 }
+// ui1 item 7: the fight's XP. Nothing shows while it lasts (the kills bank silently: the Worker works out the run's XP
+// from the whole run when it is sent). The accepted answer (gain + achXp) is kept in DF.xpBank and plays as one count
+// up burst on the results card, above the stats, when both are there (the card opens 2 to 3 s after the run ends; the
+// answer can come before or after it). No answer (no callsign, practice, offline, refused): no XP on the card.
+function dfXpBank(xp,j,b){
+  if(DF.why==='crash'&&!DF.on){xpPop(xp,'Red Flag Dogfight');return;}   // a crash keeps the crash card: the XP pops over it instead
+  DF.xpBank={xp:Math.round(xp),gain:Math.round(+j.gain||0),ach:Math.round(+j.achXp||0),played:false};dfXpShow();}
+function dfXpShow(){const X=DF.xpBank;if(!X||X.played||RES.kind!=='df'||!arcOv.classList.contains('on'))return;X.played=true;
+  const sh=arcOv.querySelector('.sheet'),lines=sh.querySelector('.rLines');let el=sh.querySelector('.rXp');
+  if(!el){el=document.createElement('div');el.className='rXp';el.setAttribute('role','status');sh.insertBefore(el,lines);}
+  el.innerHTML='<b class="n">+<i>0</i><small>XP</small></b>'+(X.ach?'<span class="why"></span>':'');el.classList.remove('done');
+  if(X.ach)el.querySelector('.why').textContent='Run +'+X.gain+'  \u00b7  achievements +'+X.ach;
+  el.setAttribute('aria-label','+'+X.xp+' XP');
+  const num=el.querySelector('i'),rm=matchMedia('(prefers-reduced-motion: reduce)').matches,T0=performance.now(),DUR=1000;
+  if(el.animate&&!rm)el.animate([{opacity:0,transform:'scale(.85)'},{opacity:1,transform:'scale(1.07)',offset:.55},{opacity:1,transform:'scale(1)'}],{duration:380,easing:'cubic-bezier(.23,1,.32,1)',fill:'both'});
+  const step=()=>{if(!el.isConnected)return;const k=rm?1:Math.min(1,(performance.now()-T0)/DUR);num.textContent=Math.round(X.xp*(1-Math.pow(1-k,3))).toLocaleString('en-US');
+    if(k<1)requestAnimationFrame(step);else{el.classList.add('done');if(el.animate&&!rm)el.animate([{transform:'scale(1)'},{transform:'scale(1.06)'},{transform:'scale(1)'}],{duration:240,easing:'cubic-bezier(.23,1,.32,1)'});}};
+  requestAnimationFrame(step);setTimeout(()=>{if(el.isConnected){num.textContent=X.xp.toLocaleString('en-US');el.classList.add('done');}},DUR+400);
+  try{hapPattern('xp');}catch(e){}
+  XPP.log.push({amount:X.xp,reason:'dogfight card',t:Date.now(),card:1});}
 // an achievement in the fight: listed for this run (DF.ach, every time it is earned) and granted (its first time, in the strip)
 function dfAch(id){if(DF.ach.indexOf(id)<0)DF.ach.push(id);achGrant(id);}
 // the mode is over: bandits hidden, the music back to the playlist
@@ -13416,6 +13444,7 @@ function toast(msg,dur){if(DF_QUIET){dfSay(msg,dur);return;}toastEl.textContent=
 // XPP.log keeps what was shown for the tests; XPP.off silences it (screenshots).
 const XPP={log:[],live:[],off:false};
 function xpPop(amount,reason,o){amount=Math.round(+amount||0);if(amount<=0||XPP.off)return null;o=o||{};
+  if(typeof DF!=='undefined'&&DF.on&&!o.force)return null;   // ui1 item 7: never a pop in the fight
   let box=document.getElementById('xpPops');if(!box){box=document.createElement('div');box.id='xpPops';box.setAttribute('aria-live','polite');document.body.appendChild(box);}
   const el=document.createElement('div');el.className='xpPop';el.setAttribute('role','status');
   el.innerHTML='<div class="xpIn"><div class="xpN">+<b>0</b><small>XP</small></div>'+(reason?'<div class="xpR"></div>':'')+'</div>';
@@ -15848,7 +15877,7 @@ const APP_VER='2026-10-07-dogfight2';          // keep version.json in step when
     if(j.rankUp)w+='  \u00b7  Rank up: '+j.rankUp;else if(j.top10&&j.rank<=10)w+='  \u00b7  Top 10';else if(j.pb)w+='  \u00b7  Personal best';
     return w;}
   function xpGrant(b,j,live){const xp=(+j.gain||0)+(+j.achXp||0);if(xp<=0)return;
-    if(/^df:/.test(b)||Array.isArray(j.ach)){if(typeof dfXpBank==='function')dfXpBank(xp,j,b);return;}
+    if((/^df:/.test(b)||Array.isArray(j.ach))&&live){if(typeof dfXpBank==='function')dfXpBank(xp,j,b);return;}
     if(typeof DF!=='undefined'&&DF.live){E.xpLater.push([xp,xpWhy(b,j,live)]);return;}   // another run's XP: after the fight
     xpPop(xp,xpWhy(b,j,live));}
 

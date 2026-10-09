@@ -29,7 +29,7 @@ async def main():
             pg = await page(b, url, vp=vp, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'})
             await pg.evaluate(SETSAFE, [0, 47, 47, 21])
             await pg.evaluate(f"()=>{{const K={K};K.pick('cessna');K.pickBase('kgeu');K.start('runway')}}"); await pg.wait_for_timeout(500)
-            await pg.evaluate(f"()=>{K}.xpPop(37,'Landing graded')")
+            await pg.evaluate(f"()=>{K}.xpPop(37,'Landing graded',{{hold:5000}})")
             await pg.wait_for_timeout(250)
             a = await pg.evaluate(POP)
             ok(f'{tag} (a) one pop shows at once, the reason under it', len(a) == 1 and a[0]['r'] == 'Landing graded', a)
