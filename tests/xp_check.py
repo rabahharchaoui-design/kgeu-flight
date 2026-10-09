@@ -4,6 +4,8 @@
 #      stack (the older one steps up), gone after about 2.5 s; 568x320 and 844x390.
 #  (b) the pops fire only when the (mocked) Worker grants XP, with its number: a free flight landing, a lesson, a
 #      challenge and the daily; none with no callsign, for a practice daily, a refused run or no connection.
+#  (c) Home: the rank insignia, callsign, total XP from the server and the bar to the next rank (filled to the right
+#      share, animated on transform), updated by a run's answer; the top rank and no callsign read right.
 # Run: .venv/bin/python tests/xp_check.py
 import asyncio, os, sys
 from playwright.async_api import async_playwright
@@ -84,6 +86,17 @@ async def main():
         ok('(b) the reason says why the bonus (the server answered top 10)', last and 'Top 10' in last['reason'], last)
         xp = await pg.evaluate(f"()=>{K}.LB.P.xp")
         ok('(b) the local XP follows the server total', xp == m.xp, (xp, m.xp))
+        await pg.evaluate(f"()=>{K}.openMenu()"); await pg.wait_for_timeout(1500)
+        HR = "()=>{const f=document.getElementById('hRkF');return {cs:document.getElementById('hRkCs').textContent,rk:document.getElementById('hRkN').textContent,x:document.getElementById('hRkX').textContent,n:document.getElementById('hRkNext').textContent,v:+document.getElementById('hRkBar').getAttribute('aria-valuenow'),tf:f.style.transform,tr:getComputedStyle(f).transitionProperty,svg:!!document.querySelector('#hRkI svg.rk'),rec:!!document.querySelector('#hRank #hRec')}}"
+        h = await pg.evaluate(HR)
+        # 1,687 XP: Flight Lead (1,200) to Instructor Pilot (3,500): 487 of 2,300 = 21 percent
+        ok('(c) Home: insignia, ACEPILOT, Flight Lead, the server XP, 1,813 to Instructor Pilot', h['svg'] and h['cs'] == 'ACEPILOT' and h['rk'] == 'Flight Lead' and h['x'] == '1,687 XP' and h['n'] == '1,813 XP to Instructor Pilot' and h['rec'], h)
+        ok('(c) Home: the bar is filled to 21 percent, on transform with a transition', h['v'] == 21 and h['tf'].startswith('scaleX(0.21') and 'transform' in h['tr'], h)
+        await pg.screenshot(path=os.path.join(SHOTS, 'xp_home_844x390.png'))
+        await pg.evaluate(f"()=>{{const K={K};K.LB.P.xp=20000;K.LB.ui()}}"); await pg.wait_for_timeout(300)
+        h = await pg.evaluate(HR)
+        ok('(c) Home: the top rank reads Top Gun, the bar full', h['rk'] == 'Top Gun' and h['n'].startswith('Top rank') and h['v'] == 100, h)
+        await pg.evaluate(f"()=>{{const K={K};K.LB.P.xp={m.xp};K.LB.ui()}}")
         sent, last = await run('lesson:steep', f"()=>{K}.startLesson('steep')", 80, 22)
         ok('(b) a lesson: +22 (whatever the server says), "Lesson: Steep turns"', sent and last and last['amount'] == 22 and last['reason'].startswith('Lesson: Steep turns'), last)
         sent, last = await run('arc:drop', f"()=>{{const K={K};K.pick('c130',1);K.start('drop')}}", 12.5, 41)
@@ -109,6 +122,9 @@ async def main():
         await pg.evaluate("()=>{const o=document.getElementById('csOv');if(o)o.classList.remove('on')}")
         sent, last = await run('free:landing', f"()=>{{const K={K};K.pick('cessna');K.start('runway')}}", 88, 37)
         ok('(b) no callsign: nothing sent, no pop', not sent and last is None, (sent, last))
+        await pg.evaluate(f"()=>{K}.openMenu()"); await pg.wait_for_timeout(600)
+        h = await pg.evaluate("()=>({cs:document.getElementById('hRkCs').textContent,n:document.getElementById('hRkNext').textContent,none:document.getElementById('hRank').classList.contains('none')})")
+        ok('(c) Home with no callsign: Nugget card asks for a callsign, no bar', h['cs'] == 'No callsign yet' and 'Pick a callsign' in h['n'] and h['none'], h)
         await pg.context.close()
         await b.close()
     sys.exit(ok.done('xp_check'))

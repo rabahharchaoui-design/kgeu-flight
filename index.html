@@ -1167,8 +1167,23 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 .lrow .tro{ top:50%; transform:translateY(-50%); color:var(--rust); }
 #menu .lrow.next .tro{ color:var(--orange); }
 .mcard .cd{ font-style:normal; color:var(--orange); font-weight:800; }
-#hRec{ display:flex; align-items:center; justify-content:center; gap:8px; }
-#hRec svg{ width:20px; height:20px; }
+/* ui1: the rank card on Home: insignia, callsign and rank, total XP, a bar to the next rank (it fills from where it was
+   last seen, 900 ms, transform only), Records as an icon at its corner */
+.hRank{ position:relative; display:grid; grid-template-columns:auto 1fr auto 44px; grid-template-rows:auto auto auto; align-items:center; column-gap:10px; row-gap:4px;
+  min-width:clamp(230px,30vw,300px); padding:8px 6px 8px 12px; border-radius:14px; background:var(--night); color:var(--sand); box-shadow:0 4px 0 rgba(42,22,8,.22); }
+.hRank .rkI{ grid-row:1 / 3; width:clamp(34px,10vh,44px); height:clamp(34px,10vh,44px); }
+.hRank .rkI svg{ width:100%; height:100%; display:block; }
+.hRank .rkT{ min-width:0; display:flex; flex-direction:column; line-height:1.05; }
+.hRank .rkT b{ font-size:17px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hRank .rkT span{ font-size:12px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--orange); white-space:nowrap; }
+.hRank .rkX{ font-size:15px; font-weight:800; white-space:nowrap; font-variant-numeric:tabular-nums; }
+#menu .hRank .rkRec{ grid-row:1 / 3; grid-column:4; width:44px; height:44px; min-height:44px; padding:0; display:grid; place-items:center; background:rgba(246,193,119,.1); color:var(--sand); border-radius:11px; }
+.hRank .rkRec svg{ width:20px; height:20px; }
+.hRank .rkBar{ grid-column:2 / 4; grid-row:2; height:8px; border-radius:4px; background:rgba(246,193,119,.16); overflow:hidden; }
+.hRank .rkBar i{ display:block; height:100%; border-radius:4px; background:linear-gradient(90deg,var(--orange),#ffd88f); transform-origin:left center; transform:scaleX(0); transition:transform 900ms cubic-bezier(.23,1,.32,1); }
+.hRank .rkNext{ grid-column:1 / 5; grid-row:3; font-size:12px; font-weight:700; color:#e3c08f; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hRank.none .rkBar{ display:none; }
+@media (prefers-reduced-motion:reduce){ .hRank .rkBar i{ transition:none; } }
 /* the leaderboard screen */
 .lbMain{ flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; gap:6px; background:var(--night); color:var(--sand); border-radius:16px; padding:6px 10px 8px; }
 /* ui1 boards: a bar (the board picker, the dogfight's EASY/HARD and stat chips, Today / This week / All time) over the
@@ -1456,9 +1471,16 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
    <div class="homeRow">
     <button class="bigB" id="hFly">FLY</button>
     <div class="homeCol">
+     <div class="hRank" id="hRank" role="group" aria-label="Your rank">
+      <div class="rkI" id="hRkI" aria-hidden="true"></div>
+      <div class="rkT"><b id="hRkCs"></b><span id="hRkN"></span></div>
+      <b class="rkX" id="hRkX"></b>
+      <button class="rkRec" id="hRec" aria-label="Records"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2.5h6V4M8.5 10h7M8.5 14h7M8.5 18h4"/></svg></button>
+      <div class="rkBar" role="progressbar" id="hRkBar" aria-valuemin="0" aria-valuemax="100"><i id="hRkF"></i></div>
+      <span class="rkNext" id="hRkNext"></span>
+     </div>
      <button class="midB" id="hSch">FLIGHT SCHOOL<span class="startHere" id="startHere">Start here</span></button>
      <button class="midB" id="hChal">CHALLENGES</button>
-     <button class="midB" id="hRec" aria-label="Records"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2.5h6V4M8.5 10h7M8.5 14h7M8.5 18h4"/></svg>RECORDS</button>
     </div>
    </div>
   </div>
@@ -16229,7 +16251,21 @@ const APP_VER='2026-10-07-dogfight2';          // keep version.json in step when
     rows.addEventListener('mousedown',e=>down(e.clientY));addEventListener('mousemove',e=>{if(y0!==null)move(e.clientY);});addEventListener('mouseup',up);}
 
   // ---- the callsign everywhere it shows: FLY, Settings, the leaderboard header
+  // ui1 item 8: the Home rank card, from the XP the Worker keeps (E.P.xp: /me at launch, every /submit answer)
+  let rkShown=null;
+  function homeRank(){const el=$('hRank');if(!el)return;const P=E.P,xp=P?Math.max(0,+P.xp||0):0,i=rankIdx(xp),nx=RANKS[i+1];
+    $('hRkI').innerHTML=rankSVG(i);$('hRkCs').textContent=P?P.cs:'No callsign yet';$('hRkN').textContent=RANKS[i][0];
+    $('hRkX').textContent=P?num(xp)+' XP':'';el.classList.toggle('none',!P);
+    const f=nx?Math.max(0,Math.min(1,(xp-RANKS[i][1])/(nx[1]-RANKS[i][1]))):1;
+    $('hRkNext').textContent=!P?(E.enabled?'Pick a callsign in Settings to earn XP':'XP and ranks need the online game'):nx?num(nx[1]-xp)+' XP to '+nx[0]:'Top rank. Keep flying';
+    const bar=$('hRkBar');bar.setAttribute('aria-valuenow',String(Math.round(f*100)));bar.setAttribute('aria-label',nx?Math.round(f*100)+' percent of the way to '+nx[0]:'Top rank');
+    // the bar fills from where it was last seen: on Home only, so the move is seen (the first time from empty)
+    const F=$('hRkF'),show=()=>{F.style.transform='scaleX('+f.toFixed(4)+')';rkShown=f;};
+    if(curScr==='sHome'&&menu.classList.contains('on')){if(rkShown!==f){if(rkShown===null)F.style.transform='scaleX(0)';requestAnimationFrame(()=>requestAnimationFrame(show));}}
+    else if(rkShown===null){}   // not on Home yet: it animates when Home shows
+  }
   function ui(){
+    homeRank();
     const P=E.P,fc=$('flyCs'),oc=$('oCs');
     if(fc)fc.innerHTML=P?csTag(P.cs,rankIdx(P.xp||0),P.creator,RANKS[rankIdx(P.xp||0)][0]):'';
     if(oc){oc.innerHTML=P?csTag(P.cs,rankIdx(P.xp||0),P.creator,num(P.xp||0)+' XP'):'<span>None yet</span>';
@@ -16274,7 +16310,7 @@ const APP_VER='2026-10-07-dogfight2';          // keep version.json in step when
   }
   function armFree(){E.armed=true;}
   return {E:E,BOARDS:BOARDS,ORDER:ORDER,board:board,runStart:runStart,runEnd:runEnd,runCancel:runCancel,frame:frame,reset:reset,armFree:armFree,
-    boot:boot,sheet:sheet,sheetOn:()=>!$('lbSheet').hidden,csHold:()=>csHold,paintModel:paintModel,paintAll:paintAll,lbOpen:lbOpen,lbRender:lbRender,race:race,ui:ui,flush:flush,csOpen:csOpen,dice:dice,
+    boot:boot,homeRank:homeRank,sheet:sheet,sheetOn:()=>!$('lbSheet').hidden,csHold:()=>csHold,paintModel:paintModel,paintAll:paintAll,lbOpen:lbOpen,lbRender:lbRender,race:race,ui:ui,flush:flush,csOpen:csOpen,dice:dice,
     fameDraw:fameDraw,fameFetch:fameFetch,fameApply:fameApply,fameApplyCity:fameApplyCity,ghostStart:ghostStart,decodePath:decodePath,rankSVG:rankSVG,rankByName:rankByName,utcDay:utcDay,fmtS:fmtS,showBadge:showBadge,ghostOff:ghostOff,runBoard:runBoard,
     get P(){return E.P;}};
 })();
