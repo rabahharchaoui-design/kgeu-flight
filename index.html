@@ -949,6 +949,14 @@ label.sens b{ color:var(--ink); min-width:74px; }
 .mcard .sc em{ font-style:normal; color:#f0d6ad; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .stars{ font-style:normal; color:var(--orange); letter-spacing:1px; font-size:13px; } .stars u{ text-decoration:none; color:rgba(246,193,119,.22); }
 #arcCards{ grid-template-columns:1fr 1fr; align-content:start; overflow-y:auto; touch-action:pan-y; }
+/* ui1: the featured dogfight across the top, bigger; the daily marked out with a warm ring; every card presses in */
+#menu #arcCards .mcard.feat{ grid-column:1 / -1; min-height:72px; }
+#menu #arcCards .mcard.feat b{ font-size:21px; }
+#menu #arcCards .mcard.feat .ico{ width:70px; height:50px; }
+#menu #arcCards .mcard[data-m=daily]{ box-shadow:inset 0 0 0 2px rgba(217,138,61,.6); }
+#menu .mcard{ transition:transform 140ms cubic-bezier(.23,1,.32,1); }
+#menu .mcard:active{ transform:scale(.98); }
+@media (prefers-reduced-motion:reduce){ #menu .mcard{ transition:none; } }
 /* the World airports group under the arcade cards: the six Arizona games fill the first screen, the group scrolls up below them */
 .cards .cgrp{ grid-column:1 / -1; font-size:11px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--brown); padding:6px 2px 0; }
 #misCards{ grid-template-columns:1fr 1fr; } #misCards .mcard[data-m=daily]{ grid-column:1 / -1; }
@@ -13320,20 +13328,18 @@ function dailyCard(wide){const D=dailySpec(),DI=AC_INFO[D.type];let used=false;t
 function dailyLeft(){const n=Date.now(),d=new Date(n),nx=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()+1),s=Math.max(0,Math.floor((nx-n)/1000));
   return Math.floor(s/3600)+':'+String(Math.floor(s/60)%60).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
 setInterval(()=>{if(!menu.classList.contains('on')||curScr!=='sArc')return;const t=dailyLeft();document.querySelectorAll('.mcard .cd').forEach(e=>e.textContent=t);},1000);
+// ui1: one Challenges list, five cards (the dogfight featured across the top, then the daily, the strike range, the
+// airdrop and the short field). The 5 and 1 mile landing challenges, the Luke to Glendale dash and the A-10 gun run keep
+// their modes, boards and starters (arcStart, start('range') with the A-10, the daily's rotation) but no card; the
+// world airports below stay until the Fly tab takes them (item 3)
 function arcList(){
-  const D=dailySpec(),DI=AC_INFO[D.type];
   fillCards($('arcCards'),[
     {id:'dogfight',lb:'df:score:'+(rookie()?'easy':'hard'),ac:'Featured',name:'Red Flag Dogfight',desc:'Your F-16 against aggressor F-16s over the Goldwater Range.',cls:'feat',go:()=>dfStart()},
     dailyCard(),
-    {id:'landing',lb:'arc:landing',ac:AC_INFO[savedType][1],name:'Landing challenge',desc:'Start 5 miles out. Beat the clock to runway 1.',go:()=>arcStart('landing')},
-    {id:'landing1',lb:'arc:landing1',ac:AC_INFO[savedType][1],name:'1 mile landing challenge',desc:'Lined up, 300 ft, 1 mile out. Beat the clock to runway 1.',go:()=>arcStart('landing1')},
-    {id:'drop',lb:'arc:drop',ac:'C-130H Hercules',name:'Airdrop challenge',desc:'Put the bundle on the drop zone.',go:()=>{pickType('c130',1);start('drop');}},
     {id:'range',lb:'arc:strike',ac:'MQ-9A Reaper',name:'Strike range',desc:'Find the targets, lock on, four missiles.',go:()=>{pickType('reaper',1);start('range');}},
+    {id:'drop',lb:'arc:drop',ac:'C-130H Hercules',name:'Airdrop',desc:'Put the bundle on the drop zone.',go:()=>{pickType('c130',1);start('drop');}},
+    {id:'short',lb:'mission:short',ac:'C-130H Hercules',name:'Short field landing',desc:'Stop a Hercules on a 3,000 ft dirt strip.',go:()=>{pickType('c130',1);start('short');}},
     // the world airports, below: each flies in its own region (tapping one from elsewhere switches there)
-    {head:'Missions'},
-    {id:'short',lb:'mission:short',cls:'more',ac:'C-130H Hercules',name:'Short field landing',desc:'Stop a Hercules on a 3,000 ft dirt strip.',go:()=>{pickType('c130',1);start('short');}},
-    {id:'dash',lb:'mission:dash',cls:'more',ac:'F-16C Viper',name:'Luke to Glendale dash',desc:'Wheels up at Luke, down at Glendale. Beat 3 minutes.',go:()=>{pickType('f16',1);start('runway','luke');}},
-    {id:'gunrun',lb:'arc:gunrun',cls:'more',ac:'A-10C Thunderbolt II',name:'A-10 gun run',desc:'Four Mavericks and the 30 mm gun on the Gila range.',go:()=>{pickType('a10',1);start('range');}},
     {head:'World airports'}].concat(APT_IDS.map(id=>{const R=REGIONS[id],b=aptBoard(id);
       return {id:b,lb:b,icon:'landing',here:1,cls:'apt',ac:AC_INFO[savedType][1],name:R.base,score:arcScore(b),desc:'5 mile landing challenge at '+R.base+', runway '+R.main+'.',go:()=>aptStart(id)};})));
 }

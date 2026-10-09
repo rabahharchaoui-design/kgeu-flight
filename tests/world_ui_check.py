@@ -184,11 +184,11 @@ async def main():
         ok('rjtt airdrop: kgeuRegion az and a resume with the mission (drop, C-130, time, Hard)',
            k['r'] == 'az' and k['rl'] == 1 and s0.get('mode') == 'drop' and s0.get('type') == 'c130' and s0.get('tod') == 'day' and s0.get('skill') == 'pilot', k)
         await pg.evaluate("()=>localStorage.setItem('kgeuRegion','rjtt')")
-        for kind, sel, check in (('landing challenge', '#arcCards .mcard[data-m="landing"]', lambda s: s.get('arc') == 'landing'),):
+        for kind, sel, check in (('strike range', '#arcCards .mcard[data-m="range"]', lambda s: s.get('mode') == 'range' and s.get('type') == 'reaper'),):   # ui1: no landing card
             await pg.evaluate(f"()=>{K}.nav('sArc')"); await pg.wait_for_timeout(200)
             await finger(pg, sel); await pg.wait_for_timeout(300)
             s1 = (await pg.evaluate("()=>JSON.parse(sessionStorage.getItem('kgeuResume')||'null')") or {}).get('start') or {}
-            ok(f'rjtt {kind}: the resume carries the arcade kind, aircraft and start', check(s1) and s1.get('type') == 'cessna' and 'pos' in s1, s1)
+            ok(f'rjtt {kind}: the resume carries the mode, aircraft and start', check(s1) and 'pos' in s1, s1)
         await pg.evaluate(f"()=>{{localStorage.setItem('kgeuRegion','rjtt');{K}.nav('sSchool')}}"); await pg.wait_for_timeout(200)
         await finger(pg, '#school .lrow[data-l="steep"]'); await pg.wait_for_timeout(300)
         s1 = (await pg.evaluate("()=>JSON.parse(sessionStorage.getItem('kgeuResume')||'null')") or {}).get('start') or {}

@@ -162,7 +162,7 @@ async def main():
             ok('its flight path is kept as the leader ghost', gh[0]['n'] == 1, gh)
             # ---------------- the board screen, from the trophy on the card
             await A.evaluate(f"()=>{{document.getElementById('arcOv').classList.remove('on');{K}.openMenu();{K}.nav('sArc')}}"); await A.wait_for_timeout(400)
-            await A.click('#arcCards [data-m=landing1] .tro'); await A.wait_for_timeout(300)
+            await A.evaluate(f"()=>{K}.LB.lbOpen('arc:landing1')"); await A.wait_for_timeout(300)   # ui1: no 1 mile card (its trophy) any more; the board still opens
             ok('trophy opens the board, not the run', await A.evaluate(f"()=>{K}.curScr()==='sLb'||document.getElementById('sLb').classList.contains('on')") and not await A.evaluate(f"()=>{K}.ARC.on&&!{K}.paused()"))
             await A.click('[data-lbp=all]'); await A.wait_for_timeout(1500)
             rows = await A.evaluate("()=>[...document.querySelectorAll('#lbRowsIn .lbRow')].map(r=>({t:r.innerText.replace(/\\s+/g,' '),me:r.classList.contains('me')}))")
