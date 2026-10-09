@@ -23,7 +23,7 @@ async def main():
         ok('the Red Flag Dogfight card no longer says Coming soon', card and not card['soon'] and card['stars'] and 'Coming soon' not in card['txt'], card)
         await finger(pg, '#arcCards [data-m="dogfight"]'); await pg.wait_for_timeout(600)
         await pg.evaluate(f"()=>{{{K}.DF.test.noBanditFire=true;}}")   # 5.3: the bandits' missiles stay off here (dogfight_defense_check)
-        await finger(pg, '#dfbGo'); await pg.wait_for_timeout(200)     # 5.4: the briefing card's FIGHT'S ON starts the run
+        await finger(pg, '#dfbNext'); await pg.wait_for_timeout(150); await finger(pg, '#dfbGo'); await pg.wait_for_timeout(200)     # 5.4: the briefing card's FIGHT'S ON starts the run
         s = await pg.evaluate(f"""()=>{{const K={K},s=K.state(),D=K.DF;return {{on:D.on,menu:document.getElementById('menu').classList.contains('on'),type:s.type,ground:s.onGround,gear:s.gearDown,
           ft:(s.pos.y-1.5)*3.28084+1071,kt:s.ias*1.943844,dc:Math.hypot(s.pos.x-D.C.x,s.pos.z-D.C.z)/1852,n:D.bandits.length,wave:D.wave,t:D.t,
           hud:document.getElementById('missT').textContent,forced:K.music().forced}}}}""")
@@ -78,12 +78,12 @@ async def main():
         ok('the arcade card shows the best', ('Best ' + format(r['sc']['score'], ',')) in em and '10 kills' in em, em)
         # a round clock running out ends the run; Try again starts a new one
         await finger(pg, '#arcCards [data-m="dogfight"]'); await pg.wait_for_timeout(500)
-        await finger(pg, '#dfbGo'); await pg.wait_for_timeout(200)
+        await finger(pg, '#dfbNext'); await pg.wait_for_timeout(150); await finger(pg, '#dfbGo'); await pg.wait_for_timeout(200)
         await pg.evaluate(f"()=>{{{K}.DF.t=1.5;}}"); await step(pg, 4); await pg.wait_for_timeout(300)
         r = await pg.evaluate(f"()=>({{on:{K}.DF.on,done:{K}.DF.done,why:{K}.DF.why,won:{K}.DF.won,card:document.getElementById('arcOv').classList.contains('on'),title:document.getElementById('aTitle').textContent}})")
         ok('the wave clock at 0 ends the run with the card', not r['on'] and r['done'] and r['why'] == 'time' and not r['won'] and r['card'] and 'out of time' in r['title'].lower(), r)
         await finger(pg, '#aRetry'); await pg.wait_for_timeout(500)
-        await finger(pg, '#dfbGo'); await pg.wait_for_timeout(200)
+        await finger(pg, '#dfbNext'); await pg.wait_for_timeout(150); await finger(pg, '#dfbGo'); await pg.wait_for_timeout(200)
         r = await pg.evaluate(f"()=>({{on:{K}.DF.on,wave:{K}.DF.wave,n:{K}.DF.bandits.length,kills:{K}.DF.kills,forced:{K}.music().forced,card:document.getElementById('arcOv').classList.contains('on')}})")
         ok('Try again restarts the dogfight at wave 1', r['on'] and r['wave'] == 1 and r['n'] == 1 and r['kills'] == 0 and r['forced'] == 'dogfight.m4a' and not r['card'], r)
         # three hits end it (5.3 brings the bandits' weapons; dfHit is the hook)

@@ -125,9 +125,11 @@ async def main():
     chk('arcade hub has the dogfight, not coming soon', await pg.is_visible('#arcCards [data-m="dogfight"]') and 'oming soon' not in await pg.inner_text('#arcCards [data-m="dogfight"]'))
     await pg.evaluate("()=>document.querySelector('#arcCards [data-m=\"dogfight\"]').click()")
     for _ in range(40):
-        if await pg.is_visible('#dfbGo'): break
+        if await pg.is_visible('#dfbNext'): break
         await pg.wait_for_timeout(500)
     chk('dogfight briefing says Sound on', 'Sound on for the full experience' in await pg.evaluate("()=>document.body.innerText"))
+    await pg.evaluate("()=>document.getElementById('dfbNext').click()")   # arsenal: the briefing's LOADOUT, then the card's FIGHT'S ON
+    await pg.wait_for_timeout(300)
     await pg.evaluate("()=>document.getElementById('dfbGo').click()")
     await pg.wait_for_timeout(4000)
     d=await pg.evaluate("()=>{const K=window.__kgeu,D=K.DF;return [!!D.on,D.wave,D.bandits.filter(b=>b.alive).length,K.MUSIC?K.MUSIC.forced:null,K.state().type];}")

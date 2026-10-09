@@ -69,7 +69,7 @@ async def main():
         ok('navigator.audioSession (stubbed): untouched before any tap, type playback after the first tap, K.audioSessionSet true',
            s0['type'] == 'auto' and s0['set'] is False and s1['type'] == 'playback' and s1['set'] is True, (s0, s1))
         await pg.evaluate(f"()=>{K}.DF.test.noBanditFire=true")
-        br = await pg.evaluate("""()=>{const o=document.getElementById('dfBrief'),g=document.getElementById('dfbGo').getBoundingClientRect(),s=document.getElementById('dfbSil');
+        br = await pg.evaluate("""()=>{const o=document.getElementById('dfBrief'),g=document.getElementById('dfbNext').getBoundingClientRect(),s=document.getElementById('dfbSil');
           return {on:o.classList.contains('on'),txt:o.innerText,w:g.width,h:g.height,sil:!s.hidden&&s.offsetParent!==null,mode:document.getElementById('dfbMode').textContent,inView:g.bottom<=innerHeight&&g.top>=0}}""")
         ok('the briefing card: RED FLAG DOGFIGHT, the range, Sound on for the full experience, the three hints, the HARD chip',
            br['on'] and all(t in br['txt'] for t in ('RED FLAG DOGFIGHT', 'Barry M. Goldwater Range', 'Sound on for the full experience', 'FOX 2', 'GUN', 'FLARES')) and br['mode'] == 'HARD', br['txt'])
@@ -81,7 +81,7 @@ async def main():
         for _ in range(40):
             if await pg.evaluate(f"()=>{{const R={K}.RADIO;return R.want&&R.got+Math.max(0,R.err)>=R.want}}"): break
             await pg.wait_for_timeout(500)
-        await finger(pg, '#dfbGo'); await pg.wait_for_timeout(100)
+        await finger(pg, '#dfbNext'); await pg.wait_for_timeout(150); await finger(pg, '#dfbGo'); await pg.wait_for_timeout(100)
         sp = await pg.evaluate(f"""()=>{{const K={K},D=K.DF,s=K.state();let x=0,y=0,z=0,n=0;for(const b of D.bandits)if(b.alive){{x+=b.p.x;y+=b.p.y;z+=b.p.z;n++;}}x/=n;y/=n;z/=n;
           const lines=K.radioLog().concat(K.radioQ()).map(l=>({{who:l.who,text:l.text,clips:l.clips}}));
           return {{brief:document.getElementById('dfBrief').classList.contains('on'),paused:!K.state().crashed&&K.DF.brief,n:n,brg:Math.atan2(x-s.pos.x,-(z-s.pos.z))*180/Math.PI,nm:Math.hypot(x-s.pos.x,z-s.pos.z)/1852,ft:(y-1.5)*3.28084+1071,pic:D.pic,lines:lines}}}}""")
