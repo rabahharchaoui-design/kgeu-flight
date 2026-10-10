@@ -98,6 +98,8 @@ async def main():
                   lines:'<div class="gl"><span>Sink rate</span><b>1,234 fpm<i class="pt bad">12</i></b></div><div class="gl"><span>Off centreline</span><b>12.3 m<i class="pt">55</i></b></div><div class="gl"><span>From the aim point</span><b>1,234 m long<i class="pt bad">0</i></b></div><div class="gl"><span>Airspeed</span><b>155 kt vs 130<i class="pt bad">3</i></b></div><div class="gl"><span>Flight time</span><b>59:59</b></div>',
                   board:'free:landing',retry:'RUNWAY START',tip:'C-130: about 700 fpm down final, power back at 50 ft, small flare, under 150 fpm at touchdown'}},true)}}""")
                 await pg.wait_for_timeout(350)
+                # school1: the card slides up 28 px over 340 ms; a late headless frame can land the measure mid animation
+                await pg.evaluate("()=>Promise.all(document.getElementById('landOv').getAnimations({subtree:true}).map(a=>a.finished.catch(()=>{})))")
                 a = await pg.evaluate(AUDIT, ['#landOv', '.sheet']); f = await pg.evaluate(CARD_FIT, 'landOv')
                 ok(f'{tag} landing card (brief): nothing cut, fits', not a and not f, (a[:4], f))
                 await pg.screenshot(path=os.path.join(SHOTS, f'landing_{tag}.png'))

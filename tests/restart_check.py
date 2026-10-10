@@ -24,8 +24,11 @@ def same(a, b):
 STEP = f"()=>{K}.stepFrame(1/30,false,true)"
 
 async def snap(pg):
+    # school1 item 3: a restart never shows the lesson briefing, it goes straight to the flight (brief is checked in run_one)
+    br = await pg.evaluate(f"()=>{K}.lesBrief.on")
     await pg.evaluate(STEP)
-    return await pg.evaluate(SNAP)
+    r = await pg.evaluate(SNAP); r['brief'] = br
+    return r
 
 async def run_one(pg, name, js):
     await pg.evaluate(f"()=>{{{js}}}"); await pg.wait_for_timeout(250)
@@ -47,6 +50,8 @@ async def run_one(pg, name, js):
     await pg.evaluate(f"()=>{K}.runRestart()"); await pg.wait_for_timeout(250)
     d = await snap(pg)
     ok(f'{name}: results Try again gives the same start', same(a, d), {'first': a, 'again': d})
+    if ' lesson ' in f' {name} ':
+        ok(f'{name}: no briefing on Restart, RETRY or Try again', not b['brief'] and not c['brief'] and not d['brief'], [b['brief'], c['brief'], d['brief']])
     return a
 
 AZ = [
@@ -65,7 +70,7 @@ AZ = [
     ('arcade 1 mile', f"{K}.pick('f16');{K}.arcStart('landing1')"),
     ('arcade daily', f"{K}.dailyRegion('az');{K}.arcStart('daily')"),
     ('dogfight', f"{K}.dfStart()"),
-] + [(f'lesson {l}', f"{K}.startLesson('{l}')") for l in ('first', 'steep', 'slow', 'stall', 'engine', 'pattern')]
+] + [(f'lesson {l}', f"{K}.startLesson('{l}',true);{K}.lesBriefSkip()") for l in ('first', 'steep', 'slow', 'stall', 'engine', 'pattern')]
 
 WORLD = [
     ('rjtt runway', f"{K}.pick('cessna');{K}.start('runway')"),

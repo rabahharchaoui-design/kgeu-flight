@@ -32,7 +32,7 @@ def audit(r, tag, types, other):
         if l['amb']:
             other.append(line)
             continue
-        if l['who'] == 'Instructor':
+        if l['who'] == 'Dana':
             continue
         if l['type'] != me:
             bad.append('stale AC ' + l['type'] + '  ' + line)
@@ -52,7 +52,7 @@ def audit(r, tag, types, other):
 
 def order(r, tag):
     """(e): nothing ambient before our first call, and nothing ambient between a call to us and our readback."""
-    bad, log = [], [l for l in r['log'] if l['who'] != 'Instructor']
+    bad, log = [], [l for l in r['log'] if l['who'] != 'Dana']
     if not log:
         return bad
     if log[0]['amb']:

@@ -17,11 +17,18 @@ async def main():
     srv, url = serve()
     async with async_playwright() as p:
         b = await launch(p)
-        # first launch as a rookie: the funnel starts lesson 1 by itself
+        # first launch as a rookie: the funnel starts lesson 1 by itself, through its briefing (school1 item 3)
         pg = await page(b, url, storage={})
         await finger(pg, '#fRookie'); await pg.wait_for_timeout(1500)
+        br = await pg.evaluate(f"()=>({{on:{K}.lesBrief.on,les:{K}.LES.on,paused:{K}.paused()}})")
+        ok('New to flying opens lesson 1 with its briefing first', br == {'on': True, 'les': 'first', 'paused': True}, br)
+        for i in range(3):
+            await finger(pg, '#brNext')
+            await pg.wait_for_function(f"()=>{{const t=document.getElementById('brTrack');return {K}.lesBrief.slide=={i + 1}&&Math.abs(t.scrollLeft-{i + 1}*t.clientWidth)<2}}", timeout=8000)
+        await finger(pg, '#brTrack .brQ .brAns:nth-child(4)'); await pg.wait_for_timeout(200)
+        await finger(pg, '#brNext'); await pg.wait_for_timeout(1200)
         s = await st(pg)
-        ok('New to flying launches lesson 1 at once', s['on'] == 'first' and s['g'], s)
+        ok('New to flying launches lesson 1 after NEXT x3, an answer and LET\'S FLY', s['on'] == 'first' and s['g'] and not await pg.evaluate(f"()=>{K}.lesBrief.on||{K}.paused()"), s)
         info = await pg.evaluate(f"()=>({{type:{K}.state().type,base:{K}.state().base,skip:document.getElementById('lesQuit').textContent,arrow:document.getElementById('tutArrow').classList.contains('on')}})")
         ok('it is the Cessna at Glendale with a big Skip and an arrow', info == {'type': 'cessna', 'base': 'kgeu', 'skip': 'Skip', 'arrow': True}, info)
         r = await pg.evaluate("()=>{const r=document.getElementById('lesQuit').getBoundingClientRect();return [r.width,r.height]}")
@@ -52,13 +59,13 @@ async def main():
         s = await st(pg)
         ok('lesson 1 runs every step to the end without a crash', set(range(1, 8)) <= set(phases) and not s['crash'] and s['on'] is None, (phases, s))
         g = await pg.evaluate("()=>({card:document.getElementById('gradeOv').classList.contains('on'),next:document.getElementById('gNext').textContent,hid:document.getElementById('gNext').hidden,letter:document.getElementById('gLetter').textContent})")
-        ok('the result screen has a big Next lesson button', g['card'] and not g['hid'] and g['next'] == 'Next lesson: Steep turns', g)
+        ok('the result screen has a big Next lesson button', g['card'] and not g['hid'] and g['next'] == 'Next lesson: Climbs, descents and turns', g)
         sim = sum(phases.values()) * 0.8
         bad = await pg.evaluate(FIT, '#gradeOv')
         ok('result screen fits with 44 px targets', not bad, bad)
         ok('lesson 1 takes about a minute of flying', 45 < sim < 100, f'{sim:.0f} s simulated')
         await finger(pg, '#gNext'); await pg.wait_for_timeout(1200)
-        ok('Next lesson starts steep turns', await pg.evaluate(f"()=>{K}.LES.on") == 'steep')
+        ok('Next lesson starts Climbs (school1: the curriculum order), its briefing first', await pg.evaluate(f"()=>[{K}.LES.on,{K}.lesBrief.on]") == ['climbs', True])
         await pg.evaluate("()=>document.getElementById('lesQuit').click()")
         # home and the school screen
         await pg.evaluate(f"()=>{K}.openMenu()"); await pg.wait_for_timeout(300)
@@ -68,13 +75,27 @@ async def main():
         ok('FLY is the big primary button', sz[0] > sz[1] * 1.6, sz)
         ok('Start here is gone once lesson 1 is finished', not await pg.evaluate("()=>document.getElementById('startHere').classList.contains('on')"))
         await finger(pg, '#hSch'); await pg.wait_for_timeout(400)
-        rows = await pg.evaluate("()=>[...document.querySelectorAll('#school .lrow')].map(r=>[r.dataset.l,r.classList.contains('done'),r.classList.contains('next')])")
-        ok('six lessons, lesson 1 ticked, steep turns highlighted next', len(rows) == 6 and rows[0] == ['first', True, False] and rows[1] == ['steep', False, True], rows)
-        ok('school screen fits with no scrolling', not await pg.evaluate(FIT, '#sSchool'), await pg.evaluate(FIT, '#sSchool'))
+        # school1: no placement yet, so the intake is up first. Never flown: lesson by lesson
+        ok('the placement intake shows over the school screen on the first visit', await pg.evaluate("()=>document.getElementById('plOv').classList.contains('on')"))
+        await finger(pg, '#plOpts [data-lv=never]'); await finger(pg, '#plGo'); await pg.wait_for_timeout(400)
+        rows = await pg.evaluate("()=>[...document.querySelectorAll('#school .lrow')].map(r=>[r.dataset.l,r.classList.contains('done'),r.classList.contains('next'),r.classList.contains('soon')])")
+        fly = [r[0] for r in rows if not r[3]]
+        nxt = [r[0] for r in rows if r[2]]
+        ok('stage 1 selected: nine rows, all flyable (item 6), lesson 1 ticked, Climbs highlighted next', len(rows) == 9 and len(fly) == 9 and rows[0][:2] == ['first', True] and nxt == ['climbs'], rows)
+        caps = await pg.evaluate("()=>[...document.querySelectorAll('#schMap .sNode')].map(c=>[c.dataset.st,c.classList.contains('sel')])")
+        ok('the stage map: four stages, stage 1 selected', caps == [['s1', True], ['s2', False], ['s3', False], ['s4', False]], caps)
+        soon = await pg.evaluate("()=>[...document.querySelectorAll('#school .lrow.soon')].every(r=>r.getAttribute('aria-disabled')==='true'&&!r.onclick&&/Coming soon/i.test(r.textContent))")
+        ok('the lessons still to come are disabled and tagged Coming soon', soon)
+        VIS = """()=>{const L=document.getElementById('school'),lr=L.getBoundingClientRect(),bad=[];const rs=[...L.querySelectorAll('.lrow')];
+          rs.slice(0,2).forEach(e=>{const r=e.getBoundingClientRect();if(r.top<lr.top-0.5||r.bottom>lr.bottom+0.5||r.bottom>innerHeight+0.5)bad.push('hidden '+e.dataset.l);});
+          document.querySelectorAll('#sSchool button').forEach(e=>{const r=e.getBoundingClientRect();if(!r.width)return;if(r.width<43.5||r.height<43.5)bad.push('small '+e.textContent.trim().slice(0,14));});
+          if(L.scrollHeight>L.clientHeight+1&&getComputedStyle(L).overscrollBehaviorY!=='contain')bad.push('no overscroll contain');
+          if(document.getElementById('sSchool').scrollHeight>document.getElementById('sSchool').clientHeight+1)bad.push('screen scrolls');return bad;}"""
+        ok('school screen: the first rows in view, the list scrolls inside, 44 px targets', not await pg.evaluate(VIS), await pg.evaluate(VIS))
         ok('flight school is not a Challenges card', await pg.evaluate("()=>{window.__kgeu.nav('sArc');return !document.querySelector('#arcCards [data-m=school]')}"))
         await pg.evaluate(f"()=>{K}.nav('sSchool')"); await pg.wait_for_timeout(200)
-        await finger(pg, '#school [data-l="slow"]'); await pg.wait_for_timeout(1200)
-        ok('one tap on a lesson starts it', await pg.evaluate(f"()=>{K}.LES.on") == 'slow')
+        await finger(pg, '#school [data-l="climbs"]'); await pg.wait_for_timeout(1200)
+        ok('one tap on a lesson starts it (its briefing up)', await pg.evaluate(f"()=>[{K}.LES.on,{K}.lesBrief.on]") == ['climbs', True])
         ok('no page errors', not pg.errs, pg.errs[:3])
         await pg.context.close()
 
@@ -83,7 +104,7 @@ async def main():
         ok('Start here shows for a rookie until lesson 1', await pg.evaluate("()=>document.getElementById('startHere').classList.contains('on')"))
         await pg.evaluate(f"()=>{K}.setSkill('pilot')"); await pg.evaluate(f"()=>{K}.nav('sHome',true)")
         ok('no Start here for pilots', not await pg.evaluate("()=>document.getElementById('startHere').classList.contains('on')"))
-        await pg.evaluate(f"()=>{{{K}.setSkill('rookie');{K}.startLesson('first')}}"); await pg.wait_for_timeout(800)
+        await pg.evaluate(f"()=>{{{K}.setSkill('rookie');{K}.startLesson('first');{K}.lesBriefSkip()}}"); await pg.wait_for_timeout(800)
         await finger(pg, '#lesQuit'); await pg.wait_for_timeout(300)
         ok('Skip ends it, flight carries on', await pg.evaluate(f"()=>{K}.LES.on===null&&!{K}.paused()"))
         await pg.evaluate(f"()=>{{{K}.openMenu('sSet')}}"); await pg.wait_for_timeout(200)

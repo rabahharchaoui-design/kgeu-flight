@@ -11,15 +11,22 @@
 #   --events lesson_first,lesson_steep,lesson_slow,lesson_stall,lesson_engine,lesson_pattern,crash_retry,pause_restart,grade_retry
 import asyncio, sys, time
 from playwright.async_api import async_playwright
-from harness import serve, launch, page, Checks, finger, IPHONE_15
+from harness import serve, launch, page, Checks, finger, IPHONE_15, PLACED
 ok = Checks()
 K = "window.__kgeu"
 LIMIT = 500   # ms from the start tap
+# school1 item 3: a lesson start opens its briefing (the sim held under it), and the flight starts on the briefing's
+# Skip (a replay: every lesson is seeded graded so Skip shows) or LET'S FLY. For these events the row is tapped
+# first, unmeasured, and the measured start tap is Skip briefing. A Retry or Restart flies at once, no briefing
+BRIEF = {'lesson_first', 'lesson_steep', 'lesson_slow', 'lesson_stall', 'lesson_engine', 'lesson_pattern'}
+GRADED = {'kgeuSchool': '{' + ','.join(f'"cessna:{l}":"C"' for l in ('first', 'steep', 'slow', 'stall', 'engine', 'pattern')) + '}'}
 
 def arg(name, default=None):
     return sys.argv[sys.argv.index(name) + 1] if name in sys.argv and sys.argv.index(name) + 1 < len(sys.argv) else default
 
 # event: (menu screen, the button tapped to start it, js run first)
+# school1: the school list shows the selected stage and scrolls, so select the lesson's stage and bring the row into view
+SCROLL = "{const K=window.__kgeu;K.schSelect(K.lessonDef('%s').stage);}document.querySelector('#school .lrow[data-l=%s]').scrollIntoView({block:'nearest'})"
 EVENTS = {
     'free_runway':    ('sFly', '#bGo', f"{K}.pickPos('runway')"),
     'free_final1':    ('sFly', '#bGo', f"{K}.pickPos('final1')"),
@@ -27,12 +34,12 @@ EVENTS = {
     'short':          ('sArc', '#arcCards .mcard[data-m=short]', ''),
     'drop':           ('sArc', '#arcCards .mcard[data-m=drop]', ''),
     'range':          ('sArc', '#arcCards .mcard[data-m=range]', ''),
-    'lesson_first':   ('sSchool', '#school .lrow[data-l=first]', ''),
-    'lesson_steep':   ('sSchool', '#school .lrow[data-l=steep]', ''),
-    'lesson_slow':    ('sSchool', '#school .lrow[data-l=slow]', ''),
-    'lesson_stall':   ('sSchool', '#school .lrow[data-l=stall]', ''),
-    'lesson_engine':  ('sSchool', '#school .lrow[data-l=engine]', ''),
-    'lesson_pattern': ('sSchool', '#school .lrow[data-l=pattern]', ''),
+    'lesson_first':   ('sSchool', '#school .lrow[data-l=first]', SCROLL % ('first', 'first')),
+    'lesson_steep':   ('sSchool', '#school .lrow[data-l=steep]', SCROLL % ('steep', 'steep')),
+    'lesson_slow':    ('sSchool', '#school .lrow[data-l=slow]', SCROLL % ('slow', 'slow')),
+    'lesson_stall':   ('sSchool', '#school .lrow[data-l=stall]', SCROLL % ('stall', 'stall')),
+    'lesson_engine':  ('sSchool', '#school .lrow[data-l=engine]', SCROLL % ('engine', 'engine')),
+    'lesson_pattern': ('sSchool', '#school .lrow[data-l=pattern]', SCROLL % ('pattern', 'pattern')),
     # the in-flight ways back in: RETRY on the crash card, Restart on the pause sheet (#pApply, it reads Restart until a pick changes), Retry on a lesson grade
     'crash_retry':    (None, '#cRetry', 'crash'),
     'pause_restart':  (None, '#pApply', 'pause'),
@@ -78,7 +85,7 @@ async def main():
     T = time.time()
     async with async_playwright() as p:
         b = await launch(p)
-        pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'rookie' if '--easy' in sys.argv else 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'})
+        pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'rookie' if '--easy' in sys.argv else 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3', **PLACED, **GRADED})
         await pg.wait_for_function(f"()=>{K}.warm()", timeout=30000)
         ok('warm up at the menu finished (every aircraft and the drop zone built and compiled)', True)
         # today's daily may be at a world airport (the rotation): pin it to Arizona so its tap starts a flight, no reload
@@ -99,7 +106,7 @@ async def main():
                 return
             # in flight: fly first, then bring up the card the button lives on
             if pre == 'grade':
-                await pg.evaluate(f"()=>{K}.startLesson('steep')"); await pg.wait_for_timeout(300)
+                await pg.evaluate(f"()=>{K}.startLesson('steep',true)"); await pg.evaluate("()=>window.__kgeu.lesBriefSkip()"); await pg.wait_for_timeout(300)
                 # the lesson never started its turn: past 60 s it grades itself F
                 await pg.evaluate(f"()=>{{{K}.LES.t=61;for(let i=0;i<3;i++){K}.stepFrame(1/30,false,true);{K}.stepFrame(0,true);}}")
                 await pg.wait_for_function("()=>document.getElementById('gradeOv').classList.contains('on')", timeout=5000)
@@ -120,13 +127,19 @@ async def main():
             for rep in range(reps):
                 await prepare(name)
                 p0 = await pg.evaluate(f"()=>{K}.glProgs()")
+                tap = sel
+                if name in BRIEF:
+                    await finger(pg, sel)
+                    await pg.wait_for_function("()=>{const o=document.getElementById('brOv');return o.classList.contains('on')&&!document.getElementById('brSkip').hidden}", timeout=5000)
+                    await pg.wait_for_timeout(300)   # past its fade in
+                    tap = '#brSkip'
                 # The harness draws about 3 frames a second, so the game loop is held (no frames) from just
                 # before the tap until the checks are done: the tap, start() and the touches then take
                 # their own time, not the harness's. It also makes the check strict: the controls must be
                 # up and live on the DOM start() leaves, before the game's next frame has run at all.
                 await pg.evaluate(f"()=>{K}.stepFrame(0,false,true)")
                 t0 = await pg.evaluate("()=>performance.now()")
-                await finger(pg, sel)
+                await finger(pg, tap)
                 r = await pg.evaluate(UI, t0)
                 if r['why']:
                     fails.append(f"rep {rep+1}: {r['why']} after {r['ms']} ms"); await pg.evaluate(f"()=>{K}.stepFrame(0,true)"); continue

@@ -83,7 +83,7 @@ def m_arc(kind):
     return f
 def m_les(id):
     async def f(pg):
-        await pg.evaluate(f"()=>{K}.startLesson('{id}')"); await pg.wait_for_timeout(900); await run_s(pg, 2)
+        await pg.evaluate(f"()=>{K}.startLesson('{id}',true)"); await pg.evaluate("()=>window.__kgeu.lesBriefSkip()"); await pg.wait_for_timeout(900); await run_s(pg, 2)
     return f
 async def m_free(pg):
     await pg.evaluate(f"()=>{{const K={K};K.pick('cessna');K.pickBase('kgeu');K.pickPos('runway');K.start('runway')}}"); await pg.wait_for_timeout(900); await run_s(pg, 2)

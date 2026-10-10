@@ -5,7 +5,7 @@
 # Run: .venv/bin/python tests/item01_shots.py
 import asyncio, os
 from playwright.async_api import async_playwright
-from harness import serve, launch, page, IPHONE_15, finger
+from harness import serve, launch, page, IPHONE_15, finger, PLACED
 
 SHOTS = os.path.join(os.path.dirname(__file__), '..', 'overnight-screenshots', 'phone0929', 'item01')
 os.makedirs(SHOTS, exist_ok=True)
@@ -20,7 +20,7 @@ async def main():
     srv, url = serve()
     async with async_playwright() as p:
         b = await launch(p)
-        pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'})
+        pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3', **PLACED})
         await pg.wait_for_function(f"()=>{K}.warm()", timeout=30000)
 
         # 1. a mission (daily), started by a real tap from the menu

@@ -134,13 +134,13 @@ async def main():
         ok('CONTINUE: card gone, flying on, challenge over', not c['on'] and not c['paused'] and not await pg.evaluate(f"()=>{K}.ARC.on"), c)
 
         # ---- a lesson: the card at the run end in the air
-        await pg.evaluate(f"()=>{{{K}.pick('cessna');{K}.startLesson('stall')}}"); await pg.wait_for_timeout(400)
+        await pg.evaluate(f"()=>{{{K}.pick('cessna');{K}.startLesson('stall',true);{K}.lesBriefSkip()}}"); await pg.wait_for_timeout(400)
         for _ in range(60):
             await pg.evaluate(f"()=>{K}.ff(2)"); await pg.wait_for_timeout(80)
             if await pg.evaluate("()=>document.getElementById('gradeOv').classList.contains('on')"): break
         c = await pg.evaluate(CARD, 'gradeOv')
         if not c['on']:   # the stall lesson needs the pilot (school_check flies lesson 1 to its card): open the card the way grade() does
-            await pg.evaluate(f"()=>{K}.resOpen(document.getElementById('gradeOv'),{{letter:'B',title:'Flight school: Power off stall',score:'84 of 100',lines:'<div class=ok>Held the heading</div><div class=no>Lost 400 ft</div>',board:'lesson:stall'}})")
+            await pg.evaluate(f"()=>{K}.resOpen(document.getElementById('gradeOv'),{{letter:'B',title:'Flight school: Power off and power on stalls',score:'84 of 100',lines:'<div class=ok>Held the heading</div><div class=no>Lost 400 ft</div>',board:'lesson:stall'}})")
             await pg.wait_for_timeout(300); c = await pg.evaluate(CARD, 'gradeOv')
         ok('lesson: the same card, paused', c['on'] and c['paused'] and c['btns'] == ['RETRY STALL', 'CONTINUE IN FREE FLIGHT', 'MAIN MENU'], c)
         bad = await pg.evaluate(FIT, '#gradeOv')

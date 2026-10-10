@@ -16,11 +16,11 @@
 # Usage: .venv/bin/python tests/world_ui_check.py
 import asyncio, sys, json, os
 from playwright.async_api import async_playwright
-from harness import serve, launch, page, IPHONE_15, IPHONE_SE, Checks, finger, ROOT
+from harness import serve, launch, page, IPHONE_15, IPHONE_SE, Checks, finger, ROOT, PLACED
 
 ok = Checks()
 K = 'window.__kgeu'
-BASE = {'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'}
+BASE = {'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3', **PLACED}
 STUB = "()=>{window.__kgeuReload=()=>{window.__reloaded=(window.__reloaded||0)+1;};}"
 HOME = {'rjtt': '34R', 'lfpg': '26L', 'sbrj': '20L'}
 TWR = {'rjtt': 'Tokyo Tower', 'lfpg': 'de Gaulle Tower', 'sbrj': 'Santos Dumont Tower'}
@@ -181,8 +181,8 @@ async def main():
         m = await pg.evaluate("()=>[...document.querySelectorAll('#arcCards .mcard')].filter(c=>!c.dataset.m.startsWith('apt:')).map(c=>[c.dataset.m,!!c.querySelector('.azTag')&&c.querySelector('.azTag').textContent])")
         ok('rjtt CHALLENGES: every card tagged ARIZONA but the daily, which names its airport instead', m and all(x[1] == 'ARIZONA' for x in m if x[0] != 'daily') and [x[1] for x in m if x[0] == 'daily'] == [False], m)
         await pg.evaluate(f"()=>{K}.nav('sSchool')"); await pg.wait_for_timeout(300)
-        sch = await pg.evaluate("()=>[...document.querySelectorAll('#school .lrow')].map(c=>!!c.querySelector('.azTag'))")
-        ok('rjtt SCHOOL: every lesson tagged ARIZONA', sch and all(sch), sch)
+        sch = await pg.evaluate("()=>[...document.querySelectorAll('#school .lrow:not(.soon)')].map(c=>!!c.querySelector('.azTag'))")
+        ok('rjtt SCHOOL: every flyable lesson tagged ARIZONA', sch and all(sch), sch)
         await pg.evaluate(f"()=>{K}.nav('sArc')"); await pg.wait_for_timeout(300)
         a = await pg.evaluate("()=>[...document.querySelectorAll('#arcCards .mcard')].map(c=>[c.dataset.m,!!c.querySelector('.azTag')])")
         ok('rjtt CHALLENGES: every Arizona card tagged ARIZONA, the strike too; the daily not; no airport cards (ui1)', a and all(x[1] for x in a if x[0] != 'daily')
@@ -198,7 +198,7 @@ async def main():
             await finger(pg, sel); await pg.wait_for_timeout(300)
             s1 = (await pg.evaluate("()=>JSON.parse(sessionStorage.getItem('kgeuResume')||'null')") or {}).get('start') or {}
             ok(f'rjtt {kind}: the resume carries the mode, aircraft and start', check(s1) and 'pos' in s1, s1)
-        await pg.evaluate(f"()=>{{localStorage.setItem('kgeuRegion','rjtt');{K}.nav('sSchool')}}"); await pg.wait_for_timeout(200)
+        await pg.evaluate(f"()=>{{localStorage.setItem('kgeuRegion','rjtt');{K}.nav('sSchool');{K}.schSelect('s2')}}"); await pg.wait_for_timeout(200)
         await finger(pg, '#school .lrow[data-l="steep"]'); await pg.wait_for_timeout(300)
         s1 = (await pg.evaluate("()=>JSON.parse(sessionStorage.getItem('kgeuResume')||'null')") or {}).get('start') or {}
         ok('rjtt lesson: the resume carries the lesson', s1.get('lesson') == 'steep', s1)
