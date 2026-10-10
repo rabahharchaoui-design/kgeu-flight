@@ -628,6 +628,30 @@ body.sensorOn.tkReplyOn #shTR{ display:-webkit-box; -webkit-box-orient:vertical;
 /* the music ticker lives top right: it steps aside while a reply is up */
 body.tkReplyOn #uiroot > #tk, body.tkReplyOn #tkCtl{ visibility:hidden; }
 body:not(.touch) #tkReply{ width:min(268px, calc(50% - var(--icon) / 2 - 130px - var(--padR))); }
+/* school2 item 2: the diversion card, in the reply bar's slot right of pause (the ticker steps aside, as for the replies). Not a
+   modal: the sim runs on under it. Two rows of 44 px controls, 98 px tall: it ends inside the top third (106 px at 320 high), above
+   the dock and the throttle (112 px down in landscape) at 568 and 844 wide. The centre column (Dana's subtitle) steps down under
+   it while it is up; on the approach (the column a strip in the top third) the strip stops short of it instead. Closed on SET
+   or by itself after 90 s */
+#divCard{ position:absolute; top:var(--padT); left:calc(50% + var(--icon) / 2 + 8px); width:min(244px, calc(50% - var(--icon) / 2 - 8px - var(--padR))); box-sizing:border-box; z-index:7;
+  display:none; flex-direction:column; gap:3px; padding:2px; border-radius:14px; background:rgba(26,16,9,.88); border:1.5px solid #7fd4ff; box-shadow:0 2px 10px rgba(0,0,0,.35);
+  pointer-events:auto; color:#fff; font-variant-numeric:tabular-nums; }
+#divCard.on{ display:flex; animation:dvIn 180ms cubic-bezier(.23,1,.32,1); }
+@keyframes dvIn{ from{ opacity:0; transform:translateY(-6px); } to{ opacity:1; transform:none; } }
+#divCard .dvR{ display:flex; gap:3px; }
+#divCard button{ flex:1 1 0; min-width:44px; min-height:44px; padding:0 2px; border-radius:10px; background:rgba(255,255,255,.07); border:1.5px solid rgba(127,212,255,.55); color:#fff;
+  font:800 15px/1 var(--font); display:flex; flex-direction:column; align-items:center; justify-content:center; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+  touch-action:manipulation; transition:transform 120ms cubic-bezier(.23,1,.32,1), background-color 150ms ease; }
+#divCard button:active{ transform:scale(.96); background:rgba(127,212,255,.22); transition-duration:60ms; }
+#divCard output{ flex:1.15 1 0; min-width:46px; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1; }
+#divCard output b{ font:800 20px/1 var(--font); color:#7fd4ff; } #divCard small{ font:700 9px/1.2 var(--font); letter-spacing:.06em; color:var(--soft); }
+#divCard #divSet{ flex:2 1 0; background:#7fd4ff; border-color:#7fd4ff; color:#06121c; } #divCard #divSet b{ font-size:16px; letter-spacing:.08em; } #divCard #divSet small{ color:#06121c; opacity:.75; }
+body.divOn #uiroot > #tk, body.divOn #tkCtl{ visibility:hidden; }
+body.divOn:not(.appr) #topCol{ top:calc(var(--padT) + 106px); }
+body.divOn.appr #topCol{ left:calc(var(--padL) + var(--map) + var(--hudW) + 16px); right:calc(50% - var(--icon) / 2 - 2px); width:auto; transform:none; }
+@media (prefers-reduced-motion: reduce){ #divCard.on{ animation:none; } }
+/* the diversion's GPS failure: no mini map (as under the hood) */
+body.navMapOff #map{ display:none; }
 .lbRow.lbLoc .c span{ white-space:normal; font-size:12px; font-weight:600; color:var(--brown); }   /* on the sand row: the rows' own brown, not the HUD grey */
 #dfBrief{ z-index:30; }
 #dfBrief .sheet{ max-width:600px; padding:12px 18px 14px; background:rgba(18,13,9,.95); text-align:center; }
@@ -1826,6 +1850,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   <div id="dfHud" aria-hidden="true"><div class="dfSeek"><b></b></div><div class="dfRad"><b></b><span></span></div><div class="dfLead"></div><div class="dfPip"><b></b><i></i><em></em></div><div class="dfMw"><b></b><span></span></div></div>
   <div id="dfSub" role="status"></div>
   <div id="tkReply" role="group" aria-label="Answer the radio" aria-hidden="true"></div>
+  <div id="divCard" role="group" aria-label="Diversion: Glendale, a heading and a time" aria-hidden="true"><div class="dvR"><button type="button" data-h="-10" aria-label="Heading minus 10">&minus;10</button><button type="button" data-h="-5" aria-label="Heading minus 5">&minus;5</button><output id="divH" aria-live="polite"><b>360</b><small>HDG</small></output><button type="button" data-h="5" aria-label="Heading plus 5">+5</button><button type="button" data-h="10" aria-label="Heading plus 10">+10</button></div><div class="dvR"><button type="button" data-m="-1" aria-label="One minute less">&minus;1</button><output id="divM" aria-live="polite"><b>5</b><small>MIN</small></output><button type="button" data-m="1" aria-label="One minute more">+1</button><button type="button" id="divSet" aria-label="Set the diversion to Glendale"><b>SET</b><small>GLENDALE</small></button></div></div>
   <div id="lookPad" role="slider" aria-label="Free look, drag to swing the camera"><svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13c2-3.2 4.3-4.8 7-4.8s5 1.6 7 4.8c-2 3.2-4.3 4.8-7 4.8S8 16.2 6 13z"/><circle cx="13" cy="13" r="2" fill="currentColor"/><path d="M13 1.5v3M11.5 3l1.5-1.5L14.5 3M13 24.5v-3M11.5 23l1.5 1.5 1.5-1.5M1.5 13h3M3 11.5L1.5 13 3 14.5M24.5 13h-3M23 11.5l1.5 1.5-1.5 1.5"/></svg><i>LOOK</i></div>
   <!-- the centre column under pause: mission card, jump light, warning, toast, tower subtitle -->
   <div id="topCol"><div id="miss" class="card"><b id="missT"></b><span id="missS"></span></div><div id="dfSix" role="status"><i></i><span></span></div><div id="jumpLt" class="card"><i class="r"></i><i class="g"></i><b></b></div><div id="warn"></div><div id="toast"></div><div id="atc" class="card"></div></div>
@@ -9766,7 +9791,7 @@ function sideCfg(t,sub,kind){
   const W3=ui.left+ui.width/3,W23=ui.left+ui.width*2/3,H3=ui.top+ui.height/3,H23=ui.top+ui.height*2/3;
   // what it may not cover: the controls, the stick zone, the ticker, the badges, the look pad, the lesson
   // panel, the centre column; nor the centre third of the screen (phone3 item 4)
-  const block=[];for(const e of document.querySelectorAll('#dock button,#thr,#stickZone,#tk.on,#tkCtl.on,#badges .badge.on,#lookPad,#lesson.on,#topCol > .on,#hDest,#tcas.on,#dfW')){
+  const block=[];for(const e of document.querySelectorAll('#dock button,#thr,#stickZone,#tk.on,#tkCtl.on,#badges .badge.on,#lookPad,#lesson.on,#divCard.on,#topCol > .on,#hDest,#tcas.on,#dfW')){
     const r=e.getBoundingClientRect();if(r.width&&r.height&&getComputedStyle(e).display!=='none')block.push(r);}
   const lr=$('lesson').classList.contains('on')?$('lesson').getBoundingClientRect():null;
   // the edge of the buttons actually beside a band of the screen (the dock's box has gaps)
@@ -10213,9 +10238,14 @@ function badgeOn(el){
   el._t1=setTimeout(()=>el.classList.add('fade'),4000);
   el._t2=setTimeout(()=>{el.classList.remove('on','fade');const n=el._next||[];el._next=null;const f=n.shift();if(f){f._next=n;badgeOn(f);}},4600);}
 function badgeOff(el){clearTimeout(el._t1);clearTimeout(el._t2);el._next=null;el.classList.remove('on','fade');}
+// school2 item 2: an achievement or record pop during a lesson or over its debrief (#gradeOv) waits; the latest shows once
+// both are gone (bannerFlush from resClose and lesEnd). The achievement itself is saved at once
+let bannerHeld=null;
 function bannerShow(kind,text){
+  if(LES.on||gradeOv.classList.contains('on')){bannerHeld=[kind,text];return;}
   bannerEl.innerHTML='<b>'+kind+'</b><span>'+text+'</span>';badgeOn(bannerEl);
 }
+function bannerFlush(){if(!bannerHeld||LES.on||gradeOv.classList.contains('on'))return;const b=bannerHeld;bannerHeld=null;bannerShow(b[0],b[1]);}
 function gradeBadge(g){
   const L=document.getElementById('gbL');L.textContent=g.letter;L.className='g'+g.letter;
   document.getElementById('gbT').textContent=g.line;badgeOn(gBadge);
@@ -10588,7 +10618,7 @@ function resShow(ov,brief){
 }
 // (the Worker may have answered before the card opened, the dogfight's comes 2 to 3 s after its run ends)
 function resOpen(ov,o,brief){resFill(ov,o);resShow(ov,brief);if(o.board&&LB&&LB.E.shown&&LB.E.shown.b===o.board)resBoard(LB.E.shown);}
-function resClose(ov){ov.classList.remove('on','brief');if(RES.brief===ov)RES.brief=null;}
+function resClose(ov){ov.classList.remove('on','brief');if(RES.brief===ov)RES.brief=null;if(ov===gradeOv)bannerFlush();}
 function resCloseAll(){[arcOv,gradeOv,missOv,landOv].forEach(resClose);RES.pend=null;}
 // the board line: "Sending" while the Worker answers, then the rank, a personal best or the top 10
 function resBoard(o){
@@ -14304,7 +14334,7 @@ function hapInit(){
   }
 }
 // the controls a finger taps: flight buttons, weapons, pause, the throttle's detent labels, every menu, sheet and card button
-const HAP_SEL='#dock button,#dfW button,#tkReply button,#bPause,#thr .det,#menu button,#menu .mcard,#menu .lrow,#pauseOv button,.overlay button,#crash button,#funnel button,#csOv button,#tkCtl button,#tk,#hDest';
+const HAP_SEL='#dock button,#dfW button,#tkReply button,#divCard button,#bPause,#thr .det,#menu button,#menu .mcard,#menu .lrow,#pauseOv button,.overlay button,#crash button,#funnel button,#csOv button,#tkCtl button,#tk,#hDest';
 function hapArm(el){
   if(!el||el.querySelector(':scope > .hapL'))return;
   if(getComputedStyle(el).position==='static')el.classList.add('hapRel');
@@ -14543,7 +14573,18 @@ const SCHOOL={
         {id:'bravo',name:'Class Bravo clearance obtained',tip:'Class Bravo call',w:15,kind:'event'},{id:'phx',name:'Landed at Sky Harbor',tip:'Sky Harbor landing',w:10,kind:'event'},
         {id:'home',name:'Landed back at Glendale',tip:'landing back home',w:10,kind:'event'},{id:'fpm',name:'Touchdowns under 300 fpm',tip:'touchdowns',w:5,kind:'range',tol:300,unit:'fpm'}],
       log:{dual:1.5,xc:1.5,ldg:2}},
-    {id:'divert',name:'Diversion and lost procedures',soon:true},{id:'night',name:'Night flying',soon:true},{id:'soloxc',name:'Solo cross country',soon:true}]},
+    // school2 item 2: the diversion. Mid route the plan changes (a dust storm at Sky Harbor) and the GPS fails: a heading and a
+    // time estimated by hand, flown to Glendale on the heading indicator and the clock, the lost procedure's call for vectors
+    {id:'divert',name:'Diversion and lost procedures',short:'Diversion',sub:'Mid route the plan changes: pick a heading, estimate the time, call it in',min:14,
+      cards:[{h:'The diversion',b:'Weather, a closed runway or low fuel can change the plan in the air. Turn toward the new field first, then work out the heading, the distance and the time. A 172 covers about 2 miles a minute at cruise.'},
+        {h:'Lost: the five Cs',b:'Climb for radio range, a better view and terrain clearance. Communicate: call the nearest controller. Confess: "unsure of position, request vectors". Comply with what they tell you. Conserve fuel: power back to an economy cruise.'},
+        {h:'Your tools',b:'The heading indicator and the clock first. Then the landmarks on the chart: the White Tank Mountains to the west, Camelback to the east, the two long runways at Luke, the stadium by Glendale. The mini map is a crutch, and today you may lose it.'}],
+      quiz:{q:'You realise you are lost. What comes first?',a:['Climb','Call 121.5','Turn around','Descend to read road signs'],ok:0,why:'Climb first: more radio range to reach a controller, a wider view of the landmarks and more room above the terrain. Then communicate, confess, comply and conserve.'},
+      tasks:[{id:'est_hdg',name:'Heading estimate within 15 degrees',tip:'heading estimate',w:20,kind:'range',tol:15,unit:'deg'},{id:'est_eta',name:'Time estimate within 5 minutes',tip:'time estimate',w:15,kind:'range',tol:5,unit:'min'},
+        {id:'hdg',name:'Diversion heading held',tip:'diversion heading',w:15,kind:'hold',tol:15,unit:'deg'},{id:'alt',name:'Altitude held',tip:'altitude',w:15,kind:'hold',tol:'instAlt',unit:'ft'},
+        {id:'eta',name:'Arrived within 5 min of the estimate',tip:'arrival time',w:15,kind:'range',tol:5,unit:'min'},{id:'call',name:'Confessed and asked for vectors',tip:'call for vectors',w:10,kind:'event'},
+        {id:'land',name:'Landed at Glendale',tip:'landing at Glendale',w:10,kind:'event'}],
+      log:{dual:1.0,xc:1.0,ldg:1}},{id:'night',name:'Night flying',soon:true},{id:'soloxc',name:'Solo cross country',soon:true}]},
   {id:'s4',n:4,name:'Checkride prep',soon:true,lessons:[{id:'cr1',name:'Maneuvers review'},{id:'cr2',name:'Emergency review'},{id:'cr3',name:'Mock checkride'}]}]};
 const LESSONS=SCHOOL.stages.flatMap(s=>s.lessons);   // every lesson in order, soon ones too (the Boards code walks this)
 const LES_BY={};SCHOOL.stages.forEach(s=>s.lessons.forEach(l=>{l.stage=s.id;LES_BY[l.id]=l;}));
@@ -14785,7 +14826,7 @@ const LES_OBJ=[];
 function lesAdd(o){scene.add(o);LES_OBJ.push(o);return o;}
 function lesClear(){for(const o of LES_OBJ){scene.remove(o);o.traverse&&o.traverse(m=>{if(m.isMesh&&m.geometry&&!m.geometry.userData.keep)m.geometry.dispose();});}LES_OBJ.length=0;}
 const HOOD={on:false,cam:0};let LES_W=null;   // school1 item 7: the hood (the camera it replaced), the flight's wind under a lesson's own
-function lesEnd(){LES.on=null;navOff();lesClear();lesRestore();if(TASK.ask&&!TASK.on){TASK.ask=null;tqReplyUI();}if(G.holds.length){G.holds.length=0;gCue();}ezUI();if(LES.brief){LES.brief=false;brClose(true);}lesEl.classList.remove('on','tut');tutArrow.classList.remove('on');if(st){st.noProt=0;st.bankMax=0;st.easy=easy;}}
+function lesEnd(){LES.on=null;bannerFlush();navOff();lesClear();lesRestore();if(TASK.ask&&!TASK.on){TASK.ask=null;tqReplyUI();}if(G.holds.length){G.holds.length=0;gCue();}ezUI();if(LES.brief){LES.brief=false;brClose(true);}lesEl.classList.remove('on','tut');tutArrow.classList.remove('on');if(st){st.noProt=0;st.bankMax=0;st.easy=easy;}}
 // ---- the briefing (school1 item 3): three of Dana's cards and the lesson's quiz question, swiped or stepped with NEXT,
 // over the aircraft at its start with the sim held (LES.brief, as the tasking brief). A replay (any saved grade, F too) may skip it
 const brOv=$('brOv'),brTrack=$('brTrack'),brNext=$('brNext'),BR={slide:0,tgt:-1,tgtT:0,L:null};
@@ -15212,7 +15253,43 @@ const LESFLY={
     else if(LES.ph<=3){if(sh){if(!d.phx){d.phx={rwy:sh,fpm:ev.fpm};gEvent('phx',true,'runway '+sh+', '+ev.fpm+' fpm');if(LES.ph<3)LES.ph=3;}return;}}
     else if(LES.ph===4&&!d.ret){if(sh)return;}
     else if(home){if(!d.home){d.home={fpm:ev.fpm};if(LES.ph<5){LES.ph=5;pilHoldsEnd(d);}}return;}
-    gEnd('off field','Touched down off the airport');}}};
+    gEnd('off field','Touched down off the airport');}},
+  // ---- school2 item 2: diversion and lost procedures. Airborne on the pilotage route's third leg at 3,500, 2.5 nm short of
+  // downtown (its 1.5 nm passage ring 1 nm on), on time (LES.ph 1); past downtown (2) a dust storm closes Sky Harbor 20 to 30 s
+  // later and the GPS fails (Glendale about 12 nm and 7 minutes away, about 290 magnetic): no mini map, no log, no marker, the diversion card (3) until SET (or 90 s); the plan to Glendale
+  // at 4,500 (4), graded against the heading the player picked, the CALL for vectors 15 s after SET; inside 3 nm of Glendale's
+  // runway (5) the GPS is back, the marker on runway 1, the tower call and the landing as the pilotage lesson's last phase
+  divert:{twr:1,start(S,d){const F=pilFix();d.F=F;d.cr=3500;d.brv=2;d.bAsk=1;d.calls=0;d.callN=0;d.G0={x:wX(THR01+RWY_LEN/2,0),z:wZ(THR01+RWY_LEN/2,0)};
+      navSet(navPlan(F.out,0,0));NV.head=['OUT 3,500'];const l=NV.legs[2],c=l.course*Math.PI/180,x=l.to.x-Math.sin(c)*2.5*NM,z=l.to.z+Math.cos(c)*2.5*NM;
+      NV.legs[0].at=NV.legs[0].eta*60;NV.legs[1].at=NV.legs[1].eta*60;NV.leg=2;NV.t0[0]=3600/105-l.eta*60;   // the stadium and Tolleson on time; 1 nm at 105 kt to downtown's ring, on time there too
+      airStart(toU(x,z),toV(x,z),3500,l.course,105,0,S.thrCruise);LES.ph=1;},
+    open(S,d){NV.tol=gTolOf('eta')*60;navPoint();navShow(true);d.hOn=1;d.altOn=0;d.altW=-60;d.hdgW=-60;
+      cfi('We are on the cross country, downtown is ahead. Hold 3,500.');},
+    tick(dt,S,d,a,alt,kt){if(lesStall())return;
+      const gnd=st.onGround,F=d.F,dG=Math.hypot(st.pos.x-d.G0.x,st.pos.z-d.G0.z),cr=d.cr.toLocaleString('en-US'),hd='HDG '+hM(a.hdg)+'   '+dev(alt-d.cr);
+      if(LES.ph<=2){const p=navTick(dt);if(p){divPass(d,p);if(p.to===F.D&&d.evT==null)d.evT=LES.t+20+Math.random()*10;}
+        if(d.evT==null&&LES.t>120)d.evT=LES.t;}   // downtown missed: the storm anyway
+      pilHolds(d,a,alt);
+      if(d.sq&&d.sq.length&&!divBusy(d)){const q=d.sq.shift();d.lc=cfi(q[0],q[1]);}   // Dana's next line once hers on the air is done (a cfi cuts the one playing)
+      if(d.homeP&&!divBusy(d)&&!(d.sq&&d.sq.length)){d.homeP=0;pilHome(d,{mi:3,line:'The GPS is back. There is the field. Call Glendale Tower for the landing.'});}
+      if(LES.ph<=2){const c=navCur();lesShow(c?hM(c.course)+'\u00b0 to '+c.to.short+'. Hold '+cr+' ft.':'Hold '+cr+' ft.',(c?c.to.short+' '+(NV.d/NM).toFixed(1)+' nm   ':'')+hd);
+        if(LES.ph===2&&LES.t>=d.evT)divEvent(d,a);}
+      else if(LES.ph===3){if(DIV.on){DIV.t+=dt;if(DIV.t>=90){DIV.h=Math.round(((a.hdg-MAGVAR)%360+360)%360)||360;DIV.m=5;divSet(true);}}
+        if(LES.ph===3)lesShow('Turn toward Glendale, then SET.',hd+'   '+Math.max(0,Math.ceil(90-DIV.t))+' s');}
+      if(LES.ph===4){const P=d.plan;
+        if(d.hdgP!=null&&(angD(a.hdg,P.tgt)<10||LES.t-d.hdgP>45)){d.hdgP=null;gHold('hdg',{get:()=>G.a.hdg,target:P.tgt,wrap:true,grace:0});}   // the turn onto the plan is not graded
+        if(d.askT!=null&&LES.t>=d.askT){d.askT=null;divAsk(d);}
+        lesShow('Fly '+h3(P.h)+'\u00b0, '+cr+' ft to Glendale.',hd+'   '+navMS(LES.t-P.t));
+        if(dG<3*NM&&d.arrT==null){d.arrT=LES.t;const am=(LES.t-P.t)/60+(dG/NM)/105*60;gRange('eta',Math.abs(am-P.m),'arrived in '+gNum(am)+' min, estimate '+P.m+' min, standard '+gNum(gTolOf('eta'))+' min');}
+        if(d.arrT!=null&&(d.vecDone||dG<1.5*NM))divArrive(d);}   // the clocked arrival: at the 3 nm ring plus its 3 nm at 105 kt (the estimate is to the field). The world is compact (Tolleson is 5 nm out): the vectors exchange is let finish first
+      else if(LES.ph===5){if(d.twrW&&(d.twrW.aired||d.twrW.dead)){d.twrW=null;cirTwr(d,'stop');}   // the tower answers once our call is out
+        const dT=Math.hypot(st.pos.x-F.G.x,st.pos.z-F.G.z),call=TASK.ask&&TASK.ask===d.ask&&TASK.ask.shown;
+        lesShow(d.home?'Brake to a stop on the runway.':call?'Call Glendale Tower: tap CALL.':'Land on runway 1, 2,100 ft.',d.home?'Touchdown '+d.home.fpm+' fpm   '+kt.toFixed(0)+' kt':Math.round(aglFt())+' ft AGL   '+kt.toFixed(0)+' kt   '+(dT/NM).toFixed(1)+' nm');
+        if(d.home&&gnd&&st.vel.length()<2){if(!isPaved(st.pos.x,st.pos.z))return gEnd('off the runway','Stopped off the runway');return gEnd();}}
+      if(LES.on&&LES.t>1200)gEnd('too long','Ran out of time');},
+    event(ev,d){if(ev.type!=='touchdown')return;const rf=ev.paved?runwayFix(ev.x,ev.z):null;
+      if(rf&&/^Glendale/.test(rf.name)){if(!d.home){d.home={fpm:ev.fpm};gEvent('land',true,'runway 1, '+ev.fpm+' fpm');if(LES.ph<5)divArrive(d);}return;}
+      gEnd('off field','Touched down off the airport');}}};
 // the pattern's transmissions, real Glendale phraseology. 1: our request at the hold, the tower's clearance (recorded clips)
 // and our readback; 2: the readback of the touch and go clearance the tower gave on downwind
 function patCall(d,k){const B=BASES.kgeu;
@@ -15435,13 +15512,63 @@ function pilRbAsk(d,l,again){d.ask=tqAsk([{k:'CALL',sub:'Read back',say:'',fn:()
     if(!d.bViol)gEvent('bravo',true,'cleared into the Class Bravo, read back');}}],{line:l,wait:25,tag:'les',keep:!!again,
   late:again?null:()=>{if(LES.on==='pilotage'&&d.brv===1&&!d.bIn)pilRbAsk(d,cfi('Read back the clearance. Tap CALL.'),true);}});d.askDep=0;}
 // 5 nm from Glendale: the inbound call on CALL, then the tower's landing clearance and its readback (cirTwr)
-function pilHome(d){const B=BASES.kgeu,tw=B.twr.split(' ').slice(0,2).join(' '),q=st.pos,F=d.F,b=(Math.atan2(q.x-F.G.x,-(q.z-F.G.z))*180/Math.PI+360)%360,
-    dir=['north','northeast','east','southeast','south','southwest','west','northwest'][Math.round(b/45)%8];
-  const l=cfi('Five miles out. Call Glendale Tower for the landing.');
+function pilHome(d,o){o=o||{};const B=BASES.kgeu,tw=B.twr.split(' ').slice(0,2).join(' '),q=st.pos,F=d.F,b=(Math.atan2(q.x-F.G.x,-(q.z-F.G.z))*180/Math.PI+360)%360,
+    dir=['north','northeast','east','southeast','south','southwest','west','northwest'][Math.round(b/45)%8],mi=o.mi||5;   // o (the diversion): mi, the opening line
+  const l=cfi(o.line||'Five miles out. Call Glendale Tower for the landing.');
   const ask=(l2,again)=>{d.ask=tqAsk([{k:'CALL',sub:'Inbound full stop',say:'',fn:()=>{d.calls++;
-      d.twrW=vqAdd(L(AC.cs,'pilot',tw+', '+AC.cs+', 5 miles '+dir+', 4,500, inbound full stop.',['p_'+B.twrClip,csP()]),{ttl:60});}}],{line:l2,wait:25,tag:'les',keep:again,
-    late:again?null:()=>{if(LES.on==='pilotage'&&!d.home)ask(cfi('Make the call to Glendale Tower.'),true);}});d.askDep=0;};
+      d.twrW=vqAdd(L(AC.cs,'pilot',tw+', '+AC.cs+', '+mi+' miles '+dir+', 4,500, inbound full stop.',['p_'+B.twrClip,csP()]),{ttl:60});}}],{line:l2,wait:25,tag:'les',keep:again,
+    late:again?null:()=>{if(LES.on&&LES.d===d&&!d.home)ask(cfi('Make the call to Glendale Tower.'),true);}});d.askDep=0;};
   ask(l,false);}
+// ---- school2 item 2: the diversion lesson's helpers. The event: Sky Harbor closes, the GPS fails (navOff: no log, no marker,
+// no route; body.navMapOff: no mini map), the card opens on the current magnetic heading
+// a checkpoint passed (downtown): Dana names the next one (pilPass would hand over to Phoenix Tower there)
+function divPass(d,p){const n=navCur();if(d.hOn){gHoldEnd('hdg');d.hdgW=LES.t;}LES.ph=2;if(!n)return;const m=Math.max(1,Math.round(n.ete));
+  const t=p.to.short+'. Next is '+n.to.say+', heading '+hM(n.course)+', '+m+(m===1?' minute.':' minutes.');cfi(t,cfiSp(t.replace(hM(n.course),hSay(n.course))));}
+// Dana's lines in this lesson never cut one another: the next waits in d.sq until hers (d.lc) is off the air
+function divBusy(d){const l=d.lc;return !!l&&!l.dead&&(radioQ.includes(l)||(!!VQ.cur&&VQ.cur.line===l));}
+function divSay(d,t,sp){(d.sq=d.sq||[]).push([t,sp==null?null:sp]);}
+function divEvent(d,a){LES.ph=3;gHoldEnd('hdg');d.hdgW=null;navOff();document.body.classList.add('navMapOff');
+  d.lc=cfi('Phoenix Approach just reported a dust storm over Sky Harbor, the field is going below minimums. We are diverting to Glendale, and the GPS just dropped out. Turn toward Glendale first, then give me a heading and a time. Landmarks and the heading indicator from here.');
+  divOpen(((a.hdg-MAGVAR)%360+360)%360,(h,m,auto)=>{if(LES.d===d)divPlan(d,h,m,auto);});}
+// SET (or the 90 s): both estimates graded against Glendale's runway from here (the bearing magnetic, the time at 105 kt), the
+// plan's clock starts, the heading hold on the picked heading (true: plus the variation), 4,500 westbound (the climb not graded)
+function divPlan(d,h,m,auto){const q=st.pos,G0=d.G0,dist=Math.hypot(G0.x-q.x,G0.z-q.z),bm=((Math.atan2(G0.x-q.x,-(G0.z-q.z))*180/Math.PI-MAGVAR)%360+360)%360,
+    e=angD(h,bm),est=dist/NM/105*60;
+  gRange('est_hdg',e,'picked '+h3(h)+', Glendale bore '+h3(bm)+', standard '+gNum(gTolOf('est_hdg'))+' deg');
+  gRange('est_eta',Math.abs(m-est),'picked '+m+' min, '+gNum(est)+' min at 105 kt, standard '+gNum(gTolOf('est_eta'))+' min');
+  d.plan={h:h,m:m,t:LES.t,tgt:(h+MAGVAR)%360};LES.ph=4;d.hdgP=LES.t;d.askT=LES.t+15;
+  d.cr=4500;gHoldEnd('alt');d.altOn=0;d.altW=LES.t;
+  const n=m+(m===1?' minute':' minutes'),t=(auto?'I will take that as your plan. Heading '+h3(h)+', '+n+'. Climb to 4,500.':'Heading '+h3(h)+', '+n+'. Climb to 4,500, we are westbound now.');
+  divSay(d,t,cfiSp(t.replace(h3(h),hSay(d.plan.tgt))));}
+// the lost procedure: confess and ask for vectors (CALL, 30 s); Approach answers with the field's clock position and miles
+function divAsk(d){d.ask=tqAsk([{k:'CALL',sub:'Request vectors',say:'',fn:()=>divVec(d)}],{wait:30,tag:'les',
+    late:()=>{d.vecDone=1;if(LES.d!==d||G.tasks.call)return;gEvent('call',false,'never asked for vectors');divSay(d,'When you are unsure, say so. Confess. Call them.');}});d.askDep=0;}
+function divVec(d){const q=st.pos,dx=d.G0.x-q.x,dz=d.G0.z-q.z,mi=Math.max(1,Math.round(Math.hypot(dx,dz)/NM)),
+    rel=((Math.atan2(dx,-dz)*180/Math.PI-G.a.hdg)%360+360)%360,clk=Math.round(rel/30)%12||12;
+  const p=vqAdd(L(AC.cs,'pilot','Phoenix Approach, '+AC.cs+', unsure of position west of Phoenix, 4,500, request vectors to Glendale.',['p_phoenix_approach',csP(),'p_unsure']),{ttl:60});
+  vqAdd(L('Phoenix Approach 120.7','tower',AC.cs+', Phoenix Approach, radar contact, Glendale is at your '+clk+" o'clock, "+mi+(mi===1?' mile.':' miles.'),
+    [csT(),'t_phoenix_approach','t_radar_contact','t_glendale_is',CLK[clk],'t_oclock'].concat(ktC(mi),[mi>1?'t_miles':'t_mile'])),{ttl:60,dep:p,ok:inAir});
+  gEvent('call',true,'unsure of position, vectors requested');d.vecDone=1;}
+// inside 3 nm of Glendale's runway (or a touchdown there): the arrival time against the estimate, the GPS back with the marker
+// on runway 1's threshold, the holds off, the tower call
+function divArrive(d){if(LES.ph>=5)return;if(DIV.on){DIV.m=5;divSet(true);}const P=d.plan;LES.ph=5;
+  if(P&&d.arrT==null){const am=(LES.t-P.t)/60+(Math.hypot(st.pos.x-d.G0.x,st.pos.z-d.G0.z)/NM)/105*60;gRange('eta',Math.abs(am-P.m),'arrived in '+gNum(am)+' min, estimate '+P.m+' min, standard '+gNum(gTolOf('eta'))+' min');}
+  if(!G.tasks.call)gEvent('call',false,'never asked for vectors');
+  if(TASK.ask&&TASK.ask===d.ask){TASK.ask=null;tqReplyUI();}
+  pilHoldsEnd(d);document.body.classList.remove('navMapOff');
+  const F=d.F;DEST={kind:'nav',nav:true,x:F.G.x,z:F.G.z,name:F.G.name,short:F.G.short};document.body.classList.add('hasDest');destUI(true);
+  d.homeP=1;}   // the GPS back line and the tower call (pilHome) once Dana's line on the air is done (tick)
+// the card (#divCard): not a modal, the sim runs on. The heading magnetic in 5 degree steps, the time in whole minutes; SET
+// hands both to the lesson. In the reply bar's slot right of pause, two rows of 44 px controls above the dock and the throttle
+const DIV={on:false,h:360,m:5,t:0,fn:null},divEl=$('divCard'),divHb=$('divH').firstChild,divMb=$('divM').firstChild;
+function divUI(){divHb.textContent=h3(DIV.h);divMb.textContent=DIV.m;}
+function divOpen(h,fn){Object.assign(DIV,{on:true,h:(Math.round(h/5)*5)%360||360,m:5,t:0,fn:fn});divUI();
+  divEl.classList.add('on');divEl.setAttribute('aria-hidden','false');document.body.classList.add('divOn');}
+function divClose(){DIV.on=false;DIV.fn=null;if(!divEl.classList.contains('on'))return;divEl.classList.remove('on');divEl.setAttribute('aria-hidden','true');document.body.classList.remove('divOn');}
+function divSet(auto){if(!DIV.on)return;const f=DIV.fn,h=DIV.h,m=DIV.m;divClose();if(!auto)hapPattern('tap');if(f)f(h,m,!!auto);}
+divEl.querySelectorAll('[data-h]').forEach(b=>tapBtn(b,()=>{if(!DIV.on)return;DIV.h=((DIV.h+ +b.dataset.h)%360+360)%360||360;divUI();hapPattern('tap');},true));
+divEl.querySelectorAll('[data-m]').forEach(b=>tapBtn(b,()=>{if(!DIV.on)return;DIV.m=clamp(DIV.m+ +b.dataset.m,1,30);divUI();hapPattern('tap');},true));
+tapBtn($('divSet'),()=>divSet(false));
 function pilArrive(seg){navArrive(seg);}
 // stopped at Glendale: home, the worst checkpoint against its ETA, the worse touchdown
 function pilFinish(d){if(!isPaved(st.pos.x,st.pos.z))return gEnd('off the runway','Stopped off the runway');
@@ -15482,7 +15609,7 @@ function hoodOn(){if(!HOOD.on){HOOD.on=true;HOOD.cam=camMode;}camMode=1;snapCame
 // lesEnd: the hood off and the camera back, the flight's wind back, the forced landing field gone
 function lesRestore(){if(HOOD.on){HOOD.on=false;document.body.classList.remove('hoodOn');camMode=HOOD.cam;snapCamera=true;}
   if(LES_W){if(st){st.windBase=st.windDir=LES_W.base;st.windKt=LES_W.kt;st.windPh=LES_W.ph;st.gustAmp=LES_W.gust;st.windHold=0;}LES_W=null;}
-  LES_FIELD=null;}
+  LES_FIELD=null;divClose();document.body.classList.remove('navMapOff');}
 // the forced landing field: 600 by 150 m of flat open ground 1.5 to 2.5 nm downwind of us, its long side along the wind;
 // the first spot that is flat (under 5 m across it), dry, unpaved, clear of obstacles, the runway and the mission sites
 function emOK(cx,cz,ax,az){let lo=1e9,hi=-1e9;
@@ -18789,7 +18916,7 @@ window.__kgeu={TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()
   RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,ticker:()=>{const e=document.getElementById('tk'),c=document.getElementById('tkCtl');return {on:e.classList.contains('on'),paused:e.classList.contains('paused'),anim:getComputedStyle(document.getElementById('tkT')).animationName,scroll:e.classList.contains('scroll'),open:c.classList.contains('on'),text:e.querySelector('#tkT i').textContent,vis:e.offsetParent!==null&&getComputedStyle(e).display!=='none',ctlVis:c.offsetParent!==null};},tickerForce:n=>{TK.force=n||null;tkUI();},tickerOpen:()=>tkOpen(),tickerClose:()=>{TK.open=false;tkUI();},musicTick:musicTick,MUSIC:MUSIC,actx:()=>actx,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,VQ:VQ,vqLog:clear=>{const r=VQ.log.map(e=>Object.assign({},e));if(clear)VQ.log.length=0;return r;},vqAdd:(who,kind,text,clips,o)=>vqAdd(L(who,kind,text,clips),o),coach2:coach2,chatNow:()=>chatNow(),atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),bannerShow:(k,t)=>bannerShow(k,t),badgeHide:()=>badgeHide(),auto:()=>autoSmart(),mission:k=>{if(k==='gunrun'){pickType('a10',1);start('range');return;}pickType(k==='range'?'reaper':'c130',1);start(k);},HOG:HOG,strikeScore:()=>strikeScore(),CRASH_FX:CRASH_FX,baseOK:baseOK,rwyLenOf:rwyLenOf,FD:FD,BASES:BASES,setThr:setThr,setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
-  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day,kind:d.kind}},dfDayOf:k=>dfDayOf(k),aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,NAV:NV,navPlan:navPlan,LES:LES,events:events,rwyFrame:()=>({thr:THR01,rh:RH*180/Math.PI,aim:AIM,field:FIELD_FT,gear:GEAR}),grSite:()=>grSite(),lesObjs:()=>LES_OBJ.map(o=>({name:o.name,type:o.geometry&&o.geometry.type,tri:o.geometry?(o.geometry.index?o.geometry.index.count:o.geometry.attributes.position.count)/3:0,col:o.material&&o.material.color&&o.material.color.getHex(),x:o.position.x,z:o.position.z,inScene:!!o.parent})),get lesBrief(){return {on:!!LES.brief,slide:BR.slide,quiz:LES.quiz};},lesBriefNext:()=>brNextTap(),lesBriefSkip:lesBriefSkip,lesBriefBack:lesBriefBack,lesBriefAnswer:k=>brAnswer(k),get G(){return G;},gBegin:gBegin,gHold:gHold,gHoldEnd:gHoldEnd,gTick:gTick,gRange:gRange,gEvent:gEvent,gEnd:gEnd,dbTip:dbTip,dbSay:dbSay,cfi:cfi,cfiCue:cfiCue,cfiSp:cfiSp,cfiVoice:cfiVoice,endorsements:endorsements,get LOGB(){return LOGB;},logbookAdd:logbookAdd,logSummary:logSummary,tqAnswer:tqAnswer,ezSet:ezSet,SCHOOL:SCHOOL,get PLACE(){return PLACE;},setPlace:(l,h)=>{setPlace(l,h);if(curScr==='sSchool')schoolList(true);},lessonOpen:lessonOpen,stageOpen:stageOpen,get schSel(){return SCH_SEL;},schSelect:schSelect,lessonDef:lessonDef,stageOf:stageOf,tolOf:tolOf,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day,kind:d.kind}},dfDayOf:k=>dfDayOf(k),aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,NAV:NV,navPlan:navPlan,DIV:DIV,divSet:divSet,LES:LES,events:events,rwyFrame:()=>({thr:THR01,rh:RH*180/Math.PI,aim:AIM,field:FIELD_FT,gear:GEAR}),grSite:()=>grSite(),lesObjs:()=>LES_OBJ.map(o=>({name:o.name,type:o.geometry&&o.geometry.type,tri:o.geometry?(o.geometry.index?o.geometry.index.count:o.geometry.attributes.position.count)/3:0,col:o.material&&o.material.color&&o.material.color.getHex(),x:o.position.x,z:o.position.z,inScene:!!o.parent})),get lesBrief(){return {on:!!LES.brief,slide:BR.slide,quiz:LES.quiz};},lesBriefNext:()=>brNextTap(),lesBriefSkip:lesBriefSkip,lesBriefBack:lesBriefBack,lesBriefAnswer:k=>brAnswer(k),get G(){return G;},gBegin:gBegin,gHold:gHold,gHoldEnd:gHoldEnd,gTick:gTick,gRange:gRange,gEvent:gEvent,gEnd:gEnd,dbTip:dbTip,dbSay:dbSay,cfi:cfi,cfiCue:cfiCue,cfiSp:cfiSp,cfiVoice:cfiVoice,endorsements:endorsements,get LOGB(){return LOGB;},logbookAdd:logbookAdd,logSummary:logSummary,tqAnswer:tqAnswer,ezSet:ezSet,SCHOOL:SCHOOL,get PLACE(){return PLACE;},setPlace:(l,h)=>{setPlace(l,h);if(curScr==='sSchool')schoolList(true);},lessonOpen:lessonOpen,stageOpen:stageOpen,get schSel(){return SCH_SEL;},schSelect:schSelect,lessonDef:lessonDef,stageOf:stageOf,tolOf:tolOf,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   // @OhRabah easter eggs (3.10): where each one is, whether its lights are on, and the tow banner
   eggs:()=>EGG.list.map(o=>{const p=o.getWorldPosition(new V3()),r={name:o.name,x:p.x,y:p.y,z:p.z,ry:o.rotation.y,lit:(o.name==='egg_billboard'||o.name==='egg_rooftop')&&EGG.lit,visible:o.visible};
     if(o.name==='egg_tow'){const b=EGG.tow.ban.getWorldPosition(new V3()),f=new V3(0,0,-1).applyQuaternion(o.quaternion);r.banner={x:b.x,y:b.y,z:b.z};r.fwd=[f.x,f.y,f.z];}return r;}),

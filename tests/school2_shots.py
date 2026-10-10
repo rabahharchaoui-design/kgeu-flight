@@ -8,10 +8,17 @@
 # Run: .venv/bin/python tests/school2_shots.py   (--item1a: map/brief/climb/bravo/final/map; --item1b: the debrief only)
 # Finer split for a 110s-per-call harness: --maps (map_s3 x3 + xc_brief), --fly844/--fly568 (xc_climb/xc_bravo/xc_map/xc_final
 # at one size), --deb844/--deb568 (xc_debrief at one size).
+#
+# School2 item 2: Stage 3's diversion and lost procedures lesson (the dust storm over Sky Harbor, the diversion card, the
+# lost-procedure CALL, the debrief). div_card_<WxH>: the card up (heading/minutes steppers, SET), the mini map hidden,
+# Dana's dust storm subtitle live, the lesson card. div_set_844x390: right after SET (card gone, the cue strip HDG/ALT, the
+# instruction line). div_call_<WxH>: the vectors CALL button up (Approach's radar contact subtitle if it landed in time).
+# div_debrief_<WxH>: the debrief after a clean run (7 rows). Split for the 110s cap: --div844 (card+set+call at 844),
+# --div568 (card+call at 568), --divdeb844, --divdeb568 (the full flown lesson, one size each: ~60s alone).
 import asyncio, os, sys
 from playwright.async_api import async_playwright
 from harness import serve, launch, page, PLACED
-from school_fly import K, BASE, start, rwy, call, final, touchdown, stop
+from school_fly import K, BASE, start, rwy, call, final, touchdown, stop, DANA, DEBRIEF
 
 SHOTS = os.path.join(os.path.dirname(__file__), '..', 'overnight-screenshots', 'school2')
 os.makedirs(SHOTS, exist_ok=True)
@@ -225,6 +232,118 @@ async def measure568(b, url):
     print('MEASURE 568x320', m)
     await pg.context.close()
 
+# ---------------- item 2: the diversion lesson (Glendale's bearing/distance, the card's steppers, the CALL) ----------------
+GLN = """()=>{const K=window.__kgeu,s=K.state(),x=K.LES.d.G0.x,z=K.LES.d.G0.z,dx=x-s.pos.x,dz=z-s.pos.z;
+  return {brg:((Math.atan2(dx,-dz)*180/Math.PI-12)%360+360)%360,nm:Math.hypot(dx,dz)/1852}}"""
+HOLD = f"()=>{K}.stepFrame(0.001,false,true)"
+DIVASK = "K.TASK.ask&&K.TASK.ask.shown"
+DIVRECTS = """()=>{const R=s=>{const e=document.querySelector(s);if(!e)return null;const r=e.getBoundingClientRect();return [r.left,r.top,r.right,r.bottom]};
+  return {card:R('#divCard'),tkReply:R('#tkReply'),les:R('#lesson'),pause:R('#bPause'),W:innerWidth,H:innerHeight}}"""
+
+async def to_card(pg):
+    """fly until the diversion card opens (past downtown, the dust storm)"""
+    c = await pg.evaluate(f"()=>{K}.NAV.legs[2].course")
+    return await fly(pg, 3000, hold=3500, kt=105, vs=0, hdg=c, until="K.DIV.on")
+
+DUST_ON = "document.getElementById('atc').classList.contains('on')&&/dust storm/.test(document.getElementById('atc').textContent)"
+
+async def to_dust(pg, n=400):
+    """the card opens with the dust-storm line only queued; fly on (heading is free, GPS is off), checked inside the
+    same frame loop (no per-frame round trip: the browser's own render loop already burns real time at ~3 fps headless,
+    so this must stay a single evaluate call), until Dana's dust-storm line is the *live* subtitle, not just logged"""
+    await fly(pg, n, hold=3500, kt=105, vs=0, hdg=300, until=DUST_ON)
+    return await pg.evaluate(f"()=>{{return {DUST_ON}}}")
+
+async def div_set(pg):
+    """the real taps: heading to the 5 deg nearest Glendale's bearing, minutes at 105 kt, then SET. Returns the heading picked."""
+    gl = await pg.evaluate(GLN)
+    want = int(round(gl['brg'] / 5) * 5) % 360 or 360
+    mins = max(1, int(round(gl['nm'] / 105 * 60)))
+    await pg.evaluate(HOLD)
+    h0 = await pg.evaluate(f"()=>{K}.DIV.h")
+    dh = ((want - h0 + 540) % 360) - 180
+    taps = 0
+    while dh != 0 and taps < 40:
+        step = 10 if dh >= 10 else -10 if dh <= -10 else 5 if dh > 0 else -5
+        await pg.click(f'#divCard [data-h="{step}"]'); dh -= step; taps += 1
+    m0 = await pg.evaluate(f"()=>{K}.DIV.m")
+    for _ in range(abs(mins - m0)):
+        await pg.click('#divCard [data-m="%d"]' % (1 if mins > m0 else -1))
+    await pg.click('#divSet')
+    return want
+
+async def div_to_card_shot(pg, W, H):
+    await start(pg, 'divert')
+    await fly(pg, 3, hold=3500, kt=105, vs=0, hdg=await pg.evaluate(f"()=>{K}.NAV.legs[2].course"))
+    await to_card(pg)
+    got = await to_dust(pg)
+    r = await pg.evaluate(DIVRECTS)
+    print(f'  div_card {W}x{H} dust-storm subtitle live: {got}  rects {r}')
+    await shot(pg, f'div_card_{W}x{H}.png')
+
+async def div844(b, url):
+    # div_card, div_set, div_call all at 844x390 in one page (card -> SET -> the CALL for vectors)
+    pg = await page(b, url, vp={'width': 844, 'height': 390}, storage=ST)
+    await div_to_card_shot(pg, 844, 390)
+    want = await div_set(pg)
+    await pg.wait_for_timeout(300)
+    r = await pg.evaluate(DIVRECTS)
+    print('  div_set 844x390 rects', r)
+    await shot(pg, 'div_set_844x390.png')
+    tgt = (want + 12) % 360
+    await fly(pg, 1, alt=4500, kt=105, vs=0, hdg=tgt)
+    await fly(pg, 400, hold=4500, kt=105, vs=0, hdg=tgt, until=DIVASK)
+    sub = await pg.evaluate(f"()=>{K}.TASK.ask&&{K}.TASK.ask.opts[0].sub")
+    r = await pg.evaluate(DIVRECTS)
+    print('  div_call 844x390 CALL sub', sub, 'rects', r)
+    await shot(pg, 'div_call_844x390.png')
+    await pg.context.close()
+
+async def div568(b, url):
+    # div_card, div_call at 568x320 (no div_set shot asked at this size)
+    pg = await page(b, url, vp={'width': 568, 'height': 320}, storage=ST)
+    await div_to_card_shot(pg, 568, 320)
+    want = await div_set(pg)
+    tgt = (want + 12) % 360
+    await fly(pg, 1, alt=4500, kt=105, vs=0, hdg=tgt)
+    await fly(pg, 400, hold=4500, kt=105, vs=0, hdg=tgt, until=DIVASK)
+    sub = await pg.evaluate(f"()=>{K}.TASK.ask&&{K}.TASK.ask.opts[0].sub")
+    r = await pg.evaluate(DIVRECTS)
+    print('  div_call 568x320 CALL sub', sub, 'rects', r)
+    await shot(pg, 'div_call_568x320.png')
+    await pg.context.close()
+
+async def divdebrief(b, url, W, H):
+    # the whole lesson flown clean (the way school_divert_check.py's run_a does it), one size, to the debrief
+    pg = await page(b, url, vp={'width': W, 'height': H}, storage=ST)
+    await start(pg, 'divert')
+    F = await rwy(pg)
+    await fly(pg, 3, hold=3500, kt=105, vs=0, hdg=await pg.evaluate(f"()=>{K}.NAV.legs[2].course"))
+    await to_card(pg)
+    want = await div_set(pg)
+    tgt = (want + 12) % 360
+    await fly(pg, 1, alt=4500, kt=105, vs=0, hdg=tgt)
+    await fly(pg, 400, hold=4500, kt=105, vs=0, hdg=tgt, until=DIVASK)
+    await pg.evaluate(HOLD)
+    await pg.click('#tkReply button')
+    await fly(pg, 300, hold=4500, kt=105, vs=0, hdg=tgt, until="K.radioLog().some(l=>/radar contact/.test(l.text))")
+    await fly(pg, 6000, hold=4500, kt=105, vs=0, hdg=tgt, until='K.LES.ph>=5')
+    for _ in range(4):
+        await fly(pg, 600, hold=4500, kt=90, vs=0, hdg=tgt, until=DIVASK)
+        await pg.evaluate(f"()=>{K}.tqAnswer('CALL')")
+        if await pg.evaluate(f"()=>{K}.radioLog().some(l=>l.who==='Skyhawk 8401L'&&/^Cleared to land/.test(l.text))"): break
+    await final(pg, F)
+    await touchdown(pg, F, past=60, fpm=160)
+    await stop(pg, F)
+    await pg.wait_for_timeout(800)
+    d = await pg.evaluate(DEBRIEF)
+    print(f'  div_debrief {W}x{H} letter {d["letter"]} rows {len(d["rows"])} all_ok {all(x[1] for x in d["rows"])}')
+    m = await pg.evaluate("""()=>{const e=document.getElementById('gLines');const r=e.getBoundingClientRect();
+      return {scrollH:e.scrollHeight,clientH:e.clientHeight,more:e.classList.contains('more'),rect:[r.top,r.bottom],Hvp:innerHeight}}""")
+    print(f'  div_debrief {W}x{H} #gLines measure {m}')
+    await shot(pg, f'div_debrief_{W}x{H}.png')
+    await pg.context.close()
+
 async def main():
     srv, url = serve()
     async with async_playwright() as p:
@@ -243,6 +362,14 @@ async def main():
             await measure568(b, url); await b.close(); srv.shutdown(); return
         if '--measurefinal844' in sys.argv:
             await measure_final844(b, url); await b.close(); srv.shutdown(); return
+        if '--div844' in sys.argv:
+            await div844(b, url); await b.close(); srv.shutdown(); return
+        if '--div568' in sys.argv:
+            await div568(b, url); await b.close(); srv.shutdown(); return
+        if '--divdeb844' in sys.argv:
+            await divdebrief(b, url, 844, 390); await b.close(); srv.shutdown(); return
+        if '--divdeb568' in sys.argv:
+            await divdebrief(b, url, 568, 320); await b.close(); srv.shutdown(); return
         if '--item1b' in sys.argv:
             await item1b(b, url); await b.close(); srv.shutdown(); return
         if '--item1a' in sys.argv:
