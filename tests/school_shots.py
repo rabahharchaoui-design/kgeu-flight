@@ -7,7 +7,9 @@
 # landings_aim_<WxH> (short final with the aiming bar), solo_debrief_<WxH> (a passed solo: the Endorsement row), at
 # 844x390 and 568x320. item 7: hood_<WxH> (under the hood, the cue strip, at 844x390 and 568x320), xwind_final_844x390
 # (crabbed on a one mile final in the lesson's crosswind), emerg_field_844x390 (the forced landing field's outline and
-# markers from short final). Run: .venv/bin/python tests/school_shots.py   (--item6, --item7: only those)
+# markers from short final). item 8: logbook_<WxH> (a seeded logbook: 12.5 h, 9.5 dual, 3 solo, 1 instrument, 9 landings, the
+# solo endorsement, four entries) at 844x390, 568x320 and 390x844.
+# Run: .venv/bin/python tests/school_shots.py   (--item6, --item7, --item8: only those)
 import asyncio, os, sys
 from playwright.async_api import async_playwright
 from harness import serve, launch, page
@@ -64,14 +66,35 @@ async def item7(b, url):
             await pg.evaluate(R); await shot(pg, f'emerg_field_{W}x{H}.png')
         await pg.context.close()
 
+# school1 item 8: the logbook, seeded
+LOGBOOK = {'dual': 9.5, 'solo': 3, 'xc': 0, 'night': 0, 'inst': 1, 'ldg': 9, 'entries': [
+    {'id': 'first', 'at': 1791100800000, 'dual': 0.5, 'solo': 0, 'xc': 0, 'night': 0, 'inst': 0, 'ldg': 1, 'score': 92, 'letter': 'A'},
+    {'id': 'landings', 'at': 1791360000000, 'dual': 1.0, 'solo': 0, 'xc': 0, 'night': 0, 'inst': 0, 'ldg': 2, 'score': 81, 'letter': 'B'},
+    {'id': 'solo', 'at': 1791532800000, 'dual': 0.5, 'solo': 0.5, 'xc': 0, 'night': 0, 'inst': 0, 'ldg': 3, 'score': 88, 'letter': 'B'},
+    {'id': 'hood', 'at': 1791619200000, 'dual': 1.0, 'solo': 0, 'xc': 0, 'night': 0, 'inst': 1.0, 'ldg': 0, 'score': 74, 'letter': 'C'}]}
+
+async def item8(b, url):
+    import json
+    ST = dict(BASE, kgeuPlace='{"level":"solo","hours":35}', kgeuLogbook=json.dumps(LOGBOOK),
+              kgeuEndorse='{"solo":{"at":1791532800000,"by":"Dana Reyes, CFI","lesson":"solo"}}')
+    for W, H in SIZES:
+        pg = await page(b, url, vp={'width': W, 'height': H}, storage=ST)
+        await pg.evaluate(f"()=>{{document.body.classList.add('portraitok');{K}.openMenu('sSchool');{K}.nav('sLog')}}")
+        await pg.wait_for_timeout(500)
+        await shot(pg, f'logbook_{W}x{H}.png')
+        await pg.context.close()
+
 async def main():
     srv, url = serve()
     async with async_playwright() as p:
         b = await launch(p)
+        if '--item8' in sys.argv:
+            await item8(b, url); await b.close(); srv.shutdown(); return
         if '--item7' in sys.argv:
             await item7(b, url); await b.close(); srv.shutdown(); return
         await item6(b, url)
         await item7(b, url)
+        await item8(b, url)
         if '--item6' in sys.argv:
             await b.close(); srv.shutdown(); return
         for W, H in SIZES:

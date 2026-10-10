@@ -78,6 +78,15 @@ async def main():
         ok('(g) 568x320 the intake fits with Back showing, 44 px targets', not bad and await pg.evaluate("()=>!document.getElementById('plBack').hidden"), bad)
         await finger(pg, '#plOpts [data-lv=student]'); await finger(pg, '#plGo'); await pg.wait_for_timeout(500)
         await fit_map(pg, '568x320')
+        # item 8 round 2: the compact header at 700 px or less; the cards start by 216 px (the floor with a title line, a 44 px
+        # button row and the under-node map below the 66 px tab bar) and a second row of cards shows
+        L = await pg.evaluate("""()=>{const R=[...document.querySelectorAll('#school .lrow')].map(e=>e.getBoundingClientRect().top),T=[...new Set(R.map(Math.round))].sort((a,b)=>a-b);
+          const cap=document.querySelector('#schMap .sNode .cap').getBoundingClientRect(),ring=document.querySelector('#schMap .sNode .ring').getBoundingClientRect();
+          return {first:T[0],second:T[1],H:innerHeight,under:cap.top>=ring.bottom-0.5,ring:Math.round(ring.width),hint:getComputedStyle(document.getElementById('ezHint')).display,
+            cap:document.querySelector('.schT .gcap').textContent,sum:getComputedStyle(document.getElementById('schSum')).display}}""")
+        ok('(g) 568x320: the first card row starts by 216 px and a second row shows', L['first'] <= 216 and L['second'] < L['H'] - 12, L)
+        ok('(g) 568x320: captions under 40 px nodes, the hint hidden, the summary folded into the caption', L['under'] and L['ring'] == 40 and L['hint'] == 'none' and L['sum'] == 'none'
+           and L['cap'].startswith('Cessna 172 at Glendale · ') and ' h · ' in L['cap'], L)
         ok('(h) no page errors', not pg.errs, pg.errs[:3])
         await pg.context.close()
 
