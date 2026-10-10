@@ -834,6 +834,32 @@ body.lookOn:not(.touch) #badges{ top:calc(var(--padT) + var(--icon) + 80px); }
   pointer-events:none; filter:drop-shadow(0 2px 6px rgba(0,0,0,.55)); }
 #sixpack.on{ display:block; }
 body.touch #sixpack{ width:216px; height:144px; }
+/* school1 item 7, Under the hood: the whole outside view blanked (#hood fills the viewport). It comes before #uiroot with
+   no z-index, so every readout, button, the stick zone, the lesson card and the subtitle draw over it, and the six pack
+   (z 3) sits on its own lighter panel (::after, 3 px round the gauges) like an instrument panel */
+#hood{ position:fixed; inset:0; display:none; pointer-events:none; background:#2b2b2b; }
+#hood::after{ content:''; position:absolute; left:calc(50% + 20px); bottom:calc(var(--saB) - 1px); transform:translateX(-50%); width:306px; height:206px; box-sizing:border-box;
+  background:#363636; border:1px solid #4a4a4a; border-radius:14px; }
+body.touch #hood::after{ width:222px; height:150px; }
+body.hoodOn #hood{ display:block; }
+body.menuOn #hood, body.photoOn #hood, body.mapOn #hood{ display:none; }
+/* under the hood the lesson panel heads the centre column (apprTick moves it there, the subtitle under it); the numbers line
+   goes (the cue rows and the readouts carry them) so the subtitle clears the six pack */
+body.hoodOn #lesson.cueOn #lesM{ display:none; }
+@media (min-width:780px){ body.hoodOn #topCol{ width:340px; } }   /* the instruction on one line, the subtitle in two */
+/* End beside the title and the instruction (not a row of its own), the cue rows full width under them */
+body.touch.hoodOn:not(.appr) #lesson.on:not(.tut) #lesQuit{ grid-column:2; grid-row:1 / span 2; }
+body.touch.hoodOn:not(.appr) #lesson.on:not(.tut) #lesT{ grid-column:1; grid-row:1; }
+body.touch.hoodOn:not(.appr) #lesson.on:not(.tut) #lesI{ grid-column:1; grid-row:2; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+/* 568 by 320 under the hood: no mini map (not an instrument); the six pack smaller and left of centre, clear of the dock;
+   the lesson panel 175 px wide under the pause button (End beside the title and instruction, the cue rows under them);
+   Dana's subtitle (apprTick moves it out of the column) over the stick zone, lower left */
+@media (max-width:600px) and (orientation:landscape){ body.touch.hoodOn #sixpack, body.touch.hoodOn #hood::after{ left:calc(50% - 20px); }
+  body.hoodOn #map{ display:none; }
+  body.touch.hoodOn #lesson.on{ left:245px; top:60px; bottom:auto; transform:none; width:175px; max-width:175px; box-sizing:border-box; }
+  body.touch.hoodOn #lesCue .cue i{ width:60px; }
+  body.hoodOn #uiroot > #atc{ position:absolute; left:8px; top:215px; width:162px; max-height:100px; box-sizing:border-box; overflow:hidden; } }
+@media (max-height:360px){ body.touch.hoodOn #sixpack{ width:180px; height:120px; } body.touch.hoodOn #hood::after{ width:186px; height:126px; } }
 /* NEW RECORD and ACHIEVEMENT: the second badge in the right column (#badges), label over
    the line. It used to sit fixed over the pause button; now it takes turns with the grade. */
 #banner{ flex-direction:column; align-items:flex-start; justify-content:center; gap:1px; }
@@ -1652,6 +1678,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 </div>
 <canvas id="gl"></canvas>
 <div id="sensorFx"><div class="gr"></div><div class="vg"></div></div>
+<div id="hood" aria-hidden="true"></div>
 <!-- everything in here is laid out inside the visual viewport, so nothing hides under
      the notch, the home indicator, or a host app header -->
 <div id="uiroot">
@@ -2213,7 +2240,10 @@ function groundHeight(x,z){
   const ad=airportZoneDist(x,z); if(ad<400) h*=smooth(0,400,ad);
   return h;
 }
+let LES_FIELD=null;   // school1 item 7: the forced landing field of the emergency lesson {cx,cz,ax,az,hl,hw}: landable while it is drawn
+function lesInField(x,z){const F=LES_FIELD;if(!F)return false;const dx=x-F.cx,dz=z-F.cz,a=dx*F.ax+dz*F.az,b=-dx*F.az+dz*F.ax;return Math.abs(a)<=F.hl&&Math.abs(b)<=F.hw;}
 function isPaved(x,z){
+  if(LES_FIELD&&lesInField(x,z))return true;
   if(!REGION.az)return terrPaved(x,z);
   const u=toU(x,z),v=toV(x,z);
   if(u>=-3&&u<=RWY_LEN+3&&Math.abs(v)<=16.5) return true;
@@ -2613,7 +2643,7 @@ function step(st,dt,ev){
   if(st.onGround){st.gload=1;st.sfU=1;st.sfR=0;}
   st.time+=dt;
   // variable wind: the direction wanders about 25 degrees either side of the base, slowly
-  st.windDir=((st.windBase+17*Math.sin(st.time*0.011+st.windPh)+8*Math.sin(st.time*0.037+st.windPh*2.3))%360+360)%360;
+  st.windDir=st.windHold?st.windBase:((st.windBase+17*Math.sin(st.time*0.011+st.windPh)+8*Math.sin(st.time*0.037+st.windPh*2.3))%360+360)%360;   // windHold: the crosswind lesson's steady wind
   // in a haboob the wind swings round to blow from where the wall comes from
   if(st.dust>0){const dd=((st.dustDir-st.windDir)%360+540)%360-180;st.windDir=((st.windDir+dd*st.dust)%360+360)%360;}
 }
@@ -10248,8 +10278,11 @@ function apprTick(){
   const chip=mOn&&!DF.live&&!!st&&st.time-APPR.missT0>=3;if(chip!==missEl.classList.contains('chip'))missEl.classList.toggle('chip',chip);
   // portrait: the lesson panel joins the strip at the top (below the controls' top edge is the centre third)
   const L=document.getElementById('lesson'),T=document.getElementById('topCol');if(!APPR.home)APPR.home={p:L.parentNode,n:L.nextSibling};
-  const want=on&&innerHeight>innerWidth;
+  const nar=HOOD.on&&innerWidth<600,want=(on&&innerHeight>innerWidth)||(HOOD.on&&!nar);   // under the hood (school1 item 7) the six pack holds the bottom centre: the panel goes up too
   if(want&&L.parentNode!==T)T.insertBefore(L,T.firstChild);else if(!want&&L.parentNode===T)APPR.home.p.insertBefore(L,APPR.home.n);
+  // under the hood on a narrow screen the subtitle leaves the column for the lower left (CSS: #uiroot > #atc)
+  if(!APPR.atcHome)APPR.atcHome={p:atcEl.parentNode,n:atcEl.nextSibling};
+  if(nar&&atcEl.parentNode===APPR.atcHome.p)T.parentNode.appendChild(atcEl);else if(!nar&&atcEl.parentNode!==APPR.atcHome.p)APPR.atcHome.p.insertBefore(atcEl,APPR.atcHome.n);
 }
 function missReset(){
   if(MISS.pallet){scene.remove(MISS.pallet.g);MISS.pallet=null;}
@@ -14350,20 +14383,20 @@ const SCHOOL={
         {h:'Short field approach',b:'Full flaps and a slower, steeper final. The POH says 61 kt; the game holds 65. Power controls the glide path, so you arrive at the point with little float.'},
         {h:'Land on the point',b:'Touch down within 200 ft past your aiming point, then brakes, flaps up, and stop as short as is safe. That 200 ft is the checkride standard.'}],
       quiz:{q:'Which speed gives the most height for the distance?',a:['Vx, 62 kt','Vy, 74 kt','Cruise, 100 kt','Best glide, 68 kt'],ok:0,why:'Vx is the best angle of climb speed: the most height per distance over the ground. Vy gives the most height per minute.'},
-      tasks:[{id:'vx',name:'Climb at Vx, 62 kt',w:25,kind:'hold',tol:'spd',unit:'kt'},{id:'tdz',name:'Touchdown within 200 ft of the point',w:35,kind:'range',tol:'landShort',unit:'ft'},
+      tasks:[{id:'vx',name:'Climb at Vx, 62 kt',w:25,kind:'hold',tol:'spd',unit:'kt'},{id:'tdz',name:'Touchdown within 200 ft of the point',w:35,kind:'range',tol:'landShort',min:0,unit:'ft'},
         {id:'fpm',name:'Touchdown under 300 fpm',w:15,kind:'range',tol:300,unit:'fpm'},{id:'vapp',name:'Approach speed held',w:15,kind:'hold',tol:'spd',unit:'kt'},
         {id:'cl',name:'On the centerline',w:10,kind:'range',tol:6,unit:'m'}],
       log:{dual:1.0,ldg:2}},
-    {id:'soft',name:'Soft field',sub:'Keep the weight off the nosewheel on grass',min:10,
+    {id:'soft',name:'Soft field',sub:'Keep the weight off the nosewheel on grass',min:10,note:'The game has no grass runway: runway 1 stands in for the soft field. With flaps 10 and the stick held back the game\'s 172 lifts off near 57 kt, so the liftoff is graded under 59; the POH soft field technique lifts off at the lowest speed it will fly.',
       cards:[{h:'Why soft fields differ',b:'Grass, sand or mud grabs the wheels and can dig the nosewheel in. Keep moving, and keep the nose light the whole time you are on the ground.'},
-        {h:'Soft field takeoff',b:'Flaps 10, stick held back as you roll. It lifts off early in ground effect, extra lift near the surface. Stay low until 74 kt, Vy, then climb.'},
+        {h:'Soft field takeoff',b:'Flaps 10, stick held back as you roll. It lifts off early in ground effect, extra lift near the surface. Stay under 30 ft until 70 kt, then climb at Vy, 74 kt.'},
         {h:'Soft field landing',b:'Touch down as slowly and gently as you can, with a little power, holding the nose up. Let the nosewheel down softly and do not brake.'}],
       quiz:{q:'Soft field takeoff: just after liftoff, what do you do?',a:['Stay just above the ground to gain speed','Climb steeply at once','Raise the flaps at once','Pull the power back'],ok:0,why:'It lifts off below a safe climb speed, held up by ground effect. Stay low until you reach Vy, then climb.'},
       tasks:[{id:'nose',name:'Nose held up on the takeoff roll',w:20,kind:'event'},{id:'low',name:'Accelerated in ground effect',w:20,kind:'event'},
         {id:'fpm',name:'Touchdown under 150 fpm',w:30,kind:'range',tol:150,unit:'fpm'},{id:'cl',name:'On the centerline',w:15,kind:'range',tol:6,unit:'m'},
         {id:'nobrk',name:'No braking after touchdown',w:15,kind:'event'}],
       log:{dual:1.0,ldg:2}},
-    {id:'xwind',name:'Crosswind landings',sub:'Land in a crosswind, then a forward slip',min:10,
+    {id:'xwind',name:'Crosswind landings',sub:'Land in a crosswind, then a forward slip',min:10,note:'The touch controls have no rudder pedals, so on a phone the forward slip is graded on what it does: over 700 fpm down without speeding up. With a keyboard, Q and E are the rudder and crossed controls count.',
       cards:[{h:'Crab, then wing low',b:'The wind drifts you sideways on final. Point the nose into it, a crab, to track the centerline. Just before touchdown, lower the upwind wing and line the nose up.'},
         {h:'Upwind wheel first',b:'In a crosswind the upwind main wheel touches first, then the other. Keep the stick into the wind as you slow down, more and more of it.'},
         {h:'The forward slip',b:'Too high? Cross the controls: bank one way, rudder the other. The plane flies a little sideways and sinks fast without speeding up. Straighten it before the flare.'}],
@@ -14437,7 +14470,7 @@ function gRange(id,value,note){const t=gTask(id);if(!t||G.end)return;const tol=g
 function gEvent(id,ok,note){const t=gTask(id);if(!t||G.end)return;G.tasks[id]={kind:'event',ok:!!ok,pts:ok?(t.w||0):0,detail:note||''};}
 function gRes(t){const r=G.tasks[t.id],w=t.w||0;if(!r)return {ok:false,pts:0,detail:'not flown'};
   if(r.kind!=='hold')return r;if(!(r.tAll>0))return {ok:false,pts:0,detail:'not flown'};const f=r.tIn/r.tAll;
-  return {ok:f>=0.85,pts:w*clamp((f-0.5)/0.45,0,1),detail:'inside '+Math.round(f*100)+'% of the time, worst '+gNum(r.worst)+' '+(t.unit||'')};}
+  return {ok:f>=0.85&&!r.bad,pts:w*clamp((f-0.5)/0.45,0,1)*(r.bad?0.5:1),detail:'inside '+Math.round(f*100)+'% of the time, worst '+gNum(r.worst)+' '+(t.unit||'')+(r.note?', '+r.note:'')};}   // r.bad: a fault outside the band (half marks), r.note says it
 // failWhy (stalled, off field, took too long) forces an F as before; why is the line that says so, above the tasks
 function gEnd(failWhy,why){if(!G.def||G.end)return;G.holds.slice().forEach(h=>gHoldEnd(h.task.id));G.end=true;
   let sc=0;const lines=(G.def.tasks||[]).map(t=>{const r=gRes(t);sc+=r.pts;return {ok:!!r.ok,name:t.name,detail:r.detail||'',pts:r.pts,w:t.w||0};});
@@ -14495,7 +14528,7 @@ function endorsements(){try{const e=JSON.parse(localStorage.getItem('kgeuEndorse
 function endorseSign(kind,lesson){const E=endorsements();if(!E[kind])E[kind]={at:Date.now(),by:SCHOOL.cfi.name+', '+SCHOOL.cfi.title,lesson:lesson};
   try{localStorage.setItem('kgeuEndorse',JSON.stringify(E));}catch(e){}return E[kind];}
 const _le=new THREE.Euler(0,0,0,'YXZ');
-function lesAtt(){_le.setFromQuaternion(st.quat,'YXZ');return {hdg:((-_le.y*180/Math.PI)%360+360)%360,bank:-_le.z*180/Math.PI};}
+function lesAtt(){_le.setFromQuaternion(st.quat,'YXZ');return {hdg:((-_le.y*180/Math.PI)%360+360)%360,bank:-_le.z*180/Math.PI,pitch:_le.x*180/Math.PI};}
 const altMSL=()=>(st.pos.y-GEAR)*M2FT+FIELD_FT,aglFt=()=>st.agl*M2FT,kts=()=>st.ias*MS2KT;
 const angD=(a,b)=>Math.abs((((a-b)%360)+540)%360-180);
 const dev=f=>(f>=0?'+':'')+Math.round(f)+' ft',h3=h=>String(Math.round(h)%360||360).padStart(3,'0');
@@ -14594,7 +14627,8 @@ function lesGo(direct){if(!LES.on||(!LES.brief&&!direct))return;const L=lessonDe
 const LES_OBJ=[];
 function lesAdd(o){scene.add(o);LES_OBJ.push(o);return o;}
 function lesClear(){for(const o of LES_OBJ){scene.remove(o);o.traverse&&o.traverse(m=>{if(m.isMesh&&m.geometry&&!m.geometry.userData.keep)m.geometry.dispose();});}LES_OBJ.length=0;}
-function lesEnd(){LES.on=null;lesClear();if(TASK.ask&&!TASK.on){TASK.ask=null;tqReplyUI();}if(G.holds.length){G.holds.length=0;gCue();}ezUI();if(LES.brief){LES.brief=false;brClose(true);}lesEl.classList.remove('on','tut');tutArrow.classList.remove('on');if(st){st.noProt=0;st.bankMax=0;st.easy=easy;}}
+const HOOD={on:false,cam:0};let LES_W=null;   // school1 item 7: the hood (the camera it replaced), the flight's wind under a lesson's own
+function lesEnd(){LES.on=null;lesClear();lesRestore();if(TASK.ask&&!TASK.on){TASK.ask=null;tqReplyUI();}if(G.holds.length){G.holds.length=0;gCue();}ezUI();if(LES.brief){LES.brief=false;brClose(true);}lesEl.classList.remove('on','tut');tutArrow.classList.remove('on');if(st){st.noProt=0;st.bankMax=0;st.easy=easy;}}
 // ---- the briefing (school1 item 3): three of Dana's cards and the lesson's quiz question, swiped or stepped with NEXT,
 // over the aircraft at its start with the sim held (LES.brief, as the tasking brief). A replay (any saved grade, F too) may skip it
 const brOv=$('brOv'),brTrack=$('brTrack'),brNext=$('brNext'),BR={slide:0,tgt:-1,tgtT:0,L:null};
@@ -14845,7 +14879,119 @@ const LESFLY={
     if(st.stalled&&!st.onGround){if(LES.ph===0){cfi('Stall. My airplane.',null,{urgent:1});gEnd('stage check failed','Stage check: stalled');}else gEnd('stalled','Stalled on the solo');return;}
     if(LES.ph===0&&d.s===3&&!st.onGround&&aglFt()>50&&kt<55&&d.fin){cfi('Too slow on final. My airplane.',null,{urgent:1});gEnd('stage check failed','Stage check: final under 55 kt');return;}
     cirTick(dt,d,a,alt,kt);if(LES.on&&LES.t>1200)gEnd('took too long','Took too long. Ran out of time');},
-  event(ev,d){cirEvent(ev,d);}}};
+  event(ev,d){cirEvent(ev,d);}},
+  // ---- school1 item 7: Stage 2 ----
+  // short field: flaps 10, the brakes held to full power, Vx to 500 ft, one circuit, a full flap approach on the bar and a stop
+  short:{at:'runway',twr:1,start(S,d){A.tko=1;A.pattern=1;cirInit(d,['stop']);lesAim();d.baseMsg='Base, then final. Full flaps, 65 knots, aim at the bar, power for the glide path.';},
+  open(S,d){cirDepart(d,'Short field. Call the tower first. Then flaps 10. Hold the brakes, full power, then release. Rotate at 55, climb at Vx, 62 knots, until 500 feet.');},
+  tick(dt,S,d,a,alt,kt){if(lesStall())return;
+    if(d.s===4&&st.onGround&&st.vel.length()<2&&!d.tdzX)d.tdzX=', stopped '+Math.round(toU(st.pos.x,st.pos.z)-THR01-AIM)+' m past the bar';   // read by cirFinish
+    stoTick(dt,d,kt);cirTick(dt,d,a,alt,kt);if(!LES.on)return;lesPh(d);
+    if(d.c===0&&d.s===0&&!(st.onGround&&TASK.ask&&TASK.ask===d.ask)){const ag=aglFt();
+      lesShow(st.onGround?'Flaps 10. Brakes, full power, release. Rotate at 55 kt.':d.vx===1?'Climb at Vx, 62 kt, to 500 ft AGL.':'Lower the nose to 74 kt. Climb to 700 ft AGL.',Math.round(ag)+' ft AGL   '+kt.toFixed(0)+' kt   Flaps '+FLAPS[st.flapIdx].deg);}
+    else if(d.s===3)lesShow('Final: full flaps, 65 kt, aim at the bar. Power for the glide path.',Math.round(aglFt())+' ft AGL   '+kt.toFixed(0)+' kt');
+    else if(d.s===4)lesShow('Flaps up, maximum braking. Stop as short as is safe.','Touchdown '+d.td.fpm+' fpm   '+gNum(Math.abs((d.tdU-THR01-AIM)*M2FT))+' ft '+(d.tdU-THR01-AIM<0?'short of':'past')+' the bar');
+    if(LES.on&&LES.t>600)gEnd('took too long','Took too long. Ran out of time');},
+  event(ev,d){const s=d.s;cirEvent(ev,d);if(ev.type==='touchdown'&&s===3&&d.s===4&&LES.on)cfi('Flaps up, maximum braking.');}},
+  // soft field (runway 1 stands in for the grass): the nose held up on the roll, low in ground effect to 70 kt, the circuit,
+  // a soft touchdown with the nose held off and no brakes
+  soft:{at:'runway',twr:1,start(S,d){A.tko=1;A.pattern=1;cirInit(d,['stop']);d.baseMsg='Base, then final. 65 knots, full flaps. Touch down as softly as you can and hold the nose up.';},
+  open(S,d){cirDepart(d,'Soft field. Pretend the runway is grass today. Call the tower, then flaps 10, stick held back, full power. It lifts off early: stay low in ground effect until 70 knots.');},
+  tick(dt,S,d,a,alt,kt){if(lesStall())return;sftTick(dt,d,a,kt);cirTick(dt,d,a,alt,kt);if(!LES.on)return;lesPh(d);
+    if(d.c===0&&d.s===0&&!(st.onGround&&TASK.ask&&TASK.ask===d.ask)){const ag=aglFt();
+      lesShow(st.onGround?'Flaps 10. Stick held back, full power. Keep the nose light.':d.low===1?'Stay under 30 ft until 70 kt.':'Climb at 74 kt to 700 ft AGL.',Math.round(ag)+' ft AGL   '+kt.toFixed(0)+' kt');}
+    else if(d.s===3)lesShow('Final: 65 kt, full flaps. Touch down softly, nose up.',Math.round(aglFt())+' ft AGL   '+kt.toFixed(0)+' kt');
+    else if(d.s===4&&d.nb&&!d.nb.done)lesShow('Hold the nose up. No brakes.',Math.max(0,8-d.nb.t).toFixed(0)+' s   '+kt.toFixed(0)+' kt');
+    if(LES.on&&LES.t>600)gEnd('took too long','Took too long. Ran out of time');},
+  event(ev,d){const s=d.s;cirEvent(ev,d);if(ev.type==='touchdown'&&s===3&&d.s===4&&LES.on){d.nb={t:0,brk:0,back:0,done:0};cfi('Hold the nose up. No brakes.');}}},
+  // crosswind: a 3 mile final in a steady 12 kt wind 70 degrees off the runway (8 on Easy), the centreline tracked, a
+  // forward slip at 500 ft, a full stop, then one more circuit to a full stop in the same wind; the worse landing counts
+  xwind:{twr:1,start(S,d){A.tko=1;A.pattern=1;cirInit(d,['stop','stop']);d.s=3;d.fin=1;d.dr=[];d.sd=Math.random()<0.5?-1:1;
+      lesWind((RH*180/Math.PI+d.sd*70+360)%360,SCHOOL.easy?8:12,d);d.baseMsg='Base, then final. Crab to hold the centerline, then wing low, nose straight.';},
+  open(S,d){const w=windNow();cfi('Crosswind landings. Wind '+w[0]+' at '+w[1]+'. Crab into the wind on final. Track the centreline.','Crosswind landings. Wind '+w[0].split('').join(' ')+' at '+w[1]+'. Crab into the wind on final. Track the centerline.');},
+  tick(dt,S,d,a,alt,kt){if(lesStall())return;const rh=RH*180/Math.PI,u=toU(st.pos.x,st.pos.z),nm=(THR01-u)/1852,ag=aglFt(),vs=vsFpm(),va=Math.round(AC.vapp*MS2KT);
+    const trk=(Math.atan2(st.vel.x,-st.vel.z)*180/Math.PI+360)%360;
+    if(!st.onGround){d.lat=st.vel.x*RX+st.vel.z*RZ;d.hE=angD(a.hdg,rh);}   // across the runway, m/s, and the nose off its heading: the last airborne frame is the touchdown's
+    const tr=d.s===3&&!st.onGround&&nm<=2&&nm>=0.3&&angD(trk,rh)<25,on=G.tasks.track&&G.tasks.track.on;
+    if(tr&&!on)gHold('track',{get:()=>toV(st.pos.x,st.pos.z),target:0});else if(!tr&&on)gHoldEnd('track');
+    if(LES.ph===0&&d.c===0&&d.s===3&&!st.onGround&&ag<=500&&nm<2.5){LES.ph=1;d.sl={t:0,x:0};cfi('You are a little high. Forward slip: rudder one way, aileron the other.');}
+    else if(LES.ph===1){const sl=d.sl;sl.t+=dt;
+      const xc=st.ail*st.rud<0&&Math.abs(st.ail)>0.3&&Math.abs(st.rud)>0.3,sink=-vs>700,slow=kt<=va+5;   // crossed controls; on touch (no rudder) the sink without speeding up
+      sl.x=sink&&(xc||slow)?sl.x+dt:0;if(sl.x>0){sl.fpm=Math.max(sl.fpm||0,-vs);sl.xc=sl.xc||xc;sl.kt=kt;}
+      if(sl.x>=3){gEvent('slip',true,(sl.xc?'crossed controls, ':'')+Math.round(sl.fpm/10)*10+' fpm down at '+Math.round(sl.kt)+' kt');LES.ph=2;cfi('Good. Straighten it out now. Wing low, nose straight, upwind wheel first.');}
+      else if(sl.t>25||d.s!==3){gEvent('slip',false,'no slip in 25 s: under 700 fpm or speeding up');LES.ph=2;if(d.s===3)cfi('Straighten it out. Wing low, nose straight, upwind wheel first.');}}
+    cirTick(dt,d,a,alt,kt);if(!LES.on)return;if(LES.ph===0&&d.c>0)LES.ph=2;
+    const W=Math.round(st.windKt)+' kt from the '+(d.sd<0?'left':'right');
+    if(d.s===3&&!st.onGround)lesShow(LES.ph===1?(isTouch?'Slip: power idle, hold '+va+' kt, sink over 700 fpm.':'Forward slip: aileron one way, rudder the other. Lose the height.'):ag<200&&LES.ph===2?'Wing low, nose straight, upwind wheel first.':'Crab into the wind. Track the centerline.',
+      (tr||LES.ph<2?gNum(Math.abs(toV(st.pos.x,st.pos.z)))+' m '+(toV(st.pos.x,st.pos.z)<0?'left':'right')+'   ':'')+Math.round(ag)+' ft AGL   '+kt.toFixed(0)+' kt   '+W);
+    if(LES.on&&LES.t>600)gEnd('took too long','Took too long. Ran out of time');},
+  event(ev,d){if(ev.type==='touchdown'&&d.s===3&&ev.paved){const lt=Math.abs(d.lat||0),he=d.hE||0,ok=lt<1.5&&he<=8;d.dr.push({lt:lt,he:he,ok:ok});
+      const w=d.dr.reduce((p,q)=>(q.lt/1.5+q.he/8)>(p.lt/1.5+p.he/8)?q:p),n=d.dr.length>1?', worst of '+d.dr.length:'';
+      gEvent('drift',d.dr.every(q=>q.ok),gNum(w.lt)+' m/s across, nose '+Math.round(w.he)+' deg off'+n+', standard 1.5 m/s and 8 deg');}
+    cirEvent(ev,d);}},
+  // emergency descent from 6,000 over the desert practice area, a level off at 3,500, then the engine quits: best glide
+  // to a field drawn 1.5 to 2.5 nm downwind (landable while it is drawn)
+  emerg:{start(S,d){st.ezManFlap=1;const g=grSite();airStart(toU(g.cx,g.cz),toV(g.cx,g.cz),6000,360,S.cruise,0,S.thrCruise);d.vmax=0;},
+  open(S,d){cfi('We are cruising at 6,000. Stand by.');},
+  tick(dt,S,d,a,alt,kt){const vs=vsFpm(),ag=aglFt();
+    if(LES.ph>=3)st.throttle=0;   // the engine lesson's lock: no power after the failure
+    if(lesStall())return;
+    if(LES.ph<=1&&d.go){d.vmax=Math.max(d.vmax,kt);
+      if(!d.vneX&&kt>AC.vne){d.vneX=1;gEvent('vne',false,'reached '+Math.round(kt)+' kt, Vne '+AC.vne+' kt');warnFlash('VNE');cfi('Over Vne. Ease the nose up, gently.',null,{urgent:1});}}
+    if(LES.ph===0){
+      if(!d.go){lesShow('Cruising at 6,000 ft. Stand by.',kt.toFixed(0)+' kt   '+Math.round(alt).toLocaleString('en-US')+' ft');
+        if(LES.t>4){d.go=1;d.t=0;warnFlash('SMOKE');cfi('Smoke in the cockpit. Emergency descent. Power idle, bank 45, nose down, stay under 163 knots.',null,{urgent:1});}}
+      else{d.t+=dt;const tl=gTolOf('idle');
+        if(d.idle==null&&st.throttle<0.1&&Math.abs(a.bank)>30){d.idle=d.t;gEvent('idle',d.t<=tl,'in '+d.t.toFixed(1)+' s, standard '+gNum(tl)+' s');}
+        else if(d.idle==null&&d.t>tl){d.idle=-1;gEvent('idle',false,'not idle and banked within '+gNum(tl)+' s');}
+        lesShow('Emergency descent: idle, bank 45, nose down. Under 163 kt.',kt.toFixed(0)+' kt   '+fpmTx(vs)+'   '+Math.round(alt).toLocaleString('en-US')+' ft   Bank '+Math.abs(a.bank).toFixed(0)+'°');
+        if(alt<=4000){LES.ph=1;d.t=0;d.lv=0;cfi('Roll out and level off at 3,500. Power back to cruise.');}
+        else if(d.t>150)gEnd('took too long','Never got down to 3,500');}}
+    else if(LES.ph===1){d.t+=dt;d.lv=Math.abs(vs)<150?d.lv+dt:0;
+      lesShow('Roll out, level off at 3,500 ft.',dev(alt-3500)+'   '+fpmTx(vs)+'   '+kt.toFixed(0)+' kt');
+      if((d.lv>=3&&Math.abs(alt-3500)<400)||d.t>60){gRange('lvl',alt-3500);if(!d.vneX)gEvent('vne',true,'top '+Math.round(d.vmax)+' kt, Vne '+AC.vne+' kt');
+        LES.ph=2;d.t=0;cfi('Good. Hold 3,500.');}}
+    else if(LES.ph===2){d.t+=dt;lesShow('Hold 3,500 ft.',dev(alt-3500)+'   '+kt.toFixed(0)+' kt');
+      if(d.t>=10){LES.ph=3;d.f=emField();emDraw(d.f);warnFlash('ENGINE FAILURE');
+        cfi('Engine failure. Best glide '+S.glide+', pick a field, flow, declare. There is a field at your '+emClock(d.f,a)+' o\'clock, '+emNm(d.f).toFixed(1)+' miles.',null,{urgent:1});}}
+    else{const gl=!d.td&&ag>300,gh=G.tasks.glide;if(gl&&!(gh&&gh.on))gHold('glide',{get:()=>G.kt,target:S.glide});else if(!gl&&gh&&gh.on)gHoldEnd('glide');
+      if(!d.td)lesShow('Best glide '+S.glide+' kt. Land in the marked field.',kt.toFixed(0)+' kt   Field '+emNm(d.f).toFixed(1)+' nm, '+emClock(d.f,a)+' o\'clock   '+Math.round(ag).toLocaleString('en-US')+' ft AGL');
+      else{if(!d.fd){d.fd=1;d.tT=0;const ins=lesInField(d.td.x,d.td.z),F=d.f,dx=d.td.x-F.cx,dz=d.td.z-F.cz,m=Math.max(0,Math.hypot(Math.max(0,Math.abs(dx*F.ax+dz*F.az)-F.hl),Math.max(0,Math.abs(-dx*F.az+dz*F.ax)-F.hw)));
+          gEvent('field',ins,ins?'touched down '+Math.round(dx*F.ax+dz*F.az+F.hl)+' m into the field':'touched down '+Math.round(m)+' m outside the field');}
+        d.tT+=dt;lesShow('Stop straight ahead.',kt.toFixed(0)+' kt');
+        if((st.onGround&&st.vel.length()<2)||d.tT>25)gEnd();}}
+    if(LES.on&&LES.t>480)gEnd('took too long','Took too long. Ran out of time');
+  }},
+  // under the hood: cockpit view, the outside blanked to the top of the six pack. Hold 3,500, 360, 90 for 60 s, a standard
+  // rate turn to 090 and hold it, then Dana sets a nose low and a nose high unusual attitude for the student to recover
+  hood:{start(S,d){st.ezManFlap=1;airStart(7000,2500,3500,360,90,0,S.thrTurn);hoodOn();d.hT=360;},
+  open(S,d){cfi('Under the hood. Hold 3,500, heading 360, 90 knots for 60 seconds.','Under the hood. Hold three thousand five hundred, heading three six zero, ninety knots for sixty seconds.');},
+  tick(dt,S,d,a,alt,kt){if(camMode!==1){camMode=1;snapCamera=true;}   // the hood is the cockpit view
+    const nums=dev(alt-3500)+'   HDG '+h3(a.hdg)+'   '+kt.toFixed(0)+' kt';
+    if(LES.ph<=1&&lesStall())return;
+    if(LES.ph===0){if(!d.h){d.h=1;d.t=0;gHold('alt',{get:()=>G.alt,target:3500});gHold('hdg',{get:()=>G.a.hdg,target:()=>d.hT,wrap:true});gHold('spd',{get:()=>G.kt,target:90});}
+      d.t+=dt;lesShow('Hold 3,500 ft, heading 360, 90 kt.',nums+'   '+Math.max(0,60-d.t).toFixed(0)+' s');
+      if(d.t>=60){LES.ph=1;d.t=0;d.hT=90;gHoldEnd('hdg');cfi('Turn right to 090, standard rate, then hold it.','Turn right to zero nine zero, standard rate, then hold it.');}}
+    else if(LES.ph===1){d.t+=dt;if(d.t>=20&&!d.h2){d.h2=1;gHold('hdg',{get:()=>G.a.hdg,target:90,wrap:true,grace:0});}   // the turn is not graded; 090 from 20 s on
+      lesShow(d.t<20?'Turn right to 090, standard rate.':'Hold 3,500 ft, heading 090, 90 kt.',nums+'   '+Math.max(0,50-d.t).toFixed(0)+' s');
+      if(d.t>=50){gHoldEnd('alt');gHoldEnd('hdg');gHoldEnd('spd');LES.ph=2;uaGo(d,'low');cfi('Close your eyes. I have the controls.');}}
+    else{const u=d.ua;if(u.t<4){uaSet(d,dt);lesShow('Dana has the controls','Eyes closed. Wait for her call.');return;}
+      if(!u.go){u.go=1;u.r={t:0,a0:alt,amin:alt,pmin:a.pitch,vmax:kt};cfi('Your controls. Recover.',null,{urgent:1});}
+      const r=u.r;r.t+=dt;r.amin=Math.min(r.amin,alt);r.vmax=Math.max(r.vmax,kt);r.pmin=Math.min(r.pmin,a.pitch);if(st.stalled)r.st=1;
+      if(u.k==='low'){if(r.tI==null&&st.throttle<0.1)r.tI=r.t;if(r.tP==null&&a.pitch>r.pmin+3)r.tP=r.t;if(r.tL==null&&Math.abs(a.bank)<10)r.tL=r.t;
+        lesShow('Nose low: power idle, wings level, then raise the nose.',a.pitch.toFixed(0)+'° pitch   Bank '+Math.abs(a.bank).toFixed(0)+'°   '+kt.toFixed(0)+' kt');
+        if(a.pitch>=0||r.t>10){const f=[];if(r.t>10&&a.pitch<0)f.push('not recovered in 10 s');if(r.tI==null||(r.tP!=null&&r.tI>r.tP))f.push(r.tI==null?'power never to idle':'power off after the pull');
+          if(r.tL==null)f.push('nose up before wings level');if(r.vmax>140)f.push('reached '+Math.round(r.vmax)+' kt');if(r.st)f.push('stalled');
+          gEvent('low',!f.length,f.length?f.join(', '):'idle at '+r.tI.toFixed(1)+' s, wings level at '+r.tL.toFixed(1)+' s, top '+Math.round(r.vmax)+' kt');
+          LES.ph=3;uaGo(d,'high');cfi(f.length?'Again: idle first, wings level, then the nose. Eyes closed, I have the controls.':'Nicely done. Eyes closed again, I have the controls.');}}
+      else{if(r.tW==null&&st.throttle>0.9)r.tW=r.t;if(r.tN==null&&a.pitch<=5)r.tN=r.t;if(r.tL==null&&Math.abs(a.bank)<10)r.tL=r.t;
+        lesShow('Nose high: full power, nose down, then wings level.',a.pitch.toFixed(0)+'° pitch   Bank '+Math.abs(a.bank).toFixed(0)+'°   '+kt.toFixed(0)+' kt');
+        const done=r.tN!=null&&r.tL!=null&&r.t>=Math.max(r.tN,r.tL)+3;
+        if(done||r.t>15){const f=[],lost=r.a0-r.amin;if(!done)f.push('not recovered in 15 s');if(r.tW==null||r.tW>2)f.push(r.tW==null?'no full power':'full power at '+r.tW.toFixed(1)+' s');
+          if(r.tL!=null&&(r.tN==null||r.tL<r.tN))f.push('wings level before the nose came down');if(r.st)f.push('stalled');if(lost>=300)f.push('lost '+Math.round(lost)+' ft');
+          gEvent('high',!f.length,f.length?f.join(', '):'full power at '+r.tW.toFixed(1)+' s, nose down first, lost '+Math.max(0,Math.round(lost))+' ft');gEnd();return;}}}
+    if(LES.on&&LES.t>420)gEnd('took too long','Took too long. Ran out of time');
+  }}};
 // the pattern's transmissions, real Glendale phraseology. 1: our request at the hold, the tower's clearance (recorded clips)
 // and our readback; 2: the readback of the touch and go clearance the tower gave on downwind
 function patCall(d,k){const B=BASES.kgeu;
@@ -14912,7 +15058,7 @@ function cirTick(dt,d,a,alt,kt){const ag=aglFt(),tgt=FIELD_FT+1000,rh=RH*180/Mat
   else if(d.s===1){lesShow('Turn crosswind, then downwind. Level at 2,100 ft.',dev(alt-tgt)+'   '+kt.toFixed(0)+' kt');
     if(angD(trk,rh+180)<40&&v>450){d.s=2;gHold('dw',{get:()=>G.alt,target:tgt});cirTwr(d,k);}}
   else if(d.s===2){lesShow('Downwind at 2,100 ft. Turn base past the threshold.',dev(alt-tgt)+'   '+kt.toFixed(0)+' kt');
-    if(angD(trk,rh+180)>55&&u<THR01+300){d.s=3;d.fin=0;gHoldEnd('dw');say1('Base, then final. '+va+' kt, full flaps, aim at the bar.');}}
+    if(angD(trk,rh+180)>55&&u<THR01+300){d.s=3;d.fin=0;gHoldEnd('dw');say1(d.baseMsg||'Base, then final. '+va+' kt, full flaps, aim at the bar.');}}
   else if(d.s===3){const fin=angD(trk,rh)<25&&v<200;if(fin)d.fin=1;
     const vh=fin&&ag<400&&ag>50&&!d.ga&&!st.onGround,on=G.tasks.vapp&&G.tasks.vapp.on;   // the approach speed from 400 ft to 50 ft on final
     if(vh&&!on)gHold('vapp',{get:()=>G.kt,target:va});else if(!vh&&on)gHoldEnd('vapp');
@@ -14942,11 +15088,69 @@ function cirEvent(ev,d){if(ev.type!=='touchdown'||d.s!==3)return;   // a bounce 
 function cirFinish(d){const W=d.ldg,tol=gTolOf('tdz'),mz=x=>x<0?-x:Math.max(0,x-tol),n=W.length>1?', worst of '+W.length:'';
   if(W.length){const z=W.reduce((p,q)=>mz(q.tdz)>mz(p.tdz)||(mz(q.tdz)===mz(p.tdz)&&Math.abs(q.tdz)>Math.abs(p.tdz))?q:p).tdz,
       f=Math.max(...W.map(q=>q.fpm)),c=Math.max(...W.map(q=>q.cl));
-    gRange('tdz',z,(z<0?gNum(-z)+' ft short of':gNum(z)+' ft past')+' the point'+n+', standard 0 to '+gNum(tol)+' ft');
+    gRange('tdz',z,(z<0?gNum(-z)+' ft short of':gNum(z)+' ft past')+' the point'+n+', standard 0 to '+gNum(tol)+' ft'+(d.tdzX||''));
     gRange('fpm',f,f+' fpm'+n+', standard '+gNum(gTolOf('fpm'))+' fpm');gRange('cl',c,gNum(c)+' m off'+n+', standard '+gNum(gTolOf('cl'))+' m');}
   if(gTask('calls'))gEvent('calls',d.calls>=d.callN,d.calls+' of '+d.callN+' made');
   if(gTask('three'))gEvent('three',(d.sstops||0)>=3,(d.sstops||0)+' of 3');
   gEnd();}
+// ---- school1 item 7 helpers. The phase of a circuit lesson (0 the takeoff, 1 the circuit, 2 the approach and landing)
+function lesPh(d){LES.ph=Math.max(LES.ph,d.s===0&&d.c===0?0:d.s<3?1:2);}
+// short field takeoff: the flaps at the start of the roll (10, else the Vx hold fails with half marks), the brakes held to
+// full power (a note only), Vx 62 kt from liftoff to 500 ft AGL
+function stoTick(dt,d,kt){if(d.c!==0)return;const ag=aglFt();
+  if(st.onGround&&d.s===0){if(kt<5&&st.brake&&st.throttle>0.9)d.brk=1;
+    if(kt>10&&d.fl0==null){d.fl0=st.flapIdx;if(st.flapIdx!==1)cfi('Flaps 10 for a short field takeoff. Set them before the roll next time.');}}
+  if(!st.onGround&&!d.vx&&d.s<=1&&ag>3){d.vx=1;gHold('vx',{get:()=>G.kt,target:62});const h=G.tasks.vx;
+    if(h&&d.fl0!=null){if(d.fl0!==1){h.bad=1;h.note='flaps '+FLAPS[d.fl0].deg+' on the roll, not 10';}else if(!d.brk)h.note='brakes off before full power';}}
+  if(d.vx===1&&(ag>=500||d.s>=2)){d.vx=2;gHoldEnd('vx');cfi('500 feet. Lower the nose to 74 and climb to 700.');}}
+// soft field: the stick held back (or the nose up) over the roll from 10 kt and a liftoff under 59 kt (the game's 172 flies
+// near 57 with flaps 10, stick back); under 30 ft AGL until 70 kt; after the touchdown 8 s of no brakes with the nose held up
+function sftTick(dt,d,a,kt){const ag=aglFt(),back=st.elev>0.25||a.pitch>3;
+  if(d.c===0&&d.s===0&&!d.lo){
+    if(st.onGround){if(kt>=10){d.rT=(d.rT||0)+dt;if(back)d.rB=(d.rB||0)+dt;}}
+    else if(d.rT>0){d.lo=kt;d.low=1;const f=(d.rB||0)/d.rT,ok=f>=0.6&&kt<59;
+      gEvent('nose',ok,'stick back '+Math.round(f*100)+'% of the roll, off at '+Math.round(kt)+' kt, standard most of it and under 59 kt');
+      cfi(ok?'Good, it is flying. Stay low in ground effect until 70.':'Stay low now, in ground effect, until 70.');}}
+  if(d.low===1){if(ag>30&&kt<70){d.low=2;gEvent('low',false,'climbed past 30 ft at '+Math.round(kt)+' kt, standard 30 ft to 70 kt');cfi('A bit early to climb. Accelerate first next time. Climb at 74 now.');}
+    else if(kt>=70){d.low=2;gEvent('low',true,'under 30 ft to '+Math.round(kt)+' kt');cfi('70. Now climb at 74.');}}
+  const n=d.nb;if(n&&!n.done){n.t+=dt;if(st.brake)n.brk=1;if(back)n.back+=dt;
+    if(n.t>=8||(st.onGround&&st.vel.length()<2)){n.done=1;const f=n.back/Math.max(n.t,0.1),ok=!n.brk&&f>=0.7&&n.t>=8;
+      gEvent('nobrk',ok,(n.brk?'braked':'no brakes')+', nose held up '+Math.round(f*100)+'% of '+Math.round(n.t)+' s'+(n.t<8?', stopped inside 8 s':''));
+      if(n.t>=8&&!n.brk)cfi('Nosewheel down gently. Now you can brake to a stop.');}}}
+// a lesson's own wind (the crosswind lesson): steady (windHold), lighter gusts; lesRestore puts the flight's wind back
+function lesWind(dir,kt,d){if(!LES_W)LES_W={base:st.windBase,kt:st.windKt,ph:st.windPh,gust:st.gustAmp};d.w0={base:LES_W.base,kt:LES_W.kt};
+  st.windBase=st.windDir=dir;st.windKt=kt;st.windHold=1;st.gustAmp=0.15;}
+function hoodOn(){if(!HOOD.on){HOOD.on=true;HOOD.cam=camMode;}camMode=1;snapCamera=true;document.body.classList.add('hoodOn');}
+// lesEnd: the hood off and the camera back, the flight's wind back, the forced landing field gone
+function lesRestore(){if(HOOD.on){HOOD.on=false;document.body.classList.remove('hoodOn');camMode=HOOD.cam;snapCamera=true;}
+  if(LES_W){if(st){st.windBase=st.windDir=LES_W.base;st.windKt=LES_W.kt;st.windPh=LES_W.ph;st.gustAmp=LES_W.gust;st.windHold=0;}LES_W=null;}
+  LES_FIELD=null;}
+// the forced landing field: 600 by 150 m of flat open ground 1.5 to 2.5 nm downwind of us, its long side along the wind;
+// the first spot that is flat (under 5 m across it), dry, unpaved, clear of obstacles, the runway and the mission sites
+function emOK(cx,cz,ax,az){let lo=1e9,hi=-1e9;
+  for(const a of [-300,-150,0,150,300])for(const b of [-75,0,75]){const x=cx+a*ax-b*az,z=cz+a*az+b*ax,h=groundHeight(x,z);lo=Math.min(lo,h);hi=Math.max(hi,h);
+    if(isWater(x,z)||isPaved(x,z)||hitObstacle(x,z,h+GEAR+2))return false;}
+  const u=toU(cx,cz),v=toV(cx,cz);if(Math.abs(v)<700&&u>-1000&&u<RWY_LEN+1000)return false;
+  if([[DROPZ.x,DROPZ.z],[LZ.x,LZ.z],[RANGE.x,RANGE.z]].some(p=>Math.hypot(cx-p[0],cz-p[1])<1500))return false;
+  return hi-lo<5;}
+function emField(){const wd=st.windDir*Math.PI/180,ax=-Math.sin(wd),az=Math.cos(wd),b0=Math.atan2(ax,-az);let c=null,c0=null;
+  for(const r of [1.8,2.1,1.6,2.4,2.0,1.5,2.5]){for(const o of [0,25,-25,50,-50,75,-75]){const b=b0+o*Math.PI/180,x=st.pos.x+Math.sin(b)*r*1852,z=st.pos.z-Math.cos(b)*r*1852;
+    if(!c0)c0={x:x,z:z};if(emOK(x,z,ax,az)){c={x:x,z:z};break;}}if(c)break;}
+  c=c||c0;return LES_FIELD={cx:c.x,cz:c.z,ax:ax,az:az,hl:300,hw:75};}
+// its marks: a white outline with a low rust marker at each corner (the ground reference pylons, cut down)
+function emDraw(F){const P=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([i,j])=>({x:F.cx+i*F.hl*F.ax-j*F.hw*F.az,z:F.cz+i*F.hl*F.az+j*F.hw*F.ax}));
+  lesAdd(fdRibbon(P.concat([P[0]]),8,0xffffff,0.9,0.1)).name='field';   // white: sand vanishes on the desert
+  P.forEach(p=>{const m=lesPylon(p.x,p.z);m.scale.set(0.8,0.3,0.8);m.name='fieldMk';});}
+const emNm=F=>Math.hypot(F.cx-st.pos.x,F.cz-st.pos.z)/1852;
+function emClock(F,a){const b=Math.atan2(F.cx-st.pos.x,-(F.cz-st.pos.z))*180/Math.PI,r=((b-a.hdg)%360+360)%360;return Math.round(r/30)%12||12;}
+// the hood's unusual attitudes: over 4 s Dana's hands take the aircraft to nose low 25 deg, bank 50, speed building to
+// 110 kt (power at cruise), or nose high 30 deg, bank 40 the other way, speed falling to 70 kt (power low)
+const _uaF=new THREE.Vector3();
+function uaGo(d,k){const lo=k==='low',h=lesAtt().hdg*Math.PI/180;
+  d.ua={k:k,t:0,go:0,q0:st.quat.clone(),v0:kts(),v1:lo?110:70,thr:lo?0.85:0.25,qT:new THREE.Quaternion().setFromEuler(new THREE.Euler((lo?-25:30)*Math.PI/180,-h,-(lo?50:-40)*Math.PI/180,'YXZ'))};}
+function uaSet(d,dt){const u=d.ua;u.t+=dt;const f=smooth(0,1,u.t/3.5),kt=u.v0+(u.v1-u.v0)*f;
+  st.quat.copy(u.q0).slerp(u.qT,f);_uaF.set(0,0,-1).applyQuaternion(st.quat);
+  st.vel.copy(_uaF).multiplyScalar(kt/MS2KT/Math.sqrt(1.097*Math.exp(-st.pos.y/9200)/1.225));st.w.set(0,0,0);st.throttle=st.power=u.thr;}
 LESSONS.forEach(l=>{if(LESFLY[l.id])l.fly=LESFLY[l.id];if(!l.fly)l.soon=true;});   // no flight yet: listed, not startable
 const LES_FLY=LESSONS.filter(l=>!l.soon);
 // ---- lesson 1, first flight: about a minute, arrows point at what to touch ----
@@ -14983,7 +15187,8 @@ function firstTick(dt,d,a){
       gRange('fpm',f,f+' fpm'+(f<=gTolOf('fpm')?', smooth':', a little firm'));gEvent('rwy',d.td.paved,d.td.paved?'':'off the runway');gEnd();}}
   if(LES.t>200)gEnd('took too long','Ran out of time');
 }
-function warnFlash(){const w=document.getElementById('warn');if(w){w.textContent=LES.on==='engine'?'ENGINE FAILURE':'STALL';w.classList.add('on');setTimeout(()=>w.classList.remove('on'),2500);}}
+// a lesson's warning (STALL, ENGINE FAILURE, SMOKE, VNE): held on the warning strip for 2.5 s over the HUD's own (school1 item 7)
+function warnFlash(t){LES.wTxt=t||(LES.on==='engine'?'ENGINE FAILURE':'STALL');LES.wUntil=performance.now()+2500;const w=document.getElementById('warn');if(w){w.textContent=LES.wTxt;w.classList.add('on');}}
 // ---- the location picker (4.6b): every airport, grouped by region, on FLY and in the pause sheet.
 // An airport of this region is a base pick as before. One in another region: from FLY the choice is
 // saved and pickRegion reloads back onto FLY there; in the pause sheet it waits for Apply, which
@@ -17493,7 +17698,7 @@ function tick(t,skipRender){
   }
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.classList.remove('on');}
   missUpdate(dt);dzUpdate(dt);taskUpdate(dt);if(running&&!paused)arcTick();apprTick();dfTick(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);if(LB)LB.frame();
-  {const show=!rookie()&&camMode===1&&(AC.id==='cessna'||AC.id==='alpha'||AC.id==='archer')&&running&&!st.crashed;
+  {const show=(!rookie()||LES.on==='hood')&&camMode===1&&(AC.id==='cessna'||AC.id==='alpha'||AC.id==='archer')&&running&&!st.crashed;
    if(spCan){spCan.classList.toggle('on',show);if(show)drawSixPack();}}
   radioUpdate(dt);cfgUpdate(dt);resTick(dt);
   const s=st;
@@ -17591,6 +17796,7 @@ function tick(t,skipRender){
   const kias=s.ias*MS2KT;let w='';
   gearWarn=running&&!s.crashed&&AC.retract&&!s.onGround&&s.gearPos<0.99&&agl<120&&s.vel.y<-0.8;
   if(running&&!paused&&!s.crashed){if(s.aoaWarn)w='STALL';else if(gearWarn)w='GEAR UP';else if(kias>AC.vne)w='OVERSPEED';else if(s.flapIdx>0&&kias>AC.vfe)w='FLAP SPEED';}
+  if(LES.on&&LES.wTxt&&performance.now()<LES.wUntil&&running&&!s.crashed)w=LES.wTxt;   // warnFlash
   if(DF.live&&DF.wTxt&&running&&!s.crashed)w=DF.wTxt;   // the dogfight's HARD DECK and EJECT win
   if(w==='STALL')hapPattern('stall');   // its cooldown makes the repeating pulse
   setTxt(warnEl,w);warnEl.classList.toggle('on',!!w);

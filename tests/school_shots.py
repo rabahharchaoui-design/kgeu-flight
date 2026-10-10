@@ -5,7 +5,9 @@
 # hud_cue_<WxH> (item 4): slow flight with the cue strip, ALT out; debrief_<WxH>: a finished slow flight with Easy on.
 # item 6: ground_<WxH> (the pylons, the box and the road from the chase view at the start of ground reference),
 # landings_aim_<WxH> (short final with the aiming bar), solo_debrief_<WxH> (a passed solo: the Endorsement row), at
-# 844x390 and 568x320. Run: .venv/bin/python tests/school_shots.py   (--item6: only those)
+# 844x390 and 568x320. item 7: hood_<WxH> (under the hood, the cue strip, at 844x390 and 568x320), xwind_final_844x390
+# (crabbed on a one mile final in the lesson's crosswind), emerg_field_844x390 (the forced landing field's outline and
+# markers from short final). Run: .venv/bin/python tests/school_shots.py   (--item6, --item7: only those)
 import asyncio, os, sys
 from playwright.async_api import async_playwright
 from harness import serve, launch, page
@@ -40,11 +42,36 @@ async def item6(b, url):
         await shot(pg, f'solo_debrief_{W}x{H}.png')
         await pg.context.close()
 
+# school1 item 7: the Stage 2 flights
+async def item7(b, url):
+    ST = dict(BASE, kgeuPlace='{"level":"ride","hours":null}', kgeuSchoolEasy='0', kgeuTOD='day')
+    R = "()=>{const K=window.__kgeu;for(let i=0;i<8;i++)K.stepFrame(0.03,false,false);K.stepFrame(0,true)}"
+    for W, H in SIZES[:2]:
+        pg = await page(b, url, vp={'width': W, 'height': H}, storage=ST)
+        await pg.evaluate(f"()=>{{const K={K};K.startLesson('hood');K.lesBriefSkip();const s=K.state();s.windKt=0;s.pos.y+=120/3.28084;}}")
+        await pg.evaluate(R); await shot(pg, f'hood_{W}x{H}.png')
+        if W == 844:
+            # one mile final, crabbed 10 degrees into the lesson's 12 kt crosswind
+            await pg.evaluate(f"""()=>{{const K={K};K.startLesson('xwind',true,{{brief:false}});const F=K.rwyFrame(),s=K.state(),sd=K.LES.d.sd,R=F.rh*Math.PI/180,u=F.thr-1852;
+              const x=Math.sin(R)*u,z=-Math.cos(R)*u,V=34;s.pos.set(x,K.groundHeight(x,z)+320/3.28084+1.6,z);s.vel.set(Math.sin(R)*V,-1.7,-Math.cos(R)*V);
+              s.quat.setFromEuler(new THREE.Euler(0.03,-(R+sd*10*Math.PI/180),0,'YXZ'));s.w.set(0,0,0);s.flapIdx=3;s.throttle=s.power=0.35;}}""")
+            await pg.evaluate(R); await shot(pg, f'xwind_final_{W}x{H}.png')
+            # the engine failure's field, from 700 m short of it at 250 ft
+            await pg.evaluate(f"()=>{{const K={K};K.startLesson('emerg',true,{{brief:false}});const s=K.state();s.windKt=0;s.pos.y-=2500/3.28084;K.LES.ph=2;K.LES.d.t=10;K.stepFrame(0.03,false,true);K.stepFrame(0,true)}}")
+            await pg.evaluate(f"""()=>{{const K={K},M=K.lesObjs().filter(o=>o.name==='fieldMk'),s=K.state();const cx=M.reduce((p,o)=>p+o.x,0)/4,cz=M.reduce((p,o)=>p+o.z,0)/4;
+              let ax=M[1].x-M[0].x,az=M[1].z-M[0].z;const L=Math.hypot(ax,az);ax/=L;az/=L;const x=cx-ax*1000,z=cz-az*1000,h=Math.atan2(ax,-az),V=33;
+              s.pos.set(x,K.groundHeight(x,z)+250/3.28084+1.6,z);s.vel.set(ax*V,-2,az*V);s.quat.setFromEuler(new THREE.Euler(-0.03,-h,0,'YXZ'));s.w.set(0,0,0);}}""")
+            await pg.evaluate(R); await shot(pg, f'emerg_field_{W}x{H}.png')
+        await pg.context.close()
+
 async def main():
     srv, url = serve()
     async with async_playwright() as p:
         b = await launch(p)
+        if '--item7' in sys.argv:
+            await item7(b, url); await b.close(); srv.shutdown(); return
         await item6(b, url)
+        await item7(b, url)
         if '--item6' in sys.argv:
             await b.close(); srv.shutdown(); return
         for W, H in SIZES:
