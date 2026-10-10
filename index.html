@@ -189,6 +189,8 @@ body.appr #lesM{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #miss.chip{ padding:2px 10px; border-width:1.5px; gap:0; }
 #miss.chip span{ display:none; }
 #miss.chip b{ font-size:13px; -webkit-line-clamp:1; }
+/* one line (the chip, the approach strip): an ellipsis at the end, never a hard cut mid letter */
+#miss.chip b, body.appr #miss b{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #warn{ font-size:24px; text-align:center; font-weight:800; letter-spacing:.06em; color:#fff; background:var(--warn); border-radius:6px; padding:2px 16px; display:none; line-height:1.15; }
 body.touch #warn{ font-size:20px; padding:2px 12px; }
 #warn.on{ display:block; animation:blink .5s steps(2) infinite; }
@@ -483,6 +485,72 @@ body.dfOn #uiroot > #dfSub{ display:flex; }
 #dfSub span.sm{ font-size:12px; padding:4px 6px; letter-spacing:-.01em; } #dfSub span.xs{ font-size:11px; padding:4px 5px; letter-spacing:-.02em; }   /* dfSay: a long line steps down to fit */
 @media (max-width:600px){ #uiroot > #dfSub{ right:calc(var(--padR) + var(--col) + 192px); } }   /* BREAK stacks over GUN there (see the cluster) */
 /* the briefing card before each run: the sim is held under it, FIGHT'S ON starts the run (and unlocks audio) */
+/* ---------- Taskings (tasking item 1) ----------
+   The briefing: the aircraft at its start behind it, the sim held. Kicker, name, aircraft and where; the situation and
+   its facts (par, wind, target) left, the numbered objectives right; ACCEPT TASKING where the dogfight's FIGHT'S ON is.
+   The replies: one or two buttons in the top bar right of pause (the centre column is 124 px at 568 wide and clipped
+   to one line on an approach), in the order read: the call under pause, the answer beside it. They come in from
+   .96 with the fade (180 ms, ease out), press to .97; nothing hovers on a phone. */
+#tkBrief{ z-index:30; }
+#tkBrief .sheet{ max-width:640px; padding:12px 18px 14px; background:rgba(18,13,9,.95); text-align:left; max-height:calc(var(--vvh) - 16px); overflow-y:auto; overscroll-behavior:contain; }
+#tkBrief .tkK{ margin:0; font:800 11px var(--font); letter-spacing:.14em; color:var(--orange); text-align:center; }
+#tkBrief h3{ margin:1px 0 0; font:800 24px/1.1 var(--font); letter-spacing:.06em; color:var(--sand); text-align:center; }
+#tkBrief h3 .modeTag{ vertical-align:4px; }
+#tkBrief .tkAc{ margin:2px 0 0; font-size:13px; color:var(--soft); text-align:center; }
+#tkBrief .tkBody{ display:grid; grid-template-columns:1.1fr 1fr; gap:10px 14px; margin:10px 0 8px; }
+#tkBrief .tkSit{ margin:0; font-size:14px; line-height:1.35; color:#fff; }
+#tkBrief .tkF{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+#tkBrief .tkF span{ display:flex; flex-direction:column; padding:4px 9px 5px; border-radius:9px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); }
+#tkBrief .tkF b{ font:800 10px var(--font); letter-spacing:.1em; color:var(--caution); }
+#tkBrief .tkF i{ font:700 15px/1.15 var(--font); font-style:normal; color:#fff; font-variant-numeric:tabular-nums; white-space:nowrap; }
+#tkBrief .tkSt{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px; counter-reset:none; }
+#tkBrief .tkSt li{ display:flex; align-items:flex-start; gap:8px; font-size:13px; line-height:1.25; color:var(--soft); }
+#tkBrief .tkSt li i{ flex:none; width:20px; height:20px; border-radius:50%; display:grid; place-items:center; font:800 12px var(--font); font-style:normal; color:var(--night); background:var(--caution); }
+#tkBrief .tkSt li span{ padding-top:1px; }
+#tkBrief .tkHow{ margin:0 0 10px; font-size:12px; color:var(--soft); text-align:center; }
+#tkBrief .tkBtns{ display:flex; justify-content:center; gap:10px; }
+#tkBrief #tkGo{ min-height:60px; min-width:240px; font:800 22px var(--font); letter-spacing:.06em; border-radius:14px; }
+#tkBrief #tkBack{ min-height:60px; min-width:96px; border-radius:14px; }
+#tkBrief button{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:manipulation; }
+@media (max-height:360px){ #tkBrief .sheet{ padding:8px 14px 10px; } #tkBrief h3{ font-size:20px; } #tkBrief .tkBody{ margin:6px 0 6px; gap:6px 12px; }
+  #tkBrief .tkSit{ font-size:12.5px; line-height:1.28; } #tkBrief .tkSt{ gap:3px; } #tkBrief .tkSt li{ font-size:12px; } #tkBrief .tkSt li i{ width:18px; height:18px; font-size:11px; }
+  #tkBrief .tkF{ margin-top:5px; gap:4px; } #tkBrief .tkF span{ padding:2px 7px 3px; } #tkBrief .tkF i{ font-size:13px; }
+  #tkBrief .tkHow{ margin-bottom:6px; font-size:11px; } #tkBrief #tkGo, #tkBrief #tkBack{ min-height:48px; } #tkBrief #tkGo{ font-size:19px; } }
+@media (max-width:600px){ #tkBrief .tkBody{ grid-template-columns:1fr 1fr; } #tkBrief .tkSit{ font-size:12.5px; } }
+@media (orientation:portrait){ #tkBrief .tkBody{ grid-template-columns:1fr; } }
+#tkReply{ position:absolute; top:var(--padT); left:calc(50% + var(--icon) / 2 + 8px); width:min(268px, calc(50% - var(--icon) / 2 - 8px - var(--padR))); z-index:7;
+  display:flex; gap:6px; pointer-events:none; opacity:0; transform:translateY(-6px) scale(.96); transform-origin:left center;
+  transition:opacity 180ms cubic-bezier(.23,1,.32,1), transform 180ms cubic-bezier(.23,1,.32,1); }
+#tkReply.on{ opacity:1; transform:none; pointer-events:auto; }
+#tkReply button{ flex:1 1 0; min-width:0; min-height:var(--icon); padding:3px 8px; border-radius:12px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(26,16,9,.86); border:1.5px solid var(--radio); color:#fff; box-shadow:0 2px 10px rgba(0,0,0,.35);
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:manipulation; transition:transform 120ms cubic-bezier(.23,1,.32,1), background-color 150ms ease; }
+#tkReply button:active{ transform:scale(.97); background:rgba(127,212,255,.22); transition-duration:60ms; }
+#tkReply button b{ font:800 16px/1 var(--font); letter-spacing:.08em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+#tkReply button small{ font:600 10px/1.1 var(--font); letter-spacing:.04em; color:var(--soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+/* a narrow bar (568 wide, beside the LOOK pad or under the ball's readouts: about 82 px a button) keeps every label whole */
+@media (max-width:700px){ #tkReply button{ padding:3px 4px; } #tkReply button b{ font-size:14px; letter-spacing:.03em; } #tkReply button small{ letter-spacing:0; } }
+body.sensorOn #tkReply button b, body.lookOn.touch #tkReply button b{ letter-spacing:.03em; }
+#tkReply button.act{ border-color:var(--caution); } #tkReply button.act b{ color:var(--caution); }
+#tkReply button.neg{ border-color:rgba(255,255,255,.28); } #tkReply button.neg b{ color:var(--soft); }
+@media (prefers-reduced-motion: reduce){ #tkReply{ transform:none; transition:opacity 150ms ease; } }
+/* the C-130 drop: the LOOK pad owns the top right corner, the replies stop short of it */
+body.lookOn.touch #tkReply{ width:min(268px, calc(50% - var(--icon) / 2 - 8px - var(--padR) - 74px)); }
+/* portrait has no room for both: the LOOK pad steps aside while a reply is up (it is back the moment you answer) */
+@media (orientation:portrait){ body.lookOn.touch #tkReply{ width:min(268px, calc(50% - var(--icon) / 2 - 8px - var(--padR))); } body.lookOn.tkReplyOn #lookPad{ visibility:hidden; } }
+/* the ball view keeps its own readouts along the top edge (DAY TV x1 left, CAM / R / EL right): the replies step down
+   under them, right aligned, clear of the mission card in the centre column */
+body.sensorOn #tkReply{ top:calc(var(--padT) + 30px); left:auto; right:var(--padR); transform-origin:right center;
+  width:min(268px, calc(100% - max(50%, calc(var(--padL) + var(--map) + var(--hudW) + 16px + var(--topW) / 2)) - var(--topW) / 2 - var(--padR) - 8px)); }
+/* portrait: the ball's readouts sit under the map, so the replies keep their place right of pause */
+@media (orientation:portrait){ body.sensorOn #tkReply{ top:var(--padT); left:calc(50% + var(--icon) / 2 + 8px); right:auto; transform-origin:left center;
+  width:min(268px, calc(50% - var(--icon) / 2 - 8px - var(--padR))); } }
+/* Easy's ball readout runs to three lines (bearing, from the nose, down): while a reply is up it keeps its first */
+body.sensorOn.tkReplyOn #shTR{ display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:1; overflow:hidden; }
+/* the music ticker lives top right: it steps aside while a reply is up */
+body.tkReplyOn #uiroot > #tk, body.tkReplyOn #tkCtl{ visibility:hidden; }
+body:not(.touch) #tkReply{ width:min(268px, calc(50% - var(--icon) / 2 - 130px - var(--padR))); }
+.lbRow.lbLoc .c span{ white-space:normal; font-size:12px; font-weight:600; color:var(--brown); }   /* on the sand row: the rows' own brown, not the HUD grey */
 #dfBrief{ z-index:30; }
 #dfBrief .sheet{ max-width:600px; padding:12px 18px 14px; background:rgba(18,13,9,.95); text-align:center; }
 #dfBrief h3{ margin:0; font:800 22px/1.15 var(--font); letter-spacing:.06em; color:var(--sand); }
@@ -1471,6 +1539,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   <canvas id="fd" aria-hidden="true"></canvas>
   <div id="dfHud" aria-hidden="true"><div class="dfSeek"><b></b></div><div class="dfRad"><b></b><span></span></div><div class="dfLead"></div><div class="dfPip"><b></b><i></i><em></em></div><div class="dfMw"><b></b><span></span></div></div>
   <div id="dfSub" role="status" aria-live="polite"></div>
+  <div id="tkReply" role="group" aria-label="Answer the radio" aria-hidden="true"></div>
   <div id="lookPad" role="slider" aria-label="Free look, drag to swing the camera"><svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13c2-3.2 4.3-4.8 7-4.8s5 1.6 7 4.8c-2 3.2-4.3 4.8-7 4.8S8 16.2 6 13z"/><circle cx="13" cy="13" r="2" fill="currentColor"/><path d="M13 1.5v3M11.5 3l1.5-1.5L14.5 3M13 24.5v-3M11.5 23l1.5 1.5 1.5-1.5M1.5 13h3M3 11.5L1.5 13 3 14.5M24.5 13h-3M23 11.5l1.5 1.5-1.5 1.5"/></svg><i>LOOK</i></div>
   <!-- the centre column under pause: mission card, jump light, warning, toast, tower subtitle -->
   <div id="topCol"><div id="miss" class="card"><b id="missT"></b><span id="missS"></span></div><div id="dfSix" role="status"><i></i><span></span></div><div id="jumpLt" class="card"><i class="r"></i><i class="g"></i><b></b></div><div id="warn"></div><div id="toast"></div><div id="atc" class="card"></div></div>
@@ -1734,6 +1803,17 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
     </div>
   </div>
   <button class="primary" id="dfbGo">FIGHT'S ON</button>
+</div></div>
+<div class="overlay" id="tkBrief" role="dialog" aria-label="Tasking briefing"><div class="sheet">
+  <p class="tkK" id="tkbK">TASKING</p>
+  <h3 id="tkbT"></h3>
+  <p class="tkAc" id="tkbAc"></p>
+  <div class="tkBody">
+    <div class="tkL"><p class="tkSit" id="tkbSit"></p><div class="tkF" id="tkbF"></div></div>
+    <ol class="tkSt" id="tkbSt" aria-label="Objectives"></ol>
+  </div>
+  <p class="tkHow" id="tkbHow"></p>
+  <div class="tkBtns"><button id="tkBack">Back</button><button class="primary" id="tkGo">ACCEPT TASKING</button></div>
 </div></div>
 <div class="overlay res" id="gradeOv" role="dialog" aria-label="Lesson results"><div class="sheet">
   <div class="rHead"><p class="gLetter" id="gLetter">A</p><div class="rT"><p class="sub" id="gTitle"></p><p class="rScore" id="gScore"></p></div></div>
@@ -9437,6 +9517,7 @@ function runLog(kind,res){try{const L=JSON.parse(localStorage.getItem('kgeuRuns'
 function modeTag(id){const el=document.getElementById(id);if(!el)return;const t=document.createElement('span');t.className='modeTag '+runMode();t.textContent=runMode()==='easy'?'EASY':'HARD';el.appendChild(t);}
 function autoSmart(){if(!running||paused||st.crashed)return;
   if(LES.on){toast('No autopilot in flight school. Tap End to quit the lesson');return;}
+  if(TASK.on&&!TASK.done&&TASK.def.auto&&TASK.def.auto(TASK.d))return;   // a tasking's own AUTO (the orbit on the target, the escort slot)
   // Reaper, airborne, nothing engaged: the first tap parks it in an orbit, the next lands it
   if(!st.ap&&!st.onGround&&hasBall()){initAudio();orbitHere();return;}
   if(st.ap&&st.ap.mode==='orbit'){apToggle('land');return;}
@@ -9961,6 +10042,7 @@ function recOpen(){scUI();resetArmed=0;
 // airport taxiway. Both score on distance, which is what the crews are judged on.
 const MISS={on:false,kind:'',armed:false,dropped:false,pallet:null,result:null,td:null,stopT:0};
 const missEl=document.getElementById('miss'),missT=document.getElementById('missT'),missS=document.getElementById('missS');
+window.missHudG=missHud;
 function missHud(title,sub,warn){
   if(!title){missEl.classList.remove('on');return;}
   setTxt(missT,title);setTxt(missS,sub||'');missEl.classList.toggle('warn',!!warn);missEl.classList.toggle('on',true);
@@ -10002,6 +10084,7 @@ function makePallet(){
 }
 function missDrop(){
   if(!MISS.on||MISS.kind!=='drop'||MISS.dropped)return;
+  if(TASK.on&&TASK.def.noDrop&&TASK.def.noDrop(TASK.d)){toast(TASK.def.noDrop(TASK.d));return;}   // Lifeline: not before the smoke call
   if(!MISS.armed){toast('Not in the drop window. 500 to 1,500 ft, under 160 kt, ramp level.');return;}
   const p=makePallet();
   // it leaves the ramp, so start it a little aft and below the aeroplane
@@ -10016,6 +10099,7 @@ function missDrop(){
 const _pw=new V3();
 function missUpdate(dt){
   if(!MISS.on||!running||paused)return;
+  const missHud=TASK.on?(t,s,w)=>{MISS.ht=t?[t,s,w]:null;}:window.missHudG;   // a tasking shows these on its own stage card
   const p=MISS.pallet;
   if(MISS.kind==='drop'){
     if(!MISS.dropped){
@@ -10058,7 +10142,7 @@ function missUpdate(dt){
       if(p.open)p.g.rotation.y+=dt*0.4;
     }
     if(p&&p.down&&!MISS.result)missHud(null);
-    if(MISS.cardT>0){MISS.cardT-=dt;if(MISS.cardT<=0)missScore(MISS.result);}
+    if(MISS.cardT>0){MISS.cardT-=dt;if(MISS.cardT<=0&&!TASK.on)missScore(MISS.result);}
   }
   else if(MISS.kind==='short'){
     const Z=lzUV(st.pos.x,st.pos.z);
@@ -10202,12 +10286,12 @@ function resBoard(o){
   if(o.rankUp){const d=add('Rank up',o.rankUp.toUpperCase(),'lbRk');if(LB&&LB.rankSVG)d.lastChild.insertAdjacentHTML('afterbegin',LB.rankSVG(LB.rankByName(o.rankUp))+' ');}
 }
 // MAIN MENU on any card: the run is over, the flight's mode state goes with it
-function resMenu(ov){resClose(ov);if(ARC.on)arcStop();if(MISS.on)missReset();openMenu();}
+function resMenu(ov){resClose(ov);if(ARC.on)arcStop();if(MISS.on)missReset();taskStop();openMenu();}
 $('lKeep').onclick=()=>{resClose(landOv);paused=false;};
 $('lMenu').onclick=()=>resMenu(landOv);
 $('lAgain').onclick=()=>{resClose(landOv);runRestart();};
 $('lRec').onclick=()=>{resClose(landOv);recOpen();};
-$('mFree').onclick=()=>{resClose(missOv);missReset();paused=false;};
+$('mFree').onclick=()=>{resClose(missOv);missReset();taskStop();paused=false;};
 $('mMenu').onclick=()=>resMenu(missOv);
 $('mRetry').onclick=()=>{resClose(missOv);runRestart();};
 $('aFree').onclick=()=>{resClose(arcOv);arcStop();dfStop();paused=false;};
@@ -10223,6 +10307,7 @@ $('aRetry').onclick=()=>{resClose(arcOv);runRestart();};
 // Hard keeps only the map marker, the smoke, the panels and the jump lights.
 const DZ={on:false,built:false,g:null,smoke:[],flares:[],glow:null,letter:null,runG:null,gates:[],f:new V3(),rel:null,
   t:0,simT:0,tRel:1e9,err:1e9,along:0,cross:0,light:'',c1:false,c10:false,cg:false,seen:false,uiT:0,lastL:''};
+const DZ_RED=[0.85,0.13,0.11];   // the smoke's colour (DZ.tint: a Lifeline team's own)
 const DZ_SMOKE=34,DZ_LIFE=46,DZ_ALT=305,DZ_KT=140,DZ_TOL={easy:140,hard:60};
 const DZ_DEST={x:DROPZ.x,z:DROPZ.z,name:'Drop zone',short:'DZ',kind:'drop',dz:true};
 const flareTex=tex(64,64,(x,w,h)=>{const g=x.createRadialGradient(32,32,1,32,32,31);
@@ -10264,6 +10349,7 @@ function dzPredict(px,py,pz,vx,vy,vz,out){
 }
 const _dzp=[0,0];
 function dzDest(on){
+  if(TASK.on)return;   // a tasking keeps its own waypoints (Lifeline: the IP, then Hilltop)
   if(on&&!(DEST&&DEST.dz)){DEST=DZ_DEST;document.body.classList.add('hasDest');destUI(true);}
   else if(!on&&DEST&&DEST.dz){DEST=null;document.body.classList.remove('hasDest');destUI(true);}
 }
@@ -10272,8 +10358,8 @@ function dzStart(){
   Object.assign(DZ,{on:true,t:0,simT:0,tRel:1e9,err:1e9,light:'',c1:false,c10:false,cg:false,seen:false,uiT:0,lastL:''});DZ.g.visible=true;
   dzRunIn();
   dzDest(rookie());
-  $('dzHint').classList.add('on');
-  vqAdd(L('Drop Zone Control','tower',AC.cs+', drop zone is marked. Head for the red smoke.',['t_cs_herky','t_dz_smoke']));
+  if(!TASK.on)$('dzHint').classList.add('on');   // "Head for the red smoke": not a Lifeline team's, whose colour is the test
+  if(!TASK.on)vqAdd(L('Drop Zone Control','tower',AC.cs+', drop zone is marked. Head for the red smoke.',['t_cs_herky','t_dz_smoke']));   // a tasking's team calls for itself
 }
 // the best run in: into the wind at 1,000 ft and 140 kt, released where the drift puts the bundle
 // on the centre. Worked out again whenever the wind shifts (a haboob swings it hard).
@@ -10311,12 +10397,12 @@ function dzUpdate(dt){
   DZ.smoke.forEach((sp,i)=>{const a=((tt/DZ_LIFE)+i/DZ_SMOKE)%1,s=a*DZ_LIFE;
     // drift a touch exaggerated so even a light wind shows its direction
     sp.position.set(DROPZ.x+_fw.x*s*1.3+Math.sin(tt*0.3+i)*a*25,gh+4+1100*Math.pow(a,0.8),DROPZ.z+_fw.z*s*1.3+Math.cos(tt*0.27+i*1.7)*a*25);
-    sp.scale.setScalar(110+a*420);sp.visible=true;
+    sp.scale.setScalar(110+a*420);sp.visible=!DZ.noSmoke;   // Lifeline: none until Hilltop pops it
     const base=night?0.5*(1-a)+0.08:1;
     // thick all the way up; thinned when the camera is inside it, so flying through does not flood the screen
     const near=clamp((sp.position.distanceTo(camera.position)-sp.scale.x*0.4)/250,0.12,1);
     sp.material.opacity=(night?0.7:0.95)*Math.min(1,a/0.04)*Math.pow(1-a,0.6)*near*(dusty?0.6:1);
-    const k=night?base:Math.max(0.5,lit);sp.material.color.setRGB(0.85*k,0.13*k,0.11*k);});
+    const k=night?base:Math.max(0.5,lit),c=DZ.tint||DZ_RED;sp.material.color.setRGB(c[0]*k,c[1]*k,c[2]*k);});
   DZ.flares.forEach((sp,i)=>{sp.visible=night;if(night){const fl=0.8+0.25*Math.sin(tt*13+i*2.1)+0.1*Math.sin(tt*31+i);sp.scale.setScalar(9*fl);sp.material.opacity=0.95;}});
   DZ.glow.visible=night;if(night){DZ.glow.scale.setScalar(300+20*Math.sin(tt*3));DZ.glow.material.opacity=0.85;}
   // Easy only: the run in line and the gates
@@ -11083,6 +11169,7 @@ function radioSpeak(clips,textLen){
 }
 const CLOCK_W=['ahead','ahead, a little right','ahead and to the right','to your right','behind you on the right','behind you on the right','behind you','behind you on the left','behind you on the left','to your left','ahead and to the left','ahead, a little left','ahead'];
 function plainOf(l){
+  if(l.task)return l.kind==='pilot'?'You: '+l.text.replace(/, [^,]*\.$/,'.'):l.plain||'';   // a tasking line says its own
   const t=l.text,mine=AC.cs&&(t.indexOf(AC.cs)>=0||(AC.csS&&t.indexOf(AC.csS)>=0)),who=/Ground/.test(l.who)?'Ground':/Range/.test(l.who)?'Range':/Approach/.test(l.who)?'Approach':'Tower';
   if(l.who==='Instructor')return '';
   if(l.who==='Loadmaster')return 'Crew: '+l.text;
@@ -11165,7 +11252,7 @@ function vqPump(){
   playLine(radioQ.shift());
 }
 function playLine(l){
-  l.cut=false;l.dead=false;
+  l.cut=false;l.dead=false;l.aired=true;
   const live=radioLive(),sp=l.who==='Instructor';
   RADIO.log.push({who:l.who,kind:l.kind,text:l.text,clips:Array.isArray(l.clips)?l.clips.slice():l.clips,t:st?+st.time.toFixed(2):0,amb:(REGION.az?CHAT:CHAT_R[REGION.id]||[]).some(p=>p.indexOf(l)>=0),type:AC.id});
   if(RADIO.log.length>200)RADIO.log.shift();
@@ -12947,6 +13034,744 @@ $('pPhoto').onclick=photoOpen;$('phX').onclick=photoClose;$('phSave').onclick=ph
 // ---------- menus ----------
 const menu=document.getElementById('menu'),crashEl=document.getElementById('crash'),crashTopEl=document.getElementById('crashTop');
 // How the run on screen was started, so every Restart (pause sheet), RETRY (crash card) and Try again
+// ================= Taskings: replayable missions with Mission Control =================
+// A tasking is a template (TASKS[id]): roll(R) draws the randomized elements from a seeded stream (where the target is,
+// when things happen, the wind, the par time), so no two replays are the same; brief(d) fills the briefing card;
+// spawn(d) puts the aircraft where the tasking starts; stages run one at a time (obj(d) the card's text, enter(d) once,
+// tick(d,dt) true when done); score(d) gives 0 to 100 and the card's lines. The radio is text through the existing
+// queue (vqAdd, the subtitle and its squelch; a readback uses the recorded Wilco or Roger where one fits), and the
+// player answers with one or two context buttons in the top bar (tqAsk). The boards are task:<id>: the Worker does not
+// know them (server/src/boards.js has no task: entry, it refuses an unknown board), so they live on this device
+// (LB.localAdd) and the XP is counted here (taskXp, the Worker's formula) until the Worker takes them.
+const TASK={on:false,id:null,def:null,d:null,R:null,seed:0,si:0,stage:null,t:0,st0:0,brief:false,ask:null,asks:[],done:false,res:null,
+  tgts:[],sens:false,objs:[],later:[],askN:0,test:{seed:null,noBrief:false},log:[]};
+const TASK_IDS=['overwatch','lifeline','shepherd','finder'];
+const TASKS={};
+const tqBoard=id=>'task:'+id;
+// mulberry32: the tasking's own stream, so a seed (tests, a shared replay) rolls the same tasking
+function tqRng(seed){let a=seed>>>0;return ()=>{a=a+0x6D2B79F5>>>0;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;};}
+const tqR=(R,a,b)=>a+R()*(b-a),tqPick=(R,a)=>a[Math.floor(R()*a.length)%a.length];
+const tqD=(x,z)=>Math.hypot(st.pos.x-x,st.pos.z-z);
+const tqMSL=()=>(st.pos.y-GEAR)*M2FT+FIELD_FT;
+const tqBrg=(fx,fz,tx,tz)=>(Math.atan2(tx-fx,-(tz-fz))*180/Math.PI+360)%360;
+const TQ_DIR=['north','north-east','east','south-east','south','south-west','west','north-west'];
+const tqDir=b=>TQ_DIR[Math.round(b/45)%8];
+const tqNm=m=>(m/1852).toFixed(1)+' nm',tqMi=m=>(m/1609.34).toFixed(1)+' mi',tqDs=m=>rookie()?tqMi(m):tqNm(m),tqDsW=m=>rookie()?(m/1609.34).toFixed(1)+' miles':(m/1852).toFixed(1)+' miles';
+const tqClock=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
+const tqWind=(d,k)=>String(Math.round(d/10)*10||360).padStart(3,'0')+' at '+Math.round(k);
+// a position the way a crew reads it: degrees and decimal minutes (anchored on Luke AFB, 33.5350 N 112.3831 W)
+function tqLL(x,z){const la=33.5350-(z-LUKE.z)/110950,lo=112.3831-(x-LUKE.x)/92530;
+  const f=v=>{const d=Math.floor(v),m=(v-d)*60;return d+'°'+m.toFixed(1).padStart(4,'0')+'′';};return 'N'+f(la)+' W'+f(lo);}
+// the clock position of a point from the aircraft's nose, 1 to 12
+function tqClk(x,z){const h=-_euH.setFromQuaternion(st.quat,'YXZ').y;let r=Math.atan2(x-st.pos.x,-(z-st.pos.z))-h;r=((r%(2*Math.PI))+2*Math.PI)%(2*Math.PI);return Math.round(r/(Math.PI/6))%12||12;}
+
+// ---- the radio: Mission Control and the other stations, text through the one voice queue ----
+// o.plain: the plain English line Easy shows under it; o.clips: recorded clips when there are any (none: the squelch
+// and the text, the existing cue). Lines from one tasking keep their order (same priority, no cut).
+function tqSay(who,text,o){o=o||{};
+  const l={who:who,text:text,clips:o.clips||null,plain:o.plain!=null?o.plain:'',task:1};
+  TASK.log.push({t:+st.time.toFixed(1),who:who,text:text});
+  return vqAdd(l,{pri:o.pri!=null?o.pri:2,ttl:o.ttl||60});
+}
+const tqMC=(text,o)=>tqSay('Mission Control',text,o);
+// fn after sec of the tasking's sim time (a follow up call)
+function tqLater(sec,fn){TASK.later.push({t:st.time+sec,fn:fn});}
+// fn once the air is quiet: the tower's takeoff clearance and its readback are out and nothing waits (or after max s)
+function tqQuiet(fn,max){TASK.quiet={fn:fn,t:0,max:max||12};}
+function tqQuietTick(dt){const q=TASK.quiet;if(!q)return;q.t+=dt;
+  const busy=VQ.cur||radioQ.some(l=>l.pri<=2)||(st.mode==='runway'&&!A.tko&&st.time<3);
+  if(!busy||q.t>=q.max){TASK.quiet=null;q.fn();}}
+// our side of it: a readback in the pilot's voice (the recorded Wilco / Roger when that is the word)
+const TQ_RB={WILCO:['Wilco, ','p_rb_wilco'],ROGER:['Roger, ','p_rb_roger']};
+function tqPilot(text,clip){const l={who:AC.cs,kind:'pilot',text:text,clips:clip?[clip,csP()]:null,task:1};
+  TASK.log.push({t:+st.time.toFixed(1),who:'You',text:text});return vqAdd(l,{pri:2,ttl:30});}
+// ask: shows the buttons once the line they answer is on the air (or right away without one). opts: [{k:'WILCO',
+// say:'text' (our readback, default 'Wilco, <cs>.'), fn}], o.line, o.wait (s before o.late runs, the asker's silence),
+// o.keep (stays up until answered, e.g. REPORT while watching). One ask at a time; a new one replaces the last.
+function tqAsk(opts,o){o=o||{};const a={opts:opts,line:o.line||null,wait:o.wait||18,late:o.late||null,keep:!!o.keep,shown:false,t:0,id:++TASK.askN,tag:o.tag||''};
+  TASK.ask=a;tqReplyUI();return a;}
+function tqAnswer(k){const a=TASK.ask;if(!a||!a.shown||!running||paused)return false;const op=a.opts.find(x=>x.k===k);if(!op)return false;
+  TASK.ask=null;tqReplyUI();hapPattern('tap');
+  const rb=TQ_RB[k],txt=op.say!=null?op.say:rb?rb[0]+AC.csS+'.':k.charAt(0)+k.slice(1).toLowerCase()+', '+AC.csS+'.';
+  if(txt)tqPilot(txt,op.say==null&&rb?rb[1]:null);
+  TASK.d.replies=(TASK.d.replies||0)+1;TASK.d.replyT=(TASK.d.replyT||0)+a.t;
+  if(op.fn)op.fn(a.t);return true;}
+const tqReplyEl=document.getElementById('tkReply');
+let tqReplyKey='';
+function tqReplyUI(){const a=TASK.ask,on=!!(a&&a.shown&&TASK.on&&running&&!st.crashed);
+  const key=on?a.id+'|'+a.opts.map(o=>o.k).join(','):'';
+  if(key!==tqReplyKey){tqReplyKey=key;
+    if(on){tqReplyEl.innerHTML='';a.opts.forEach(o=>{const b=document.createElement('button');b.type='button';b.dataset.k=o.k;
+        b.className=o.k==='UNABLE'?'neg':o.k==='REPORT'||o.k==='MARK'?'act':'';b.innerHTML='<b></b>'+(o.sub?'<small></small>':'');
+        b.firstChild.textContent=o.label||o.k;if(o.sub)b.lastChild.textContent=o.sub;b.setAttribute('aria-label',(o.label||o.k)+(o.sub?', '+o.sub:''));
+        tapBtn(b,()=>tqAnswer(o.k),true);tqReplyEl.appendChild(b);});}}
+  if(on!==tqReplyEl.classList.contains('on')){tqReplyEl.classList.toggle('on',on);document.body.classList.toggle('tkReplyOn',on);tqReplyEl.setAttribute('aria-hidden',on?'false':'true');}
+}
+function tqAskTick(dt){const a=TASK.ask;if(!a)return;
+  if(!a.shown){const l=a.line;if(!l||l.aired||l.dead){a.shown=true;tqReplyUI();}return;}
+  a.t+=dt;if(!a.keep&&a.t>=a.wait){TASK.ask=null;tqReplyUI();TASK.d.missed=(TASK.d.missed||0)+1;if(a.late)a.late();}
+}
+
+// ---- the stage card: the existing mission card, in full for 3 s as each stage comes up, then a chip ----
+function tqObj(title,sub,warn){const n=TASK.def.stages.length,k=TASK.si+1;missHud(k+'/'+n+'  '+title,sub||'',!!warn);}
+function tqStageGo(i){const D=TASK.def;TASK.si=i;TASK.stage=D.stages[i];TASK.st0=st.time;
+  missEl.classList.remove('chip');APPR.missT0=st.time;APPR.missOn=true;   // a new stage: the full card again
+  if(i>0)hapPattern('green');
+  if(TASK.stage.enter)TASK.stage.enter(TASK.d);
+  TASK.log.push({t:+st.time.toFixed(1),stage:TASK.stage.id});
+}
+
+// ---- the 3D bits a tasking puts in the world, removed by taskStop ----
+function tqAdd(o){scene.add(o);TASK.objs.push(o);return o;}
+function tqClear(){for(const o of TASK.objs){scene.remove(o);o.traverse&&o.traverse(m=>{if(m.isMesh&&m.geometry&&!m.geometry.userData.keep)m.geometry.dispose();});}TASK.objs.length=0;TASK.tgts.length=0;}
+
+// ---- start, stop, the frame ----
+// id: a tasking; from a world region it switches to Arizona first (the taskings fly around Luke and the White Tanks)
+function taskStart(id,o){const D=TASKS[id];if(!D)return;
+  if(!REGION.az){pickRegion('az',{resume:{task:id,region:'az',type:D.ac,tod:TOD.id}});return;}
+  if(!WORLD.ready){toast('Loading '+REGION.city+'…');return;}
+  const seed=(o&&o.seed!=null)?o.seed:TASK.test.seed!=null?TASK.test.seed:(Math.random()*4294967296)>>>0;
+  pickType(D.ac,1);
+  start('runway',D.base||'luke');RUNSTART={k:'task',id:id};
+  // no haboob for a tasking: the day sky for this run, the saved choice comes back on the next start() (as the dogfight)
+  if(TOD.id==='haboob'){const p=TOD.id;setTOD('day');try{localStorage.setItem('kgeuTOD',p);}catch(e){}ARC.prevTod=p;hbSync(true);}
+  Object.assign(TASK,{on:true,id:id,def:D,seed:seed,R:tqRng(seed),si:0,stage:null,t:0,brief:false,ask:null,quiet:null,later:[],done:false,res:null,sens:false,log:[]});
+  tqClear();
+  const d=TASK.d={id:id,seed:seed,mode:runMode(),t0:0,replies:0,replyT:0,missed:0};
+  D.roll(TASK.R,d);if(TASK.test.roll)TASK.test.roll(d,id);   // tests: push a roll to its extremes (tasking_break_check)
+  st.windBase=st.windDir=d.wdir;st.windKt=d.wkt;st.windPh=TASK.R()*6.28;
+  D.spawn(d);
+  st.mode=D.airStart?'task':st.mode;if(D.airStart){A.tko=1;A.land=1;A.pattern=1;A.ground=0;}
+  chatT=40;
+  runLog('tasking',{task:id,seed:seed,start:1});
+  if(TASK.test.noBrief){taskGo();return;}
+  tqBriefShow(d);
+}
+// ACCEPT TASKING: the briefing goes, the clock and the stages start
+function taskGo(){if(!TASK.on||TASK.done)return;audioSess();initAudio();
+  const ov=$('tkBrief');ov.classList.remove('on');TASK.brief=false;paused=false;
+  TASK.d.t0=st.time;TASK.lastT=st.time;tqStageGo(0);
+}
+function taskStop(){if(!TASK.on&&!TASK.objs.length)return;
+  const D=TASK.def;if(D&&D.cleanup)try{D.cleanup(TASK.d);}catch(e){console.warn(e);}
+  TASK.on=false;TASK.brief=false;TASK.ask=null;TASK.quiet=null;TASK.later=[];TASK.sens=false;tqReplyUI();tqClear();
+  $('tkBrief').classList.remove('on');
+  if(DEST&&DEST.task){DEST=null;document.body.classList.remove('hasDest');destUI(true);}
+  for(let i=radioQ.length-1;i>=0;i--)if(radioQ[i].task){radioQ[i].dead=true;radioQ.splice(i,1);}
+}
+// a destination for the map, its arrow and the readout (Easy and Hard: a tasking always says where)
+function tqDest(x,z,name,short){const e={x:x,z:z,name:name,short:short||name,kind:'task',task:true};DEST=e;document.body.classList.add('hasDest');destUI(true);return e;}
+function taskUpdate(dt){
+  if(!TASK.on||TASK.brief||!running)return;
+  tqReplyUI();
+  if(paused||st.crashed){if(st.crashed&&!TASK.done){TASK.done=true;TASK.ask=null;tqReplyUI();}return;}
+  if(TASK.done)return;
+  // the tasking's clock is sim time (what the physics flew this frame), so a fast forward or a slow frame scores the same
+  dt=Math.max(0,Math.min(5,st.time-(TASK.lastT==null?st.time:TASK.lastT)));TASK.lastT=st.time;
+  TASK.t+=dt;
+  const D=TASK.def,d=TASK.d;
+  if(D.always)D.always(d,dt);
+  tqQuietTick(dt);tqAskTick(dt);
+  for(let i=TASK.later.length-1;i>=0;i--)if(st.time>=TASK.later[i].t){const f=TASK.later[i].fn;TASK.later.splice(i,1);f();}
+  const S=TASK.stage;if(!S)return;
+  if(S.obj){const o=S.obj(d);if(o){const k=o.join('|');if(k!==TASK.objK){TASK.objK=k;tqObj(o[0],o[1],o[2]);}}}
+  if(S.tick&&S.tick(d,dt)){if(TASK.si+1<D.stages.length)tqStageGo(TASK.si+1);else taskEnd();}
+  // the overall cap: a tasking is 3 to 6 minutes; past its limit Mission Control calls it
+  if(!TASK.done&&D.limit&&st.time-d.t0>D.limit){d.timeout=1;tqMC(AC.csS+', Mission Control, we are out of time on this one. Knock it off, RTB.',{plain:'Time is up. The tasking ends here.'});taskEnd();}
+}
+// the end: score, the device board, the XP, the card (after the last call has had a moment)
+function taskEnd(){if(TASK.done)return;TASK.done=true;TASK.ask=null;tqReplyUI();
+  const D=TASK.def,d=TASK.d;d.secs=st.time-d.t0;
+  const r=D.score(d);r.score=Math.max(0,Math.min(100,Math.round(r.score)));
+  r.letter=r.score>=90?'A':r.score>=75?'B':r.score>=60?'C':r.score>=40?'D':'F';
+  TASK.res=r;
+  const b=tqBoard(TASK.id),L=LB?LB.localAdd(b,r.score,d.secs):null;
+  const pb=!!(L&&L.pb),xp=taskXp(r.score,d.mode,pb);r.xp=xp;r.lb=L;
+  runLog('tasking',{task:TASK.id,seed:d.seed,score:r.score,secs:Math.round(d.secs),letter:r.letter,xp:xp});
+  tqBest(TASK.id,r);
+  TASK.endT=setTimeout(()=>tqCard(r,d),r.wait!=null?r.wait:2600);
+}
+// XP for a tasking, the Worker's own formula (xpFor in server/src/boards.js): 10 for flying it, up to 40 for the score,
+// x1.25 in Hard, +15 for a best on this device. Kept on this device (kgeuTaskXP) until the Worker takes task: boards.
+function taskXp(score,mode,pb){return Math.round((10+40*Math.max(0,Math.min(1,score/100)))*(mode==='hard'?1.25:1))+(pb?15:0);}
+function tqBest(id,r){try{const B=JSON.parse(localStorage.getItem('kgeuTaskBest')||'{}'),o=B[id];
+  if(!o||r.score>o.score)B[id]={score:r.score,letter:r.letter,when:Date.now()};
+  localStorage.setItem('kgeuTaskBest',JSON.stringify(B));
+  localStorage.setItem('kgeuTaskXP',String((+localStorage.getItem('kgeuTaskXP')||0)+(r.xp||0)));}catch(e){}}
+function tqCard(r,d){if(!TASK.on||!running)return;
+  missHud(null);
+  const L=r.lb,lines=r.lines.slice();
+  lines.push(['Time',tqClock(d.secs)+(d.par?'  (par '+tqClock(d.par)+')':'')]);
+  resOpen(missOv,{letter:r.letter,title:TASKS[TASK.id].name+': '+r.title,score:r.score,sub:'of 100',stats:lines,board:'',tip:r.tip||'',retry:TASKS[TASK.id].name.toUpperCase()});
+  // the board line: this device's runs (the global boards need the Worker to know task: boards)
+  const box=missOv.querySelector('.rLines'),row=document.createElement('div');row.className='gl lbLine';
+  row.innerHTML='<span>Board, this device</span><b></b>';
+  row.lastChild.textContent=L?'#'+L.rank+' of '+L.total+'  +'+r.xp+' XP':'+'+r.xp+' XP';
+  if(L&&L.pb){const e=document.createElement('em');e.textContent=L.total>1?'PERSONAL BEST':'FIRST RUN';row.lastChild.appendChild(e);}
+  box.appendChild(row);resMore(box);
+  xpPop(r.xp,'Tasking: '+TASKS[TASK.id].name+(L&&L.pb&&L.total>1?'  ·  Personal best':''));
+}
+
+// ---- the briefing: over the aircraft at its start, the sim held until ACCEPT TASKING ----
+function tqBriefShow(d){const D=TASK.def,B=D.brief(d),ov=$('tkBrief');
+  $('tkbK').textContent='TASKING · '+D.role.toUpperCase();
+  const h=$('tkbT');h.textContent=D.name.toUpperCase();const mt=document.createElement('span');mt.className='modeTag '+runMode();mt.textContent=runMode()==='easy'?'EASY':'HARD';h.appendChild(mt);
+  $('tkbAc').textContent=B.ac;$('tkbSit').textContent=B.sit;
+  $('tkbSt').innerHTML='';D.stages.forEach((s,i)=>{const li=document.createElement('li');li.innerHTML='<i></i><span></span>';li.firstChild.textContent=String(i+1);li.lastChild.textContent=s.name;$('tkbSt').appendChild(li);});
+  $('tkbF').innerHTML='';B.facts.forEach(f=>{const s=document.createElement('span');s.innerHTML='<b></b><i></i>';s.firstChild.textContent=f[0];s.lastChild.textContent=f[1];$('tkbF').appendChild(s);});
+  $('tkbHow').textContent=B.how||'Mission Control calls on the radio. Answer with the buttons at the top of the screen.';
+  TASK.brief=true;paused=true;pauseOv.classList.remove('on');ov.classList.add('on');
+}
+tapBtn($('tkGo'),()=>taskGo());
+tapBtn($('tkBack'),()=>{taskStop();openMenu('sArc');});
+
+// ---- OVERWATCH (MQ-9B SkyGuardian, surveillance) ----
+// Launch from Luke, climb to 3,000 ft and orbit a compound west of the base with the sensor on its white building.
+// Mission Control: "Keep eyes on the white building. Report when the vehicle departs." A white pickup leaves at a
+// random moment; REPORT calls it, then follow it at a standoff (the orbit follows the track), never overhead, and talk
+// the ground team (Saber 6) onto it. Scored on time on target, standoff discipline, report timing and time to station.
+// Rolled: the compound (bearing 190 to 345 from Luke, 6 to 8.5 km, clear of the drop zone, the strip and the range),
+// the departure (30 to 70 s after on station), the pickup's road and speed, the follow time, the team's spot, the wind.
+const OW_ALT=3000,OW_FLOOR=2800,OW_R=2400;
+function owSite(R){
+  for(let i=0;i<40;i++){const b=tqR(R,190,345)*Math.PI/180,r=tqR(R,6000,8500),x=LUKE.x+Math.sin(b)*r,z=LUKE.z-Math.cos(b)*r;
+    if([[DROPZ.x,DROPZ.z],[LZ.x,LZ.z],[RANGE.x,RANGE.z]].some(p=>Math.hypot(x-p[0],z-p[1])<2600))continue;
+    let lo=1e9,hi=-1e9;for(const [ox,oz] of [[0,0],[60,0],[-60,0],[0,60],[0,-60],[300,300],[-300,-300]]){const h=groundHeight(x+ox,z+oz);lo=Math.min(lo,h);hi=Math.max(hi,h);}
+    if(hi-lo>6||hi>60)continue;return {x:x,z:z};}
+  return {x:LUKE.x-7200,z:LUKE.z+600};
+}
+// a white pickup: body, cab, glass, bed, wheels; 5.4 m long, nose toward -z (heading 0 = north)
+function owPickup(col){const g=new THREE.Group(),W=lam(col||0xeef0f2),D=lam(0x23272c),G=lam(0x3a4a5a),T=lam(0x151515);
+  const add=(geo,m,x,y,z)=>{const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);g.add(o);return o;};
+  add(new THREE.BoxGeometry(1.95,0.75,5.4),W,0,0.85,0);add(new THREE.BoxGeometry(1.85,0.85,2.3),W,0,1.62,-0.6);
+  add(new THREE.BoxGeometry(1.87,0.55,0.08),G,0,1.72,-1.76).rotation.x=-0.35;add(new THREE.BoxGeometry(1.9,0.5,1.9),G,0,1.68,-0.6).scale.set(1.002,1,0.98);
+  add(new THREE.BoxGeometry(1.95,0.45,0.1),W,0,1.45,2.65);add(new THREE.BoxGeometry(1.95,0.12,5.42),D,0,0.5,0);
+  const wg=new THREE.CylinderGeometry(0.42,0.42,0.3,10);wg.rotateZ(Math.PI/2);for(const z of [-1.7,1.7])for(const x of [-0.92,0.92])add(wg,T,x,0.42,z);
+  g.traverse(o=>{if(o.isMesh)o.userData.heat=0.5;});return g;}
+// the compound: a walled yard, the white building, a tan house, a shade structure, a water tank, two trees
+function owCompound(c,ang){const g=new THREE.Group(),gh=groundHeight(c.x,c.z),tan=lam(0xc8ab82),wht=lam(0xf3f1ea),dark=lam(0x4a4a4a),grn=lam(0x5d6b3a);
+  const add=(geo,m,x,y,z)=>{const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);g.add(o);return o;};
+  const W=64,H=46,h=2.4;
+  add(new THREE.BoxGeometry(W,h,0.5),tan,0,h/2,-H/2);add(new THREE.BoxGeometry(0.5,h,H),tan,-W/2,h/2,0);add(new THREE.BoxGeometry(0.5,h,H),tan,W/2,h/2,0);
+  add(new THREE.BoxGeometry(W/2-5,h,0.5),tan,-W/4-2.5,h/2,H/2);add(new THREE.BoxGeometry(W/2-5,h,0.5),tan,W/4+2.5,h/2,H/2);   // the gate: a 10 m gap on the south wall
+  const yd=new THREE.Mesh(new THREE.PlaneGeometry(W,H),lam(0xb59e7a));yd.rotation.x=-Math.PI/2;yd.position.y=0.05;g.add(yd);
+  add(new THREE.BoxGeometry(15,5.2,10),wht,-14,2.6,-10);add(new THREE.BoxGeometry(15.6,0.6,10.6),wht,-14,5.5,-10);   // the white building, its parapet
+  add(new THREE.BoxGeometry(2.2,2.4,0.15),dark,-14,1.2,-4.95);
+  add(new THREE.BoxGeometry(10,3.6,8),tan,16,1.8,-12);const rf=add(new THREE.BoxGeometry(10.8,0.3,8.8),lam(0x8a5a3c),16,3.75,-12);rf.rotation.z=0.06;
+  add(new THREE.BoxGeometry(8,0.2,6),dark,14,3,8);for(const [x,z] of [[10.2,5.2],[17.8,5.2],[10.2,10.8],[17.8,10.8]])add(new THREE.CylinderGeometry(0.12,0.12,3,5),dark,x,1.5,z);
+  add(new THREE.CylinderGeometry(1.8,1.8,3.2,12),lam(0xd8d6cf),26,4.6,-18);add(new THREE.CylinderGeometry(0.15,0.15,3,5),dark,26,1.5,-18);
+  for(const [x,z] of [[-28,14],[2,-18]]){add(new THREE.CylinderGeometry(0.25,0.35,2.5,6),lam(0x5a4632),x,1.25,z);const t=add(new THREE.SphereGeometry(3,8,6),grn,x,4.2,z);t.scale.y=0.8;}
+  const car=owPickup(0x2b2f36);car.position.set(4,0,6);car.rotation.y=0.3;g.add(car);
+  g.position.set(c.x,gh,c.z);g.rotation.y=ang;
+  g.traverse(o=>{if(o.isMesh&&o.userData.heat==null)o.userData.heat=0.25;});
+  return g;}
+// the pickup's road: out of the gate, then three to five legs away from Luke, each turn under 55 degrees
+function owRoute(R,c,ang){const P=[],gx=Math.sin(ang),gz=Math.cos(ang);   // the gate faces local +z, turned by ang
+  let x=c.x+gx*30,z=c.z+gz*30;P.push({x:c.x+gx*8,z:c.z+gz*8},{x:x,z:z});
+  let h=Math.atan2(c.x-LUKE.x,-(c.z-LUKE.z))+tqR(R,-0.9,0.9);
+  const n=3+Math.floor(R()*3);
+  for(let i=0;i<n;i++){const L=tqR(R,350,650);h+=tqR(R,-0.95,0.95);x+=Math.sin(h)*L;z-=Math.cos(h)*L;
+    if(groundHeight(x,z)>80||Math.hypot(x-LUKE.x,z-LUKE.z)<3500){x-=Math.sin(h)*L*2;z+=Math.cos(h)*L*2;h+=Math.PI*0.6;}
+    P.push({x:x,z:z});}
+  return P;}
+function owVehTick(d,dt){const v=d.veh,P=d.route;if(!v.moving)return;
+  let rem=d.vk*dt;
+  while(rem>0&&v.i<P.length-1){const a=P[v.i],b=P[v.i+1],L=Math.hypot(b.x-a.x,b.z-a.z)||1,left=L*(1-v.f),step=Math.min(rem,left);v.f+=step/L;rem-=step;if(v.f>=1-1e-6){v.i++;v.f=0;}}
+  if(v.i>=P.length-1){v.moving=false;v.stopped=true;}
+  const a=P[Math.min(v.i,P.length-2)],b=P[Math.min(v.i+1,P.length-1)],f=v.i>=P.length-1?1:v.f;
+  v.x=a.x+(b.x-a.x)*f;v.z=a.z+(b.z-a.z)*f;v.y=groundHeight(v.x,v.z);
+  const hd=Math.atan2(b.x-a.x,-(b.z-a.z));v.h+=wrapPi(hd-v.h)*Math.min(1,dt*2.5);
+  v.g.position.set(v.x,v.y+0.06,v.z);v.g.rotation.y=-v.h;
+  if(v.moving&&(v.dustT=(v.dustT||0)-dt)<=0){v.dustT=0.35;puff(v.x-Math.sin(v.h)*3,v.y+0.8,v.z+Math.cos(v.h)*3);}
+}
+// the sensor on a target: the ball's ground point within r metres of it
+function owOn(t,r){return !!(t&&SENSOR.valid&&(SENSOR.tgt===t||Math.hypot(SENSOR.spot.x-t.x,SENSOR.spot.z-t.z)<r));}   // a lock on it counts
+TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limit:520,
+  roll(R,d){const c=owSite(R);d.c=c;d.ang=tqR(R,0,Math.PI*2);d.route=owRoute(R,c,d.ang);d.vk=tqR(R,10.5,14);
+    d.dep=tqR(R,30,70);d.follow=tqR(R,45,60);d.wdir=Math.round(tqR(R,0,36))*10||360;d.wkt=Math.round(tqR(R,3,16));
+    d.dist=Math.hypot(c.x-LUKE.x,c.z-LUKE.z);d.brg=tqBrg(LUKE.x,LUKE.z,c.x,c.z);
+    d.stPar=Math.round(45+Math.max(147,d.dist/62)+25);d.par=Math.round(d.stPar+d.dep+d.follow+35);
+    const sa=R()*Math.PI*2;d.saber={a:sa,r:tqR(R,1800,2600)};
+    d.tot=0;d.totT=0;d.band=0;d.bandT=0;d.over=0;d.overT=-99;d.falseRep=0;d.repDelay=null;d.onT=0;},
+  brief(d){return {ac:'MQ-9B SkyGuardian · Luke AFB runway 3L',
+    sit:'A compound '+tqDs(d.dist)+' '+tqDir(d.brg)+' of Luke. Keep the sensor on its white building from 3,000 ft. A vehicle is expected to leave: call it the moment it moves, follow it without overflying, then talk the ground team onto it.',
+    facts:[['PAR',tqClock(d.par)],['ON STATION',tqClock(d.stPar)],['WIND',tqWind(d.wdir,d.wkt)],['TARGET',tqDs(d.dist)+' '+tqDir(d.brg).replace('north','N').replace('south','S').replace('east','E').replace('west','W').replace('-','')]]};},
+  spawn(d){
+    const g=tqAdd(owCompound(d.c,d.ang)),gh=groundHeight(d.c.x,d.c.z);
+    // the white building's centre, in the world (local -14,-10 turned by ang)
+    const ca=Math.cos(d.ang),sa=Math.sin(d.ang),bx=d.c.x+(-14)*ca+(-10)*sa,bz=d.c.z-(-14)*sa+(-10)*ca;
+    d.bld={x:bx,y:gh+2.6,z:bz,name:'the white building',dead:false,task:1};
+    const pk=tqAdd(owPickup()),p0=d.route[0];
+    d.veh={g:pk,x:p0.x,y:groundHeight(p0.x,p0.z),z:p0.z,h:Math.atan2(d.route[1].x-p0.x,-(d.route[1].z-p0.z)),i:0,f:0,moving:false,stopped:false,name:'the white pickup',dead:false,task:1};
+    pk.position.set(p0.x,d.veh.y+0.06,p0.z);pk.rotation.y=-d.veh.h;
+    TASK.tgts.push(d.bld,d.veh);TASK.sens=true;irDirty=true;
+    d.tgt=d.bld;tqDest(d.c.x,d.c.z,'Compound','CMPD');
+  },
+  // AUTO in flight: an orbit on the target at 3,000 ft (it climbs on the way), then off; on the ground AUTO takes off
+  autoLbl:(d,ap)=>st.onGround?null:ap&&ap.tk?'Auto Off':'Orbit',
+  auto(d){if(st.onGround)return false;
+    if(st.ap&&st.ap.mode==='orbit'&&st.ap.tk){st.ap=null;st.apW=null;toast('Autopilot off, your airplane');return true;}
+    const t=d.tgt===d.veh?d.veh:d.c;initAudio();if(AC.retract)st.gearDown=false;st.flapIdx=0;
+    apEngage(st,'orbit',{cx:t.x,cz:t.z,r:OW_R,y:Math.max(st.pos.y-GEAR,(OW_ALT-FIELD_FT)/M2FT),v:AC.vcruise,dir:1});st.ap.tk=1;st.ap.sensor=true;
+    toast((d.tgt===d.veh?'Orbit following the pickup':'Orbit: the compound')+', 3,000 ft. AUTO again: your airplane',3);return true;},
+  always(d,dt){owVehTick(d,dt);
+    if(DEST&&DEST.task&&d.tgt===d.veh){DEST.x=d.veh.x;DEST.z=d.veh.z;}
+    // the orbit follows the pickup while the ball is locked on it (the crew's track), at a truck's pace
+    if(st.ap&&st.ap.mode==='orbit'&&d.tgt===d.veh&&(SENSOR.tgt===d.veh||st.ap.tk)){const k=Math.min(1,dt*0.6);st.ap.cx+=(d.veh.x-st.ap.cx)*k;st.ap.cz+=(d.veh.z-st.ap.cz)*k;}
+    // Easy: the ball, entered without a lock, swings to the target
+    if(rookie()&&camMode===2&&!SENSOR.tgt&&!SENSOR.track&&!SENSOR.slewTo&&!d.easySlew){d.easySlew=1;if(sensorAim(d.tgt))SENSOR.slewTo=d.tgt;}
+    if(camMode!==2)d.easySlew=0;
+    // the score clocks run from the watch on
+    if(TASK.si>=2){d.totT+=dt;if(owOn(d.tgt,rookie()?110:70))d.tot+=dt;}
+    if(TASK.si>=3){const r=Math.hypot(st.pos.x-d.veh.x,st.pos.z-d.veh.z),lo=rookie()?1000:1400,hi=rookie()?6500:5600;d.bandT+=dt;if(r>=lo&&r<=hi)d.band+=dt;
+      if(r<800&&!st.onGround&&TASK.t-d.overT>20){d.overT=TASK.t;d.over++;
+        tqMC(AC.csS+', Mission Control, you are overhead the vehicle. They will hear you. Open it up.',{plain:'Too close: you are right over them. Fly further away.'});}}
+  },
+  stages:[
+    {id:'takeoff',name:'Take off from Luke runway 3L',
+      obj:d=>['Take off, Luke 3L',st.onGround?'AUTO takes off for you. The compound is on the map':'Climbing'],
+      enter(d){tqQuiet(()=>{const l=tqMC(AC.csS+', Mission Control. Tasking: overwatch on a compound '+tqDsW(d.dist)+' '+tqDir(d.brg)+' of Luke, '+tqLL(d.c.x,d.c.z)+'. Climb to 3,000, set up an orbit, sensor on the white building.',
+          {plain:'Fly to the compound on your map, circle it at 3,000 ft and point the camera at the white building.'});
+        tqAsk([{k:'WILCO'},{k:'UNABLE',fn:()=>tqMC('Copy unable. Take your time, the compound is on your map. Call us when you have eyes on.',{plain:'No rush. Find the compound on the map.'})}],{line:l});});},
+      tick:d=>!st.onGround&&st.agl>40},
+    {id:'station',name:'Orbit the compound at 3,000 ft, sensor on the white building',
+      obj(d){const r=tqD(d.c.x,d.c.z),ft=tqMSL(),on=owOn(d.bld,rookie()?110:70);
+        const need=r>4000?tqDs(r)+' to go. Tap AUTO for the orbit':ft<OW_FLOOR?'Climb: '+(Math.round(ft/100)*100).toLocaleString('en-US')+' of 3,000 ft':!on?(camMode===2?'Put the cross on the white building, LOCK':'Tap SENSOR, find the white building'):'Holding it';
+        return ['On station',need];},
+      tick(d,dt){const ok=tqD(d.c.x,d.c.z)<4000&&tqMSL()>=OW_FLOOR&&owOn(d.bld,rookie()?110:70);d.onT=ok?d.onT+dt:0;
+        if(d.onT>=2){d.station=st.time-d.t0;tqPilot('Mission Control, '+AC.csS+', on station, eyes on the white building.');return true;}
+        // the window will not wait: past 4:20 the vehicle goes anyway
+        if(st.time-d.t0>260){d.station=null;d.late=1;return true;}return false;}},
+    {id:'watch',name:'Watch the white building. REPORT when the vehicle departs',
+      obj(d){return ['Eyes on the building',d.veh.moving?'It is moving: REPORT':'REPORT the moment the vehicle departs'];},
+      enter(d){d.w0=st.time;if(d.late)d.dep=2;
+        const l=d.late?tqMC(AC.csS+', Mission Control, we are losing the window. Get eyes on the compound now, the vehicle is starting up.',{plain:'Hurry: get the camera on the compound, the vehicle is about to leave.'})
+          :tqMC('Copy. Keep eyes on the white building. Report when the vehicle departs.',{plain:'Watch the white building. Tap REPORT when the vehicle drives off.'});
+        tqAsk([{k:'REPORT',sub:'vehicle departs',say:'',fn:()=>owReport(d)}],{line:l,keep:1});},
+      tick(d){if(!d.veh.moving&&!d.veh.stopped&&st.time-d.w0>=d.dep){d.veh.moving=true;d.depT=st.time;}
+        if(d.veh.moving&&d.repDelay==null&&st.time-d.depT>40){d.repDelay=99;TASK.ask=null;tqReplyUI();
+          tqMC(AC.csS+', Mission Control, we show the vehicle moving. Pick it up and follow it.',{plain:'The vehicle left without your call. Follow it.'});owFollowGo(d);}
+        return !!d.following;}},
+    {id:'follow',name:'Follow it at a standoff, 1 to 3 nm. Do not overfly',
+      obj(d){const r=Math.hypot(st.pos.x-d.veh.x,st.pos.z-d.veh.z),lo=rookie()?1000:1400,hi=rookie()?6500:5600;
+        return ['Follow the pickup',tqDs(r)+(r<lo?'  Too close, open it up':r>hi?'  Too far, close in':'  Standoff good')+(owOn(d.veh,rookie()?110:70)?'':'. Sensor on it'),r<800];},
+      enter(d){d.f0=st.time;},
+      tick:d=>st.time-d.f0>=d.follow},
+    {id:'talkon',name:'Talk Saber 6 onto the vehicle',
+      obj:d=>['Talk-on to Saber 6',owOn(d.veh,rookie()?110:70)?'REPORT where it is':'Sensor on the pickup first'],
+      enter(d){const v=d.veh;d.sab={x:v.x+Math.sin(d.saber.a)*d.saber.r,z:v.z-Math.cos(d.saber.a)*d.saber.r};
+        tqSay('Saber 6','Mission Control, Saber 6, two vehicles moving to intercept. Request a talk-on to the pickup.',{plain:'The ground team wants you to tell them where the pickup is.'});
+        const l=tqMC(AC.csS+', talk Saber 6 onto the vehicle.',{plain:'Tap REPORT to tell the team where the pickup is.'});
+        tqAsk([{k:'REPORT',sub:'talk-on',say:'',fn:()=>owTalk(d)}],{line:l,wait:35,late:()=>{d.talk=0;
+          tqSay('Saber 6','Mission Control, Saber 6, we have it ourselves now. Saber 6 has the vehicle.',{plain:'The team found it without your help.'});d.end=st.time;}});},
+      tick:d=>d.end!=null&&st.time-d.end>4}],
+  score(d){
+    const tot=d.totT>0?d.tot/d.totT:0,band=d.bandT>0?d.band/d.bandT:0;
+    const rep=d.repDelay==null||d.repDelay>=40?0:25*clamp(1-(d.repDelay-4)/36,0,1);
+    const stn=d.station==null?0:10*clamp(1-(d.station-d.stPar)/90,0,1);
+    const sc=40*tot+Math.max(0,25*band-8*d.over)+Math.max(0,rep-6*d.falseRep)+stn-(d.talk===0?10:0);
+    return {score:sc,title:sc>=90?'Eyes never left it':sc>=75?'Good overwatch':sc>=60?'Overwatch done':'The vehicle got away from you',
+      lines:[['Time on target',Math.round(tot*100)+' %  ('+Math.round(d.tot)+' of '+Math.round(d.totT)+' s)'],
+        ['Standoff in band',Math.round(band*100)+' %'+(d.over?'  ·  '+d.over+' overflight'+(d.over>1?'s':''):'')],
+        ['Report after departure',d.repDelay==null||d.repDelay>=40?'missed':d.repDelay.toFixed(1)+' s'+(d.falseRep?'  ·  '+d.falseRep+' early':'')],
+        ['On station',d.station==null?'not in time':tqClock(d.station)+'  (par '+tqClock(d.stPar)+')'],
+        ['Talk-on',d.talk===0?'the team found it':d.talk?'Saber 6 contact':'not done']],
+      tip:tot<0.6?'Lock the ball on the target (LOCK) and it stays on as you circle.':d.over?'Hold 1 to 3 nm off. Overhead, they can hear you.':rep<15?'Call REPORT the moment the wheels move.':'Fly it again: the compound, the road and the timing change every time.'};},
+  cleanup(d){TASK.sens=false;if(SENSOR.tgt&&SENSOR.tgt.task){SENSOR.tgt=null;}if(SENSOR.slewTo&&SENSOR.slewTo.task)SENSOR.slewTo=null;}
+};
+function owReport(d){
+  if(!d.veh.moving&&!d.veh.stopped){d.falseRep++;tqPilot('Mission Control, '+AC.csS+', vehicle departing.');
+    tqMC('Negative, we show it still parked. Keep watching.',{plain:'Not yet: the vehicle has not moved. Keep watching.'});
+    tqAsk([{k:'REPORT',sub:'vehicle departs',say:'',fn:()=>owReport(d)}],{keep:1});return;}
+  d.repDelay=st.time-d.depT;
+  const b=d.route.length>2?tqBrg(d.route[1].x,d.route[1].z,d.route[2].x,d.route[2].z):0;
+  tqPilot('Mission Control, '+AC.csS+', vehicle departing the compound, white pickup, heading '+tqDir(b)+'.');
+  owFollowGo(d);
+}
+function owFollowGo(d){d.tgt=d.veh;d.following=1;
+  // a lock on the building moves to the pickup (the crew slews the track); the destination follows it
+  if(SENSOR.tgt===d.bld)SENSOR.tgt=d.veh;
+  if(DEST&&DEST.task){DEST.name='The white pickup';DEST.short='PICKUP';destUI(true);}
+  const l=tqMC('Copy, vehicle moving. Follow it. Hold your standoff, 1 to 3 miles, do not overfly.',{plain:'Follow the pickup from 1 to 3 miles away. Do not fly over it.'});
+  tqAsk([{k:'WILCO'}],{line:l,wait:15});
+}
+function owTalk(d){const v=d.veh;
+  if(!owOn(v,rookie()?110:70)){d.talkMiss=(d.talkMiss||0)+1;tqPilot('Saber 6, '+AC.csS+', stand by, reacquiring.');
+    const l=tqMC(AC.csS+', get your sensor back on the pickup.',{plain:'Point the camera at the pickup first, then REPORT.'});
+    tqAsk([{k:'REPORT',sub:'talk-on',say:'',fn:()=>owTalk(d)}],{line:l,wait:30,late:()=>{d.talk=0;d.end=st.time;}});return;}
+  const r=Math.hypot(v.x-d.sab.x,v.z-d.sab.z),b=tqBrg(d.sab.x,d.sab.z,v.x,v.z),kt=Math.round(d.vk*MS2KT/5)*5;   // knots: the game speaks knots everywhere (units_check)
+  tqPilot('Saber 6, '+AC.csS+', your vehicle is the white pickup, '+(r/1609.34).toFixed(1)+' miles '+tqDir(b)+' of you, '+(v.moving?'heading '+tqDir(((v.h*180/Math.PI)%360+360)%360)+' on the dirt track, about '+kt+' knots.':'stopped on the dirt track.'));
+  tqSay('Saber 6','Contact the white pickup. Saber 6 has it from here. Thanks for the eyes.',{plain:'The team sees it. Job done.'});
+  d.talk=1;d.end=st.time;
+}
+// ---- LIFELINE (C-130H Hercules, resupply) ----
+// A ground team (Hilltop) calls for one bundle at a rolled position 11 to 18 km south-west to north-west of Luke. Fly
+// the route (start, the IP 5 km out on the run in, into the wind), call their smoke's colour when they pop it, drop on
+// it from 1,000 ft (the airdrop's own window, jump lights and pallet), then a low pickup pass over their panels to
+// confirm the extraction lane. Scored on drop accuracy, time to the drop against par, the smoke call and the pass.
+// The drop zone is the airdrop's, moved to the team for the run (DROPZ, rebuilt; put back by cleanup).
+const LL_SMOKE={green:[0.2,0.72,0.26],yellow:[0.95,0.83,0.2],violet:[0.55,0.27,0.78],red:[0.85,0.13,0.11]};
+const DZ_HOME={x:DROPZ.x,z:DROPZ.z};
+function dzMove(x,z){DROPZ.x=x;DROPZ.z=z;DZ_DEST.x=x;DZ_DEST.z=z;
+  if(DZ.built){dzStop();scene.remove(DZ.g);DZ.g.traverse(o=>{if(o.geometry)o.geometry.dispose();});DZ.built=false;DZ.g=null;DZ.smoke=[];DZ.flares=[];DZ.gates=[];DZ.runG=null;DZ.letter=null;DZ.glow=null;}}
+function llSite(R){
+  for(let i=0;i<50;i++){const b=tqR(R,170,330)*Math.PI/180,r=tqR(R,11000,18000),x=LUKE.x+Math.sin(b)*r,z=LUKE.z-Math.cos(b)*r;
+    if([[DZ_HOME.x,DZ_HOME.z],[LZ.x,LZ.z],[RANGE.x,RANGE.z]].some(p=>Math.hypot(x-p[0],z-p[1])<2500))continue;
+    let lo=1e9,hi=-1e9;for(const [ox,oz] of [[0,0],[400,0],[-400,0],[0,400],[0,-400],[900,900],[-900,-900],[900,-900],[-900,900]]){const h=groundHeight(x+ox,z+oz);lo=Math.min(lo,h);hi=Math.max(hi,h);}
+    if(hi-lo>10||hi>90)continue;
+    // open desert all round (the run in, the turn and the pass): rings at 3, 5 and 7 km no more than 80 m above the team
+    let rise=0;for(const rr of [3000,5000,7000])for(let k=0;k<12;k++){const q=k/12*Math.PI*2;rise=Math.max(rise,groundHeight(x+Math.sin(q)*rr,z-Math.cos(q)*rr)-lo);}
+    if(rise>80)continue;return {x:x,z:z};}
+  return {x:LUKE.x-3000,z:LUKE.z+8000};
+}
+TASKS.lifeline={name:'Lifeline',role:'Resupply',ac:'c130',base:'luke',airStart:1,limit:480,
+  roll(R,d){const c=llSite(R);d.c=c;d.wdir=Math.round(tqR(R,0,36))*10||360;d.wkt=Math.round(tqR(R,4,16));
+    const cols=Object.keys(LL_SMOKE);d.smoke=tqPick(R,cols);d.decoy=tqPick(R,cols.filter(k=>k!==d.smoke));d.swap=R()<0.5;
+    // the run in: into the wind; the IP 5 km before the team on it; the start 6 to 9 km before the IP, off to one side
+    const h=d.wdir*Math.PI/180;d.f={x:Math.sin(h),z:-Math.cos(h)};d.ip={x:c.x-d.f.x*5000,z:c.z-d.f.z*5000};
+    const a=Math.atan2(-d.f.x,d.f.z)+tqR(R,-1.1,1.1),r=tqR(R,6000,9000);   // back along the run in, swung up to 63 degrees
+    d.s={x:d.ip.x+Math.sin(a)*r,z:d.ip.z-Math.cos(a)*r};d.leg=r;
+    d.runHdg=Math.round(((h*180/Math.PI)%360+360)%360/10)*10||360;
+    d.par=Math.round((d.leg)/100+5000/74+40);   // to the drop: the leg at 195 kt, the run in at 145, the turn at the IP
+    d.smokeCall=null;d.wrong=0;},
+  brief(d){return {ac:'C-130H Hercules · airborne out of Luke, 1,500 ft',
+    sit:'Hilltop, a ground team '+tqDs(Math.hypot(d.c.x-LUKE.x,d.c.z-LUKE.z))+' '+tqDir(tqBrg(LUKE.x,LUKE.z,d.c.x,d.c.z))+' of Luke, needs one bundle. Fly to the IP, call their smoke by its colour, drop from 1,000 ft into the wind, then a low pass over their panels.',
+    facts:[['PAR TO DROP',tqClock(d.par)],['RUN IN',String(d.runHdg).padStart(3,'0')+'°'],['WIND',tqWind(d.wdir,d.wkt)],['DROP','1,000 ft, 140 kt']]};},
+  spawn(d){dzMove(d.c.x,d.c.z);
+    placeAir(d.s.x,d.s.z,1500,Math.atan2(d.ip.x-d.s.x,-(d.ip.z-d.s.z)),195);st.gearDown=false;st.gearPos=0;trimSpawn(st,0);
+    missStart('drop');dzStart();DZ.noSmoke=true;DZ.tint=LL_SMOKE[d.smoke];
+    d.wp=d.ip;tqDest(d.ip.x,d.ip.z,'IP Hilltop','IP');},
+  // AUTO: the route at 1,000 ft (the IP, then the team, 145 kt on the run in); for the pass, low over the panels; again: off
+  noDrop:d=>d.smokeCall==null?'Not cleared yet: call Hilltop\'s smoke first':'',
+  autoLbl:(d,ap)=>ap&&ap.tk?'Auto Off':'Auto Nav',
+  auto(d){if(st.ap&&st.ap.tk){st.ap=null;st.apW=null;toast('Autopilot off, your airplane');return true;}
+    initAudio();apEngage(st,'hold');const a=st.ap;a.tk=1;a.y=st.pos.y-GEAR;a.trk=Math.atan2(st.vel.x,-st.vel.z);a.v=AC.vcruise;llAp(d,0);
+    toast(TASK.stage&&TASK.stage.id==='pass'?'Autopilot: the pass over the panels':'Autopilot: the route at 1,000 ft. AUTO again: your airplane',3);return true;},
+  always(d,dt){llAp(d,dt);
+    // the bundle down (whatever stage we are in by then): Hilltop says where
+    if(MISS.result&&MISS.result.kind==='drop'&&d.dist==null){d.dist=MISS.result.dist;
+      const p=MISS.pallet.pos,b=tqBrg(d.c.x,d.c.z,p.x,p.z),m=Math.round(d.dist);
+      tqSay('Hilltop','Bundle on the ground, '+(m<12?'right on the smoke':m+' metres '+tqDir(b)+' of the smoke')+'. '+(m<30?'Outstanding drop.':m<80?'Good drop.':m<150?'We can get to it.':'That is a long walk.'),
+        {plain:'The bundle landed '+m+' m from the smoke.'});}
+    if(DEST&&DEST.task&&d.wp){DEST.x=d.wp.x;DEST.z=d.wp.z;}},
+  stages:[
+    {id:'route',name:'Fly the route to the IP',
+      obj:d=>{const r=tqD(d.ip.x,d.ip.z);return ['Route to the IP',tqDs(r)+'. Then run in '+String(d.runHdg).padStart(3,'0')+'°, the drop at 1,000 ft'];},
+      enter(d){tqQuiet(()=>{const l=tqMC(AC.csS+', Mission Control. Hilltop needs resupply, one bundle, at '+tqLL(d.c.x,d.c.z)+'. Route via the IP, run in heading '+String(d.runHdg).padStart(3,'0')+', drop from 1,000 feet. Hilltop will mark with smoke.',
+          {plain:'Fly to the IP on your map, then turn toward the team and drop the bundle from 1,000 ft.'});
+        tqAsk([{k:'WILCO'},{k:'UNABLE',fn:()=>tqMC('Copy. The IP is on your map. Hilltop is waiting on that bundle.',{plain:'No rush: follow the arrow to the IP.'})}],{line:l});},2);},
+      tick:d=>tqD(d.ip.x,d.ip.z)<1500||tqD(d.c.x,d.c.z)<4200},
+    {id:'smoke',name:'Call Hilltop\'s smoke by its colour',
+      obj:d=>['Call the smoke','Which colour is Hilltop\'s smoke?'],
+      enter(d){d.wp=d.c;if(DEST&&DEST.task){DEST.name='Hilltop';DEST.short='DZ';destUI(true);}
+        tqPilot('Hilltop, '+AC.csS+', IP inbound, one bundle. Pop smoke.');
+        DZ.noSmoke=false;DZ.t=0;
+        const l=tqSay('Hilltop','Herky, Hilltop, smoke is out.',{plain:'The team has lit a smoke. Tap its colour.'});
+        llAskSmoke(d,l);},
+      tick:d=>d.smokeCall!=null},
+    {id:'drop',name:'Drop on the smoke from 1,000 ft',
+      obj:d=>{const h=MISS.ht;return ['Drop on the smoke',h?(MISS.dropped?h[0].replace(/^TO CENTER: /,'To the smoke: '):h[1]):'1,000 ft, under 160 kt, wings level',h&&h[2]&&!MISS.dropped];},
+      enter(d){},
+      tick(d){if(MISS.dropped&&d.dropT==null)d.dropT=st.time-d.t0;return d.dropT!=null&&st.time-d.t0-d.dropT>6;}},
+    {id:'pass',name:'Pickup pass low over the panels',
+      obj:d=>{const r=tqD(d.c.x,d.c.z),ft=Math.round(st.agl*M2FT/10)*10;return ['Pickup pass',(r>1200?tqDs(r)+' to the panels. ':'')+'Under '+(rookie()?400:300)+' ft over them: '+ft.toLocaleString('en-US')+' ft',false];},
+      enter(d){d.p0=st.time;const l=tqSay('Hilltop','Good chute. Hilltop is moving to it. Request a pickup pass to confirm the extraction lane: low over our panels, below 300 feet.',{plain:'Fly low over the team, under 300 ft, so they can check the pickup lane.'});
+        tqAsk([{k:'WILCO'}],{line:l,wait:15});d.best=null;},
+      tick(d){const r=tqD(d.c.x,d.c.z),ft=st.agl*M2FT,lat=rookie()?250:150,top=rookie()?400:300;
+        if(!d.pass&&!st.onGround&&r<lat&&ft<top){d.pass={r:r,ft:ft};
+          tqSay('Hilltop','Pass confirmed, the lane is good. Hilltop is complete. Thanks for the lift.',{plain:'The team saw your pass. Job done.'});d.end=st.time;}
+        if(!d.pass&&st.time-d.p0>200&&!d.passLate){d.passLate=1;d.end=st.time;tqSay('Hilltop','Herky, Hilltop, we will walk the lane ourselves. Thanks for the bundle.',{plain:'The team gave up on the pass.'});}
+        return d.end!=null&&d.dist!=null&&st.time-d.end>4;}}],
+  score(d){
+    const m=d.dist==null?1e9:d.dist;
+    const acc=m>=250?0:m<=15?50:50*Math.pow(1-(m-15)/235,1.35);
+    const tm=d.dropT==null?0:25*clamp(1-(d.dropT-d.par)/120,0,1);
+    const sm=d.smokeCall==='right'?(d.wrong?4:10):0;
+    const ps=d.pass?(d.pass.r<100&&d.pass.ft<200?15:10):0;
+    const sc=acc+tm+sm+ps;
+    return {score:sc,title:m<15?'On the smoke':m<50?'Good bundle':m<150?'Bundle delivered':d.dist==null?'No drop':'Long walk for Hilltop',
+      lines:[['Drop from the smoke',d.dist==null?'no drop':Math.round(m)+' m  ('+Math.round(m*M2FT)+' ft)'],
+        ['Time to the drop',d.dropT==null?'no drop':tqClock(d.dropT)+'  (par '+tqClock(d.par)+')'],
+        ['Smoke call',d.smokeCall==='right'?(d.wrong?d.smoke+' on the second call':d.smoke+', first call'):'Hilltop told you'],
+        ['Pickup pass',d.pass?Math.round(d.pass.ft)+' ft, '+Math.round(d.pass.r)+' m off the panels':'not flown'],
+        ['Wind at the drop',tqWind(d.wdir,d.wkt)]],
+      tip:d.dist==null?'The DROP button is live from 500 to 1,500 ft, under 160 kt, wings level.':m>80?'Release on the green light: the jump lights count the wind drift for you.':!d.pass?'After the drop, come round low over the panels, under 300 ft.':'Fly it again: the team, the wind and the smoke change every time.'};},
+  cleanup(d){DZ.noSmoke=false;DZ.tint=null;dzMove(DZ_HOME.x,DZ_HOME.z);if(MISS.on)missReset();}
+};
+// the smoke call: the right colour and a decoy, in rolled order; a wrong call: "not our smoke", ask again
+function llAskSmoke(d,line){const cols=[d.smoke,d.decoy];if(d.swap)cols.reverse();
+  tqAsk(cols.map(c=>({k:c.toUpperCase(),sub:'smoke',say:'Hilltop, '+AC.csS+', I see '+c+' smoke.',fn:()=>{
+    if(c===d.smoke){d.smokeCall='right';tqSay('Hilltop','Correct, '+c+' smoke. Wind on the ground '+tqWind(d.wdir,Math.max(2,d.wkt-3))+'. You are cleared to drop.',{plain:'Right colour. You may drop.'});}
+    else{d.wrong++;const Ks=Object.keys(LL_SMOKE).filter(k=>k!==d.smoke&&k!==c);d.decoy=Ks[d.wrong%Ks.length];
+      const l=tqSay('Hilltop','Negative, that is not our smoke. Look again.',{plain:'Wrong colour. Look again at the smoke by the team.'});llAskSmoke(d,l);}}})),
+    {line:line,wait:25,late:()=>{d.smokeCall='told';tqSay('Hilltop','Herky, our smoke is '+d.smoke+'. We have you in sight. Cleared to drop.',{plain:'The team told you their colour. You may drop.'});}});
+}
+// AUTO's route: toward the IP, then the team at 1,000 ft and 145 kt (the run in), then low over the panels for the pass
+function llAp(d,dt){const a=st.ap;if(!a||!a.tk||a.mode!=='hold')return;
+  const S=TASK.stage&&TASK.stage.id,w=S==='route'?d.ip:d.c,gh=groundHeight(d.c.x,d.c.z);
+  a.trk=Math.atan2(w.x-st.pos.x,-(w.z-st.pos.z));
+  // heights over the higher of the ground here and 800 m ahead, so AUTO never flies the Hercules into a rise
+  const gv=Math.hypot(st.vel.x,st.vel.z)||1,ga=Math.max(gh,groundHeight(st.pos.x,st.pos.z),groundHeight(st.pos.x+st.vel.x/gv*800,st.pos.z+st.vel.z/gv*800));
+  if(S==='pass'){a.v=150*KT;
+    // a racetrack, the way a crew sets up a low pass: already pointed at the panels from 2 km out, fly the line through
+    // them; otherwise run on 2.5 km past them, two turn widths (3.2 km) to the side, and turn back in onto the line. On the
+    // line the aim is 2.5 km ahead of our point on it (the Hercules turns wide on autopilot; chasing the panels circles)
+    const r=tqD(d.c.x,d.c.z),gs=Math.hypot(st.vel.x,st.vel.z)||1,vx=st.vel.x/gs,vz=st.vel.z/gs,bx=(d.c.x-st.pos.x)/r,bz=(d.c.z-st.pos.z)/r;
+    if(!d.pm){if(vx*bx+vz*bz>0.77&&r>2000){d.pm='in';d.pu={x:bx,z:bz};}
+      else{d.pm='out';const ux=-vx,uz=-vz,sd=Math.sign((st.pos.x-d.c.x)*uz-(st.pos.z-d.c.z)*ux)||1;d.pu={x:ux,z:uz};
+        d.po={x:d.c.x-ux*2500+uz*sd*3200,z:d.c.z-uz*2500-ux*sd*3200};}}
+    if(d.pm==='out'){a.trk=Math.atan2(d.po.x-st.pos.x,-(d.po.z-st.pos.z));if(tqD(d.po.x,d.po.z)<2000)d.pm='in';}   // a wide capture: chasing a point at this turn radius circles it
+    if(d.pm==='in'){const u=d.pu,px=st.pos.x-d.c.x,pz=st.pos.z-d.c.z,s0=px*u.x+pz*u.z;
+      if(s0>500)d.pm=null;   // past them: round again
+      else{const s1=s0+2500,ax=d.c.x+u.x*s1,az=d.c.z+u.z*s1;a.trk=Math.atan2(ax-st.pos.x,-(az-st.pos.z));
+        // the turn in goes toward the line: the autopilot's shorter way round can swing out 3 km wide of it
+        const mx=-u.z,mz=u.x,lat=px*mx+pz*mz,sg=lat<0?-1:1;if(Math.abs(wrapPi(a.trk-Math.atan2(vx,-vz)))>1.4)a.trk=Math.atan2(-sg*mx,sg*mz);}}
+    a.y=ga+(d.pm==='in'&&r<5000?70:305);}   // down to 230 ft from 5 km out (the hold autopilot descends at 6 m/s at most)
+  else if(S==='route'){a.y=ga+305;a.v=180*KT;}
+  else{a.y=ga+305;a.v=140*KT;if(MISS.dropped&&tqD(d.c.x,d.c.z)<600)a.trk=Math.atan2(d.f.x,-d.f.z);}
+}
+// ---- SHEPHERD (F-16C Viper, escort) ----
+// Join on a C-130 (Herky 21, the game's C-130H model, cloned as it is) and hold the escort position, right side about
+// 1,000 ft out and 1,100 ft aft, through a corridor south-west of Luke while Mission Control calls traffic (a Cessna and
+// a 737 that are really there) and weather (a buildup the lead deviates around). Stay in the lane, stay in the band.
+// No combat. Scored on station keeping, the lane and the join. Rolled: the corridor (start, heading, three legs and their
+// turns), the lead's altitude, the weather's leg and side, the traffic's clock and timing, the wind.
+const SH_SLOT={r:300,b:350},SH_V=118;   // the escort position: 300 m right, 350 m aft (he is at 10 to 11 o'clock, in view); 230 kt true
+function tqClone(src){const c=src.clone(true),A=[],B=[];src.traverse(o=>A.push(o));c.traverse(o=>B.push(o));const M=new Map();A.forEach((o,i)=>M.set(o,B[i]));return {c:c,M:M};}
+// the lead: the C-130H as the player flies it, props turning (its own rig, mapped onto the clone), gear up
+function shLead(){const m=getModel('c130'),k=tqClone(m.g),P=m.propRig,g=k.c;g.visible=true;
+  const L={g:g,ps:P?P.ps.map(p=>k.M.get(p)).filter(Boolean):[],ds:P?P.ds.map(p=>k.M.get(p)).filter(Boolean):[],bl:P?P.blades.map(p=>k.M.get(p)).filter(Boolean):[],P:P};
+  if(m.gear){const gg=k.M.get(m.gear);if(gg)gg.visible=false;}
+  if(m.canopy){const c=k.M.get(m.canopy);if(c)c.visible=true;}
+  return L;}
+function shLeadFrame(L,dt){if(!L.P)return;const K=L.P.K,rate=K.idle+0.75*(K.max-K.idle);
+  for(const p of L.ps)p.rotation.z+=rate*dt;for(const b of L.bl)b.visible=false;for(const d of L.ds){d.visible=true;d.rotation.z+=rate*0.02*dt;}
+  if(L.P.dm)L.P.dm.opacity=Math.max(L.P.dm.opacity,0.6);}
+// traffic that is really there: a clone of the game's own model flying a straight line
+function shFlyer(id,x,y,z,h,kt){const m=getModel(id),k=tqClone(m.g),g=k.c;g.visible=true;if(m.gear){const gg=k.M.get(m.gear);if(gg)gg.visible=false;}
+  tqAdd(g);return {g:g,x:x,y:y,z:z,h:h,v:kt*KT,t:0};}
+function shCorridor(R){const L0=LUKE;
+  const b=tqR(R,200,290)*Math.PI/180,s={x:L0.x+Math.sin(b)*5000,z:L0.z-Math.cos(b)*5000};
+  let h=tqR(R,185,245)*Math.PI/180;const W=[s];let x=s.x,z=s.z;
+  for(let i=0;i<3;i++){const len=tqR(R,8500,11000);x+=Math.sin(h)*len;z-=Math.cos(h)*len;W.push({x:x,z:z});h+=(R()<0.5?-1:1)*tqR(R,15,35)*Math.PI/180;}
+  return W;}
+function shLane(d,x,z){let best=1e12;for(let i=0;i<d.W.length-1;i++){const a=d.W[i],b=d.W[i+1];best=Math.min(best,segD(x,z,a.x,a.z,b.x,b.z));}return best;}
+// where we are against the escort position, in the lead's frame: right, aft, above (m)
+function shRel(d){const L=d.L,f={x:Math.sin(L.h),z:-Math.cos(L.h)},r={x:Math.cos(L.h),z:Math.sin(L.h)},dx=st.pos.x-L.x,dz=st.pos.z-L.z;
+  const right=dx*r.x+dz*r.z,fwd=dx*f.x+dz*f.z,up=(st.pos.y-GEAR)-L.y;
+  return {right:right,aft:-fwd,up:up,ex:right-SH_SLOT.r,ea:-fwd-SH_SLOT.b,err:Math.hypot(right-SH_SLOT.r,-fwd-SH_SLOT.b)};}
+function shIn(d){const q=shRel(d),e=rookie();return q.err<=(e?700:400)&&Math.abs(q.up)*M2FT<=(e?500:300);}
+TASKS.shepherd={name:'Shepherd',role:'Escort',ac:'f16',base:'luke',airStart:1,limit:420,
+  roll(R,d){d.W=shCorridor(R);d.alt=Math.round(tqR(R,8,11))*1000;d.wdir=Math.round(tqR(R,18,30))*10;d.wkt=Math.round(tqR(R,8,22));
+    d.devAt=tqR(R,75,110);d.devSide=R()<0.5?-1:1;d.devDur=tqR(R,40,55);
+    d.t1=tqR(R,25,40);d.t1c=tqPick(R,[1,2,10,11]);d.t1u=R()<0.5?-1:1;d.t2=tqR(R,140,175);d.t2c=tqPick(R,[2,3,9,10]);
+    let len=0;for(let i=0;i<d.W.length-1;i++)len+=Math.hypot(d.W[i+1].x-d.W[i].x,d.W[i+1].z-d.W[i].z);d.len=len;
+    d.par=Math.round(len/SH_V+20);d.joinPar=60;d.inT=0;d.inS=0;d.laneT=0;d.laneS=0;d.join=null;d.inRun=0;},
+  brief(d){const h0=tqBrg(d.W[0].x,d.W[0].z,d.W[1].x,d.W[1].z);return {ac:'F-16C Viper · airborne, 2 miles behind the package',
+    sit:'Herky 21, a C-130H, is crossing corridor Bravo '+tqDir(h0)+' of Luke at '+d.alt.toLocaleString('en-US')+' ft, 230 kt. Join on his right side, about 1,000 ft out and back, and hold it through the corridor. Mission Control will call traffic and weather. No weapons today.',
+    facts:[['CORRIDOR',tqDs(d.len)],['PAR',tqClock(d.par)],['ALTITUDE',d.alt.toLocaleString('en-US')+' ft'],['WIND ALOFT',tqWind(d.wdir,d.wkt)]]};},
+  spawn(d){const W=d.W,h=Math.atan2(W[1].x-W[0].x,-(W[1].z-W[0].z)),y=(d.alt-FIELD_FT)/M2FT+GEAR;
+    const Lm=shLead();tqAdd(Lm.g);d.L={x:W[0].x,z:W[0].z,y:y,h:h,bank:0,k:1,Lm:Lm,done:false,dev:0};shLeadPose(d,0);
+    const f={x:Math.sin(h),z:-Math.cos(h)},r={x:Math.cos(h),z:Math.sin(h)},x=W[0].x-f.x*3600-r.x*900,z=W[0].z-f.z*3600-r.z*900;
+    placeAir(x,z,Math.max(500,d.alt-1500-FIELD_FT-Math.max(0,groundHeight(x,z))*M2FT),h,300);st.gearDown=false;st.gearPos=0;st.flapIdx=0;trimSpawn(st,0);
+    tqDest(d.L.x,d.L.z,'Herky 21','HERKY');
+    // Easy: a diamond on the escort position
+    if(rookie()){const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:SH_DIA,color:0x9fffc8,transparent:true,depthWrite:false,depthTest:false,sizeAttenuation:false,fog:false}));sp.scale.set(0.05,0.05,1);sp.renderOrder=6;d.mk=tqAdd(sp);}
+  },
+  // Easy: AUTO holds the escort position (Hard flies it by hand); again: off
+  autoLbl:(d,ap)=>rookie()?(ap&&ap.tk?'Auto Off':'Hold Slot'):'Hand Fly',
+  auto(d){if(!rookie()){toast('Hard: you hold the escort position by hand. Easy has a slot hold',3);return true;}
+    if(st.ap&&st.ap.tk){st.ap=null;st.apW=null;toast('Autopilot off, your airplane');return true;}
+    initAudio();apEngage(st,'hold');st.ap.tk=1;shAp(d);toast('Holding the escort position. AUTO again: your airplane',3);return true;},
+  always(d,dt){shLeadMove(d,dt);shAp(d);
+    if(DEST&&DEST.task){DEST.x=d.L.x;DEST.z=d.L.z;}
+    if(d.mk){const L=d.L,r={x:Math.cos(L.h),z:Math.sin(L.h)},f={x:Math.sin(L.h),z:-Math.cos(L.h)};d.mk.position.set(L.x+r.x*SH_SLOT.r-f.x*SH_SLOT.b,L.y,L.z+r.z*SH_SLOT.r-f.z*SH_SLOT.b);d.mk.visible=!shIn(d);}
+    for(const T of d.tfc||[]){T.t+=dt;T.x+=Math.sin(T.h)*T.v*dt;T.z-=Math.cos(T.h)*T.v*dt;T.g.position.set(T.x,T.y,T.z);T.g.rotation.set(0,-T.h,0,'YXZ');if(T.t>120)T.g.visible=false;}
+  },
+  stages:[
+    {id:'join',name:'Join on Herky 21, right side, 1,000 ft out and back',
+      obj:d=>['Join on Herky 21',shCue(d)],
+      enter(d){d.j0=st.time;
+        const l=tqMC(AC.csS+', Mission Control. Herky 21 is your package, 2 miles ahead, '+d.alt.toLocaleString('en-US')+'. Join on his right side and escort him through corridor Bravo.',{plain:'Catch up with the C-130 ahead and fly beside its right wing.'});
+        tqAsk([{k:'WILCO',fn:()=>tqSay('Herky 21','Herky 21, 230 knots, '+d.alt.toLocaleString('en-US')+', looking for you.',{plain:'The C-130 is waiting for you.'})},
+          {k:'UNABLE',fn:()=>tqMC('Copy. Herky 21 presses on regardless; join when able.',{plain:'Catch up when you can.'})}],{line:l});},
+      tick(d,dt){d.inRun=shIn(d)?d.inRun+dt:0;
+        if(d.inRun>=4){d.join=st.time-d.j0;tqSay('Herky 21','Viper in sight, welcome aboard. Herky 21, steady 230.',{plain:'The C-130 sees you. Stay beside it.'});return true;}
+        if(st.time-d.j0>150){d.join=null;tqMC(AC.csS+', Herky 21 is pressing on through the corridor. Join when able.',{plain:'Catch up: the C-130 will not wait.'});return true;}return false;}},
+    {id:'escort',name:'Hold escort position through the corridor',
+      obj:d=>['Escort Herky 21',shCue(d),!shIn(d)],
+      enter(d){d.e0=st.time;},
+      tick(d,dt){const t=st.time-d.e0;
+        if(shIn(d))d.inS+=dt;d.inT+=dt;
+        const lw=d.devOn||(d.devEnd&&st.time-d.devEnd<60)?5556:2778;if(shLane(d,st.pos.x,st.pos.z)<=lw)d.laneS+=dt;d.laneT+=dt;
+        if(t>=d.t1&&!d.c1){d.c1=1;shTraffic(d,1);}
+        if(t>=d.devAt&&!d.cw){d.cw=1;shWeather(d);}
+        if(d.devOn&&st.time-d.devT0>d.devDur){d.devOn=0;d.devEnd=st.time;d.L.dev=0;tqSay('Herky 21','Herky 21, clear of the weather, back on course.',{plain:'The C-130 turns back onto the route.'});}
+        if(t>=d.t2&&!d.c2){d.c2=1;shTraffic(d,2);}
+        return d.L.done;}},
+    {id:'handoff',name:'Hand off and RTB',
+      obj:d=>['Hand off','WILCO, Mission Control'],
+      enter(d){tqSay('Herky 21','Herky 21, end of corridor Bravo. Thanks for the escort, Viper.',{plain:'The C-130 thanks you.'});
+        const l=tqMC(AC.csS+', Herky 21 is clear of the corridor. You are released. RTB. Good work.',{plain:'Job done. You can head home.'});
+        tqAsk([{k:'WILCO'}],{line:l,wait:12,late:()=>{}});d.h0=st.time;},
+      tick:d=>!TASK.ask&&st.time-d.h0>3}],
+  score(d){const k=d.inT>0?d.inS/d.inT:0,la=d.laneT>0?d.laneS/d.laneT:0,j=d.join==null?0:15*clamp(1-(d.join-d.joinPar)/105,0,1);
+    const sc=60*k+25*la+j;
+    return {score:sc,title:k>=0.9?'Glued to his wing':k>=0.7?'Solid escort':k>=0.4?'Loose escort':'Herky 21 flew alone',
+      lines:[['Escort position held',Math.round(k*100)+' %  ('+Math.round(d.inS)+' of '+Math.round(d.inT)+' s)'],['In the corridor',Math.round(la*100)+' %'],
+        ['Join',d.join==null?'not made':tqClock(d.join)+'  (par '+tqClock(d.joinPar)+')'],
+        ['Traffic called',[d.r1,d.r2].filter(Boolean).join(', ')||'no answer'],['Weather',d.cw?'deviated '+(d.devSide<0?'left':'right'):'none']],
+      tip:k<0.6?(rookie()?'AUTO holds the slot in Easy. The green diamond is where to be.':'Match his 230 kt first, then close the gap a little at a time.'):la<0.8?'Stay with him through the deviation: the corridor widens while he goes round.':'Fly it again: the corridor, the weather and the traffic change every time.'};},
+  cleanup(d){}
+};
+const SH_DIA=tex(64,64,(x,w,h)=>{x.clearRect(0,0,w,h);x.strokeStyle='#fff';x.lineWidth=6;x.beginPath();x.moveTo(32,6);x.lineTo(58,32);x.lineTo(32,58);x.lineTo(6,32);x.closePath();x.stroke();});
+// the lead: towards the next waypoint at standard rate (3 deg/s), the deviation added on, bank from the turn, props turning
+function shLeadMove(d,dt){const L=d.L;if(L.done||dt<=0){shLeadPose(d,dt);return;}
+  const w=d.W[L.k];if(Math.hypot(w.x-L.x,w.z-L.z)<700){L.k++;if(L.k>=d.W.length){L.done=true;}}
+  const tgt=L.k<d.W.length?d.W[L.k]:null;
+  if(tgt){const want=Math.atan2(tgt.x-L.x,-(tgt.z-L.z))+L.dev,e=wrapPi(want-L.h),w0=Math.min(Math.abs(e),0.0524*dt)*Math.sign(e);L.h+=w0;
+    const bk=Math.atan(SH_V*(w0/Math.max(dt,1e-3))/9.81);L.bank+=(bk-L.bank)*Math.min(1,dt*1.5);}
+  L.x+=Math.sin(L.h)*SH_V*dt;L.z-=Math.cos(L.h)*SH_V*dt;shLeadPose(d,dt);}
+const _shE=new THREE.Euler(0,0,0,'YXZ');
+function shLeadPose(d,dt){const L=d.L;L.Lm.g.position.set(L.x,L.y,L.z);L.Lm.g.quaternion.setFromEuler(_shE.set(0.03,-L.h,-L.bank,'YXZ'));shLeadFrame(L.Lm,dt);}
+// the HUD cue: how far off the escort position and which way to fix it
+function shCue(d){const q=shRel(d),E=rookie(),gap=q.err;
+  const dv=(Math.hypot(st.vel.x,st.vel.z)-SH_V)*MS2KT,up=q.up*M2FT;
+  if(gap>1500)return (E?tqMi(gap):tqNm(gap))+' to the slot. '+(q.ea>0?'Faster: he is at 230':'Ease off');
+  const a=q.ea>120?(E?'Speed up a bit':'Close, '+Math.round(q.ea)+' m aft'):q.ea<-120?(E?'Slow down a bit':Math.round(-q.ea)+' m ahead'):'';
+  const s=q.ex>150?(E?'Move left':'Wide '+Math.round(q.ex)+' m'):q.ex<-150?(E?'Move right':'Tight '+Math.round(-q.ex)+' m'):'';
+  const v=up>200?(E?'Lower':Math.round(up/10)*10+' ft high'):up<-200?(E?'Higher':Math.round(-up/10)*10+' ft low'):'';
+  const t=[a,s,v].filter(Boolean).join('. ');return t||(shIn(d)?'In position'+(Math.abs(dv)>15?(dv>0?'. A touch fast':'. A touch slow'):''):'Nearly there');}
+// Easy's slot hold: aim 1 km ahead of the slot on the lead's heading, its altitude, its speed plus the gap to close
+function shAp(d){const a=st.ap;if(!a||!a.tk||a.mode!=='hold')return;const L=d.L,f={x:Math.sin(L.h),z:-Math.cos(L.h)},r={x:Math.cos(L.h),z:Math.sin(L.h)};
+  const q=shRel(d),sx=L.x+r.x*SH_SLOT.r-f.x*SH_SLOT.b,sz=L.z+r.z*SH_SLOT.r-f.z*SH_SLOT.b,ax=sx+f.x*1000,az=sz+f.z*1000;
+  a.trk=Math.atan2(ax-st.pos.x,-(az-st.pos.z));a.y=L.y-GEAR;a.v=clamp(SH_V+q.ea*0.08,SH_V-25,SH_V+60)*Math.sqrt(1.097*Math.exp(-st.pos.y/9200)/1.225);}   // indicated, from true
+// traffic: a Cessna 2 to 3 thousand below crossing, then a 737 above going the other way; really there, called by clock
+function shTraffic(d,n){const id=n===1?'cessna':'b737',clk=n===1?d.t1c:d.t2c,mi=n===1?5:7,dy=(n===1?-2200*d.t1u:-2000)/M2FT;
+  const hd=-_euH.setFromQuaternion(st.quat,'YXZ').y,b=hd+clk*Math.PI/6,r=mi*1609,x=st.pos.x+Math.sin(b)*r,z=st.pos.z-Math.cos(b)*r;
+  const th=n===1?b+Math.PI*0.5*(clk<6?1:-1):hd+Math.PI+(clk<6?-0.35:0.35);
+  if(!d.tfc)d.tfc=[];d.tfc.push(shFlyer(id,x,st.pos.y+dy,z,th,n===1?110:280));
+  const what=n===1?'a Cessna':'a Boeing 737',alt=Math.round(Math.abs(dy*M2FT)/100)*100,dir=tqDir(((th*180/Math.PI)%360+360)%360);
+  const l=tqMC(AC.csS+', traffic, '+clk+' o\'clock, '+mi+' miles, '+dir+'bound, '+what+', '+alt.toLocaleString('en-US')+' '+(dy>0?'above':'below')+'.',{plain:'Another aircraft at '+clk+' o\'clock, '+mi+' miles away. Look for it.'});
+  tqAsk([{k:'CONTACT',say:AC.csS+', contact.',fn:()=>{d['r'+n]='contact';}},{k:'LOOKING',say:AC.csS+', looking.',fn:()=>{d['r'+n]='looking';
+      tqLater(7,()=>tqMC(AC.csS+', that traffic is no factor.',{plain:'The other aircraft is no danger.'}));}}],{line:l,wait:20});}
+// weather: a buildup on the route; Mission Control approves the deviation, the lead turns 20 degrees and the lane widens
+function shWeather(d){const L=d.L,f={x:Math.sin(L.h),z:-Math.cos(L.h)},r={x:Math.cos(L.h),z:Math.sin(L.h)},cx=L.x+f.x*7000-r.x*d.devSide*600,cz=L.z+f.z*7000-r.z*d.devSide*600;
+  const g=new THREE.Group(),R=TASK.R;
+  for(let i=0;i<16;i++){const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:puffTex,color:0xf4f6f8,transparent:true,opacity:0.92,depthWrite:false}));
+    const s=tqR(R,500,1100);sp.scale.set(s,s*tqR(R,0.8,1.2),1);sp.position.set(cx+tqR(R,-900,900),L.y+tqR(R,-350,900)+i*40,cz+tqR(R,-900,900));g.add(sp);}
+  tqAdd(g);d.cloud=g;
+  const side=d.devSide<0?'left':'right';
+  tqMC('Herky 21, Mission Control, buildups on your route, 4 miles ahead. Deviation 20 '+side+' approved, the corridor widens with you.',{plain:'Bad weather ahead. The C-130 will turn '+side+' around it. Stay with it.'});
+  tqSay('Herky 21','Herky 21, 20 '+side+' for weather. Viper, stay with me.',{plain:'The C-130 turns '+side+'. Follow it.'});
+  L.dev=d.devSide*20*Math.PI/180;d.devOn=1;d.devT0=st.time;
+  const l=tqMC(AC.csS+', copy the deviation?',{plain:'Tap WILCO to say you will follow.'});tqAsk([{k:'WILCO'}],{line:l,wait:15});}
+// ---- FINDER (Cessna 172, search and rescue) ----
+// A hiker is missing in a rolled search box on the White Tanks' east slopes. Fly the search pattern (parallel legs, drawn
+// on the ground), spot the signal mirror's flash (a strobe after dark: it only shows within range and in line of sight),
+// MARK over it, orbit the hiker until Ranger 41 (a DPS helicopter, on the radio) calls for the position, then REPORT
+// the coordinates. Scored on find time against par, mark accuracy, the orbit and the report.
+// Rolled: the box (its corner, its size), the hiker in it, the flash's rhythm, Ranger 41's time out, the wind.
+function fdRibbon(P,w,col,op,dy){const pos=[],idx=[];let n=0;
+  for(let i=0;i<P.length-1;i++){const a=P[i],b=P[i+1],L=Math.hypot(b.x-a.x,b.z-a.z),k=Math.max(1,Math.round(L/45)),ux=(b.x-a.x)/L,uz=(b.z-a.z)/L;
+    for(let j=0;j<=k;j++){if(i>0&&j===0)continue;const x=a.x+(b.x-a.x)*j/k,z=a.z+(b.z-a.z)*j/k,y=groundHeight(x,z)+(dy||1.2);
+      pos.push(x-uz*w/2,y,z+ux*w/2,x+uz*w/2,y,z-ux*w/2);if(n)idx.push(2*n-2,2*n-1,2*n,2*n-1,2*n+1,2*n);n++;}}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);
+  return new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:op,depthWrite:false,side:THREE.DoubleSide}));}
+const FD_FLASH=tex(64,64,(x,w,h)=>{const g=x.createRadialGradient(32,32,0,32,32,32);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(0.18,'rgba(255,252,235,.95)');g.addColorStop(0.45,'rgba(255,240,200,.35)');g.addColorStop(1,'rgba(255,240,200,0)');
+  x.fillStyle=g;x.fillRect(0,0,64,64);x.strokeStyle='rgba(255,255,255,.75)';x.lineWidth=2;x.beginPath();x.moveTo(32,2);x.lineTo(32,62);x.moveTo(2,32);x.lineTo(62,32);x.stroke();});
+function fdHiker(d){const g=new THREE.Group(),or=lam(0xff6a1a),bl=lam(0x2c3a52),sk=lam(0xd9a273);
+  const add=(geo,m,x,y,z)=>{const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);g.add(o);return o;};
+  add(new THREE.BoxGeometry(0.5,0.6,0.3),or,0,1.25,0);add(new THREE.BoxGeometry(0.42,0.8,0.26),bl,0,0.45,0);add(new THREE.SphereGeometry(0.14,8,6),sk,0,1.7,0);
+  add(new THREE.BoxGeometry(0.45,0.55,0.25),lam(0x6b4a2a),0,1.25,0.25);   // the pack
+  const tarp=add(new THREE.BoxGeometry(3,0.05,2),lam(0xffa21a),2.2,0.06,1);tarp.material.emissive=new THREE.Color(0x3a1800);   // the orange signal panel
+  g.position.set(d.h.x,groundHeight(d.h.x,d.h.z),d.h.z);g.traverse(o=>{if(o.isMesh)o.userData.heat=0.8;});return g;}
+TASKS.finder={name:'Finder',role:'Search and rescue',ac:'cessna',base:'kgeu',airStart:1,limit:480,
+  roll(R,d){const cx=tqR(R,-19300,-17600),cz=tqR(R,-11000,-3000),W=tqR(R,2000,2600),H=tqR(R,2600,3200);
+    d.box={x0:cx-W/2,x1:cx+W/2,z0:cz-H/2,z1:cz+H/2,cx:cx,cz:cz,W:W,H:H};
+    d.h={x:tqR(R,d.box.x0+250,d.box.x1-250),z:tqR(R,d.box.z0+250,d.box.z1-250)};
+    // the pattern: north-south legs 0.4 nm apart, from the east side (where we come from) working west
+    const sp=740,n=Math.max(3,Math.ceil(W/sp)),P=[];for(let i=0;i<n;i++){const x=d.box.x1-sp/2-i*(W-sp)/(n-1);const a=i%2===0?d.box.z0+150:d.box.z1-150,b=i%2===0?d.box.z1-150:d.box.z0+150;P.push({x:x,z:a},{x:x,z:b});}
+    d.P=P;let top=0;for(let i=0;i<=8;i++)for(let j=0;j<=8;j++)top=Math.max(top,groundHeight(d.box.x0+W*i/8,d.box.z0+H*j/8));
+    d.top=top;d.altY=top+300;d.altFt=Math.round(((d.altY)*M2FT+FIELD_FT)/100)*100;
+    d.wdir=Math.round(tqR(R,0,36))*10||360;d.wkt=Math.round(tqR(R,2,12));d.heliAt=tqR(R,190,230);d.fl=tqR(R,1.2,2.6);d.flR=R;
+    let len=0;for(let i=0;i<P.length-1;i++)len+=Math.hypot(P[i+1].x-P[i].x,P[i+1].z-P[i].z);
+    // par to find: to the box, half the pattern, a turn; the 172 at about 105 kt
+    d.par=Math.round(4500/54+len*0.5/54+30);d.wp=0;d.falseMark=0;d.orbIn=0;d.orbT=0;},
+  brief(d){const b=tqBrg(LUKE.x,LUKE.z,d.box.cx,d.box.cz);return {ac:'Cessna 172 · airborne east of the White Tanks',
+    sit:'A hiker is overdue in the White Tank Mountains. The search box is '+(rookie()?(d.box.W/1609).toFixed(1)+' by '+(d.box.H/1609).toFixed(1)+' mi':(d.box.W/1852).toFixed(1)+' by '+(d.box.H/1852).toFixed(1)+' nm')+' on the east slopes. Fly the pattern at '+d.altFt.toLocaleString('en-US')+' ft, watch for a signal mirror flash'+(TOD.night?' (a strobe after dark)':'')+', MARK when you are over it, orbit until Ranger 41 arrives, then report the position.',
+    facts:[['PAR TO FIND',tqClock(d.par)],['SEARCH',d.altFt.toLocaleString('en-US')+' ft'],['PATTERN',(d.P.length/2)+' legs'],['WIND',tqWind(d.wdir,d.wkt)]]};},
+  spawn(d){const B=d.box,x=B.x1+4500,z=d.P[0].z+(d.P[0].z<B.cz?-600:600);
+    placeAir(x,z,(d.altY-Math.max(0,groundHeight(x,z)))*M2FT,Math.atan2(d.P[0].x-x,-(d.P[0].z-z)),105);trimSpawn(st,0);
+    tqAdd(fdRibbon([{x:B.x0,z:B.z0},{x:B.x1,z:B.z0},{x:B.x1,z:B.z1},{x:B.x0,z:B.z1},{x:B.x0,z:B.z0}],16,0xff8a3d,0.55,4));
+    d.pat=tqAdd(fdRibbon(d.P,10,0x7fd4ff,0.45,4));   // 4 m over the slope, sampled every 45 m, so the line does not dive under the rocks
+    d.hk=tqAdd(fdHiker(d));
+    const fl=new THREE.Sprite(new THREE.SpriteMaterial({map:FD_FLASH,color:0xffffff,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending,sizeAttenuation:false,fog:false}));
+    fl.position.set(d.h.x,groundHeight(d.h.x,d.h.z)+1.8,d.h.z);fl.renderOrder=5;d.fl0=tqAdd(fl);d.flT=d.fl;d.flA=0;
+    tqDest(d.P[0].x,d.P[0].z,'Search pattern','LEG 1');},
+  // AUTO: the pattern at search height (searching), an orbit over the mark (after it); again: off
+  autoLbl:(d,ap)=>ap&&ap.tk?'Auto Off':TASK.si>=1&&d.mark?'Orbit':'Auto Nav',
+  auto(d){if(st.ap&&st.ap.tk){st.ap=null;st.apW=null;toast('Autopilot off, your airplane');return true;}initAudio();
+    if(d.mark){apEngage(st,'orbit',{cx:d.mark.x,cz:d.mark.z,r:1200,y:Math.max(st.pos.y-GEAR,d.altY),v:AC.vcruise,dir:1});st.ap.tk=1;toast('Orbit over your mark. AUTO again: your airplane',3);return true;}
+    apEngage(st,'hold');st.ap.tk=1;fdAp(d);toast('Autopilot: the search pattern. AUTO again: your airplane',3);return true;},
+  always(d,dt){fdAp(d);
+    // the pattern's next point: on to the next leg within 350 m
+    if(!d.mark&&d.wp<d.P.length){const w=d.P[d.wp];if(tqD(w.x,w.z)<350){d.wp++;if(d.wp<d.P.length&&DEST&&DEST.task){DEST.short='LEG '+(Math.floor(d.wp/2)+1);destUI(true);}}
+      const w2=d.P[Math.min(d.wp,d.P.length-1)];if(DEST&&DEST.task){DEST.x=w2.x;DEST.z=w2.z;}}
+    // the flash: a short bright pulse every 1.2 to 2.6 s (rolled), seen only within range (Easy 3.5 km, Hard 2.6 km)
+    const r=tqD(d.h.x,d.h.z),rng=rookie()?3500:2600,f=d.fl0;d.flT-=dt;
+    if(d.flT<=0){d.flT=d.fl*(0.7+0.6*d.flR());d.flA=0.22;}
+    d.flA=Math.max(0,d.flA-dt);const k=d.flA>0?Math.sin(d.flA/0.22*Math.PI):0,near=r<rng&&!st.onGround;
+    f.material.opacity=near&&d.end==null?k:0;f.scale.setScalar(0.022+0.03*k*(1-r/rng*0.6));f.visible=f.material.opacity>0.01;
+    if(near&&k>0.5&&!d.seen){d.seen=st.time-d.t0;}
+    if(TASK.si===1&&!st.onGround){const rr=tqD(d.h.x,d.h.z);d.orbT+=dt;if(rr<=(rookie()?2500:2000)&&st.agl*M2FT>=500)d.orbIn+=dt;}
+  },
+  stages:[
+    {id:'search',name:'Fly the search pattern, watch for the flash. MARK over it',
+      obj:d=>{const w=d.P[Math.min(d.wp,d.P.length-1)],leg=Math.floor(d.wp/2)+1;return ['Search: leg '+Math.min(leg,d.P.length/2)+' of '+d.P.length/2,
+        (tqD(d.box.cx,d.box.cz)>Math.max(d.box.W,d.box.H)?tqDs(tqD(w.x,w.z))+' to the box. ':'')+'Watch for a flash. MARK when over it'];},
+      enter(d){tqQuiet(()=>{const l=tqMC(AC.csS+', Mission Control. A hiker is overdue in the White Tanks. Search box on your map, pattern at '+d.altFt.toLocaleString('en-US')+'. He may have a signal mirror. Mark anything you see.',
+          {plain:'Fly along the blue lines over the mountains. Look for a bright flash on the ground and tap MARK when you are right over it.'});
+        tqAsk([{k:'WILCO',fn:()=>fdAskMark(d)},{k:'UNABLE',fn:()=>{tqMC('Copy. The box is on your map when you are ready.',{plain:'Take your time.'});fdAskMark(d);}}],{line:l,late:()=>fdAskMark(d)});},2);},
+      tick:d=>!!d.mark},
+    {id:'orbit',name:'Orbit the hiker until Ranger 41 arrives',
+      obj:d=>{const r=tqD(d.h.x,d.h.z),lim=rookie()?2500:2000,lo=st.agl*M2FT<500;return ['Orbit the hiker',(r>lim?'Too far: '+tqDs(r):lo?'Too low: climb above 500 ft':'Keep him in sight')+'. Ranger 41 in '+Math.max(0,Math.round(d.eta-(st.time-d.o0)))+' s',r>lim||lo];},
+      enter(d){d.o0=st.time;d.found=1;
+        // Ranger 41 launched when the search began: it arrives at its rolled time, at least 45 s after the mark
+        d.eta=Math.max(45,d.heliAt-(st.time-d.t0));const mn=Math.max(1,Math.round(d.eta/60));
+        const l=tqMC('Copy your mark. Ranger 41, DPS helicopter, is '+(mn===1?'about a minute':mn+' minutes')+' out. Orbit the hiker and keep him in sight.',{plain:'Fly circles around the hiker. The rescue helicopter is on its way.'});
+        tqAsk([{k:'WILCO'}],{line:l,wait:15});},
+      tick:d=>st.time-d.o0>=d.eta},
+    {id:'report',name:'Report the position to Ranger 41',
+      obj:d=>['Report the position','REPORT the hiker\'s coordinates'],
+      enter(d){tqSay('Ranger 41','Mission Control, Ranger 41, one minute out. Request the hiker\'s position.',{plain:'The helicopter asks where the hiker is.'});
+        const l=tqMC(AC.csS+', report the hiker\'s position for Ranger 41.',{plain:'Tap REPORT to give the helicopter the position.'});
+        tqAsk([{k:'REPORT',sub:'coordinates',say:'',fn:t=>fdReport(d,t)}],{line:l,wait:30,late:()=>{d.repT=99;tqSay('Ranger 41','Ranger 41 has your orbit in sight, we will find him from there.',{plain:'The helicopter found the hiker by your circles.'});d.end=st.time;}});},
+      tick:d=>d.end!=null&&st.time-d.end>4}],
+  score(d){const find=d.findT==null?0:40*clamp(1-(d.findT-d.par)/180,0,1),m=d.mark?d.mark.err:1e9,acc=m>=600?0:m<=50?35:35*(1-(m-50)/550);
+    const orb=d.orbT>0?15*d.orbIn/d.orbT:0,rep=d.repT==null||d.repT>=30?0:10*clamp(1-(d.repT-8)/22,0,1);
+    const sc=find+acc+orb+rep-5*d.falseMark;
+    return {score:sc,title:m<60?'Right on top of him':m<200?'Hiker found':m<600?'Found, roughly':'Not found',
+      lines:[['Find time',d.findT==null?'not found':tqClock(d.findT)+'  (par '+tqClock(d.par)+')'],['Mark from the hiker',d.mark?Math.round(m)+' m'+(d.falseMark?'  ·  '+d.falseMark+' false mark'+(d.falseMark>1?'s':''):''):'no mark'],
+        ['Orbit kept',d.orbT>0?Math.round(100*d.orbIn/d.orbT)+' %':'not flown'],['Report',d.repT==null||d.repT>=30?'not given':d.repT.toFixed(1)+' s'],['First flash seen',d.seen!=null?tqClock(d.seen):'never']],
+      tip:!d.mark?'The flash only shows within about 1.5 miles: fly the legs and look down the slope.':m>150?'MARK when the flash is right under the nose, not as you see it.':'Fly it again: the box, the hiker and the time of day change every time.'};},
+  cleanup(d){}
+};
+function fdAskMark(d){tqAsk([{k:'MARK',sub:'over the flash',say:'',fn:()=>fdMark(d)}],{keep:1});}
+function fdMark(d){const err=tqD(d.h.x,d.h.z),lim=rookie()?800:600;
+  tqPilot('Mission Control, '+AC.csS+', mark, mark, mark.');
+  if(err>lim){d.falseMark++;tqMC('Negative, nothing at that mark. Continue the search.',{plain:'Nothing there. Keep looking for the flash.'});fdAskMark(d);return;}
+  d.mark={x:st.pos.x,z:st.pos.z,err:err};d.findT=st.time-d.t0;if(DEST&&DEST.task){DEST.x=d.mark.x;DEST.z=d.mark.z;DEST.name='Your mark';DEST.short='MARK';destUI(true);}
+  if(d.pat)d.pat.visible=false;}
+function fdReport(d,t){d.repT=t;const m=d.mark,ft=Math.round(((groundHeight(m.x,m.z))*M2FT+FIELD_FT)/100)*100;
+  tqPilot('Ranger 41, '+AC.csS+', hiker at '+tqLL(m.x,m.z)+', on the east slope, about '+ft.toLocaleString('en-US')+' feet, signal mirror.');
+  const e=m.err,b=tqDir(tqBrg(m.x,m.z,d.h.x,d.h.z));
+  tqSay('Ranger 41',e<80?'Copy. Ranger 41 has your orbit in sight. Tally the mirror, right where you said. We have him.':'Copy. Ranger 41 has the mirror, about '+Math.round(e/10)*10+' metres '+b+' of your mark. We have him.',{plain:'The helicopter has found the hiker. Job done.'});
+  d.end=st.time;}
+// AUTO's pattern: toward the next point at search height (over the higher of here and 600 m ahead plus 1,000 ft)
+function fdAp(d){const a=st.ap;if(!a||!a.tk||a.mode!=='hold')return;const w=d.P[Math.min(d.wp,d.P.length-1)];
+  a.trk=Math.atan2(w.x-st.pos.x,-(w.z-st.pos.z));a.v=AC.vcruise;
+  const gv=Math.hypot(st.vel.x,st.vel.z)||1;a.y=Math.max(d.altY,groundHeight(st.pos.x+st.vel.x/gv*600,st.pos.z+st.vel.z/gv*600)+300);}
 // (results cards) flies exactly the same start: a free flight / segment / mission start keeps its spawn
 // (final1 is not final), base and aircraft; an arcade game, lesson or dogfight goes back through its own
 // starter (arcStart, startLesson, dfStart), which sets its own position. Each starter stamps it after start().
@@ -12958,11 +13783,13 @@ function runName(){const R=RUNSTART;
   if(R.k==='arc')return R.kind==='apt'?String(REGION.base||'AIRPORT').toUpperCase()+' LANDING':RUN_NAMES[R.kind]||'CHALLENGE';
   if(R.k==='les')return RUN_NAMES[R.id]||'LESSON';
   if(R.k==='df')return R.daily?'DAILY DOGFIGHT':'DOGFIGHT';
+  if(R.k==='task')return TASKS[R.id]?TASKS[R.id].name.toUpperCase():'TASKING';
   return RUN_NAMES[R.mode]||'FLIGHT';}
 function runRestart(){const R=RUNSTART;
   if(R.k==='arc'){arcStart(R.kind);return;}
   if(R.k==='les'){startLesson(R.id);return;}
   if(R.k==='df'){dfStart(R.daily?{daily:1}:null);return;}
+  if(R.k==='task'){taskStart(R.id);return;}   // a fresh roll: a replay differs
   if(R.type&&R.type!==acType)pickType(R.type,1);
   start(R.mode||'runway',R.base||undefined);}
 function start(mode,base){
@@ -13004,7 +13831,7 @@ function start(mode,base){
 // (pauseGo: Missions, Arcade, School, Boards, Settings) keep the flight for Back and Resume: they
 // do not come here, the flight's overlays are only hidden under them (body.menuOn).
 function hudClear(){
-  resCloseAll();for(const id of ['recOv','storyOv'])$(id).classList.remove('on');
+  resCloseAll();taskStop();for(const id of ['recOv','storyOv'])$(id).classList.remove('on');
   STRIKE.active=false;tgtMarkHide();
   if(camMode>1)camMode=0;   // the ball view is entered in flight, where its autopilot can take over
   if(sensOn){sensOn=false;hudSens.classList.remove('on');document.body.classList.remove('sensorOn');glc.style.filter='';}
@@ -13020,7 +13847,7 @@ function hudClear(){
 const pauseOv=$('pauseOv');
 function openMenu(scr){if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.forced=null;hudClear();pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
 // the pause button, P and a backgrounded app all land here; the sheet shows while paused
-function togglePause(){if(DF.brief)return;   // the dogfight briefing holds the sim itself; FIGHT'S ON is the way on
+function togglePause(){if(DF.brief||TASK.brief)return;   // the dogfight briefing holds the sim itself; FIGHT'S ON is the way on
   if(RES.brief)resClose(RES.brief);paused=!paused;pauseOv.classList.toggle('on',paused);if(paused){radioFade(120);CARP.sync();PZ0={t:savedType,b:SPAWN_BASE,p:SPAWN_POS};PZ_LOC=null;locSel();pzApplyUI();requestAnimationFrame(locShow);if(window.stickReset)stickReset();musicUI();}}
 $('pResume').onclick=()=>{paused=false;pauseOv.classList.remove('on');initAudio();radioVolApply();};
 // Restart and Apply are one button: it restarts this flight (same start, mission or range) until
@@ -13119,7 +13946,7 @@ function hapInit(){
     try{const mo=new MutationObserver(ms=>{const seen=new Set();for(const m of ms){
         const t=m.target.nodeType===1&&m.target.closest?m.target.closest(HAP_SEL):null;if(t&&!seen.has(t)){seen.add(t);hapArm(t);}
         for(const n of m.addedNodes)if(n.nodeType===1&&!n.classList.contains('hapL')&&!seen.has(n)){seen.add(n);hapArmAll(n);}}});
-      ['menu','pauseOv','arcOv','gradeOv','landOv','missOv','recOv','crash','funnel','csOv','tkCtl','tk','dfBrief','dfLo','photoOv','mapOv'].forEach(id=>{const e=document.getElementById(id);if(e)mo.observe(e,{childList:true,subtree:true});});}catch(e){}
+      ['menu','pauseOv','arcOv','gradeOv','landOv','missOv','recOv','crash','funnel','csOv','tkCtl','tk','dfBrief','dfLo','tkBrief','tkReply','photoOv','mapOv'].forEach(id=>{const e=document.getElementById(id);if(e)mo.observe(e,{childList:true,subtree:true});});}catch(e){}
     // a real tap on an overlay: the native tick has played, so the scripted tick for the same tap is skipped
     document.addEventListener('click',e=>{const t=e.target,L=t&&t.classList&&t.classList.contains('hapL');
       // hapShield: after a tapBtn tap on an overlay only that overlay's click (and the switch it forwards to) gets through
@@ -13128,7 +13955,7 @@ function hapInit(){
   }
 }
 // the controls a finger taps: flight buttons, weapons, pause, the throttle's detent labels, every menu, sheet and card button
-const HAP_SEL='#dock button,#dfW button,#bPause,#thr .det,#menu button,#menu .mcard,#menu .lrow,#pauseOv button,.overlay button,#crash button,#funnel button,#csOv button,#tkCtl button,#tk,#hDest';
+const HAP_SEL='#dock button,#dfW button,#tkReply button,#bPause,#thr .det,#menu button,#menu .mcard,#menu .lrow,#pauseOv button,.overlay button,#crash button,#funnel button,#csOv button,#tkCtl button,#tk,#hDest';
 function hapArm(el){
   if(!el||el.querySelector(':scope > .hapL'))return;
   if(getComputedStyle(el).position==='static')el.classList.add('hapRel');
@@ -13654,7 +14481,11 @@ const ICONS={
   landing:svgI([[ICO_PARTS.runway,'translate(20 26) scale(1.1 1.35)'],[ICO_PARTS.watch,'translate(46 24) scale(1.1)']]),
   landing1:svgI([[ICO_PARTS.runway,'translate(20 26) scale(1.1 1.35)'],['<text x="0" y="6" text-anchor="middle" font-size="17" font-weight="800" fill="#F6C177" font-family="sans-serif">1</text><circle r="10.5" fill="none" stroke="#D98A3D" stroke-width="2.2"/>','translate(46 24) scale(1.05)']]),
   daily:svgI([['<g><rect x="-12" y="-10" width="24" height="22" rx="3" fill="none" stroke="#D98A3D" stroke-width="2.2"/><path d="M-12-4 H12" stroke="#D98A3D" stroke-width="2.2"/><rect x="-7" y="-14" width="2.6" height="6" rx="1" fill="#F6C177"/><rect x="4.4" y="-14" width="2.6" height="6" rx="1" fill="#F6C177"/></g>','translate(20 25)'],[SIL.f16,'translate(46 26) rotate(30) scale(.75)']]),
-  dogfight:svgI([[SIL.f16,'translate(20 28) rotate(40) scale(.9)'],[SIL.f16,'translate(44 20) rotate(-140) scale(.9)']])};
+  dogfight:svgI([[SIL.f16,'translate(20 28) rotate(40) scale(.9)'],[SIL.f16,'translate(44 20) rotate(-140) scale(.9)']]),
+  'tk-overwatch':svgI([['<g><ellipse rx="11" ry="7" fill="none" stroke="#D98A3D" stroke-width="1.8" stroke-dasharray="3 2.4"/><rect x="-3.2" y="-2.6" width="6.4" height="5.2" rx=".8" fill="#F6C177"/></g>','translate(44 32)'],[SIL.mq9,'translate(24 20) rotate(-20) scale(.8)']]),
+  'tk-lifeline':svgI([[SIL.c130,'translate(22 18) rotate(-60) scale(.72)'],[ICO_PARTS.chute,'translate(46 28) scale(.9)']]),
+  'tk-shepherd':svgI([[SIL.c130,'translate(26 26) rotate(-45) scale(.7)'],[SIL.f16,'translate(46 16) rotate(-45) scale(.55)']]),
+  'tk-finder':svgI([[SIL.cessna,'translate(22 22) rotate(-30) scale(.9)'],['<g><path d="M0-9 L1.8-1.8 L9 0 L1.8 1.8 L0 9 L-1.8 1.8 L-9 0 L-1.8-1.8Z" fill="#F6C177"/><circle r="2.2" fill="#fff"/></g>','translate(46 32)']])};
 // ---- stars and best score, from the records store ----
 const stars=n=>'<i class="stars" aria-label="'+n+' of 3 stars">'+'★'.repeat(n)+'<u>'+'★'.repeat(3-n)+'</u></i>';
 const L2S={A:3,B:2,C:1,D:1,F:0};
@@ -13669,6 +14500,7 @@ function scoreOf(id){
   if(id==='school'){const g=LESSONS.map(l=>schoolBest[schoolAc+':'+l.id]).filter(Boolean),pass=g.filter(x=>x!=='F').length,a=g.filter(x=>x==='A').length;
     return g.length?[a>=5?3:a>=3?2:pass?1:0,pass+' of 5 passed']:[0,''];}
   if(id==='landing'||id==='landing1'||id==='daily')return arcScore(id);
+  if(/^tk-/.test(id)){try{r=JSON.parse(localStorage.getItem('kgeuTaskBest')||'{}')[id.slice(3)];}catch(e){r=null;}return r?[L2S[r.letter]||0,'Best '+r.score+' of 100']:[0,''];}
   if(id==='dogfight'){r=B[dfKey(rookie()?'easy':'hard')];return r?[r.stars,'Best '+resNum(r.pts)+' \u00b7 '+r.kills+' kills']:[0,''];}   // the mode being flown
   return [0,''];
 }
@@ -13707,8 +14539,17 @@ function arcList(){
     dailyCard(),
     {id:'range',lb:'arc:strike',ac:'MQ-9A Reaper',name:'Strike range',desc:'Find the targets, lock on, four missiles.',go:()=>{pickType('reaper',1);start('range');}},
     {id:'drop',lb:'arc:drop',ac:'C-130H Hercules',name:'Airdrop',desc:'Put the bundle on the drop zone.',go:()=>{pickType('c130',1);start('drop');}},
-    {id:'short',lb:'mission:short',ac:'C-130H Hercules',name:'Short field landing',desc:'Stop a Hercules on a 3,000 ft dirt strip.',go:()=>{pickType('c130',1);start('short');}}]);
+    {id:'short',lb:'mission:short',ac:'C-130H Hercules',name:'Short field landing',desc:'Stop a Hercules on a 3,000 ft dirt strip.',go:()=>{pickType('c130',1);start('short');}},
+    ].concat(tqCards()));
 }
+// the Taskings group under the five (the list scrolls to it), a card for each tasking that is in
+function tqCards(){const C=TASK_CARDS.filter(c=>TASKS[c[0]]);
+  return C.length?[{head:'Taskings'}].concat(C.map(c=>({id:'tk-'+c[0],lb:'task:'+c[0],icon:'tk-'+c[0],cls:'tk',ac:c[1],name:c[2],desc:c[3],go:()=>taskStart(c[0])}))):[];}
+// tasking item 1: the four Taskings, each replayable (a fresh roll every start)
+const TASK_CARDS=[['overwatch','MQ-9B SkyGuardian','Overwatch','Watch a compound, call the vehicle out, follow it.'],
+  ['lifeline','C-130H Hercules','Lifeline','Resupply a ground team on their smoke.'],
+  ['shepherd','F-16C Viper','Shepherd','Escort a C-130 through the corridor.'],
+  ['finder','Cessna 172','Finder','Search the White Tanks for a missing hiker.']];
 // ---- first launch: one screen, two big buttons ----
 function funnelPick(v){setSkill(v);$('funnel').classList.remove('on');startHereUI();if(v==='rookie')startLesson('first');}
 $('fRookie').onclick=()=>funnelPick('rookie');$('fPilot').onclick=()=>funnelPick('pilot');
@@ -15523,6 +16364,8 @@ function targetUnder(p,maxD){
   let best=null,bd=maxD;
   for(const t of STRIKE.targets){if(t.dead)continue;
     const d=Math.hypot(t.x-p.x,t.z-p.z);if(d<bd){bd=d;best=t;}}
+  // a tasking's targets (Overwatch's building and pickup): LOCK takes them a little wider, Easy wider still
+  if(TASK.on)for(const t of TASK.tgts){if(t.dead)continue;const d=Math.hypot(t.x-p.x,t.z-p.z),lim=Math.max(maxD,rookie()?200:110);if(d<lim&&d<(best?bd:lim)){bd=d;best=t;}}
   return best;
 }
 function sensorTrackHere(){
@@ -15841,6 +16684,7 @@ function sensorOrbit(p){
 function sensorAP(){
   if(!running||paused||st.crashed||st.onGround||!hasBall())return;
   if(st.ap&&(st.ap.mode==='land'||st.ap.mode==='to'))return;
+  if(st.ap&&st.ap.tk){initAudio();sensorUpdate(0);return;}   // a tasking's orbit (on the compound, on the truck) stays as it is
   initAudio();sensorUpdate(0);
   const p=SENSOR.tgt?_st2.set(SENSOR.tgt.x,SENSOR.tgt.y,SENSOR.tgt.z):SENSOR.track||(SENSOR.valid?SENSOR.spot:null);
   if(p)sensorOrbit(p);
@@ -15898,7 +16742,7 @@ function tick(t,skipRender){
     if(ev.type==='liftoff') clusters.forEach(c=>{if(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)<1500){c.cheer=4;}});
   }
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.classList.remove('on');}
-  missUpdate(dt);dzUpdate(dt);if(running&&!paused)arcTick();apprTick();dfTick(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);if(LB)LB.frame();
+  missUpdate(dt);dzUpdate(dt);taskUpdate(dt);if(running&&!paused)arcTick();apprTick();dfTick(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);if(LB)LB.frame();
   {const show=!rookie()&&camMode===1&&(AC.id==='cessna'||AC.id==='alpha'||AC.id==='archer')&&running&&!st.crashed;
    if(spCan){spCan.classList.toggle('on',show);if(show)drawSixPack();}}
   radioUpdate(dt);cfgUpdate(dt);resTick(dt);
@@ -15919,7 +16763,7 @@ function tick(t,skipRender){
   if(RIO.built)rioTick(running&&!paused?dt:0);
   if(running&&!paused&&!st.crashed){
     if(STRIKE.built){rangeMoving(dt);targetsTick(dt);}
-    if(STRIKE.active||(camMode===2&&hasBall()))sensorUpdate(dt);
+    if(STRIKE.active||TASK.sens||(camMode===2&&hasBall()))sensorUpdate(dt);
     if(STRIKE.active){missileUpdate(dt);if(AC.id==='a10')hogGun(dt);
       // time on target: the ball locked onto an actual target, not a ground point
       if(SENSOR.tgt&&!SENSOR.tgt.dead)STRIKE.tot=(STRIKE.tot||0)+dt;}
@@ -15986,7 +16830,8 @@ function tick(t,skipRender){
     else{setTxt(hIas,Math.round(s.ias*MS2KT));setTxt(hAlt,(Math.round((s.pos.y*M2FT+FIELD_FT-GEAR*M2FT)/10)*10).toLocaleString('en-US'));}
     const apm=s.ap;hAp.classList.toggle('on',!!apm);if(apm)setTxt(hAp,((APN[apm.mode]||'AUTO')+'  '+(apm.flare?'FLARE':s.onGround&&apm.mode==='land'?'ROLLOUT':(APP[apm.phase]||''))).trim());
     const orb=apm&&(apm.mode==='hold'||apm.mode==='orbit');
-    const lbl=apm?(orb?'Auto Land':'Auto ON'):(s.onGround?'Auto T/O':(hasBall()?'Orbit':'Auto Land'));
+    let lbl=apm?(orb?'Auto Land':'Auto ON'):(s.onGround?'Auto T/O':(hasBall()?'Orbit':'Auto Land'));
+    if(TASK.on&&!TASK.done&&TASK.def.autoLbl){const x=TASK.def.autoLbl(TASK.d,apm);if(x)lbl=x;}   // a tasking's own AUTO says what it does
     {const t=lbl.toUpperCase();if(bAutoT.textContent!==t)bAutoT.textContent=t;}bAuto.classList.toggle('on',!!apm&&!orb);
     {const vs=Math.round(s.vel.y*196.85/10)*10;
      if(rookie()){setTxt(hVs,Math.abs(vs)<50?'Level':(vs>0?'\u25B2 ':'\u25BC ')+Math.abs(vs).toLocaleString('en-US'));
@@ -16015,7 +16860,7 @@ function tick(t,skipRender){
 // it switched off, so nothing is fetched and no request can fail in their console.
 var LB=null;
 LB=(function(){
-const APP_VER='2026-10-10-arsenal';          // keep version.json in step when shipping
+const APP_VER='2026-10-10-tasking';          // keep version.json in step when shipping
   const ORIGINS=['https://rabahharchaoui-design.github.io','http://localhost:8765'];
   let over='';try{over=localStorage.getItem('kgeuLBUrl')||'';}catch(e){}
   const E={url:over||'https://pfs-scores.rabahharchaoui.workers.dev',enabled:!!over||ORIGINS.includes(location.origin),online:null,
@@ -16045,6 +16890,20 @@ const APP_VER='2026-10-10-arsenal';          // keep version.json in step when s
   board('arc:gunrun',{name:'A-10 gun run',group:'Arcade',go:()=>{pickType('a10',1);start('range');},how:'0 to 100: hits 45%, average miss 30%, time on target 25%'});
   LESSONS.forEach(l=>board('lesson:'+l.id,{name:l.name,group:'Flight school',how:'The lesson score, 0 to 100'}));
   board('free:landing',{name:'Free flight landing',group:'Free flight',how:'The landing grade points, 0 to 100'});
+  // Taskings: one board each, 0 to 100. local: the Worker refuses an id it does not know (boardOf in server/src/boards.js
+  // has no task: entry), so these rank the runs flown on this device until it does; nothing is sent
+  [['overwatch','Overwatch','time on target, standoff, report timing, on station'],['lifeline','Lifeline','drop accuracy, time, smoke call, pickup pass'],
+   ['shepherd','Shepherd','station keeping, the lane, the join'],['finder','Finder','find time, mark accuracy, the orbit, the report']].forEach(([id,n,how])=>
+    board('task:'+id,{name:n,group:'Taskings',local:1,go:()=>taskStart(id),how:'0 to 100: '+how+'. Runs on this device'}));
+  // a tasking's score on this device's board: rank among its runs here, a personal best
+  function localAdd(b,score,secs){const A=load('kgeuTaskLB',{}),L=A[b]||(A[b]=[]),B=BOARDS[b]||{dir:1},better=(x,y)=>B.dir>0?x>y:x<y;
+    const pb=!L.length||L.every(x=>better(score,x.s));
+    L.push({s:score,secs:Math.round(secs*10)/10,ac:acType,mode:runMode(),when:Date.now()});
+    L.sort((a,c)=>(B.dir>0?c.s-a.s:a.s-c.s)||a.when-c.when);if(L.length>60)L.length=60;save('kgeuTaskLB',A);
+    return {rank:1+L.filter(x=>better(x.s,score)).length,total:L.length,pb:pb};}
+  function localRows(b,p){const A=load('kgeuTaskLB',{}),now=Date.now(),day=utcDay();
+    const L=(A[b]||[]).filter(x=>p==='today'?utcDay(x.when)===day:p==='week'?now-x.when<7*864e5:true);
+    return {local:1,rows:L.slice(0,30).map((x,i)=>({r:i+1,score:x.s,ac:x.ac,mode:x.mode,when:x.when,secs:x.secs})),total:L.length};}
   // the world airports: the 5 mile landing challenge to each region's home runway (aptStart switches region when needed)
   APT_IDS.forEach(id=>board(aptBoard(id),{name:REGIONS[id].base+' landing',group:'World airports',ghost:1,go:()=>aptStart(id),
     how:'Points: 1,000 x par / your time (up to 1.5x), x the landing grade. Runway '+REGIONS[id].main}));
@@ -16433,7 +17292,7 @@ const APP_VER='2026-10-10-arsenal';          // keep version.json in step when s
   // with its EASY or HARD chip. Hidden boards (the landing challenges, the dash, the gun run, the world airports) keep
   // their rows on the server and still open from code (lbOpen), they just have no entry
   const V={b:'daily',p:'today',seq:0,cache:{},dm:null,ds:'score'};
-  const PICK=[['Challenges',['daily','df','arc:strike','arc:drop','mission:short']],['Free flight',['free:landing']],['Flight school',LESSONS.map(l=>'lesson:'+l.id)]];
+  const PICK=[['Challenges',['daily','df','arc:strike','arc:drop','mission:short']],['Taskings',TASK_IDS.map(id=>'task:'+id)],['Free flight',['free:landing']],['Flight school',LESSONS.map(l=>'lesson:'+l.id)]];
   const PNAME={daily:'Daily challenge',df:'Red Flag Dogfight','arc:strike':'Strike range','arc:drop':'Airdrop','mission:short':'Short field landing','free:landing':'Landings'};
   const DF_STAT={score:'Score',kills:'Kills',clear:'Clear time',guns:'Gun kills'};
   const isDf=b=>/^df:/.test(b),entryOf=b=>isDf(b)?'df':b;
@@ -16491,7 +17350,15 @@ const APP_VER='2026-10-10-arsenal';          // keep version.json in step when s
     let off=false;if(r){const a=r.getBoundingClientRect(),b=rows.getBoundingClientRect();off=a.top>=b.top-1&&a.bottom<=b.bottom-56+1;}
     if(me.classList.contains('off')!==off)me.classList.toggle('off',off);}
   $('lbRows').addEventListener('scroll',lbPin,{passive:true});
+  // a device board: this device's runs, best first, the date under the callsign; works offline
+  function lbLocal(j){const inn=$('lbRowsIn'),me=$('lbMe'),P=E.P,cs=P?P.cs:'You',ri=P?rankIdx(P.xp||0):0,cr=P&&P.creator;
+    const dt=w=>new Date(w).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    inn.innerHTML=j.rows.length?j.rows.map(r=>'<div class="lbRow'+(r.r===1?' top1 me':'')+(r.r<=3?' pod p'+r.r:'')+'" data-full="'+esc(cs+'  ·  #'+r.r+'  ·  '+fmtS(V.b,r.score)+'  ·  '+(AC_TAG[r.ac]||'')+'  ·  '+(r.mode==='easy'?'Easy':'Hard')+'  ·  '+dt(r.when))+'"><span class="n">'+(r.r<=3?'<b>'+r.r+'</b>':num(r.r))+'</span><span class="c">'+csTag(cs,ri,cr,dt(r.when))+'</span>'+lbMode(r.mode)+'<span class="s">'+esc(fmtS(V.b,r.score))+'</span><span class="a">'+lbAc(r.ac)+'</span></div>').join('')
+      :'<div class="lbMsg"><b>No runs yet</b>'+(V.p==='today'?'Nothing flown today. ':'')+'Fly this tasking from Challenges.</div>';
+    me.innerHTML='<div class="lbRow me lbLoc"><span class="c"><span>On this device. Global Taskings boards are coming.</span></span></div>';me.classList.remove('off');
+    $('lbTotal').textContent=num(j.total)+' run'+(j.total===1?'':'s');$('lbRace').hidden=true;$('lbRows').scrollTop=0;}
   function lbFetch(force){
+    if(BOARDS[V.b]&&BOARDS[V.b].local){++V.seq;lbLocal(localRows(V.b,V.p));return Promise.resolve();}
     const key=V.b+'|'+V.p,seq=++V.seq,c=V.cache[key];
     if(c)lbRows(c);else $('lbRowsIn').innerHTML='<div class="lbMsg">Loading...</div>';
     if(!E.enabled){lbRows(null);return Promise.resolve();}
@@ -16571,10 +17438,13 @@ const APP_VER='2026-10-10-arsenal';          // keep version.json in step when s
   return {E:E,BOARDS:BOARDS,ORDER:ORDER,board:board,runStart:runStart,runEnd:runEnd,runCancel:runCancel,frame:frame,reset:reset,armFree:armFree,
     boot:boot,homeRank:homeRank,sheet:sheet,sheetOn:()=>!$('lbSheet').hidden,csHold:()=>csHold,paintModel:paintModel,paintAll:paintAll,lbOpen:lbOpen,lbRender:lbRender,race:race,ui:ui,flush:flush,csOpen:csOpen,dice:dice,
     fameDraw:fameDraw,fameFetch:fameFetch,fameApply:fameApply,fameApplyCity:fameApplyCity,ghostStart:ghostStart,decodePath:decodePath,rankSVG:rankSVG,rankByName:rankByName,utcDay:utcDay,fmtS:fmtS,showBadge:showBadge,ghostOff:ghostOff,runBoard:runBoard,
+    localAdd:localAdd,localRows:localRows,
     get P(){return E.P;}};
 })();
 
-window.__kgeu={tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
+window.__kgeu={TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),taskXp:taskXp,tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
+  task:()=>({on:TASK.on,id:TASK.id,stage:TASK.stage&&TASK.stage.id,si:TASK.si,brief:TASK.brief,done:TASK.done,res:TASK.res,ask:TASK.ask&&{shown:TASK.ask.shown,opts:TASK.ask.opts.map(o=>o.k),t:TASK.ask.t},d:TASK.d,log:TASK.log.slice(),seed:TASK.seed}),
+  tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
   lights:()=>({KGEU:AL.KGEU.count(),KLUF:AL.KLUF.count(),uLights:AL_MAT.uniforms.uLights.value,
@@ -16676,6 +17546,7 @@ worldLoad();
   const go=()=>{const sp=$('splash');if(!WORLD.ready||(sp&&!sp.classList.contains('done'))){if(!WORLD.err)setTimeout(go,200);return;}
     if(r.start){const S=r.start;if(S.skill&&S.skill!==SKILL)setSkill(S.skill);if(S.tod&&TOD_SET[S.tod])setTOD(S.tod);
       if(S.df)dfStart(S.daily?{daily:1}:null);
+      else if(S.task)taskStart(S.task);
       else if(S.arc){if(S.type&&TYPES[S.type])pickType(S.type);arcStart(S.arc);}
       else if(S.lesson)startLesson(S.lesson);
       else if(S.mode==='free'){if(S.type&&TYPES[S.type])pickType(S.type);if(S.base)pickBase(S.base);freeStart(S.pos);}   // the pause sheet's Apply

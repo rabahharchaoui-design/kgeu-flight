@@ -119,7 +119,7 @@ async def main():
         await pg.evaluate(f"()=>{{{K}.openMenu();{K}.nav('sArc')}}"); await pg.wait_for_timeout(400)
         cards = await pg.evaluate(ARCCARDS)
         ok('(a) ui1 CHALLENGES: no World airports group and no airport cards (they are FLY destinations now)',
-           not [c for c in cards if c['id'].startswith('apt:')] and not await pg.evaluate("()=>!!document.querySelector('#arcCards .cgrp')"), [c['id'] for c in cards])
+           not [c for c in cards if c['id'].startswith('apt:')] and await pg.evaluate("()=>[...document.querySelectorAll('#arcCards .cgrp')].every(e=>e.textContent==='Taskings')"), [c['id'] for c in cards])   # tasking: its own group only
 
         # ---------------- (b) the Tokyo landing challenge (no card since ui1, the mode stays): region switch, then the run ----------------
         await pg.evaluate(STUB)
