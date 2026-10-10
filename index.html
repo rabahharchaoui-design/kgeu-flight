@@ -13656,6 +13656,112 @@ function shWeather(d){const L=d.L,f={x:Math.sin(L.h),z:-Math.cos(L.h)},r={x:Math
   tqSay('Herky 21','Herky 21, 20 '+side+' for weather. Viper, stay with me.',{plain:'The C-130 turns '+side+'. Follow it.'});
   L.dev=d.devSide*20*Math.PI/180;d.devOn=1;d.devT0=st.time;
   const l=tqMC(AC.csS+', copy the deviation?',{plain:'Tap WILCO to say you will follow.'});tqAsk([{k:'WILCO'}],{line:l,wait:15});}
+// ---- FINDER (Cessna 172, search and rescue) ----
+// A hiker is missing in a rolled search box on the White Tanks' east slopes. Fly the search pattern (parallel legs, drawn
+// on the ground), spot the signal mirror's flash (a strobe after dark: it only shows within range and in line of sight),
+// MARK over it, orbit the hiker until Ranger 41 (a DPS helicopter, on the radio) calls for the position, then REPORT
+// the coordinates. Scored on find time against par, mark accuracy, the orbit and the report.
+// Rolled: the box (its corner, its size), the hiker in it, the flash's rhythm, Ranger 41's time out, the wind.
+function fdRibbon(P,w,col,op,dy){const pos=[],idx=[];let n=0;
+  for(let i=0;i<P.length-1;i++){const a=P[i],b=P[i+1],L=Math.hypot(b.x-a.x,b.z-a.z),k=Math.max(1,Math.round(L/45)),ux=(b.x-a.x)/L,uz=(b.z-a.z)/L;
+    for(let j=0;j<=k;j++){if(i>0&&j===0)continue;const x=a.x+(b.x-a.x)*j/k,z=a.z+(b.z-a.z)*j/k,y=groundHeight(x,z)+(dy||1.2);
+      pos.push(x-uz*w/2,y,z+ux*w/2,x+uz*w/2,y,z-ux*w/2);if(n)idx.push(2*n-2,2*n-1,2*n,2*n-1,2*n+1,2*n);n++;}}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);
+  return new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:op,depthWrite:false,side:THREE.DoubleSide}));}
+const FD_FLASH=tex(64,64,(x,w,h)=>{const g=x.createRadialGradient(32,32,0,32,32,32);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(0.18,'rgba(255,252,235,.95)');g.addColorStop(0.45,'rgba(255,240,200,.35)');g.addColorStop(1,'rgba(255,240,200,0)');
+  x.fillStyle=g;x.fillRect(0,0,64,64);x.strokeStyle='rgba(255,255,255,.75)';x.lineWidth=2;x.beginPath();x.moveTo(32,2);x.lineTo(32,62);x.moveTo(2,32);x.lineTo(62,32);x.stroke();});
+function fdHiker(d){const g=new THREE.Group(),or=lam(0xff6a1a),bl=lam(0x2c3a52),sk=lam(0xd9a273);
+  const add=(geo,m,x,y,z)=>{const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);g.add(o);return o;};
+  add(new THREE.BoxGeometry(0.5,0.6,0.3),or,0,1.25,0);add(new THREE.BoxGeometry(0.42,0.8,0.26),bl,0,0.45,0);add(new THREE.SphereGeometry(0.14,8,6),sk,0,1.7,0);
+  add(new THREE.BoxGeometry(0.45,0.55,0.25),lam(0x6b4a2a),0,1.25,0.25);   // the pack
+  const tarp=add(new THREE.BoxGeometry(3,0.05,2),lam(0xffa21a),2.2,0.06,1);tarp.material.emissive=new THREE.Color(0x3a1800);   // the orange signal panel
+  g.position.set(d.h.x,groundHeight(d.h.x,d.h.z),d.h.z);g.traverse(o=>{if(o.isMesh)o.userData.heat=0.8;});return g;}
+TASKS.finder={name:'Finder',role:'Search and rescue',ac:'cessna',base:'kgeu',airStart:1,limit:480,
+  roll(R,d){const cx=tqR(R,-19300,-17600),cz=tqR(R,-11000,-3000),W=tqR(R,2000,2600),H=tqR(R,2600,3200);
+    d.box={x0:cx-W/2,x1:cx+W/2,z0:cz-H/2,z1:cz+H/2,cx:cx,cz:cz,W:W,H:H};
+    d.h={x:tqR(R,d.box.x0+250,d.box.x1-250),z:tqR(R,d.box.z0+250,d.box.z1-250)};
+    // the pattern: north-south legs 0.4 nm apart, from the east side (where we come from) working west
+    const sp=740,n=Math.max(3,Math.ceil(W/sp)),P=[];for(let i=0;i<n;i++){const x=d.box.x1-sp/2-i*(W-sp)/(n-1);const a=i%2===0?d.box.z0+150:d.box.z1-150,b=i%2===0?d.box.z1-150:d.box.z0+150;P.push({x:x,z:a},{x:x,z:b});}
+    d.P=P;let top=0;for(let i=0;i<=8;i++)for(let j=0;j<=8;j++)top=Math.max(top,groundHeight(d.box.x0+W*i/8,d.box.z0+H*j/8));
+    d.top=top;d.altY=top+300;d.altFt=Math.round(((d.altY)*M2FT+FIELD_FT)/100)*100;
+    d.wdir=Math.round(tqR(R,0,36))*10||360;d.wkt=Math.round(tqR(R,2,12));d.heliAt=tqR(R,190,230);d.fl=tqR(R,1.2,2.6);d.flR=R;
+    let len=0;for(let i=0;i<P.length-1;i++)len+=Math.hypot(P[i+1].x-P[i].x,P[i+1].z-P[i].z);
+    // par to find: to the box, half the pattern, a turn; the 172 at about 105 kt
+    d.par=Math.round(4500/54+len*0.5/54+30);d.wp=0;d.falseMark=0;d.orbIn=0;d.orbT=0;},
+  brief(d){const b=tqBrg(LUKE.x,LUKE.z,d.box.cx,d.box.cz);return {ac:'Cessna 172 · airborne east of the White Tanks',
+    sit:'A hiker is overdue in the White Tank Mountains. The search box is '+(rookie()?(d.box.W/1609).toFixed(1)+' by '+(d.box.H/1609).toFixed(1)+' mi':(d.box.W/1852).toFixed(1)+' by '+(d.box.H/1852).toFixed(1)+' nm')+' on the east slopes. Fly the pattern at '+d.altFt.toLocaleString('en-US')+' ft, watch for a signal mirror flash'+(TOD.night?' (a strobe after dark)':'')+', MARK when you are over it, orbit until Ranger 41 arrives, then report the position.',
+    facts:[['PAR TO FIND',tqClock(d.par)],['SEARCH',d.altFt.toLocaleString('en-US')+' ft'],['PATTERN',(d.P.length/2)+' legs'],['WIND',tqWind(d.wdir,d.wkt)]]};},
+  spawn(d){const B=d.box,x=B.x1+4500,z=d.P[0].z+(d.P[0].z<B.cz?-600:600);
+    placeAir(x,z,(d.altY-Math.max(0,groundHeight(x,z)))*M2FT,Math.atan2(d.P[0].x-x,-(d.P[0].z-z)),105);trimSpawn(st,0);
+    tqAdd(fdRibbon([{x:B.x0,z:B.z0},{x:B.x1,z:B.z0},{x:B.x1,z:B.z1},{x:B.x0,z:B.z1},{x:B.x0,z:B.z0}],16,0xff8a3d,0.55,4));
+    d.pat=tqAdd(fdRibbon(d.P,10,0x7fd4ff,0.45,4));   // 4 m over the slope, sampled every 45 m, so the line does not dive under the rocks
+    d.hk=tqAdd(fdHiker(d));
+    const fl=new THREE.Sprite(new THREE.SpriteMaterial({map:FD_FLASH,color:0xffffff,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending,sizeAttenuation:false,fog:false}));
+    fl.position.set(d.h.x,groundHeight(d.h.x,d.h.z)+1.8,d.h.z);fl.renderOrder=5;d.fl0=tqAdd(fl);d.flT=d.fl;d.flA=0;
+    tqDest(d.P[0].x,d.P[0].z,'Search pattern','LEG 1');},
+  // AUTO: the pattern at search height (searching), an orbit over the mark (after it); again: off
+  autoLbl:(d,ap)=>ap&&ap.tk?'Auto Off':TASK.si>=1&&d.mark?'Orbit':'Auto Nav',
+  auto(d){if(st.ap&&st.ap.tk){st.ap=null;st.apW=null;toast('Autopilot off, your airplane');return true;}initAudio();
+    if(d.mark){apEngage(st,'orbit',{cx:d.mark.x,cz:d.mark.z,r:1200,y:Math.max(st.pos.y-GEAR,d.altY),v:AC.vcruise,dir:1});st.ap.tk=1;toast('Orbit over your mark. AUTO again: your airplane',3);return true;}
+    apEngage(st,'hold');st.ap.tk=1;fdAp(d);toast('Autopilot: the search pattern. AUTO again: your airplane',3);return true;},
+  always(d,dt){fdAp(d);
+    // the pattern's next point: on to the next leg within 350 m
+    if(!d.mark&&d.wp<d.P.length){const w=d.P[d.wp];if(tqD(w.x,w.z)<350){d.wp++;if(d.wp<d.P.length&&DEST&&DEST.task){DEST.short='LEG '+(Math.floor(d.wp/2)+1);destUI(true);}}
+      const w2=d.P[Math.min(d.wp,d.P.length-1)];if(DEST&&DEST.task){DEST.x=w2.x;DEST.z=w2.z;}}
+    // the flash: a short bright pulse every 1.2 to 2.6 s (rolled), seen only within range (Easy 3.5 km, Hard 2.6 km)
+    const r=tqD(d.h.x,d.h.z),rng=rookie()?3500:2600,f=d.fl0;d.flT-=dt;
+    if(d.flT<=0){d.flT=d.fl*(0.7+0.6*d.flR());d.flA=0.22;}
+    d.flA=Math.max(0,d.flA-dt);const k=d.flA>0?Math.sin(d.flA/0.22*Math.PI):0,near=r<rng&&!st.onGround;
+    f.material.opacity=near&&d.end==null?k:0;f.scale.setScalar(0.022+0.03*k*(1-r/rng*0.6));f.visible=f.material.opacity>0.01;
+    if(near&&k>0.5&&!d.seen){d.seen=st.time-d.t0;}
+    if(TASK.si===1&&!st.onGround){const rr=tqD(d.h.x,d.h.z);d.orbT+=dt;if(rr<=(rookie()?2500:2000)&&st.agl*M2FT>=500)d.orbIn+=dt;}
+  },
+  stages:[
+    {id:'search',name:'Fly the search pattern, watch for the flash. MARK over it',
+      obj:d=>{const w=d.P[Math.min(d.wp,d.P.length-1)],leg=Math.floor(d.wp/2)+1;return ['Search: leg '+Math.min(leg,d.P.length/2)+' of '+d.P.length/2,
+        (tqD(d.box.cx,d.box.cz)>Math.max(d.box.W,d.box.H)?tqDs(tqD(w.x,w.z))+' to the box. ':'')+'Watch for a flash. MARK when over it'];},
+      enter(d){tqQuiet(()=>{const l=tqMC(AC.csS+', Mission Control. A hiker is overdue in the White Tanks. Search box on your map, pattern at '+d.altFt.toLocaleString('en-US')+'. He may have a signal mirror. Mark anything you see.',
+          {plain:'Fly along the blue lines over the mountains. Look for a bright flash on the ground and tap MARK when you are right over it.'});
+        tqAsk([{k:'WILCO',fn:()=>fdAskMark(d)},{k:'UNABLE',fn:()=>{tqMC('Copy. The box is on your map when you are ready.',{plain:'Take your time.'});fdAskMark(d);}}],{line:l,late:()=>fdAskMark(d)});},2);},
+      tick:d=>!!d.mark},
+    {id:'orbit',name:'Orbit the hiker until Ranger 41 arrives',
+      obj:d=>{const r=tqD(d.h.x,d.h.z),lim=rookie()?2500:2000,lo=st.agl*M2FT<500;return ['Orbit the hiker',(r>lim?'Too far: '+tqDs(r):lo?'Too low: climb above 500 ft':'Keep him in sight')+'. Ranger 41 in '+Math.max(0,Math.round(d.eta-(st.time-d.o0)))+' s',r>lim||lo];},
+      enter(d){d.o0=st.time;d.found=1;
+        // Ranger 41 launched when the search began: it arrives at its rolled time, at least 45 s after the mark
+        d.eta=Math.max(45,d.heliAt-(st.time-d.t0));const mn=Math.max(1,Math.round(d.eta/60));
+        const l=tqMC('Copy your mark. Ranger 41, DPS helicopter, is '+(mn===1?'about a minute':mn+' minutes')+' out. Orbit the hiker and keep him in sight.',{plain:'Fly circles around the hiker. The rescue helicopter is on its way.'});
+        tqAsk([{k:'WILCO'}],{line:l,wait:15});},
+      tick:d=>st.time-d.o0>=d.eta},
+    {id:'report',name:'Report the position to Ranger 41',
+      obj:d=>['Report the position','REPORT the hiker\'s coordinates'],
+      enter(d){tqSay('Ranger 41','Mission Control, Ranger 41, one minute out. Request the hiker\'s position.',{plain:'The helicopter asks where the hiker is.'});
+        const l=tqMC(AC.csS+', report the hiker\'s position for Ranger 41.',{plain:'Tap REPORT to give the helicopter the position.'});
+        tqAsk([{k:'REPORT',sub:'coordinates',say:'',fn:t=>fdReport(d,t)}],{line:l,wait:30,late:()=>{d.repT=99;tqSay('Ranger 41','Ranger 41 has your orbit in sight, we will find him from there.',{plain:'The helicopter found the hiker by your circles.'});d.end=st.time;}});},
+      tick:d=>d.end!=null&&st.time-d.end>4}],
+  score(d){const find=d.findT==null?0:40*clamp(1-(d.findT-d.par)/180,0,1),m=d.mark?d.mark.err:1e9,acc=m>=600?0:m<=50?35:35*(1-(m-50)/550);
+    const orb=d.orbT>0?15*d.orbIn/d.orbT:0,rep=d.repT==null||d.repT>=30?0:10*clamp(1-(d.repT-8)/22,0,1);
+    const sc=find+acc+orb+rep-5*d.falseMark;
+    return {score:sc,title:m<60?'Right on top of him':m<200?'Hiker found':m<600?'Found, roughly':'Not found',
+      lines:[['Find time',d.findT==null?'not found':tqClock(d.findT)+'  (par '+tqClock(d.par)+')'],['Mark from the hiker',d.mark?Math.round(m)+' m'+(d.falseMark?'  ·  '+d.falseMark+' false mark'+(d.falseMark>1?'s':''):''):'no mark'],
+        ['Orbit kept',d.orbT>0?Math.round(100*d.orbIn/d.orbT)+' %':'not flown'],['Report',d.repT==null||d.repT>=30?'not given':d.repT.toFixed(1)+' s'],['First flash seen',d.seen!=null?tqClock(d.seen):'never']],
+      tip:!d.mark?'The flash only shows within about 1.5 miles: fly the legs and look down the slope.':m>150?'MARK when the flash is right under the nose, not as you see it.':'Fly it again: the box, the hiker and the time of day change every time.'};},
+  cleanup(d){}
+};
+function fdAskMark(d){tqAsk([{k:'MARK',sub:'over the flash',say:'',fn:()=>fdMark(d)}],{keep:1});}
+function fdMark(d){const err=tqD(d.h.x,d.h.z),lim=rookie()?800:600;
+  tqPilot('Mission Control, '+AC.csS+', mark, mark, mark.');
+  if(err>lim){d.falseMark++;tqMC('Negative, nothing at that mark. Continue the search.',{plain:'Nothing there. Keep looking for the flash.'});fdAskMark(d);return;}
+  d.mark={x:st.pos.x,z:st.pos.z,err:err};d.findT=st.time-d.t0;if(DEST&&DEST.task){DEST.x=d.mark.x;DEST.z=d.mark.z;DEST.name='Your mark';DEST.short='MARK';destUI(true);}
+  if(d.pat)d.pat.visible=false;}
+function fdReport(d,t){d.repT=t;const m=d.mark,ft=Math.round(((groundHeight(m.x,m.z))*M2FT+FIELD_FT)/100)*100;
+  tqPilot('Ranger 41, '+AC.csS+', hiker at '+tqLL(m.x,m.z)+', on the east slope, about '+ft.toLocaleString('en-US')+' feet, signal mirror.');
+  const e=m.err,b=tqDir(tqBrg(m.x,m.z,d.h.x,d.h.z));
+  tqSay('Ranger 41',e<80?'Copy. Ranger 41 has your orbit in sight. Tally the mirror, right where you said. We have him.':'Copy. Ranger 41 has the mirror, about '+Math.round(e/10)*10+' metres '+b+' of your mark. We have him.',{plain:'The helicopter has found the hiker. Job done.'});
+  d.end=st.time;}
+// AUTO's pattern: toward the next point at search height (over the higher of here and 600 m ahead plus 1,000 ft)
+function fdAp(d){const a=st.ap;if(!a||!a.tk||a.mode!=='hold')return;const w=d.P[Math.min(d.wp,d.P.length-1)];
+  a.trk=Math.atan2(w.x-st.pos.x,-(w.z-st.pos.z));a.v=AC.vcruise;
+  const gv=Math.hypot(st.vel.x,st.vel.z)||1;a.y=Math.max(d.altY,groundHeight(st.pos.x+st.vel.x/gv*600,st.pos.z+st.vel.z/gv*600)+300);}
 // (results cards) flies exactly the same start: a free flight / segment / mission start keeps its spawn
 // (final1 is not final), base and aircraft; an arcade game, lesson or dogfight goes back through its own
 // starter (arcStart, startLesson, dfStart), which sets its own position. Each starter stamps it after start().
