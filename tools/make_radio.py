@@ -157,6 +157,9 @@ PILOT = {
     'rb_wilco':        'Wilco,',
     'rb_roger':        'Roger,',
     'rb_traffic':      'Looking for the traffic,',
+    # school1 item 5: the pattern lesson's request at the hold and the touch and go readback (Glendale)
+    'hold_closed':     'holding short runway one, request closed traffic.',
+    'rb_cleared_tg':   'Cleared touch and go runway one,',
     'load_away':       'load away, one bundle.',
     'rifle':           'Rifle,',
     # C-130 jump calls on the intercom

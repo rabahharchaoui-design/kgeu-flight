@@ -49,15 +49,15 @@ async def main():
         ok('(a) 10 s in, 1 s out, the range at 250 of 300, the event: 95 (45.5 + 30 + 20), an A', r['score'] == 95 and r['letter'] == 'A', r)
         ok('(a) the detail wording', r['lines'] == [[True, 'inside 91% of the time, worst 150 ft'], [True, '250 ft, standard 300 ft'], [True, 'in 1.4 s']], r['lines'])
         ok('(a) the debrief rows: tick, name, detail', r['rows'] == [[True, 'Hold it', 'inside 91% of the time, worst 150 ft'], [True, 'Range it', '250 ft, standard 300 ft'], [True, 'Event it', 'in 1.4 s']], r['rows'])
-        ok('(a) Standard: no Easy tag, the score reads 95 of 100, Dana says checkride standard', not r['tag'] and r['score2'] == '95 of 100' and r['tip'] == 'Checkride standard. Nice work.', r)
+        ok('(a) Standard: no Easy tag, the score reads 95 of 100, Dana says checkride standard', not r['tag'] and r['score2'] == '95 of 100' and r['tip'] == 'That was checkride standard. I would sign that off any day.', r)
         t = await pg.evaluate("()=>document.getElementById('gTitle').firstChild.textContent")
         ok('(a) the title reads Debrief: <lesson>', t == 'Debrief: Slow flight', t)
         await held(pg)
         r = await pg.evaluate(RUN, [60, 50])
         ok('(a) 6 s in, 5 s out: the hold fails and scores 5, total 55, an F', r['score'] == 55 and r['letter'] == 'F' and r['lines'][0] == [False, 'inside 55% of the time, worst 150 ft'], r)
-        ok('(a) the F tip names the lowest task', r['tip'] == 'Below standard today. Hold it needs work; let us fly it again.', r['tip'])
+        ok('(a) the F tip names the lowest task', r['tip'] == 'Not to standard today, and that is normal at this point. Hold it needs work, so we fly it again.', r['tip'])
         tip = await pg.evaluate(f"()=>{K}.dbTip({{letter:'C',lines:[{{ok:true,name:'Altitude within 100 ft',pts:30,w:35}},{{ok:false,name:'Airspeed on target',pts:10,w:35}}]}})")
-        ok('(a) a B to D tip names the worst failed task', tip == 'Passed. Work on the airspeed on target.', tip)
+        ok('(a) a B to D tip names the worst failed task', tip == 'You passed. Airspeed on target was outside the standard; we will work on it.', tip)
         await pg.context.close()
 
         # (b) slow flight: the cue strip on the lesson card, three rows, ALT out when 250 ft high, back in

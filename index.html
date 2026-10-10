@@ -11297,7 +11297,7 @@ function musicLoadList(list){
 // still shows its text and clicks the squelch, which is a fine degraded mode
 function radioLoad(){
   if(RADIO.loaded||!actx)return;RADIO.loaded=true;
-  fetch('radio/clips.json?v=3').then(r=>r.json()).then(list=>{   // ?v: a cached list from before 5.4 would miss the dogfight clips
+  fetch('radio/clips.json?v=4').then(r=>r.json()).then(list=>{   // ?v: a cached list from before 5.4 would miss the dogfight clips
     RADIO.want=list.length;let i=0;
     const next=()=>{if(i>=list.length)return;const id=list[i++];
       fetch('radio/'+id+'.m4a').then(r=>r.arrayBuffer())
@@ -11359,7 +11359,7 @@ const CLOCK_W=['ahead','ahead, a little right','ahead and to the right','to your
 function plainOf(l){
   if(l.task)return l.kind==='pilot'?'You: '+l.text.replace(/, [^,]*\.$/,'.'):l.plain||'';   // a tasking line says its own
   const t=l.text,mine=AC.cs&&(t.indexOf(AC.cs)>=0||(AC.csS&&t.indexOf(AC.csS)>=0)),who=/Ground/.test(l.who)?'Ground':/Range/.test(l.who)?'Range':/Approach/.test(l.who)?'Approach':'Tower';
-  if(l.who==='Instructor')return '';
+  if(isCFI(l))return '';                                          // Dana already speaks plainly
   if(l.who==='Loadmaster')return 'Crew: '+l.text;
   if(/red smoke/.test(l.text))return 'Drop zone says: fly to the red smoke.';
   if(l.who===AC.cs||l.kind==='pilot')return 'You: got it.';
@@ -11441,7 +11441,7 @@ function vqPump(){
 }
 function playLine(l){
   l.cut=false;l.dead=false;l.aired=true;
-  const live=radioLive(),sp=l.who==='Instructor';
+  const live=radioLive(),sp=isCFI(l);
   RADIO.log.push({who:l.who,kind:l.kind,text:l.text,clips:Array.isArray(l.clips)?l.clips.slice():l.clips,t:st?+st.time.toFixed(2):0,amb:(REGION.az?CHAT:CHAT_R[REGION.id]||[]).some(p=>p.indexOf(l)>=0),type:AC.id});
   if(RADIO.log.length>200)RADIO.log.shift();
   if(live&&!l.df){                                                 // the grade card speaks without a subtitle; the dogfight's go to its strip (below)
@@ -11468,18 +11468,38 @@ function coachSpeak(c,text){
   radioHush();                                                     // belt and braces: no clip left under the voice
   if(muted||!RADIO.on||!window.speechSynthesis)return est;         // silent: the subtitle still gets its time
   try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);
-    u.rate=1.02;u.volume=0.9*RADIO.vol;
+    u.rate=1.02;u.volume=0.9*RADIO.vol;const v=cfiVoice();if(v){u.voice=v;if(v.lang)u.lang=v.lang;}
     u.onend=u.onerror=()=>{if(VQ.cur===c){c.fin=true;if(c.rec.a1==null)c.rec.a1=vqNow();musicUnduck();}};
     speechSynthesis.speak(u);c.voiced=true;
     if(actx){const n=actx.currentTime;musicDuck(n,n+est*1.6+1);}}catch(e){}
   return est;
 }
+// Dana's voice: an English female voice when the device has one (Samantha, Karen, Moira, Ava...), else the default.
+// The list can be empty until the engine loads it, so a miss is not cached
+let CFI_V=null;
+function cfiVoice(){if(CFI_V)return CFI_V;
+  try{const vs=(window.speechSynthesis&&speechSynthesis.getVoices&&speechSynthesis.getVoices())||[],en=vs.filter(v=>v&&/^en/i.test(v.lang||''));
+    const by=n=>en.find(v=>v.name===n)||en.find(v=>(v.name||'').indexOf(n)===0);
+    CFI_V=['Samantha','Karen','Moira','Ava'].map(by).find(Boolean)||en.find(v=>/female|samantha|karen|moira|ava|allison|susan|zira/i.test(v.name||''))||null;}catch(e){CFI_V=null;}
+  return CFI_V;}
+// every instructor line in the game is Dana Reyes, CFI (SCHOOL.cfi): she sits beside you, so her lines are spoken, not radioed
+const isCFI=l=>!!l&&l.who==='Dana';
 // a new instruction replaces the one before it; tower calls waiting behind it keep waiting
 function coach2(t,sp,o){o=o||{};
-  for(let i=radioQ.length-1;i>=0;i--)if(radioQ[i].pri<=1&&radioQ[i].who==='Instructor'){radioQ[i].dead=true;radioQ.splice(i,1);}
-  const l={who:'Instructor',text:t,sp:sp,clips:null};
-  vqAdd(l,{pri:o.urgent?0:1,cut:true,offAir:o.offAir});
+  for(let i=radioQ.length-1;i>=0;i--)if(radioQ[i].pri<=1&&isCFI(radioQ[i])){radioQ[i].dead=true;radioQ.splice(i,1);}
+  const l={who:'Dana',text:t,sp:sp,clips:null};
+  return vqAdd(l,{pri:o.urgent?0:1,cut:true,offAir:o.offAir});
 }
+// the lessons' name for it: sp defaults to the text with its numbers in words, as a CFI says them (3,500: thirty-five hundred)
+function cfi(t,sp,o){return coach2(t,sp==null?cfiSp(t):sp,o);}
+const NW1=['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'],
+  NW10=['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
+function nWords(n){n=Math.round(Math.abs(n));if(n<20)return NW1[n];if(n<100)return NW10[n/10|0]+(n%10?'-'+NW1[n%10]:'');
+  if(n<1000)return NW1[n/100|0]+' hundred'+(n%100?' '+nWords(n%100):'');
+  if(n<10000&&n%100===0&&n%1000)return nWords(n/100)+' hundred';
+  if(n<1e6)return nWords(n/1000|0)+' thousand'+(n%1000?' '+nWords(n%1000):'');return String(n);}
+function cfiSp(t){return String(t).replace(/\bft\b/g,'feet').replace(/\bkt\b/g,'knots').replace(/\bfpm\b/g,'feet a minute').replace(/\u00b0/g,' degrees')
+  .replace(/\b\d[\d,]*\b/g,m=>nWords(+m.replace(/,/g,'')));}
 function vqReset(){radioQ.length=0;if(VQ.cur){const c=VQ.cur;if(c.speech){try{speechSynthesis.cancel();}catch(e){}}vqClose(c,vqNow());}radioBusy=0;}
 // a tower call to us: it drops pending chatter, supersedes a tower line on the air (whose
 // readback goes with it), and goes ahead of other tower lines, but waits for an instruction
@@ -13279,14 +13299,14 @@ function tqPilot(text,clip){const l={who:AC.cs,kind:'pilot',text:text,clips:clip
 function tqAsk(opts,o){o=o||{};const a={opts:opts,line:o.line||null,wait:o.wait||18,late:o.late||null,keep:!!o.keep,shown:false,t:0,id:++TASK.askN,tag:o.tag||''};
   TASK.ask=a;tqReplyUI();return a;}
 function tqAnswer(k){const a=TASK.ask;if(!a||!a.shown||!running||paused)return false;const op=a.opts.find(x=>x.k===k);if(!op)return false;
-  TASK.ask=null;tqReplyUI();hapPattern('tap');
+  TASK.ask=null;tqReplyUI();hapPattern('tap');if(!TASK.d)TASK.d={};   // a lesson's ask (LES.on) has no tasking state
   const rb=TQ_RB[k],txt=op.say!=null?op.say:rb?rb[0]+AC.csS+'.':k.charAt(0)+k.slice(1).toLowerCase()+', '+AC.csS+'.';
   if(txt)tqPilot(txt,op.say==null&&rb?rb[1]:null);
   TASK.d.replies=(TASK.d.replies||0)+1;TASK.d.replyT=(TASK.d.replyT||0)+a.t;
   if(op.fn)op.fn(a.t);return true;}
 const tqReplyEl=document.getElementById('tkReply');
 let tqReplyKey='';
-function tqReplyUI(){const a=TASK.ask,on=!!(a&&a.shown&&TASK.on&&running&&!st.crashed);
+function tqReplyUI(){const a=TASK.ask,on=!!(a&&a.shown&&(TASK.on||LES.on)&&running&&!st.crashed);
   const key=on?a.id+'|'+a.opts.map(o=>o.k).join(','):'';
   if(key!==tqReplyKey){tqReplyKey=key;
     if(on){tqReplyEl.innerHTML='';a.opts.forEach(o=>{const b=document.createElement('button');b.type='button';b.dataset.k=o.k;
@@ -13297,7 +13317,7 @@ function tqReplyUI(){const a=TASK.ask,on=!!(a&&a.shown&&TASK.on&&running&&!st.cr
 }
 function tqAskTick(dt){const a=TASK.ask;if(!a)return;
   if(!a.shown){const l=a.line;if(!l||l.aired||l.dead){a.shown=true;tqReplyUI();}return;}
-  a.t+=dt;if(!a.keep&&a.t>=a.wait){TASK.ask=null;tqReplyUI();TASK.d.missed=(TASK.d.missed||0)+1;if(a.late)a.late();}
+  a.t+=dt;if(!a.keep&&a.t>=a.wait){TASK.ask=null;tqReplyUI();if(TASK.d)TASK.d.missed=(TASK.d.missed||0)+1;if(a.late)a.late();}
 }
 
 // ---- the stage card: the existing mission card, in full for 3 s as each stage comes up, then a chip ----
@@ -14254,12 +14274,12 @@ const SCHOOL={
       log:{dual:1.0}},
     {id:'pattern',name:'Pattern and touch and go',sub:'Fly the circuit, land in the zone',min:6,server:true,note:'The game flies final at 65 kt; the POH normal approach is 60 to 70 kt.',
       cards:[{h:'The traffic pattern',b:'A rectangle flown 1,000 ft above the field, 2,100 ft at Glendale: upwind, crosswind, downwind, base and final, then you land on runway 1.'},
-        {h:'Talking to the tower',b:'On 121.0: "Glendale Tower, Skyhawk 8401L, ready for departure runway 1, closed traffic." The tower answers "runway 1, cleared for takeoff". Read that back.'},
+        {h:'Talking to the tower',b:'On 121.0: "Glendale Tower, Skyhawk 8401L, holding short runway 1, request closed traffic." Tap CALL to transmit. The tower clears you for takeoff; on downwind it clears your touch and go. Read it back.'},
         {h:'The touch and go',b:'Land on the numbers at 65 kt on the centerline, then flaps up a notch and full power to take off again without stopping. Many landings in one flight.'}],
       quiz:{q:'At Glendale, what altitude do you fly on downwind?',a:['1,071 ft MSL','2,100 ft MSL','3,500 ft MSL','700 ft above the field'],ok:1,why:'Pattern altitude is about 1,000 ft above the field. Glendale sits at 1,071 ft, so downwind is 2,100 ft MSL.'},
-      tasks:[{id:'dw',name:'Downwind altitude held',w:25,kind:'hold',tol:'alt',unit:'ft'},{id:'zone',name:'Touchdown in the zone',w:20,kind:'range',tol:600,min:60,unit:'m'},
-        {id:'fpm',name:'Touchdown under 300 fpm',w:25,kind:'range',tol:300,unit:'fpm'},{id:'cl',name:'On the centerline',w:15,kind:'range',tol:6,unit:'m'},
-        {id:'vapp',name:'Final approach speed',w:15,kind:'range',tol:'spd',unit:'kt'}],
+      tasks:[{id:'dw',name:'Downwind altitude held',w:20,kind:'hold',tol:'alt',unit:'ft'},{id:'zone',name:'Touchdown in the zone',w:20,kind:'range',tol:600,min:60,unit:'m'},
+        {id:'fpm',name:'Touchdown under 300 fpm',w:20,kind:'range',tol:300,unit:'fpm'},{id:'cl',name:'On the centerline',w:15,kind:'range',tol:6,unit:'m'},
+        {id:'vapp',name:'Final approach speed',w:15,kind:'range',tol:'spd',unit:'kt'},{id:'calls',name:'Made the tower calls',w:10,kind:'event'}],
       log:{dual:1.0,ldg:1}},
     {id:'slow',name:'Slow flight',sub:'Just above the stall for 45 seconds',min:3,server:true,note:'The game flies slow flight at 55 kt. In the real 172 it is nearer 50 kt, just above the stall; the game wing stalls a little later.',
       cards:[{h:'What slow flight is',b:'Flying just above the stall, with full flaps, the nose high and plenty of power. The controls feel soft and slow to answer. It shows you how the plane behaves near the edge.'},
@@ -14382,7 +14402,7 @@ let G={def:null,tasks:{},holds:[],t0:0,easy:false,cueT:0,end:false,res:null};
 const cueEl=document.getElementById('lesCue');
 const gTask=id=>G.def&&(G.def.tasks||[]).find(t=>t.id===id),gTol=t=>tolOf(t.tol)*(G.easy?2:1),gTolOf=id=>{const t=gTask(id);return t?gTol(t):0;};
 const gNum=v=>{const a=Math.abs(v),r=a<10?Math.round(a*10)/10:Math.round(a);return (v<0&&r?'\u2212':'')+(r%1?r.toFixed(1):r.toLocaleString('en-US'));};
-function gBegin(def){G={def:def,tasks:{},holds:[],t0:performance.now(),easy:!!SCHOOL.easy,cueT:0,end:false,res:null,a:null,alt:0,kt:0};if(G.easy)RUN.easyEver=true;gCue();}
+function gBegin(def){G={def:def,tasks:{},holds:[],t0:performance.now(),easy:!!SCHOOL.easy,cueT:0,end:false,res:null,a:null,alt:0,kt:0,tt:0,sayAt:-1e9};if(G.easy)RUN.easyEver=true;gCue();}
 // o: get ()=>value, target number or ()=>number, wrap true for headings, grace seconds not graded at the start (3). A hold
 // stopped and started again (the engine lesson's glide above 200 ft) keeps its time; the grace counts once
 function gHold(id,o){const t=gTask(id);if(!t||G.end)return;let h=G.tasks[id];
@@ -14392,8 +14412,12 @@ function gHold(id,o){const t=gTask(id);if(!t||G.end)return;let h=G.tasks[id];
   if(!G.holds.includes(h)){G.holds.push(h);gCue();}}
 function gHoldEnd(id){const h=G.tasks[id];if(!h||!h.on)return;h.on=false;G.holds=G.holds.filter(x=>x!==h);gCue();}
 function gDev(h){const tg=typeof h.target==='function'?h.target():h.target;let d=h.get()-tg;if(h.wrap)d=((d%360)+540)%360-180;return d;}
-function gTick(dt){if(!G.def||G.end||!G.holds.length)return;
-  for(const h of G.holds){const d=gDev(h);if(!isFinite(d))continue;h.dev=d;h.t+=dt;if(h.t<=h.grace+1e-9)continue;
+function gTick(dt){if(!G.def||G.end||!G.holds.length)return;G.tt+=dt;let said=false;
+  for(const h of G.holds){const d=gDev(h);if(!isFinite(d))continue;h.dev=d;h.t+=dt;
+    // Dana's correction: a row out (past 1.5 tolerances) for 4 s running, not in a hold's first 3 s, one call every 12 s at most
+    h.outT=h.t>3&&Math.abs(d)>1.5*h.tol?(h.outT||0)+dt:0;
+    if(!said&&h.outT>=4&&G.tt-G.sayAt>=12&&G.def.id!=='first'){const c=cfiCue(gLbl(h.task).toLowerCase(),d);h.outT=0;if(c){said=true;G.sayAt=G.tt;cfi(c);}}
+    if(h.t<=h.grace+1e-9)continue;
     const a=Math.abs(d);h.tAll+=dt;if(a<=h.tol)h.tIn+=dt;if(a>h.worst)h.worst=a;}
   G.cueT+=dt;if(G.cueT>=0.1-1e-9){G.cueT=0;gCueTick();}}   // the pip and the text at most 10 times a second
 function gRange(id,value,note){const t=gTask(id);if(!t||G.end)return;const tol=gTol(t),u=t.unit||'';
@@ -14426,11 +14450,37 @@ function ezUI(){document.querySelectorAll('[data-ez]').forEach(b=>{const on=(b.d
   const hn=$('ezHint');if(hn)hn.textContent=LES.on?'Set before a lesson':SCHOOL.easy?'Every tolerance doubled, for new pilots':'Private ACS tolerances';}
 document.querySelectorAll('[data-ez]').forEach(b=>b.onclick=()=>ezSet(b.dataset.ez==='1'));
 addEventListener('resize',()=>{if(G.holds.length)gCue();});   // a rotation can change the bar's width
-// the debrief's line from Dana (item 5 refines her voice)
-function dbTip(r){const T=r.lines.filter(l=>!l.why&&l.w>0),by=(a,b)=>a.pts/a.w-b.pts/b.w,low=T.slice().sort(by)[0],bad=T.filter(l=>!l.ok).sort(by)[0];
-  if(r.letter==='A')return 'Checkride standard. Nice work.';
-  if(r.letter==='F')return 'Below standard today. '+(low?low.name+' needs work; let':'Let')+' us fly it again.';
-  const k=bad||low;return 'Passed. Work on the '+(k?k.name.charAt(0).toLowerCase()+k.name.slice(1):'details')+'.';}
+// Dana's live corrections (gTick): kind alt, spd, hdg, bank or trk, dev the signed deviation (above, fast, right, steep);
+// feet to the nearest ten, knots and degrees to the unit
+function cfiCue(kind,dev){const ft=Math.round(Math.abs(dev)/10)*10,n=Math.round(Math.abs(dev));
+  if(kind==='alt')return dev>0?'You are '+ft+' feet high. Ease the power back a touch.':'You are '+ft+' feet low. A touch more power and back pressure.';
+  if(kind==='spd')return dev>0?'You are '+n+' knots fast. Raise the nose a little.':'Nose down a little, you are '+n+' knots slow.';
+  if(kind==='hdg')return dev>0?'Bring the heading back left, you are '+n+' degrees right.':'Bring the heading back right, you are '+n+' degrees left.';
+  if(kind==='bank')return dev>0?'A little less bank, you are '+n+' degrees steep.':'A little more bank, you are '+n+' degrees shallow.';
+  if(kind==='trk')return 'Back to the centerline, you are '+n+' meters off.';
+  return null;}
+// the debrief's line from Dana: the lowest scoring failed task when there is one (else the lowest), the fail reason on an F
+function dbPick(r){const T=r.lines.filter(l=>!l.why&&l.w>0),by=(a,b)=>a.pts/a.w-b.pts/b.w,low=T.slice().sort(by)[0],bad=T.filter(l=>!l.ok).sort(by)[0];
+  return {k:bad||low||null,why:r.lines.find(l=>l.why)||null};}
+const lc1=t=>t.charAt(0).toLowerCase()+t.slice(1),dot=t=>String(t).trim().replace(/[.\s]+$/,'')+'.';
+function dbTip(r){const p=dbPick(r),k=p.k?p.k.name:'The detail work',L=r.letter;
+  if(L==='A')return 'That was checkride standard. I would sign that off any day.';
+  if(L==='B')return 'Good flight. '+k+' is the one to polish.';
+  if(L!=='F')return 'You passed. '+k+' was outside the standard; we will work on it.';
+  if(r.failWhy||p.why){const w=p.why?p.why.name:r.failWhy;return dot(w.charAt(0).toUpperCase()+w.slice(1)).slice(0,-1)+'. Let us set it up again.';}
+  return 'Not to standard today, and that is normal at this point. '+k+' needs work, so we fly it again.';}
+// the same thing, short, for her voice at the debrief
+function dbSay(r){const p=dbPick(r),k=p.k?lc1(p.k.name):'the details',L=r.letter;
+  if(L==='A')return 'That was checkride standard.';
+  if(L==='B')return 'Good flight. Polish the '+k+'.';
+  if(L!=='F')return 'You passed. We will work on the '+k+'.';
+  if(r.failWhy||p.why)return 'Not to standard. Let us set it up again.';
+  return 'Not to standard today. We fly it again.';}
+// endorsements Dana signs (kgeuEndorse): {solo:{at,by,lesson}}; the logbook reads them
+const ENDORSE_NAME={solo:'Solo'};
+function endorsements(){try{const e=JSON.parse(localStorage.getItem('kgeuEndorse')||'{}');return e&&typeof e==='object'?e:{};}catch(e){return {};}}
+function endorseSign(kind,lesson){const E=endorsements();if(!E[kind])E[kind]={at:Date.now(),by:SCHOOL.cfi.name+', '+SCHOOL.cfi.title,lesson:lesson};
+  try{localStorage.setItem('kgeuEndorse',JSON.stringify(E));}catch(e){}return E[kind];}
 const _le=new THREE.Euler(0,0,0,'YXZ');
 function lesAtt(){_le.setFromQuaternion(st.quat,'YXZ');return {hdg:((-_le.y*180/Math.PI)%360+360)%360,bank:-_le.z*180/Math.PI};}
 const altMSL=()=>(st.pos.y-GEAR)*M2FT+FIELD_FT,aglFt=()=>st.agl*M2FT,kts=()=>st.ias*MS2KT;
@@ -14527,7 +14577,7 @@ function lesGo(direct){if(!LES.on||(!LES.brief&&!direct))return;const L=lessonDe
   brClose();LES.brief=false;paused=false;pauseOv.classList.remove('on');LES.t=0;lesEl.classList.add('on');
   gBegin(L);if(LB)LB.runStart('lesson:'+LES.on);if(L.fly.open)L.fly.open(SCH[acType],LES.d);
 }
-function lesEnd(){LES.on=null;if(G.holds.length){G.holds.length=0;gCue();}ezUI();if(LES.brief){LES.brief=false;brClose(true);}lesEl.classList.remove('on','tut');tutArrow.classList.remove('on');if(st){st.noProt=0;st.bankMax=0;st.easy=easy;}}
+function lesEnd(){LES.on=null;if(TASK.ask&&!TASK.on){TASK.ask=null;tqReplyUI();}if(G.holds.length){G.holds.length=0;gCue();}ezUI();if(LES.brief){LES.brief=false;brClose(true);}lesEl.classList.remove('on','tut');tutArrow.classList.remove('on');if(st){st.noProt=0;st.bankMax=0;st.easy=easy;}}
 // ---- the briefing (school1 item 3): three of Dana's cards and the lesson's quiz question, swiped or stepped with NEXT,
 // over the aircraft at its start with the sim held (LES.brief, as the tasking brief). A replay (any saved grade, F too) may skip it
 const brOv=$('brOv'),brTrack=$('brTrack'),brNext=$('brNext'),BR={slide:0,tgt:-1,tgtT:0,L:null};
@@ -14580,16 +14630,19 @@ function grade(score,title,lines,failWhy){
   // the debrief (item 4): a row a task with what was measured, then the quiz, then the board line (resBoard)
   const row=l=>Array.isArray(l)?'<div class="'+(l[0]?'ok':'no')+'">'+resEsc(l[1])+'</div>':l.why?'<div class="no">'+resEsc(l.name)+'</div>'
     :'<div class="gl gt '+(l.ok?'ok':'no')+'"><span>'+resEsc(l.name)+'</span><b>'+resEsc(l.detail||'')+'</b></div>';
-  const qz=LES.quiz?[{ok:LES.quiz.ok,name:'Quiz',detail:LES.quiz.ok?'Right first time':'Missed, read the answer'}]:[];
-  const tl=lines.filter(l=>!Array.isArray(l));
+  const qz=LES.quiz?[{ok:LES.quiz.ok,name:'Quiz',detail:LES.quiz.ok?'Right first time':'We went over the answer'}]:[];
+  const tl=lines.filter(l=>!Array.isArray(l)),dr={letter:L2,lines:tl,failWhy:failWhy};
+  // a lesson with an endorsement (solo), passed: Dana signs it
+  const ek=L2!=='F'&&((lessonDef(id)||{}).endorse||(G.def&&G.def.endorse)),en=ek?endorseSign(ek,id||G.def.id):null;
+  const er=en?'<div class="gl gEnd"><span>Endorsement</span><b>'+resEsc((ENDORSE_NAME[ek]||ek)+', signed by '+en.by)+'</b></div>':'';
   resFill(gradeOv,{letter:L2,title:(id==='first'?'Lesson 1: ':'Debrief: ')+LES.name+(failWhy?': '+failWhy:''),score:failWhy?'':score+' of 100',
-    lines:lines.concat(qz).map(row).join(''),board:failWhy?'':'lesson:'+id,tip:tl.length?dbTip({letter:L2,lines:tl}):''});
+    lines:lines.concat(qz).map(row).join('')+er,board:failWhy?'':'lesson:'+id,tip:tl.length?dbTip(dr):''});
   if(G.def&&G.easy){const t=document.createElement('span');t.className='modeTag ezTag';t.textContent='EASY TOLERANCES, x2';$('gScore').appendChild(t);}
   lesEnd();
   if(id==='first'&&L2!=='F'){try{localStorage.setItem('kgeuTut','1');}catch(e){}}
   const nx=nextLesson(id),gn=$('gNext');gn.hidden=!nx||(L2==='F'&&nx.id!==id);if(nx)gn.textContent='Next lesson: '+nx.name;gn.dataset.l=nx?nx.id:'';
   resShow(gradeOv,false);
-  coach2(L2==='A'?'Excellent. That is checkride standard.':L2==='F'?'Unsatisfactory. Let us try that again.':'Not bad. Grade '+L2+'.',null,{offAir:1});
+  cfi((tl.length?dbSay(dr):L2==='F'?'Not to standard. Let us set it up again.':'Good flight.')+(en?' That is your '+lc1(ENDORSE_NAME[ek]||ek)+' endorsement. I am signing your logbook.':''),null,{offAir:1});
 }
 document.getElementById('gRetry').onclick=()=>{resClose(gradeOv);startLesson(LES.last,true,{brief:false});};
 $('gNext').onclick=()=>{resClose(gradeOv);startLesson($('gNext').dataset.l);};
@@ -14610,13 +14663,14 @@ function lessonTick(dt){
   G.a=a;G.alt=alt;G.kt=kt;
   if(L&&L.fly)L.fly.tick(dt,S,d,a,alt,kt);
   if(LES.on)gTick(dt);
+  if(LES.on&&TASK.ask&&!TASK.on)tqAskTick(dt);   // the pattern's CALL button
 }
 // ---- each lesson's flight: start(S,d) after the common set up in startLesson (at: the start position, final by default),
 // open(S,d) when the briefing closes and the flight begins (the opening radio line), tick(dt,S,d,a,alt,kt) every frame, event(ev,d) for liftoff and the like (the touchdown is stored for every lesson first)
 const LESFLY={
-  first:{at:'runway',start(S,d){st.easy=true;st.noPF=true;},open(S,d){coach2('Your first flight. Follow the arrows. It takes about a minute.');},tick(dt,S,d,a){firstTick(dt,d,a);}},
+  first:{at:'runway',start(S,d){st.easy=true;st.noPF=true;},open(S,d){cfi('Your first flight. I am right here with you. Follow the arrows; it takes about a minute.');},tick(dt,S,d,a){firstTick(dt,d,a);}},
   steep:{start(S,d){st.ezManFlap=1;airStart(7000,2500,3500,360,S.turn,0,S.thrTurn);st.bankMax=0.95;},
-  open(S,d){coach2('Steep turns. Roll into a 45 degree bank, left or right, and hold 3,500 feet all the way around.');},
+  open(S,d){cfi('Steep turns. Roll into 45 degrees of bank, either way, and hold 3,500 all the way around. A little back pressure as you roll in.');},
   tick(dt,S,d,a,alt,kt){
     if(LES.ph===0){if(d.h0===undefined)d.h0=a.hdg;
       lesShow('Roll into 45 degrees of bank, either way. Hold 3,500 ft.','Bank '+Math.abs(a.bank).toFixed(0)+'\u00b0   '+dev(alt-3500)+'   '+kt.toFixed(0)+' kt');
@@ -14631,36 +14685,36 @@ const LESFLY={
       else if(d.t>150)gEnd('took too long','Did not finish the 360 in time');}
   }},
   slow:{start(S,d){st.ezManFlap=1;airStart(7000,2500,3500,360,S.slow+8,FLAPS.length-1,S.thrSlow);st.noProt=1;},
-  open(S,d){coach2('Slow flight. Full flaps. Slow to '+S.slow+' knots and hold 3,500 feet, heading north. Use power for altitude.');},
+  open(S,d){cfi('Slow flight. Full flaps are in. Bring it back to '+S.slow+' knots and hold 3,500, heading north. The power holds your altitude.');},
   tick(dt,S,d,a,alt,kt){
     if(st.stalled){gEvent('nostall',false,'stalled');gEnd('stalled','Stalled during slow flight. Stay just above it: lower the nose or add power.');return;}
     const inBand=Math.abs(kt-S.slow)<=5;
     if(LES.ph===0){lesShow('Slow to '+S.slow+' kt. Hold 3,500 ft, heading 360.',kt.toFixed(0)+' kt   '+dev(alt-3500)+'   HDG '+h3(a.hdg));
-      if(inBand||LES.t>25){LES.ph=1;d.t=0;coach2('Good. Hold it there for 45 seconds.');
+      if(inBand||LES.t>25){LES.ph=1;d.t=0;cfi('Nice. Hold it right there for 45 seconds. Small moves.');
         gHold('alt',{get:()=>G.alt,target:3500});gHold('spd',{get:()=>G.kt,target:S.slow});gHold('hdg',{get:()=>G.a.hdg,target:360,wrap:true});}}
     else{d.t+=dt;
       lesShow('Hold '+S.slow+' kt, 3,500 ft, heading 360.',kt.toFixed(0)+' kt   '+dev(alt-3500)+'   HDG '+h3(a.hdg)+'   '+Math.max(0,45-d.t).toFixed(0)+' s left');
       if(d.t>=45){gEvent('nostall',true);gEnd();}}
   }},
   stall:{start(S,d){st.ezManFlap=1;airStart(7000,2500,3500,360,S.slow+14,FLAPS.length-1,0);st.noProt=1;},
-  open(S,d){coach2('Power off stall. Power is at idle. Hold altitude and keep easing back until it breaks. Then nose down, full power, wings level.');},
+  open(S,d){cfi('Power off stall. Power is at idle. Hold your altitude and keep easing the nose up. Let it break.');},
   tick(dt,S,d,a,alt,kt){
     if(LES.ph===0){lesShow('Idle. Hold altitude, keep easing back until it stalls.',kt.toFixed(0)+' kt   '+dev(alt-3500)+(st.throttle>0.2?'   keep the power at idle':''));
-      if(st.stalled){LES.ph=1;d.a0=alt;d.amin=alt;d.t=0;d.pwr=null;d.bmax=0;warnFlash();coach2('Stall! Nose down, full power, wings level.',null,{urgent:1});}
+      if(st.stalled){LES.ph=1;d.a0=alt;d.amin=alt;d.t=0;d.pwr=null;d.bmax=0;warnFlash();cfi('Stall! Nose down, full power, wings level.',null,{urgent:1});}
       if(LES.t>90)gEnd('no stall','It never stalled. Pull back further with the power at idle.');}
     else if(LES.ph===1){d.t+=dt;d.amin=Math.min(d.amin,alt);d.bmax=Math.max(d.bmax,Math.abs(a.bank));if(d.pwr===null&&st.throttle>0.9)d.pwr=d.t;
       lesShow('Recover: nose down, full power, wings level.','Lost '+Math.round(d.a0-alt)+' ft   Bank '+Math.abs(a.bank).toFixed(0)+'\u00b0   '+kt.toFixed(0)+' kt');
-      if(!st.stalled&&st.vel.y>0.5&&d.t>1){LES.ph=2;d.t2=0;d.sec=0;coach2('Recovered. Climb away.');}
+      if(!st.stalled&&st.vel.y>0.5&&d.t>1){LES.ph=2;d.t2=0;d.sec=0;cfi('Good recovery. Climb away at '+Math.round(AC.vy*MS2KT)+'.');}
       if(d.t>40)gEnd('no recovery','Did not recover within 40 seconds');}
     else{d.t2+=dt;d.amin=Math.min(d.amin,alt);if(st.stalled)d.sec=1;lesShow('Climb away at '+Math.round(AC.vy*MS2KT)+' kt.','Lost '+Math.round(d.a0-d.amin)+' ft total');
       if(d.t2>4){const loss=d.a0-d.amin,pw=d.pwr===null?99:d.pwr;
         gRange('loss',loss);gEvent('pwr',pw<=gTolOf('pwr'),d.pwr===null?'never added':'in '+pw.toFixed(1)+' s, standard '+gNum(gTolOf('pwr'))+' s');
         gRange('wings',d.bmax,'worst '+Math.round(d.bmax)+' deg, standard '+gNum(gTolOf('wings'))+' deg');gEvent('sec',!d.sec,d.sec?'stalled again':'');gEnd();}}
   }},
-  engine:{start(S,d){airStart(THR01-4500,2500,3571,10,S.cruise,0,S.thrCruise);},open(S,d){coach2('Cruising at 2,500 above the ground. Stand by.');},
+  engine:{start(S,d){airStart(THR01-4500,2500,3571,10,S.cruise,0,S.thrCruise);},open(S,d){cfi('We are cruising at 2,500 above the ground. Relax and stand by.');},
   tick(dt,S,d,a,alt,kt){
     if(LES.ph===0){lesShow('Cruising at 2,500 ft AGL. Stand by.',kt.toFixed(0)+' kt');
-      if(LES.t>4){LES.ph=1;warnFlash();coach2('Engine failure! Pitch for '+S.glide+' knots, best glide, and turn toward the field.',null,{urgent:1});}}
+      if(LES.t>4){LES.ph=1;warnFlash();cfi('Engine failure! Pitch for '+S.glide+' knots, best glide. Turn toward the field.',null,{urgent:1});}}
     else{st.throttle=0;
       const dx=wX(THR01+RWY_LEN/2,0)-st.pos.x,dz=wZ(THR01+RWY_LEN/2,0)-st.pos.z,nm=Math.hypot(dx,dz)/1852;
       const gl=!d.td&&st.agl*M2FT>200,gh=G.tasks.glide;   // best glide graded above 200 ft AGL
@@ -14670,23 +14724,40 @@ const LESFLY={
         if(!d.td.paved){gEvent('rwy',false,'off the runway');return gEnd('off field','Touched down off the runway');}
         gEvent('rwy',true);gRange('fpm',f);gRange('cl',d.tdV,gNum(d.tdV)+' m off, standard '+gNum(gTolOf('cl'))+' m');gEnd();}}
   }},
-  pattern:{at:'runway',start(S,d){},open(S,d){coach2('Pattern work. Take off, climb to 700 above the ground, then fly the circuit at 2,100 feet and bring it back to runway 1.','Pattern work. Take off, climb to seven hundred above the ground, then fly the circuit at two thousand one hundred feet, and bring it back to runway one.');},
+  // the tower (school1 item 5): no automatic clearance; Dana gives the call, the student taps CALL (the tasking reply bar)
+  pattern:{at:'runway',start(S,d){A.tko=1;A.pattern=1;},open(S,d){const B=BASES.kgeu,tw=B.twr.split(' ').slice(0,2).join(' '),
+      t='Pattern work. Take off, climb to 700 above the ground, fly the circuit at 2,100 and land on runway 1. First, call the tower: '+tw+', '+AC.cs+', holding short runway 1, request closed traffic.';
+    const l=cfi(t,cfiSp(t.replace(AC.cs,AC.say)));
+    d.ask1=tqAsk([{k:'CALL',sub:'Request closed traffic',say:'',fn:()=>patCall(d,1)}],{line:l,wait:20,tag:'les',
+      late:()=>{if(LES.on==='pattern'&&!d.c1)cfi('Go ahead and make the call.');}});},
   tick(dt,S,d,a,alt,kt){
     const ag=aglFt(),tgt=FIELD_FT+1000,rh=RH*180/Math.PI,trk=(Math.atan2(st.vel.x,-st.vel.z)*180/Math.PI+360)%360,u=toU(st.pos.x,st.pos.z),v=Math.abs(toV(st.pos.x,st.pos.z));
-    if(LES.ph===0){lesShow('Take off, climb straight ahead to 700 ft AGL.',Math.round(ag)+' ft AGL   '+kt.toFixed(0)+' kt');if(!st.onGround&&ag>700){LES.ph=1;coach2('Turn crosswind. Level at 2,100 feet.');}}
-    else if(LES.ph===1){lesShow('Turn crosswind, then downwind. Level at 2,100 ft.',dev(alt-tgt)+'   '+kt.toFixed(0)+' kt');if(angD(trk,rh+180)<40&&v>450){LES.ph=2;gHold('dw',{get:()=>G.alt,target:tgt});}}
+    if(!st.onGround&&TASK.ask&&TASK.ask===d.ask1){TASK.ask=null;tqReplyUI();}   // airborne without the call: that one is missed
+    if(LES.ph===0){lesShow('Take off, climb straight ahead to 700 ft AGL.',Math.round(ag)+' ft AGL   '+kt.toFixed(0)+' kt');if(!st.onGround&&ag>700){LES.ph=1;cfi('Turn crosswind now. Level off at 2,100.');}}
+    else if(LES.ph===1){lesShow('Turn crosswind, then downwind. Level at 2,100 ft.',dev(alt-tgt)+'   '+kt.toFixed(0)+' kt');if(angD(trk,rh+180)<40&&v>450){LES.ph=2;gHold('dw',{get:()=>G.alt,target:tgt});
+      const B=BASES.kgeu,tl=say(B.twr,AC.csS+', runway '+B.rwy+', cleared touch and go.',[csTs(),'t_'+B.rwyClip,'t_cleared_tg'],{ok:inAir,ttl:30});
+      d.ask2=tqAsk([{k:'CALL',sub:'Read back',say:'',fn:()=>patCall(d,2)}],{line:tl,wait:20,tag:'les'});}}
     else if(LES.ph===2){lesShow('Downwind. Hold 2,100 ft. Turn base past the threshold.',dev(alt-tgt)+'   '+kt.toFixed(0)+' kt');
-      if(angD(trk,rh+180)>55&&u<THR01+300){LES.ph=3;gHoldEnd('dw');coach2('Base. Then final. Aim for the numbers.');}}
+      if(angD(trk,rh+180)>55&&u<THR01+300){LES.ph=3;gHoldEnd('dw');cfi('Turn base, then final. Aim for the numbers.');}}
     else if(LES.ph===3){lesShow('Turn final, aim for the numbers. '+Math.round(AC.vapp*MS2KT)+' kt.',Math.round(ag)+' ft AGL   '+kt.toFixed(0)+' kt');
-      if(d.fin===undefined&&angD(trk,rh)<25&&ag<400)d.fin=kt;if(d.td){LES.ph=4;coach2('Touch and go. Flaps up a notch, full power, go.','Touch and go. Full power, go.');}}
+      if(d.fin===undefined&&angD(trk,rh)<25&&ag<400)d.fin=kt;if(d.td){LES.ph=4;cfi('Touch and go. Flaps up a notch, full power, and go.','Touch and go. Full power, and go.');}}
     else{lesShow('Full power, take off again. Or stop on the runway.','Touchdown '+d.td.fpm+' fpm   '+Math.round(d.tdU-THR01)+' m past the threshold');
       if(d.tng||(st.onGround&&st.vel.length()<2)){const z=d.tdU-THR01,f=d.td.fpm,va=AC.vapp*MS2KT,fk=d.fin===undefined?va:d.fin;
         if(!d.td.paved)return gEnd('off field','Touched down off the runway');
         gRange('zone',z,Math.round(z)+' m past the threshold, standard '+gNum(gTask('zone').min)+' to '+gNum(gTolOf('zone'))+' m');gRange('fpm',f);
-        gRange('cl',d.tdV,gNum(d.tdV)+' m off, standard '+gNum(gTolOf('cl'))+' m');gRange('vapp',fk-va,Math.round(fk)+' kt, target '+Math.round(va)+' \u00b1 '+gNum(gTolOf('vapp')));gEnd();}}
+        gRange('cl',d.tdV,gNum(d.tdV)+' m off, standard '+gNum(gTolOf('cl'))+' m');gRange('vapp',fk-va,Math.round(fk)+' kt, target '+Math.round(va)+' \u00b1 '+gNum(gTolOf('vapp')));
+        const nc=(d.c1?1:0)+(d.c2?1:0);gEvent('calls',nc===2,nc+' of 2 made');gEnd();}}
     if(LES.t>600)gEnd('too long','Ran out of time');
   },
   event(ev,d){if(ev.type==='liftoff'&&d.td)d.tng=1;}}};
+// the pattern's transmissions, real Glendale phraseology. 1: our request at the hold, the tower's clearance (recorded clips)
+// and our readback; 2: the readback of the touch and go clearance the tower gave on downwind
+function patCall(d,k){const B=BASES.kgeu;
+  if(k===1){d.c1=1;const tw=B.twr.split(' ').slice(0,2).join(' ');
+    const p=vqAdd(L(AC.cs,'pilot',tw+', '+AC.cs+', holding short runway '+B.rwy+', request closed traffic.',['p_'+B.twrClip,csP(),'p_hold_closed']),{ttl:60});
+    const t=vqAdd(L(B.twr,'tower',AC.csS+', '+tw+', runway '+B.rwy+', cleared for takeoff, make right closed traffic.',[csTs(),'t_'+B.twrClip,'t_'+B.rwyClip,'t_cleared_to','t_closed_traffic']),{ttl:60,dep:p,ok:onGnd});
+    vqAdd(L(AC.cs,'pilot','Cleared for takeoff, '+AC.cs+'.',['p_rb_cleared_to',csP()]),{ttl:60,dep:t});}
+  else{d.c2=1;vqAdd(L(AC.cs,'pilot','Cleared touch and go runway '+B.rwy+', '+AC.csS+'.',['p_rb_cleared_tg',csPs()]),{ttl:60});}}
 LESSONS.forEach(l=>{if(LESFLY[l.id])l.fly=LESFLY[l.id];if(!l.fly)l.soon=true;});   // no flight yet: listed, not startable
 const LES_FLY=LESSONS.filter(l=>!l.soon);
 // ---- lesson 1, first flight: about a minute, arrows point at what to touch ----
@@ -17960,7 +18031,7 @@ window.__kgeu={TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()
   RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,ticker:()=>{const e=document.getElementById('tk'),c=document.getElementById('tkCtl');return {on:e.classList.contains('on'),paused:e.classList.contains('paused'),anim:getComputedStyle(document.getElementById('tkT')).animationName,scroll:e.classList.contains('scroll'),open:c.classList.contains('on'),text:e.querySelector('#tkT i').textContent,vis:e.offsetParent!==null&&getComputedStyle(e).display!=='none',ctlVis:c.offsetParent!==null};},tickerForce:n=>{TK.force=n||null;tkUI();},tickerOpen:()=>tkOpen(),tickerClose:()=>{TK.open=false;tkUI();},musicTick:musicTick,MUSIC:MUSIC,actx:()=>actx,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,VQ:VQ,vqLog:clear=>{const r=VQ.log.map(e=>Object.assign({},e));if(clear)VQ.log.length=0;return r;},vqAdd:(who,kind,text,clips,o)=>vqAdd(L(who,kind,text,clips),o),coach2:coach2,chatNow:()=>chatNow(),atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),bannerShow:(k,t)=>bannerShow(k,t),badgeHide:()=>badgeHide(),auto:()=>autoSmart(),mission:k=>{if(k==='gunrun'){pickType('a10',1);start('range');return;}pickType(k==='range'?'reaper':'c130',1);start(k);},HOG:HOG,strikeScore:()=>strikeScore(),CRASH_FX:CRASH_FX,baseOK:baseOK,rwyLenOf:rwyLenOf,FD:FD,BASES:BASES,setThr:setThr,setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
-  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day,kind:d.kind}},dfDayOf:k=>dfDayOf(k),aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,get lesBrief(){return {on:!!LES.brief,slide:BR.slide,quiz:LES.quiz};},lesBriefNext:()=>brNextTap(),lesBriefSkip:lesBriefSkip,lesBriefBack:lesBriefBack,lesBriefAnswer:k=>brAnswer(k),get G(){return G;},gBegin:gBegin,gHold:gHold,gHoldEnd:gHoldEnd,gTick:gTick,gRange:gRange,gEvent:gEvent,gEnd:gEnd,dbTip:dbTip,ezSet:ezSet,SCHOOL:SCHOOL,get PLACE(){return PLACE;},setPlace:(l,h)=>{setPlace(l,h);if(curScr==='sSchool')schoolList(true);},lessonOpen:lessonOpen,stageOpen:stageOpen,get schSel(){return SCH_SEL;},schSelect:schSelect,lessonDef:lessonDef,stageOf:stageOf,tolOf:tolOf,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day,kind:d.kind}},dfDayOf:k=>dfDayOf(k),aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,get lesBrief(){return {on:!!LES.brief,slide:BR.slide,quiz:LES.quiz};},lesBriefNext:()=>brNextTap(),lesBriefSkip:lesBriefSkip,lesBriefBack:lesBriefBack,lesBriefAnswer:k=>brAnswer(k),get G(){return G;},gBegin:gBegin,gHold:gHold,gHoldEnd:gHoldEnd,gTick:gTick,gRange:gRange,gEvent:gEvent,gEnd:gEnd,dbTip:dbTip,dbSay:dbSay,cfi:cfi,cfiCue:cfiCue,cfiSp:cfiSp,cfiVoice:cfiVoice,endorsements:endorsements,tqAnswer:tqAnswer,ezSet:ezSet,SCHOOL:SCHOOL,get PLACE(){return PLACE;},setPlace:(l,h)=>{setPlace(l,h);if(curScr==='sSchool')schoolList(true);},lessonOpen:lessonOpen,stageOpen:stageOpen,get schSel(){return SCH_SEL;},schSelect:schSelect,lessonDef:lessonDef,stageOf:stageOf,tolOf:tolOf,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   // @OhRabah easter eggs (3.10): where each one is, whether its lights are on, and the tow banner
   eggs:()=>EGG.list.map(o=>{const p=o.getWorldPosition(new V3()),r={name:o.name,x:p.x,y:p.y,z:p.z,ry:o.rotation.y,lit:(o.name==='egg_billboard'||o.name==='egg_rooftop')&&EGG.lit,visible:o.visible};
     if(o.name==='egg_tow'){const b=EGG.tow.ban.getWorldPosition(new V3()),f=new V3(0,0,-1).applyQuaternion(o.quaternion);r.banner={x:b.x,y:b.y,z:b.z};r.fwd=[f.x,f.y,f.z];}return r;}),

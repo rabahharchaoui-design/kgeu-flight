@@ -67,12 +67,15 @@ async def main():
         await pg.evaluate(f"()=>{{const K={K};K.coach2('Pattern work. Take off, climb to 700 above the ground, then fly the circuit at 2,100 feet and bring it back to runway 1.');K.vqAdd('Viper 99','fighter','Viper 99, chatter test one.',['p_ch_p1'],{{pri:3}});}}")
         await pg.evaluate(DRIVE)
         await pg.wait_for_timeout(1500)
+        # school1 item 5: the pattern's clearance waits for the student's call (the CALL reply button)
+        await wait_until(pg, f"()=>{K}.TASK.ask&&{K}.TASK.ask.shown", 10)
+        ok('the CALL button is offered', await pg.evaluate(f"()=>{K}.tqAnswer('CALL')"))
         await pg.evaluate(f"()=>{{const K={K};window.__ok=true;K.vqAdd('Glendale Tower 121.0','tower','Skyhawk 31G, runway 1, cleared for takeoff. (stale test)',['t_cleared_to'],{{ok:()=>window.__ok}});K.vqAdd('Viper 98','fighter','Viper 98, chatter test two.',['p_ch_p4'],{{pri:3}});}}")
         await pg.wait_for_timeout(1500)
         mid = await pg.evaluate(f"()=>{{const a=document.getElementById('atc'),l=document.getElementById('lesson');const A=a.getBoundingClientRect(),B=l.getBoundingClientRect();"
                                 f"return {{who:a.querySelector('b')&&a.querySelector('b').textContent,q:{K}.radioQ().map(x=>x.who+': '+x.text),"
                                 "hit:!(A.right<B.left||B.right<A.left||A.bottom<B.top||B.bottom<A.top),duck:window.__kgeu.music().ducked}}")
-        ok('while the instructor talks the subtitle is the instructor, not the queued tower', mid['who'] == 'Instructor', mid)
+        ok('while the instructor talks the subtitle is the instructor, not the queued tower', mid['who'] == 'Dana', mid)
         ok('the tower clearance waits in the queue', any('cleared for takeoff' in x for x in mid['q']), mid['q'])
         ok('the tower subtitle box does not cover the lesson panel', not mid['hit'], mid)
         # the instructor goes on; the second clearance stops being relevant before it can play
@@ -83,7 +86,7 @@ async def main():
         await pg.evaluate(f"()=>{{const K={K};window.__cutT=null;K.say('Glendale Tower 121.0','Skyhawk 31G, make right closed traffic, runway 1, report midfield downwind.',['t_cs_skyhawk_s','t_closed_traffic','t_rwy_1','t_wind','t_n_0','t_n_1','t_n_0','t_at','t_n_5']);}}")
         await pg.wait_for_timeout(900)
         await pg.evaluate(f"()=>{{{K}.coach2('Turn crosswind. Level at 2,100 feet.');}}")
-        await wait_until(pg, f"()=>{{const K={K};return K.radioLog().filter(l=>/closed traffic/.test(l.text)).length>=2&&!K.VQ.cur&&!K.radioQ().length}}", 40)
+        await wait_until(pg, f"()=>{{const K={K};return K.radioLog().filter(l=>/report midfield/.test(l.text)).length>=2&&!K.VQ.cur&&!K.radioQ().length}}", 40)
         # (3) a safety call cuts the instructor at once
         await pg.evaluate(f"()=>{{{K}.coach2('Pattern work. Take off, climb to 700 above the ground, then fly the circuit.');}}")
         await pg.wait_for_timeout(1200)
@@ -101,7 +104,7 @@ async def main():
         ok('no two voices overlap (0.1 s allowed for the cut fade)', not overlaps(log, 0.1), overlaps(log, 0.1))
         both = [s['t'] for s in samp if s['radio'] > 0 and s['sp']]
         ok('sampled every 50 ms: radio clips and the instructor never sound together', not both, both[:5])
-        ok('the instructor plays first', log and log[0]['who'] == 'Instructor', texts[:2])
+        ok('the instructor plays first', log and log[0]['who'] == 'Dana', texts[:2])
         ci = next((i for i, e in enumerate(log) if 'cleared for takeoff' in e['text'] and 'stale' not in e['text']), None)
         ok('the tower clearance plays after the instruction ends', ci is not None and ci > 0 and log[ci]['a0'] >= log[0]['a1'] - 0.01,
            (ci, log[0]['a1'], log[ci]['a0'] if ci is not None else None))
@@ -109,7 +112,7 @@ async def main():
         ok('the readback follows the clearance', rb is not None and ci is not None and rb > ci, (ci, rb))
         ok('stale chatter queued behind the instructor was dropped', not any('chatter test' in t for t in texts + rlog), [t for t in texts if 'chatter test' in t])
         ok('a clearance that stopped being relevant was dropped', not any('stale test' in t for t in texts))
-        ct = [i for i, e in enumerate(log) if 'closed traffic' in e['text']]
+        ct = [i for i, e in enumerate(log) if 'report midfield' in e['text']]   # the test's own long call (the pattern's clearance also says closed traffic)
         ins = next((i for i, e in enumerate(log) if e['text'].startswith('Turn crosswind')), None)
         ok('an instruction cuts a long tower call, which replays after it', len(ct) == 2 and ins is not None and ct[0] < ins < ct[1], (ct, ins))
         if len(ct) == 2 and ins is not None:
@@ -118,7 +121,7 @@ async def main():
         ok('a safety call (Stall!) cuts the instructor at once', st is not None and log[st]['pri'] == 0 and spk[-2].get('cut'), (st, spk[-2:] if len(spk) > 1 else spk))
         # subtitles follow the audio: while the instructor speaks the subtitle is the instructor's,
         # and a tower subtitle only shows while tower clips are playing or just after
-        wrong = [s for s in samp if s['sp'] and s['atc'] and s['atc'] != 'Instructor']
+        wrong = [s for s in samp if s['sp'] and s['atc'] and s['atc'] != 'Dana']
         ok('while the instructor speaks, the subtitle is never a tower call', not wrong, wrong[:2])
         early = [(s['cur'][:30], s['txt'][:40]) for s in samp if s['cur'] and s['atc'] and s['cur'] not in s['txt']]
         ok('the subtitle is always the line on the air, never one still queued', not early, early[:2])
