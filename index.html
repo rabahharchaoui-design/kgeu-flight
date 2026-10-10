@@ -529,6 +529,12 @@ body.dfOn #uiroot > #dfSub{ display:flex; }
 #tkReply button.act{ border-color:var(--caution); } #tkReply button.act b{ color:var(--caution); }
 #tkReply button.neg{ border-color:rgba(255,255,255,.28); } #tkReply button.neg b{ color:var(--soft); }
 @media (prefers-reduced-motion: reduce){ #tkReply{ transform:none; transition:opacity 150ms ease; } }
+/* the ball view keeps its own readouts along the top edge (DAY TV x1 left, CAM / R / EL right): the replies step down
+   under them, right aligned, clear of the mission card in the centre column */
+body.sensorOn #tkReply{ top:calc(var(--padT) + 30px); left:auto; right:var(--padR); transform-origin:right center;
+  width:min(268px, calc(100% - max(50%, calc(var(--padL) + var(--map) + var(--hudW) + 16px + var(--topW) / 2)) - var(--topW) / 2 - var(--padR) - 8px)); }
+/* Easy's ball readout runs to three lines (bearing, from the nose, down): while a reply is up it keeps its first */
+body.sensorOn.tkReplyOn #shTR{ display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:1; overflow:hidden; }
 /* the music ticker lives top right: it steps aside while a reply is up */
 body.tkReplyOn #uiroot > #tk, body.tkReplyOn #tkCtl{ visibility:hidden; }
 body:not(.touch) #tkReply{ width:min(268px, calc(50% - var(--icon) / 2 - 130px - var(--padR))); }
@@ -13017,79 +13023,79 @@ const menu=document.getElementById('menu'),crashEl=document.getElementById('cras
 // spawn(d) puts the aircraft where the tasking starts; stages run one at a time (obj(d) the card's text, enter(d) once,
 // tick(d,dt) true when done); score(d) gives 0 to 100 and the card's lines. The radio is text through the existing
 // queue (vqAdd, the subtitle and its squelch; a readback uses the recorded Wilco or Roger where one fits), and the
-// player answers with one or two context buttons in the top bar (tkAsk). The boards are task:<id>: the Worker does not
+// player answers with one or two context buttons in the top bar (tqAsk). The boards are task:<id>: the Worker does not
 // know them (server/src/boards.js has no task: entry, it refuses an unknown board), so they live on this device
 // (LB.localAdd) and the XP is counted here (taskXp, the Worker's formula) until the Worker takes them.
 const TASK={on:false,id:null,def:null,d:null,R:null,seed:0,si:0,stage:null,t:0,st0:0,brief:false,ask:null,asks:[],done:false,res:null,
   tgts:[],sens:false,objs:[],askN:0,test:{seed:null,noBrief:false},log:[]};
 const TASK_IDS=['overwatch','lifeline','shepherd','finder'];
 const TASKS={};
-const tkBoard=id=>'task:'+id;
+const tqBoard=id=>'task:'+id;
 // mulberry32: the tasking's own stream, so a seed (tests, a shared replay) rolls the same tasking
-function tkRng(seed){let a=seed>>>0;return ()=>{a=a+0x6D2B79F5>>>0;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;};}
-const tkR=(R,a,b)=>a+R()*(b-a),tkPick=(R,a)=>a[Math.floor(R()*a.length)%a.length];
-const tkD=(x,z)=>Math.hypot(st.pos.x-x,st.pos.z-z);
-const tkMSL=()=>(st.pos.y-GEAR)*M2FT+FIELD_FT;
-const tkBrg=(fx,fz,tx,tz)=>(Math.atan2(tx-fx,-(tz-fz))*180/Math.PI+360)%360;
-const TK_DIR=['north','north-east','east','south-east','south','south-west','west','north-west'];
-const tkDir=b=>TK_DIR[Math.round(b/45)%8];
-const tkNm=m=>(m/1852).toFixed(1)+' nm',tkMi=m=>(m/1609.34).toFixed(1)+' mi';
-const tkClock=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
-const tkWind=(d,k)=>String(Math.round(d/10)*10||360).padStart(3,'0')+' at '+Math.round(k);
+function tqRng(seed){let a=seed>>>0;return ()=>{a=a+0x6D2B79F5>>>0;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;};}
+const tqR=(R,a,b)=>a+R()*(b-a),tqPick=(R,a)=>a[Math.floor(R()*a.length)%a.length];
+const tqD=(x,z)=>Math.hypot(st.pos.x-x,st.pos.z-z);
+const tqMSL=()=>(st.pos.y-GEAR)*M2FT+FIELD_FT;
+const tqBrg=(fx,fz,tx,tz)=>(Math.atan2(tx-fx,-(tz-fz))*180/Math.PI+360)%360;
+const TQ_DIR=['north','north-east','east','south-east','south','south-west','west','north-west'];
+const tqDir=b=>TQ_DIR[Math.round(b/45)%8];
+const tqNm=m=>(m/1852).toFixed(1)+' nm',tqMi=m=>(m/1609.34).toFixed(1)+' mi',tqDs=m=>rookie()?tqMi(m):tqNm(m),tqDsW=m=>rookie()?(m/1609.34).toFixed(1)+' miles':(m/1852).toFixed(1)+' miles';
+const tqClock=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
+const tqWind=(d,k)=>String(Math.round(d/10)*10||360).padStart(3,'0')+' at '+Math.round(k);
 // a position the way a crew reads it: degrees and decimal minutes (anchored on Luke AFB, 33.5350 N 112.3831 W)
-function tkLL(x,z){const la=33.5350-(z-LUKE.z)/110950,lo=112.3831-(x-LUKE.x)/92530;
+function tqLL(x,z){const la=33.5350-(z-LUKE.z)/110950,lo=112.3831-(x-LUKE.x)/92530;
   const f=v=>{const d=Math.floor(v),m=(v-d)*60;return d+'°'+m.toFixed(1).padStart(4,'0')+'′';};return 'N'+f(la)+' W'+f(lo);}
 // the clock position of a point from the aircraft's nose, 1 to 12
-function tkClk(x,z){const h=-_euH.setFromQuaternion(st.quat,'YXZ').y;let r=Math.atan2(x-st.pos.x,-(z-st.pos.z))-h;r=((r%(2*Math.PI))+2*Math.PI)%(2*Math.PI);return Math.round(r/(Math.PI/6))%12||12;}
+function tqClk(x,z){const h=-_euH.setFromQuaternion(st.quat,'YXZ').y;let r=Math.atan2(x-st.pos.x,-(z-st.pos.z))-h;r=((r%(2*Math.PI))+2*Math.PI)%(2*Math.PI);return Math.round(r/(Math.PI/6))%12||12;}
 
 // ---- the radio: Mission Control and the other stations, text through the one voice queue ----
 // o.plain: the plain English line Easy shows under it; o.clips: recorded clips when there are any (none: the squelch
 // and the text, the existing cue). Lines from one tasking keep their order (same priority, no cut).
-function tkSay(who,text,o){o=o||{};
+function tqSay(who,text,o){o=o||{};
   const l={who:who,text:text,clips:o.clips||null,plain:o.plain!=null?o.plain:'',task:1};
   TASK.log.push({t:+st.time.toFixed(1),who:who,text:text});
   return vqAdd(l,{pri:o.pri!=null?o.pri:2,ttl:o.ttl||60});
 }
-const tkMC=(text,o)=>tkSay('Mission Control',text,o);
+const tqMC=(text,o)=>tqSay('Mission Control',text,o);
 // fn once the air is quiet: the tower's takeoff clearance and its readback are out and nothing waits (or after max s)
-function tkQuiet(fn,max){TASK.quiet={fn:fn,t:0,max:max||12};}
-function tkQuietTick(dt){const q=TASK.quiet;if(!q)return;q.t+=dt;
+function tqQuiet(fn,max){TASK.quiet={fn:fn,t:0,max:max||12};}
+function tqQuietTick(dt){const q=TASK.quiet;if(!q)return;q.t+=dt;
   const busy=VQ.cur||radioQ.some(l=>l.pri<=2)||(st.mode==='runway'&&!A.tko&&st.time<3);
   if(!busy||q.t>=q.max){TASK.quiet=null;q.fn();}}
 // our side of it: a readback in the pilot's voice (the recorded Wilco / Roger when that is the word)
-const TK_RB={WILCO:['Wilco, ','p_rb_wilco'],ROGER:['Roger, ','p_rb_roger']};
-function tkPilot(text,clip){const l={who:AC.cs,kind:'pilot',text:text,clips:clip?[clip,csP()]:null,task:1};
+const TQ_RB={WILCO:['Wilco, ','p_rb_wilco'],ROGER:['Roger, ','p_rb_roger']};
+function tqPilot(text,clip){const l={who:AC.cs,kind:'pilot',text:text,clips:clip?[clip,csP()]:null,task:1};
   TASK.log.push({t:+st.time.toFixed(1),who:'You',text:text});return vqAdd(l,{pri:2,ttl:30});}
 // ask: shows the buttons once the line they answer is on the air (or right away without one). opts: [{k:'WILCO',
 // say:'text' (our readback, default 'Wilco, <cs>.'), fn}], o.line, o.wait (s before o.late runs, the asker's silence),
 // o.keep (stays up until answered, e.g. REPORT while watching). One ask at a time; a new one replaces the last.
-function tkAsk(opts,o){o=o||{};const a={opts:opts,line:o.line||null,wait:o.wait||18,late:o.late||null,keep:!!o.keep,shown:false,t:0,id:++TASK.askN,tag:o.tag||''};
-  TASK.ask=a;tkReplyUI();return a;}
-function tkAnswer(k){const a=TASK.ask;if(!a||!a.shown||!running||paused)return false;const op=a.opts.find(x=>x.k===k);if(!op)return false;
-  TASK.ask=null;tkReplyUI();hapPattern('tap');
-  const rb=TK_RB[k],txt=op.say!=null?op.say:rb?rb[0]+AC.csS+'.':k.charAt(0)+k.slice(1).toLowerCase()+', '+AC.csS+'.';
-  if(txt)tkPilot(txt,op.say==null&&rb?rb[1]:null);
+function tqAsk(opts,o){o=o||{};const a={opts:opts,line:o.line||null,wait:o.wait||18,late:o.late||null,keep:!!o.keep,shown:false,t:0,id:++TASK.askN,tag:o.tag||''};
+  TASK.ask=a;tqReplyUI();return a;}
+function tqAnswer(k){const a=TASK.ask;if(!a||!a.shown||!running||paused)return false;const op=a.opts.find(x=>x.k===k);if(!op)return false;
+  TASK.ask=null;tqReplyUI();hapPattern('tap');
+  const rb=TQ_RB[k],txt=op.say!=null?op.say:rb?rb[0]+AC.csS+'.':k.charAt(0)+k.slice(1).toLowerCase()+', '+AC.csS+'.';
+  if(txt)tqPilot(txt,op.say==null&&rb?rb[1]:null);
   TASK.d.replies=(TASK.d.replies||0)+1;TASK.d.replyT=(TASK.d.replyT||0)+a.t;
   if(op.fn)op.fn(a.t);return true;}
-const tkReplyEl=document.getElementById('tkReply');
-let tkReplyKey='';
-function tkReplyUI(){const a=TASK.ask,on=!!(a&&a.shown&&TASK.on&&running&&!st.crashed);
+const tqReplyEl=document.getElementById('tkReply');
+let tqReplyKey='';
+function tqReplyUI(){const a=TASK.ask,on=!!(a&&a.shown&&TASK.on&&running&&!st.crashed);
   const key=on?a.id+'|'+a.opts.map(o=>o.k).join(','):'';
-  if(key!==tkReplyKey){tkReplyKey=key;
-    if(on){tkReplyEl.innerHTML='';a.opts.forEach(o=>{const b=document.createElement('button');b.type='button';b.dataset.k=o.k;
+  if(key!==tqReplyKey){tqReplyKey=key;
+    if(on){tqReplyEl.innerHTML='';a.opts.forEach(o=>{const b=document.createElement('button');b.type='button';b.dataset.k=o.k;
         b.className=o.k==='UNABLE'?'neg':o.k==='REPORT'||o.k==='MARK'?'act':'';b.innerHTML='<b></b>'+(o.sub?'<small></small>':'');
         b.firstChild.textContent=o.label||o.k;if(o.sub)b.lastChild.textContent=o.sub;b.setAttribute('aria-label',(o.label||o.k)+(o.sub?', '+o.sub:''));
-        tapBtn(b,()=>tkAnswer(o.k),true);tkReplyEl.appendChild(b);});}}
-  if(on!==tkReplyEl.classList.contains('on')){tkReplyEl.classList.toggle('on',on);document.body.classList.toggle('tkReplyOn',on);tkReplyEl.setAttribute('aria-hidden',on?'false':'true');}
+        tapBtn(b,()=>tqAnswer(o.k),true);tqReplyEl.appendChild(b);});}}
+  if(on!==tqReplyEl.classList.contains('on')){tqReplyEl.classList.toggle('on',on);document.body.classList.toggle('tkReplyOn',on);tqReplyEl.setAttribute('aria-hidden',on?'false':'true');}
 }
-function tkAskTick(dt){const a=TASK.ask;if(!a)return;
-  if(!a.shown){const l=a.line;if(!l||l.aired||l.dead){a.shown=true;tkReplyUI();}return;}
-  a.t+=dt;if(!a.keep&&a.t>=a.wait){TASK.ask=null;tkReplyUI();TASK.d.missed=(TASK.d.missed||0)+1;if(a.late)a.late();}
+function tqAskTick(dt){const a=TASK.ask;if(!a)return;
+  if(!a.shown){const l=a.line;if(!l||l.aired||l.dead){a.shown=true;tqReplyUI();}return;}
+  a.t+=dt;if(!a.keep&&a.t>=a.wait){TASK.ask=null;tqReplyUI();TASK.d.missed=(TASK.d.missed||0)+1;if(a.late)a.late();}
 }
 
 // ---- the stage card: the existing mission card, in full for 3 s as each stage comes up, then a chip ----
-function tkObj(title,sub,warn){const n=TASK.def.stages.length,k=TASK.si+1;missHud(k+'/'+n+'  '+title,sub||'',!!warn);}
-function tkStageGo(i){const D=TASK.def;TASK.si=i;TASK.stage=D.stages[i];TASK.st0=st.time;
+function tqObj(title,sub,warn){const n=TASK.def.stages.length,k=TASK.si+1;missHud(k+'/'+n+'  '+title,sub||'',!!warn);}
+function tqStageGo(i){const D=TASK.def;TASK.si=i;TASK.stage=D.stages[i];TASK.st0=st.time;
   missEl.classList.remove('chip');APPR.missT0=st.time;APPR.missOn=true;   // a new stage: the full card again
   if(i>0)hapPattern('green');
   if(TASK.stage.enter)TASK.stage.enter(TASK.d);
@@ -13097,8 +13103,8 @@ function tkStageGo(i){const D=TASK.def;TASK.si=i;TASK.stage=D.stages[i];TASK.st0
 }
 
 // ---- the 3D bits a tasking puts in the world, removed by taskStop ----
-function tkAdd(o){scene.add(o);TASK.objs.push(o);return o;}
-function tkClear(){for(const o of TASK.objs){scene.remove(o);o.traverse&&o.traverse(m=>{if(m.isMesh&&m.geometry&&!m.geometry.userData.keep)m.geometry.dispose();});}TASK.objs.length=0;TASK.tgts.length=0;}
+function tqAdd(o){scene.add(o);TASK.objs.push(o);return o;}
+function tqClear(){for(const o of TASK.objs){scene.remove(o);o.traverse&&o.traverse(m=>{if(m.isMesh&&m.geometry&&!m.geometry.userData.keep)m.geometry.dispose();});}TASK.objs.length=0;TASK.tgts.length=0;}
 
 // ---- start, stop, the frame ----
 // id: a tasking; from a world region it switches to Arizona first (the taskings fly around Luke and the White Tanks)
@@ -13110,8 +13116,8 @@ function taskStart(id,o){const D=TASKS[id];if(!D)return;
   start('runway',D.base||'luke');RUNSTART={k:'task',id:id};
   // no haboob for a tasking: the day sky for this run, the saved choice comes back on the next start() (as the dogfight)
   if(TOD.id==='haboob'){const p=TOD.id;setTOD('day');try{localStorage.setItem('kgeuTOD',p);}catch(e){}ARC.prevTod=p;hbSync(true);}
-  Object.assign(TASK,{on:true,id:id,def:D,seed:seed,R:tkRng(seed),si:0,stage:null,t:0,brief:false,ask:null,quiet:null,done:false,res:null,sens:false,log:[]});
-  tkClear();
+  Object.assign(TASK,{on:true,id:id,def:D,seed:seed,R:tqRng(seed),si:0,stage:null,t:0,brief:false,ask:null,quiet:null,done:false,res:null,sens:false,log:[]});
+  tqClear();
   const d=TASK.d={id:id,seed:seed,mode:runMode(),t0:0,replies:0,replyT:0,missed:0};
   D.roll(TASK.R,d);
   st.windBase=st.windDir=d.wdir;st.windKt=d.wkt;st.windPh=TASK.R()*6.28;
@@ -13120,60 +13126,62 @@ function taskStart(id,o){const D=TASKS[id];if(!D)return;
   chatT=40;
   runLog('tasking',{task:id,seed:seed,start:1});
   if(TASK.test.noBrief){taskGo();return;}
-  tkBriefShow(d);
+  tqBriefShow(d);
 }
 // ACCEPT TASKING: the briefing goes, the clock and the stages start
 function taskGo(){if(!TASK.on||TASK.done)return;audioSess();initAudio();
   const ov=$('tkBrief');ov.classList.remove('on');TASK.brief=false;paused=false;
-  TASK.d.t0=st.time;tkStageGo(0);
+  TASK.d.t0=st.time;TASK.lastT=st.time;tqStageGo(0);
 }
 function taskStop(){if(!TASK.on&&!TASK.objs.length)return;
   const D=TASK.def;if(D&&D.cleanup)try{D.cleanup(TASK.d);}catch(e){console.warn(e);}
-  TASK.on=false;TASK.brief=false;TASK.ask=null;TASK.quiet=null;TASK.sens=false;tkReplyUI();tkClear();
+  TASK.on=false;TASK.brief=false;TASK.ask=null;TASK.quiet=null;TASK.sens=false;tqReplyUI();tqClear();
   $('tkBrief').classList.remove('on');
   if(DEST&&DEST.task){DEST=null;document.body.classList.remove('hasDest');destUI(true);}
   for(let i=radioQ.length-1;i>=0;i--)if(radioQ[i].task){radioQ[i].dead=true;radioQ.splice(i,1);}
 }
 // a destination for the map, its arrow and the readout (Easy and Hard: a tasking always says where)
-function tkDest(x,z,name,short){const e={x:x,z:z,name:name,short:short||name,kind:'task',task:true};DEST=e;document.body.classList.add('hasDest');destUI(true);return e;}
+function tqDest(x,z,name,short){const e={x:x,z:z,name:name,short:short||name,kind:'task',task:true};DEST=e;document.body.classList.add('hasDest');destUI(true);return e;}
 function taskUpdate(dt){
   if(!TASK.on||TASK.brief||!running)return;
-  tkReplyUI();
-  if(paused||st.crashed){if(st.crashed&&!TASK.done){TASK.done=true;TASK.ask=null;tkReplyUI();}return;}
+  tqReplyUI();
+  if(paused||st.crashed){if(st.crashed&&!TASK.done){TASK.done=true;TASK.ask=null;tqReplyUI();}return;}
   if(TASK.done)return;
+  // the tasking's clock is sim time (what the physics flew this frame), so a fast forward or a slow frame scores the same
+  dt=Math.max(0,Math.min(5,st.time-(TASK.lastT==null?st.time:TASK.lastT)));TASK.lastT=st.time;
   TASK.t+=dt;
   const D=TASK.def,d=TASK.d;
   if(D.always)D.always(d,dt);
-  tkQuietTick(dt);tkAskTick(dt);
+  tqQuietTick(dt);tqAskTick(dt);
   const S=TASK.stage;if(!S)return;
-  if(S.obj){const o=S.obj(d);if(o){const k=o.join('|');if(k!==TASK.objK){TASK.objK=k;tkObj(o[0],o[1],o[2]);}}}
-  if(S.tick&&S.tick(d,dt)){if(TASK.si+1<D.stages.length)tkStageGo(TASK.si+1);else taskEnd();}
+  if(S.obj){const o=S.obj(d);if(o){const k=o.join('|');if(k!==TASK.objK){TASK.objK=k;tqObj(o[0],o[1],o[2]);}}}
+  if(S.tick&&S.tick(d,dt)){if(TASK.si+1<D.stages.length)tqStageGo(TASK.si+1);else taskEnd();}
   // the overall cap: a tasking is 3 to 6 minutes; past its limit Mission Control calls it
-  if(!TASK.done&&D.limit&&st.time-d.t0>D.limit){d.timeout=1;tkMC(AC.csS+', Mission Control, we are out of time on this one. Knock it off, RTB.',{plain:'Time is up. The tasking ends here.'});taskEnd();}
+  if(!TASK.done&&D.limit&&st.time-d.t0>D.limit){d.timeout=1;tqMC(AC.csS+', Mission Control, we are out of time on this one. Knock it off, RTB.',{plain:'Time is up. The tasking ends here.'});taskEnd();}
 }
 // the end: score, the device board, the XP, the card (after the last call has had a moment)
-function taskEnd(){if(TASK.done)return;TASK.done=true;TASK.ask=null;tkReplyUI();
+function taskEnd(){if(TASK.done)return;TASK.done=true;TASK.ask=null;tqReplyUI();
   const D=TASK.def,d=TASK.d;d.secs=st.time-d.t0;
   const r=D.score(d);r.score=Math.max(0,Math.min(100,Math.round(r.score)));
   r.letter=r.score>=90?'A':r.score>=75?'B':r.score>=60?'C':r.score>=40?'D':'F';
   TASK.res=r;
-  const b=tkBoard(TASK.id),L=LB?LB.localAdd(b,r.score,d.secs):null;
+  const b=tqBoard(TASK.id),L=LB?LB.localAdd(b,r.score,d.secs):null;
   const pb=!!(L&&L.pb),xp=taskXp(r.score,d.mode,pb);r.xp=xp;r.lb=L;
   runLog('tasking',{task:TASK.id,seed:d.seed,score:r.score,secs:Math.round(d.secs),letter:r.letter,xp:xp});
-  tkBest(TASK.id,r);
-  TASK.endT=setTimeout(()=>tkCard(r,d),r.wait!=null?r.wait:2600);
+  tqBest(TASK.id,r);
+  TASK.endT=setTimeout(()=>tqCard(r,d),r.wait!=null?r.wait:2600);
 }
 // XP for a tasking, the Worker's own formula (xpFor in server/src/boards.js): 10 for flying it, up to 40 for the score,
 // x1.25 in Hard, +15 for a best on this device. Kept on this device (kgeuTaskXP) until the Worker takes task: boards.
 function taskXp(score,mode,pb){return Math.round((10+40*Math.max(0,Math.min(1,score/100)))*(mode==='hard'?1.25:1))+(pb?15:0);}
-function tkBest(id,r){try{const B=JSON.parse(localStorage.getItem('kgeuTaskBest')||'{}'),o=B[id];
+function tqBest(id,r){try{const B=JSON.parse(localStorage.getItem('kgeuTaskBest')||'{}'),o=B[id];
   if(!o||r.score>o.score)B[id]={score:r.score,letter:r.letter,when:Date.now()};
   localStorage.setItem('kgeuTaskBest',JSON.stringify(B));
   localStorage.setItem('kgeuTaskXP',String((+localStorage.getItem('kgeuTaskXP')||0)+(r.xp||0)));}catch(e){}}
-function tkCard(r,d){if(!TASK.on||!running)return;
+function tqCard(r,d){if(!TASK.on||!running)return;
   missHud(null);
   const L=r.lb,lines=r.lines.slice();
-  lines.push(['Time',tkClock(d.secs)+(d.par?'  (par '+tkClock(d.par)+')':'')]);
+  lines.push(['Time',tqClock(d.secs)+(d.par?'  (par '+tqClock(d.par)+')':'')]);
   resOpen(missOv,{letter:r.letter,title:TASKS[TASK.id].name+': '+r.title,score:r.score,sub:'of 100',stats:lines,board:'',tip:r.tip||'',retry:TASKS[TASK.id].name.toUpperCase()});
   // the board line: this device's runs (the global boards need the Worker to know task: boards)
   const box=missOv.querySelector('.rLines'),row=document.createElement('div');row.className='gl lbLine';
@@ -13185,7 +13193,7 @@ function tkCard(r,d){if(!TASK.on||!running)return;
 }
 
 // ---- the briefing: over the aircraft at its start, the sim held until ACCEPT TASKING ----
-function tkBriefShow(d){const D=TASK.def,B=D.brief(d),ov=$('tkBrief');
+function tqBriefShow(d){const D=TASK.def,B=D.brief(d),ov=$('tkBrief');
   $('tkbK').textContent='TASKING · '+D.role.toUpperCase();
   const h=$('tkbT');h.textContent=D.name.toUpperCase();const mt=document.createElement('span');mt.className='modeTag '+runMode();mt.textContent=runMode()==='easy'?'EASY':'HARD';h.appendChild(mt);
   $('tkbAc').textContent=B.ac;$('tkbSit').textContent=B.sit;
@@ -13197,6 +13205,185 @@ function tkBriefShow(d){const D=TASK.def,B=D.brief(d),ov=$('tkBrief');
 tapBtn($('tkGo'),()=>taskGo());
 tapBtn($('tkBack'),()=>{taskStop();openMenu('sArc');});
 
+// ---- OVERWATCH (MQ-9B SkyGuardian, surveillance) ----
+// Launch from Luke, climb to 3,000 ft and orbit a compound west of the base with the sensor on its white building.
+// Mission Control: "Keep eyes on the white building. Report when the vehicle departs." A white pickup leaves at a
+// random moment; REPORT calls it, then follow it at a standoff (the orbit follows the track), never overhead, and talk
+// the ground team (Saber 6) onto it. Scored on time on target, standoff discipline, report timing and time to station.
+// Rolled: the compound (bearing 190 to 345 from Luke, 6 to 8.5 km, clear of the drop zone, the strip and the range),
+// the departure (30 to 70 s after on station), the pickup's road and speed, the follow time, the team's spot, the wind.
+const OW_ALT=3000,OW_FLOOR=2800,OW_R=2400;
+function owSite(R){
+  for(let i=0;i<40;i++){const b=tqR(R,190,345)*Math.PI/180,r=tqR(R,6000,8500),x=LUKE.x+Math.sin(b)*r,z=LUKE.z-Math.cos(b)*r;
+    if([[DROPZ.x,DROPZ.z],[LZ.x,LZ.z],[RANGE.x,RANGE.z]].some(p=>Math.hypot(x-p[0],z-p[1])<2600))continue;
+    let lo=1e9,hi=-1e9;for(const [ox,oz] of [[0,0],[60,0],[-60,0],[0,60],[0,-60],[300,300],[-300,-300]]){const h=groundHeight(x+ox,z+oz);lo=Math.min(lo,h);hi=Math.max(hi,h);}
+    if(hi-lo>6||hi>60)continue;return {x:x,z:z};}
+  return {x:LUKE.x-7200,z:LUKE.z+600};
+}
+// a white pickup: body, cab, glass, bed, wheels; 5.4 m long, nose toward -z (heading 0 = north)
+function owPickup(col){const g=new THREE.Group(),W=lam(col||0xeef0f2),D=lam(0x23272c),G=lam(0x3a4a5a),T=lam(0x151515);
+  const add=(geo,m,x,y,z)=>{const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);g.add(o);return o;};
+  add(new THREE.BoxGeometry(1.95,0.75,5.4),W,0,0.85,0);add(new THREE.BoxGeometry(1.85,0.85,2.3),W,0,1.62,-0.6);
+  add(new THREE.BoxGeometry(1.87,0.55,0.08),G,0,1.72,-1.76).rotation.x=-0.35;add(new THREE.BoxGeometry(1.9,0.5,1.9),G,0,1.68,-0.6).scale.set(1.002,1,0.98);
+  add(new THREE.BoxGeometry(1.95,0.45,0.1),W,0,1.45,2.65);add(new THREE.BoxGeometry(1.95,0.12,5.42),D,0,0.5,0);
+  const wg=new THREE.CylinderGeometry(0.42,0.42,0.3,10);wg.rotateZ(Math.PI/2);for(const z of [-1.7,1.7])for(const x of [-0.92,0.92])add(wg,T,x,0.42,z);
+  g.traverse(o=>{if(o.isMesh)o.userData.heat=0.5;});return g;}
+// the compound: a walled yard, the white building, a tan house, a shade structure, a water tank, two trees
+function owCompound(c,ang){const g=new THREE.Group(),gh=groundHeight(c.x,c.z),tan=lam(0xc8ab82),wht=lam(0xf3f1ea),dark=lam(0x4a4a4a),grn=lam(0x5d6b3a);
+  const add=(geo,m,x,y,z)=>{const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);g.add(o);return o;};
+  const W=64,H=46,h=2.4;
+  add(new THREE.BoxGeometry(W,h,0.5),tan,0,h/2,-H/2);add(new THREE.BoxGeometry(0.5,h,H),tan,-W/2,h/2,0);add(new THREE.BoxGeometry(0.5,h,H),tan,W/2,h/2,0);
+  add(new THREE.BoxGeometry(W/2-5,h,0.5),tan,-W/4-2.5,h/2,H/2);add(new THREE.BoxGeometry(W/2-5,h,0.5),tan,W/4+2.5,h/2,H/2);   // the gate: a 10 m gap on the south wall
+  const yd=new THREE.Mesh(new THREE.PlaneGeometry(W,H),lam(0xb59e7a));yd.rotation.x=-Math.PI/2;yd.position.y=0.05;g.add(yd);
+  add(new THREE.BoxGeometry(15,5.2,10),wht,-14,2.6,-10);add(new THREE.BoxGeometry(15.6,0.6,10.6),wht,-14,5.5,-10);   // the white building, its parapet
+  add(new THREE.BoxGeometry(2.2,2.4,0.15),dark,-14,1.2,-4.95);
+  add(new THREE.BoxGeometry(10,3.6,8),tan,16,1.8,-12);const rf=add(new THREE.BoxGeometry(10.8,0.3,8.8),lam(0x8a5a3c),16,3.75,-12);rf.rotation.z=0.06;
+  add(new THREE.BoxGeometry(8,0.2,6),dark,14,3,8);for(const [x,z] of [[10.2,5.2],[17.8,5.2],[10.2,10.8],[17.8,10.8]])add(new THREE.CylinderGeometry(0.12,0.12,3,5),dark,x,1.5,z);
+  add(new THREE.CylinderGeometry(1.8,1.8,3.2,12),lam(0xd8d6cf),26,4.6,-18);add(new THREE.CylinderGeometry(0.15,0.15,3,5),dark,26,1.5,-18);
+  for(const [x,z] of [[-28,14],[2,-18]]){add(new THREE.CylinderGeometry(0.25,0.35,2.5,6),lam(0x5a4632),x,1.25,z);const t=add(new THREE.SphereGeometry(3,8,6),grn,x,4.2,z);t.scale.y=0.8;}
+  const car=owPickup(0x2b2f36);car.position.set(4,0,6);car.rotation.y=0.3;g.add(car);
+  g.position.set(c.x,gh,c.z);g.rotation.y=ang;
+  g.traverse(o=>{if(o.isMesh&&o.userData.heat==null)o.userData.heat=0.25;});
+  return g;}
+// the pickup's road: out of the gate, then three to five legs away from Luke, each turn under 55 degrees
+function owRoute(R,c,ang){const P=[],gx=Math.sin(ang),gz=Math.cos(ang);   // the gate faces local +z, turned by ang
+  let x=c.x+gx*30,z=c.z+gz*30;P.push({x:c.x+gx*8,z:c.z+gz*8},{x:x,z:z});
+  let h=Math.atan2(c.x-LUKE.x,-(c.z-LUKE.z))+tqR(R,-0.9,0.9);
+  const n=3+Math.floor(R()*3);
+  for(let i=0;i<n;i++){const L=tqR(R,350,650);h+=tqR(R,-0.95,0.95);x+=Math.sin(h)*L;z-=Math.cos(h)*L;
+    if(groundHeight(x,z)>80||Math.hypot(x-LUKE.x,z-LUKE.z)<3500){x-=Math.sin(h)*L*2;z+=Math.cos(h)*L*2;h+=Math.PI*0.6;}
+    P.push({x:x,z:z});}
+  return P;}
+function owVehTick(d,dt){const v=d.veh,P=d.route;if(!v.moving)return;
+  let rem=d.vk*dt;
+  while(rem>0&&v.i<P.length-1){const a=P[v.i],b=P[v.i+1],L=Math.hypot(b.x-a.x,b.z-a.z)||1,left=L*(1-v.f),step=Math.min(rem,left);v.f+=step/L;rem-=step;if(v.f>=1-1e-6){v.i++;v.f=0;}}
+  if(v.i>=P.length-1){v.moving=false;v.stopped=true;}
+  const a=P[Math.min(v.i,P.length-2)],b=P[Math.min(v.i+1,P.length-1)],f=v.i>=P.length-1?1:v.f;
+  v.x=a.x+(b.x-a.x)*f;v.z=a.z+(b.z-a.z)*f;v.y=groundHeight(v.x,v.z);
+  const hd=Math.atan2(b.x-a.x,-(b.z-a.z));v.h+=wrapPi(hd-v.h)*Math.min(1,dt*2.5);
+  v.g.position.set(v.x,v.y+0.06,v.z);v.g.rotation.y=-v.h;
+  if(v.moving&&(v.dustT=(v.dustT||0)-dt)<=0){v.dustT=0.35;puff(v.x-Math.sin(v.h)*3,v.y+0.8,v.z+Math.cos(v.h)*3);}
+}
+// the sensor on a target: the ball's ground point within r metres of it
+function owOn(t,r){return !!(t&&SENSOR.valid&&(SENSOR.tgt===t||Math.hypot(SENSOR.spot.x-t.x,SENSOR.spot.z-t.z)<r));}   // a lock on it counts
+TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limit:520,
+  roll(R,d){const c=owSite(R);d.c=c;d.ang=tqR(R,0,Math.PI*2);d.route=owRoute(R,c,d.ang);d.vk=tqR(R,10.5,14);
+    d.dep=tqR(R,30,70);d.follow=tqR(R,45,60);d.wdir=Math.round(tqR(R,0,36))*10||360;d.wkt=Math.round(tqR(R,3,16));
+    d.dist=Math.hypot(c.x-LUKE.x,c.z-LUKE.z);d.brg=tqBrg(LUKE.x,LUKE.z,c.x,c.z);
+    d.stPar=Math.round(45+Math.max(147,d.dist/62)+25);d.par=Math.round(d.stPar+d.dep+d.follow+35);
+    const sa=R()*Math.PI*2;d.saber={a:sa,r:tqR(R,1800,2600)};
+    d.tot=0;d.totT=0;d.band=0;d.bandT=0;d.over=0;d.overT=-99;d.falseRep=0;d.repDelay=null;d.onT=0;},
+  brief(d){return {ac:'MQ-9B SkyGuardian · Luke AFB runway 3L',
+    sit:'A compound '+tqDs(d.dist)+' '+tqDir(d.brg)+' of Luke. Keep the sensor on its white building from 3,000 ft. A vehicle is expected to leave: call it the moment it moves, follow it without overflying, then talk the ground team onto it.',
+    facts:[['PAR',tqClock(d.par)],['ON STATION',tqClock(d.stPar)],['WIND',tqWind(d.wdir,d.wkt)],['TARGET',tqDs(d.dist)+' '+tqDir(d.brg).replace('north','N').replace('south','S').replace('east','E').replace('west','W').replace('-','')]]};},
+  spawn(d){
+    const g=tqAdd(owCompound(d.c,d.ang)),gh=groundHeight(d.c.x,d.c.z);
+    // the white building's centre, in the world (local -14,-10 turned by ang)
+    const ca=Math.cos(d.ang),sa=Math.sin(d.ang),bx=d.c.x+(-14)*ca+(-10)*sa,bz=d.c.z-(-14)*sa+(-10)*ca;
+    d.bld={x:bx,y:gh+2.6,z:bz,name:'the white building',dead:false,task:1};
+    const pk=tqAdd(owPickup()),p0=d.route[0];
+    d.veh={g:pk,x:p0.x,y:groundHeight(p0.x,p0.z),z:p0.z,h:Math.atan2(d.route[1].x-p0.x,-(d.route[1].z-p0.z)),i:0,f:0,moving:false,stopped:false,name:'the white pickup',dead:false,task:1};
+    pk.position.set(p0.x,d.veh.y+0.06,p0.z);pk.rotation.y=-d.veh.h;
+    TASK.tgts.push(d.bld,d.veh);TASK.sens=true;irDirty=true;
+    d.tgt=d.bld;tqDest(d.c.x,d.c.z,'Compound','CMPD');
+  },
+  // AUTO in flight: an orbit on the target at 3,000 ft (it climbs on the way), then off; on the ground AUTO takes off
+  autoLbl:(d,ap)=>st.onGround?null:ap&&ap.tk?'Auto Off':'Orbit',
+  auto(d){if(st.onGround)return false;
+    if(st.ap&&st.ap.mode==='orbit'&&st.ap.tk){st.ap=null;st.apW=null;toast('Autopilot off, your airplane');return true;}
+    const t=d.tgt===d.veh?d.veh:d.c;initAudio();if(AC.retract)st.gearDown=false;st.flapIdx=0;
+    apEngage(st,'orbit',{cx:t.x,cz:t.z,r:OW_R,y:Math.max(st.pos.y-GEAR,(OW_ALT-FIELD_FT)/M2FT),v:AC.vcruise,dir:1});st.ap.tk=1;st.ap.sensor=true;
+    toast((d.tgt===d.veh?'Orbit following the pickup':'Orbit: the compound')+', 3,000 ft. AUTO again: your airplane',3);return true;},
+  always(d,dt){owVehTick(d,dt);
+    if(DEST&&DEST.task&&d.tgt===d.veh){DEST.x=d.veh.x;DEST.z=d.veh.z;}
+    // the orbit follows the pickup while the ball is locked on it (the crew's track), at a truck's pace
+    if(st.ap&&st.ap.mode==='orbit'&&d.tgt===d.veh&&(SENSOR.tgt===d.veh||st.ap.tk)){const k=Math.min(1,dt*0.6);st.ap.cx+=(d.veh.x-st.ap.cx)*k;st.ap.cz+=(d.veh.z-st.ap.cz)*k;}
+    // Easy: the ball, entered without a lock, swings to the target
+    if(rookie()&&camMode===2&&!SENSOR.tgt&&!SENSOR.track&&!SENSOR.slewTo&&!d.easySlew){d.easySlew=1;if(sensorAim(d.tgt))SENSOR.slewTo=d.tgt;}
+    if(camMode!==2)d.easySlew=0;
+    // the score clocks run from the watch on
+    if(TASK.si>=2){d.totT+=dt;if(owOn(d.tgt,rookie()?110:70))d.tot+=dt;}
+    if(TASK.si>=3){const r=Math.hypot(st.pos.x-d.veh.x,st.pos.z-d.veh.z),lo=rookie()?1000:1400,hi=rookie()?6500:5600;d.bandT+=dt;if(r>=lo&&r<=hi)d.band+=dt;
+      if(r<800&&!st.onGround&&TASK.t-d.overT>20){d.overT=TASK.t;d.over++;
+        tqMC(AC.csS+', Mission Control, you are overhead the vehicle. They will hear you. Open it up.',{plain:'Too close: you are right over them. Fly further away.'});}}
+  },
+  stages:[
+    {id:'takeoff',name:'Take off from Luke runway 3L',
+      obj:d=>['Take off, Luke 3L',st.onGround?'AUTO takes off for you. The compound is on the map':'Climbing'],
+      enter(d){tqQuiet(()=>{const l=tqMC(AC.csS+', Mission Control. Tasking: overwatch on a compound '+tqDsW(d.dist)+' '+tqDir(d.brg)+' of Luke, '+tqLL(d.c.x,d.c.z)+'. Climb to 3,000, set up an orbit, sensor on the white building.',
+          {plain:'Fly to the compound on your map, circle it at 3,000 ft and point the camera at the white building.'});
+        tqAsk([{k:'WILCO'},{k:'UNABLE',fn:()=>tqMC('Copy unable. Take your time, the compound is on your map. Call us when you have eyes on.',{plain:'No rush. Find the compound on the map.'})}],{line:l});});},
+      tick:d=>!st.onGround&&st.agl>40},
+    {id:'station',name:'Orbit the compound at 3,000 ft, sensor on the white building',
+      obj(d){const r=tqD(d.c.x,d.c.z),ft=tqMSL(),on=owOn(d.bld,rookie()?110:70);
+        const need=r>4000?tqDs(r)+' to go. Tap AUTO for the orbit':ft<OW_FLOOR?'Climb: '+(Math.round(ft/100)*100).toLocaleString('en-US')+' of 3,000 ft':!on?(camMode===2?'Put the cross on the white building, LOCK':'Tap SENSOR, find the white building'):'Holding it';
+        return ['On station',need];},
+      tick(d,dt){const ok=tqD(d.c.x,d.c.z)<4000&&tqMSL()>=OW_FLOOR&&owOn(d.bld,rookie()?110:70);d.onT=ok?d.onT+dt:0;
+        if(d.onT>=2){d.station=st.time-d.t0;tqPilot('Mission Control, '+AC.csS+', on station, eyes on the white building.');return true;}
+        // the window will not wait: past 4:20 the vehicle goes anyway
+        if(st.time-d.t0>260){d.station=null;d.late=1;return true;}return false;}},
+    {id:'watch',name:'Watch the white building. REPORT when the vehicle departs',
+      obj(d){return ['Eyes on the building',d.veh.moving?'It is moving: REPORT':'REPORT the moment the vehicle departs'];},
+      enter(d){d.w0=st.time;if(d.late)d.dep=2;
+        const l=d.late?tqMC(AC.csS+', Mission Control, we are losing the window. Get eyes on the compound now, the vehicle is starting up.',{plain:'Hurry: get the camera on the compound, the vehicle is about to leave.'})
+          :tqMC('Copy. Keep eyes on the white building. Report when the vehicle departs.',{plain:'Watch the white building. Tap REPORT when the vehicle drives off.'});
+        tqAsk([{k:'REPORT',sub:'vehicle departs',say:'',fn:()=>owReport(d)}],{line:l,keep:1});},
+      tick(d){if(!d.veh.moving&&!d.veh.stopped&&st.time-d.w0>=d.dep){d.veh.moving=true;d.depT=st.time;}
+        if(d.veh.moving&&d.repDelay==null&&st.time-d.depT>40){d.repDelay=99;TASK.ask=null;tqReplyUI();
+          tqMC(AC.csS+', Mission Control, we show the vehicle moving. Pick it up and follow it.',{plain:'The vehicle left without your call. Follow it.'});owFollowGo(d);}
+        return !!d.following;}},
+    {id:'follow',name:'Follow it at a standoff, 1 to 3 nm. Do not overfly',
+      obj(d){const r=Math.hypot(st.pos.x-d.veh.x,st.pos.z-d.veh.z),lo=rookie()?1000:1400,hi=rookie()?6500:5600;
+        return ['Follow the pickup',tqDs(r)+(r<lo?'  Too close, open it up':r>hi?'  Too far, close in':'  Standoff good')+(owOn(d.veh,rookie()?110:70)?'':'. Sensor on it'),r<800];},
+      enter(d){d.f0=st.time;},
+      tick:d=>st.time-d.f0>=d.follow},
+    {id:'talkon',name:'Talk Saber 6 onto the vehicle',
+      obj:d=>['Talk-on to Saber 6',owOn(d.veh,rookie()?110:70)?'REPORT where it is':'Sensor on the pickup first'],
+      enter(d){const v=d.veh;d.sab={x:v.x+Math.sin(d.saber.a)*d.saber.r,z:v.z-Math.cos(d.saber.a)*d.saber.r};
+        tqSay('Saber 6','Mission Control, Saber 6, two vehicles moving to intercept. Request a talk-on to the pickup.',{plain:'The ground team wants you to tell them where the pickup is.'});
+        const l=tqMC(AC.csS+', talk Saber 6 onto the vehicle.',{plain:'Tap REPORT to tell the team where the pickup is.'});
+        tqAsk([{k:'REPORT',sub:'talk-on',say:'',fn:()=>owTalk(d)}],{line:l,wait:35,late:()=>{d.talk=0;
+          tqSay('Saber 6','Mission Control, Saber 6, we have it ourselves now. Saber 6 has the vehicle.',{plain:'The team found it without your help.'});d.end=st.time;}});},
+      tick:d=>d.end!=null&&st.time-d.end>4}],
+  score(d){
+    const tot=d.totT>0?d.tot/d.totT:0,band=d.bandT>0?d.band/d.bandT:0;
+    const rep=d.repDelay==null||d.repDelay>=40?0:25*clamp(1-(d.repDelay-4)/36,0,1);
+    const stn=d.station==null?0:10*clamp(1-(d.station-d.stPar)/90,0,1);
+    const sc=40*tot+Math.max(0,25*band-8*d.over)+Math.max(0,rep-6*d.falseRep)+stn-(d.talk===0?10:0);
+    return {score:sc,title:sc>=90?'Eyes never left it':sc>=75?'Good overwatch':sc>=60?'Overwatch done':'The vehicle got away from you',
+      lines:[['Time on target',Math.round(tot*100)+' %  ('+Math.round(d.tot)+' of '+Math.round(d.totT)+' s)'],
+        ['Standoff in band',Math.round(band*100)+' %'+(d.over?'  ·  '+d.over+' overflight'+(d.over>1?'s':''):'')],
+        ['Report after departure',d.repDelay==null||d.repDelay>=40?'missed':d.repDelay.toFixed(1)+' s'+(d.falseRep?'  ·  '+d.falseRep+' early':'')],
+        ['On station',d.station==null?'not in time':tqClock(d.station)+'  (par '+tqClock(d.stPar)+')'],
+        ['Talk-on',d.talk===0?'the team found it':d.talk?'Saber 6 contact':'not done']],
+      tip:tot<0.6?'Lock the ball on the target (LOCK) and it stays on as you circle.':d.over?'Hold 1 to 3 nm off. Overhead, they can hear you.':rep<15?'Call REPORT the moment the wheels move.':'Fly it again: the compound, the road and the timing change every time.'};},
+  cleanup(d){TASK.sens=false;if(SENSOR.tgt&&SENSOR.tgt.task){SENSOR.tgt=null;}if(SENSOR.slewTo&&SENSOR.slewTo.task)SENSOR.slewTo=null;}
+};
+function owReport(d){
+  if(!d.veh.moving&&!d.veh.stopped){d.falseRep++;tqPilot('Mission Control, '+AC.csS+', vehicle departing.');
+    tqMC('Negative, we show it still parked. Keep watching.',{plain:'Not yet: the vehicle has not moved. Keep watching.'});
+    tqAsk([{k:'REPORT',sub:'vehicle departs',say:'',fn:()=>owReport(d)}],{keep:1});return;}
+  d.repDelay=st.time-d.depT;
+  const b=d.route.length>2?tqBrg(d.route[1].x,d.route[1].z,d.route[2].x,d.route[2].z):0;
+  tqPilot('Mission Control, '+AC.csS+', vehicle departing the compound, white pickup, heading '+tqDir(b)+'.');
+  owFollowGo(d);
+}
+function owFollowGo(d){d.tgt=d.veh;d.following=1;
+  // a lock on the building moves to the pickup (the crew slews the track); the destination follows it
+  if(SENSOR.tgt===d.bld)SENSOR.tgt=d.veh;
+  if(DEST&&DEST.task){DEST.name='The white pickup';DEST.short='PICKUP';destUI(true);}
+  const l=tqMC('Copy, vehicle moving. Follow it. Hold your standoff, 1 to 3 miles, do not overfly.',{plain:'Follow the pickup from 1 to 3 miles away. Do not fly over it.'});
+  tqAsk([{k:'WILCO'}],{line:l,wait:15});
+}
+function owTalk(d){const v=d.veh;
+  if(!owOn(v,rookie()?110:70)){d.talkMiss=(d.talkMiss||0)+1;tqPilot('Saber 6, '+AC.csS+', stand by, reacquiring.');
+    const l=tqMC(AC.csS+', get your sensor back on the pickup.',{plain:'Point the camera at the pickup first, then REPORT.'});
+    tqAsk([{k:'REPORT',sub:'talk-on',say:'',fn:()=>owTalk(d)}],{line:l,wait:30,late:()=>{d.talk=0;d.end=st.time;}});return;}
+  const r=Math.hypot(v.x-d.sab.x,v.z-d.sab.z),b=tqBrg(d.sab.x,d.sab.z,v.x,v.z),mph=Math.round(d.vk*2.237/5)*5;
+  tqPilot('Saber 6, '+AC.csS+', your vehicle is the white pickup, '+(r/1609.34).toFixed(1)+' miles '+tqDir(b)+' of you, '+(v.moving?'heading '+tqDir(((v.h*180/Math.PI)%360+360)%360)+' on the dirt track, about '+mph+' miles an hour.':'stopped on the dirt track.'));
+  tqSay('Saber 6','Contact the white pickup. Saber 6 has it from here. Thanks for the eyes.',{plain:'The team sees it. Job done.'});
+  d.talk=1;d.end=st.time;
+}
 // (results cards) flies exactly the same start: a free flight / segment / mission start keeps its spawn
 // (final1 is not final), base and aircraft; an arcade game, lesson or dogfight goes back through its own
 // starter (arcStart, startLesson, dfStart), which sets its own position. Each starter stamps it after start().
@@ -13965,10 +14152,10 @@ function arcList(){
     {id:'range',lb:'arc:strike',ac:'MQ-9A Reaper',name:'Strike range',desc:'Find the targets, lock on, four missiles.',go:()=>{pickType('reaper',1);start('range');}},
     {id:'drop',lb:'arc:drop',ac:'C-130H Hercules',name:'Airdrop',desc:'Put the bundle on the drop zone.',go:()=>{pickType('c130',1);start('drop');}},
     {id:'short',lb:'mission:short',ac:'C-130H Hercules',name:'Short field landing',desc:'Stop a Hercules on a 3,000 ft dirt strip.',go:()=>{pickType('c130',1);start('short');}},
-    ].concat(tkCards()));
+    ].concat(tqCards()));
 }
 // the Taskings group under the five (the list scrolls to it), a card for each tasking that is in
-function tkCards(){const C=TASK_CARDS.filter(c=>TASKS[c[0]]);
+function tqCards(){const C=TASK_CARDS.filter(c=>TASKS[c[0]]);
   return C.length?[{head:'Taskings'}].concat(C.map(c=>({id:'tk-'+c[0],lb:'task:'+c[0],icon:'tk-'+c[0],cls:'tk',ac:c[1],name:c[2],desc:c[3],go:()=>taskStart(c[0])}))):[];}
 // tasking item 1: the four Taskings, each replayable (a fresh roll every start)
 const TASK_CARDS=[['overwatch','MQ-9B SkyGuardian','Overwatch','Watch a compound, call the vehicle out, follow it.'],
@@ -15789,6 +15976,8 @@ function targetUnder(p,maxD){
   let best=null,bd=maxD;
   for(const t of STRIKE.targets){if(t.dead)continue;
     const d=Math.hypot(t.x-p.x,t.z-p.z);if(d<bd){bd=d;best=t;}}
+  // a tasking's targets (Overwatch's building and pickup): LOCK takes them a little wider, Easy wider still
+  if(TASK.on)for(const t of TASK.tgts){if(t.dead)continue;const d=Math.hypot(t.x-p.x,t.z-p.z),lim=Math.max(maxD,rookie()?200:110);if(d<lim&&d<(best?bd:lim)){bd=d;best=t;}}
   return best;
 }
 function sensorTrackHere(){
@@ -16107,6 +16296,7 @@ function sensorOrbit(p){
 function sensorAP(){
   if(!running||paused||st.crashed||st.onGround||!hasBall())return;
   if(st.ap&&(st.ap.mode==='land'||st.ap.mode==='to'))return;
+  if(st.ap&&st.ap.tk){initAudio();sensorUpdate(0);return;}   // a tasking's orbit (on the compound, on the truck) stays as it is
   initAudio();sensorUpdate(0);
   const p=SENSOR.tgt?_st2.set(SENSOR.tgt.x,SENSOR.tgt.y,SENSOR.tgt.z):SENSOR.track||(SENSOR.valid?SENSOR.spot:null);
   if(p)sensorOrbit(p);
@@ -16185,7 +16375,7 @@ function tick(t,skipRender){
   if(RIO.built)rioTick(running&&!paused?dt:0);
   if(running&&!paused&&!st.crashed){
     if(STRIKE.built){rangeMoving(dt);targetsTick(dt);}
-    if(STRIKE.active||(camMode===2&&hasBall()))sensorUpdate(dt);
+    if(STRIKE.active||TASK.sens||(camMode===2&&hasBall()))sensorUpdate(dt);
     if(STRIKE.active){missileUpdate(dt);if(AC.id==='a10')hogGun(dt);
       // time on target: the ball locked onto an actual target, not a ground point
       if(SENSOR.tgt&&!SENSOR.tgt.dead)STRIKE.tot=(STRIKE.tot||0)+dt;}
@@ -16252,7 +16442,8 @@ function tick(t,skipRender){
     else{setTxt(hIas,Math.round(s.ias*MS2KT));setTxt(hAlt,(Math.round((s.pos.y*M2FT+FIELD_FT-GEAR*M2FT)/10)*10).toLocaleString('en-US'));}
     const apm=s.ap;hAp.classList.toggle('on',!!apm);if(apm)setTxt(hAp,((APN[apm.mode]||'AUTO')+'  '+(apm.flare?'FLARE':s.onGround&&apm.mode==='land'?'ROLLOUT':(APP[apm.phase]||''))).trim());
     const orb=apm&&(apm.mode==='hold'||apm.mode==='orbit');
-    const lbl=apm?(orb?'Auto Land':'Auto ON'):(s.onGround?'Auto T/O':(hasBall()?'Orbit':'Auto Land'));
+    let lbl=apm?(orb?'Auto Land':'Auto ON'):(s.onGround?'Auto T/O':(hasBall()?'Orbit':'Auto Land'));
+    if(TASK.on&&!TASK.done&&TASK.def.autoLbl){const x=TASK.def.autoLbl(TASK.d,apm);if(x)lbl=x;}   // a tasking's own AUTO says what it does
     {const t=lbl.toUpperCase();if(bAutoT.textContent!==t)bAutoT.textContent=t;}bAuto.classList.toggle('on',!!apm&&!orb);
     {const vs=Math.round(s.vel.y*196.85/10)*10;
      if(rookie()){setTxt(hVs,Math.abs(vs)<50?'Level':(vs>0?'\u25B2 ':'\u25BC ')+Math.abs(vs).toLocaleString('en-US'));
@@ -16863,7 +17054,7 @@ const APP_VER='2026-10-10-arsenal';          // keep version.json in step when s
     get P(){return E.P;}};
 })();
 
-window.__kgeu={TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tkAnswer(k),taskXp:taskXp,tkLL:tkLL,tkMC:(t,o)=>tkMC(t,o),tkAsk:(a,o)=>tkAsk(a,o),tkQuiet:(f,m)=>tkQuiet(f,m),
+window.__kgeu={TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),taskXp:taskXp,tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
   task:()=>({on:TASK.on,id:TASK.id,stage:TASK.stage&&TASK.stage.id,si:TASK.si,brief:TASK.brief,done:TASK.done,res:TASK.res,ask:TASK.ask&&{shown:TASK.ask.shown,opts:TASK.ask.opts.map(o=>o.k),t:TASK.ask.t},d:TASK.d,log:TASK.log.slice(),seed:TASK.seed}),
   tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
