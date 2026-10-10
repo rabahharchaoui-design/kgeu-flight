@@ -35,6 +35,7 @@ async def run(pg, good):
     PH = []
     cam0 = await pg.evaluate(f"()=>{K}.camMode()")
     await start(pg, 'hood'); await pg.evaluate(R); await pg.wait_for_timeout(450)
+    await pg.wait_for_function("()=>getComputedStyle(document.getElementById('atc')).opacity==='1'", timeout=5000)   # the subtitle's 0.35 s fade in has finished
     h0 = await pg.evaluate(HOOD); h0['L'] = await pg.evaluate(LAYOUT)
     await fly(pg, 700, alt=3500, kt=90, vs=0, hdg=0, until="K.LES.ph===1"); PH.append(await pg.evaluate(f"()=>{K}.LES.ph"))
     await fly(pg, 200, kt=90, vs=0, hdg=0, rate=4.5, bank=15)
@@ -84,6 +85,7 @@ async def main():
         PH, cam0, h0, dh, low, high, h1, d, dana = await run(pg, False)
         pg2 = await page(b, url, vp={'width': 568, 'height': 320}, storage=dict(BASE, **PLACED))
         await start(pg2, 'hood'); await pg2.evaluate(R); await pg2.wait_for_timeout(450)
+        await pg2.wait_for_function("()=>getComputedStyle(document.getElementById('atc')).opacity==='1'", timeout=5000)
         L = await pg2.evaluate(LAYOUT)
         hit = [x['id'] for x in L['dock'] if X(L['card'], x)] + (['throttle'] if X(L['card'], L['thr']) else []) + (['six pack'] if X(L['card'], L['panel']) else [])
         ok('(e) 568x320: the card at least 170 px wide, clear of the dock buttons, the throttle and the six pack panel', L['card']['w'] >= 170 and not hit and INSIDE(L['card'], L), (L['card'], hit))
