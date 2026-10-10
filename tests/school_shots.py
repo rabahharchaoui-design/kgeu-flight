@@ -3,8 +3,10 @@
 # intake_<WxH>: the intake with one option picked. At 844x390, 568x320 and 390x844, the intake also at 667x375.
 # brief_card1_<WxH>, brief_quiz_<WxH> (item 3): slow flight's briefing, card 1 and the quiz answered wrong.
 # hud_cue_<WxH> (item 4): slow flight with the cue strip, ALT out; debrief_<WxH>: a finished slow flight with Easy on.
-# Run: .venv/bin/python tests/school_shots.py
-import asyncio, os
+# item 6: ground_<WxH> (the pylons, the box and the road from the chase view at the start of ground reference),
+# landings_aim_<WxH> (short final with the aiming bar), solo_debrief_<WxH> (a passed solo: the Endorsement row), at
+# 844x390 and 568x320. Run: .venv/bin/python tests/school_shots.py   (--item6: only those)
+import asyncio, os, sys
 from playwright.async_api import async_playwright
 from harness import serve, launch, page
 
@@ -18,10 +20,33 @@ async def shot(pg, name):
     await pg.wait_for_timeout(450)   # past the fades
     p = os.path.abspath(os.path.join(SHOTS, name)); await pg.screenshot(path=p); print(p)
 
+# school1 item 6: the new Stage 1 flights
+async def item6(b, url):
+    ST = dict(BASE, kgeuPlace='{"level":"ride","hours":null}', kgeuSchoolEasy='0', kgeuTOD='day')
+    R = "()=>{const K=window.__kgeu;for(let i=0;i<6;i++)K.stepFrame(0.03,false,false);K.stepFrame(0,true)}"
+    for W, H in SIZES[:2]:
+        pg = await page(b, url, vp={'width': W, 'height': H}, storage=ST)
+        await pg.evaluate(f"()=>{{const K={K};K.startLesson('ground');K.lesBriefSkip();const s=K.state();s.windKt=0;}}")
+        await pg.evaluate(R); await shot(pg, f'ground_{W}x{H}.png')
+        # short final for runway 1, 200 ft up at 65 kt, the sand bar on the 1,000 ft markers ahead
+        await pg.evaluate(f"""()=>{{const K={K},F=K.rwyFrame(),R=F.rh*Math.PI/180,u=F.thr-650;K.startLesson('landings',true,{{brief:false}});const s=K.state();s.windKt=0;
+          s.pos.set(Math.sin(R)*u,K.groundHeight(Math.sin(R)*u,-Math.cos(R)*u)+190/3.28084+1.5,-Math.cos(R)*u);const V=33.4;s.vel.set(Math.sin(R)*V,-2.5,-Math.cos(R)*V);
+          s.quat.setFromEuler(new THREE.Euler(0.02,-R,0,'YXZ'));s.w.set(0,0,0);s.onGround=false;s.flapIdx=3;s.throttle=s.power=0.35;K.LES.d.s=3;}}""")
+        await pg.evaluate(R); await shot(pg, f'landings_aim_{W}x{H}.png')
+        # a passed solo: the debrief with the Endorsement row
+        await pg.evaluate(f"""()=>{{const K={K};K.startLesson('solo',true,{{brief:false}});if(!K.paused())K.togglePause();K.LES.quiz={{ok:true}};K.gBegin(K.lessonDef('solo'));
+          K.gHold('dw',{{get:()=>2110,target:2071,grace:0}});for(let i=0;i<30;i++)K.gTick(0.1);K.gEvent('three',true,'3 of 3');
+          K.gRange('fpm',180,'180 fpm, worst of 3, standard 300 fpm');K.gRange('tdz',240,'240 ft past the point, worst of 3, standard 0 to 400 ft');K.gRange('cl',1.8,'1.8 m off, worst of 3, standard 6 m');K.gEnd();}}""")
+        await shot(pg, f'solo_debrief_{W}x{H}.png')
+        await pg.context.close()
+
 async def main():
     srv, url = serve()
     async with async_playwright() as p:
         b = await launch(p)
+        await item6(b, url)
+        if '--item6' in sys.argv:
+            await b.close(); srv.shutdown(); return
         for W, H in SIZES:
             pg = await page(b, url, vp={'width': W, 'height': H}, storage=dict(BASE, kgeuPlace='{"level":"student","hours":12.5}'))
             await pg.evaluate("()=>document.body.classList.add('portraitok')")

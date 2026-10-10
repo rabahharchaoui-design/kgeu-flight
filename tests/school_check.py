@@ -59,13 +59,13 @@ async def main():
         s = await st(pg)
         ok('lesson 1 runs every step to the end without a crash', set(range(1, 8)) <= set(phases) and not s['crash'] and s['on'] is None, (phases, s))
         g = await pg.evaluate("()=>({card:document.getElementById('gradeOv').classList.contains('on'),next:document.getElementById('gNext').textContent,hid:document.getElementById('gNext').hidden,letter:document.getElementById('gLetter').textContent})")
-        ok('the result screen has a big Next lesson button', g['card'] and not g['hid'] and g['next'] == 'Next lesson: Pattern and touch and go', g)
+        ok('the result screen has a big Next lesson button', g['card'] and not g['hid'] and g['next'] == 'Next lesson: Climbs, descents and turns', g)
         sim = sum(phases.values()) * 0.8
         bad = await pg.evaluate(FIT, '#gradeOv')
         ok('result screen fits with 44 px targets', not bad, bad)
         ok('lesson 1 takes about a minute of flying', 45 < sim < 100, f'{sim:.0f} s simulated')
         await finger(pg, '#gNext'); await pg.wait_for_timeout(1200)
-        ok('Next lesson starts the pattern (school1: the curriculum order), its briefing first', await pg.evaluate(f"()=>[{K}.LES.on,{K}.lesBrief.on]") == ['pattern', True])
+        ok('Next lesson starts Climbs (school1: the curriculum order), its briefing first', await pg.evaluate(f"()=>[{K}.LES.on,{K}.lesBrief.on]") == ['climbs', True])
         await pg.evaluate("()=>document.getElementById('lesQuit').click()")
         # home and the school screen
         await pg.evaluate(f"()=>{K}.openMenu()"); await pg.wait_for_timeout(300)
@@ -81,7 +81,7 @@ async def main():
         rows = await pg.evaluate("()=>[...document.querySelectorAll('#school .lrow')].map(r=>[r.dataset.l,r.classList.contains('done'),r.classList.contains('next'),r.classList.contains('soon')])")
         fly = [r[0] for r in rows if not r[3]]
         nxt = [r[0] for r in rows if r[2]]
-        ok('stage 1 selected: nine rows, its five flyable, lesson 1 ticked, the pattern highlighted next', len(rows) == 9 and sorted(fly) == sorted(['first','pattern','slow','stall','engine']) and rows[0][:2] == ['first', True] and nxt == ['pattern'], rows)
+        ok('stage 1 selected: nine rows, all flyable (item 6), lesson 1 ticked, Climbs highlighted next', len(rows) == 9 and len(fly) == 9 and rows[0][:2] == ['first', True] and nxt == ['climbs'], rows)
         caps = await pg.evaluate("()=>[...document.querySelectorAll('#schMap .sNode')].map(c=>[c.dataset.st,c.classList.contains('sel')])")
         ok('the stage map: four stages, stage 1 selected', caps == [['s1', True], ['s2', False], ['s3', False], ['s4', False]], caps)
         soon = await pg.evaluate("()=>[...document.querySelectorAll('#school .lrow.soon')].every(r=>r.getAttribute('aria-disabled')==='true'&&!r.onclick&&/Coming soon/i.test(r.textContent))")
@@ -94,8 +94,8 @@ async def main():
         ok('school screen: the first rows in view, the list scrolls inside, 44 px targets', not await pg.evaluate(VIS), await pg.evaluate(VIS))
         ok('flight school is not a Challenges card', await pg.evaluate("()=>{window.__kgeu.nav('sArc');return !document.querySelector('#arcCards [data-m=school]')}"))
         await pg.evaluate(f"()=>{K}.nav('sSchool')"); await pg.wait_for_timeout(200)
-        await finger(pg, '#school [data-l="pattern"]'); await pg.wait_for_timeout(1200)
-        ok('one tap on a lesson starts it (its briefing up)', await pg.evaluate(f"()=>[{K}.LES.on,{K}.lesBrief.on]") == ['pattern', True])
+        await finger(pg, '#school [data-l="climbs"]'); await pg.wait_for_timeout(1200)
+        ok('one tap on a lesson starts it (its briefing up)', await pg.evaluate(f"()=>[{K}.LES.on,{K}.lesBrief.on]") == ['climbs', True])
         ok('no page errors', not pg.errs, pg.errs[:3])
         await pg.context.close()
 

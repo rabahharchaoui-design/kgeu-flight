@@ -1,7 +1,9 @@
 # School1 item 4: the grading engine, the live tolerance cues, the debrief and the Easy toggle.
 # (a) engine arithmetic through window.__kgeu (a hold, a range, an event); (b) slow flight's cue strip, ALT turning out and
 # back in; (c) slow flight flown to the end with Easy on: the debrief rows, the quiz row, the Easy tag, fits at 844x390 and
-# 568x320; (d) the Standard / Easy chips persist and lock during a lesson; (e) no page errors.
+# 568x320; (d) the Standard / Easy chips persist and lock during a lesson; (e) no page errors; (f) item 6: slow flight's
+# asymmetric speed band (+10/-0 kt: 54 kt out, 64 in, the band drawn off centre; Easy +20/-5) and the stall lesson's power
+# on stall after the power off one, both recoveries scored.
 # Run: .venv/bin/python tests/school_grade_check.py
 import asyncio, sys
 from playwright.async_api import async_playwright
@@ -29,6 +31,18 @@ CLEAR = """()=>{const L=document.getElementById('lesson').getBoundingClientRect(
   if(L.height>=0.45*innerHeight)bad.push('tall '+Math.round(L.height)+' of '+innerHeight);
   if(!document.getElementById('lesCue').classList.contains('on'))bad.push('no strip');return bad;}"""
 CUE = "()=>[...document.querySelectorAll('#lesCue .cue')].map(r=>[r.querySelector('b').textContent,r.className.replace('cue','').trim(),r.querySelector('span').textContent])"
+
+# slow flight's spd hold driven by window.__v: the band class after 54, 64 and 48 kt, the band's gradient, the graded time
+BAND = """()=>{const K=window.__kgeu;K.gBegin(K.lessonDef('slow'));K.gHold('alt',{get:()=>3500,target:3500,grace:0});K.gHold('spd',{get:()=>window.__v,target:55,grace:0});
+  const h=K.G.tasks.spd,row=()=>document.querySelectorAll('#lesCue .cue')[1],b=[];
+  for(const v of [54,64,48]){window.__v=v;for(let i=0;i<3;i++)K.gTick(0.1);b.push(row().className.replace('cue','').trim());}
+  window.__v=54;const t0=h.tIn;for(let i=0;i<10;i++)K.gTick(0.1);
+  return {hl:[h.hi,h.lo],b:b,bg:row().children[1].style.background,bgAlt:document.querySelectorAll('#lesCue .cue')[0].children[1].style.background,tIn:h.tIn-t0,tAll:h.tAll}}"""
+# the stall lesson pinned: o.kt indicated, o.p pitch (rad), o.vy (m/s), o.thr; frames until o.u or o.n
+STALL = """(o)=>{const K=window.__kgeu,u=o.u?new Function('K','return '+o.u):null;let i=0;
+  for(;i<(o.n||400)&&K.LES.on;i++){const s=K.state();s.windKt=0;s.gustAmp=0;s.throttle=s.power=o.thr;
+    const V=o.kt/1.943844/Math.sqrt(1.097*Math.exp(-s.pos.y/9200)/1.225);s.vel.set(0,o.vy||0,-V);s.quat.setFromEuler(new THREE.Euler(o.p,0,0,'YXZ'));s.w.set(0,0,0);
+    K.stepFrame(0.1,false,true);if(u&&u(K))break;}K.stepFrame(0,true);return {ph:K.LES.on?K.LES.ph:null,i:i,stalled:K.state().stalled}}"""
 
 async def held(pg):
     await pg.evaluate(f"()=>{{{K}.startLesson('slow',true,{{brief:false}})}}"); await pg.wait_for_timeout(300)
@@ -140,6 +154,35 @@ async def main():
         c2 = await pg.evaluate(CH)
         ok('(d) during a lesson the chips are disabled with Set before a lesson', c['dis'] == [True, True] and c['hint'] == 'Set before a lesson' and c2['ls'] == '0', (c, c2))
         ok('(e) no page errors', not pg.errs, pg.errs[:3])
+        await pg.context.close()
+
+        # (f) the stall lesson: the power off stall, its recovery, then the power on stall and its recovery
+        pg = await page(b, url, vp={'width': 844, 'height': 390}, storage=dict(BASE, kgeuSchoolEasy='0'))
+        # (f) slow flight's speed band: +10/-0 kt around 55 (Standard), +20/-5 (Easy), on a held slow flight
+        await held(pg)
+        for ez, exp in ((False, [10, 0, 'out', 'in', 'out']), (True, [20, 5, 'in', 'in', 'near'])):
+            await pg.evaluate(f"(e)=>{K}.ezSet(e,true)", ez)
+            r = await pg.evaluate(BAND)
+            ok(f'(f) {"Easy" if ez else "Standard"}: hi {exp[0]}, lo {exp[1]}; 54 kt {exp[2]}, 64 in, 48 {exp[4]}', r['hl'] == exp[:2] and r['b'] == exp[2:], r)
+            if not ez:
+                ok('(f) the band is drawn off centre (50% to 66.67%), the symmetric ALT row is not', r['bg'] and ' 50%' in r['bg'] and '66.67%' in r['bg'] and not r['bgAlt'], r)
+                ok('(f) 54 kt counts as out of tolerance in the grading too', r['tIn'] == 0 and r['tAll'] > 0, r)
+        await pg.evaluate(f"()=>{K}.ezSet(false,true)")
+        await pg.evaluate(f"()=>{{const K={K};K.radioLog(true);K.startLesson('stall');K.lesBriefSkip()}}"); await pg.wait_for_timeout(200)
+        P = []
+        for o in ({'kt': 48, 'p': 0.5, 'thr': 0, 'u': 'K.LES.ph===1'}, {'kt': 60, 'p': -0.05, 'vy': 1.2, 'thr': 1, 'u': 'K.LES.ph===2'}, {'kt': 74, 'p': 0.1, 'vy': 2, 'thr': 1, 'u': 'K.LES.ph===3'},
+                  {'kt': 58, 'p': 0.1, 'vy': 0, 'thr': 0.4, 'n': 20}, {'kt': 52, 'p': 0.55, 'thr': 1, 'u': 'K.LES.ph===4'}, {'kt': 62, 'p': -0.05, 'vy': 1.2, 'thr': 1, 'u': 'K.LES.ph===5'},
+                  {'kt': 74, 'p': 0.1, 'vy': 2, 'thr': 1, 'u': '!K.LES.on'}):
+            P.append(await pg.evaluate(STALL, o))
+        await pg.wait_for_timeout(600)
+        d = await pg.evaluate("""()=>({rows:[...document.querySelectorAll('#gLines .gt')].map(r=>[r.querySelector('span').textContent,r.classList.contains('ok')]),letter:document.getElementById('gLetter').textContent,
+          dana:window.__kgeu.radioLog().filter(l=>l.who==='Dana').map(l=>l.text)})""")
+        ok('(f) the stall lesson reaches every phase: stall, recover, climb, the power on stall, recover, climb', [x['ph'] for x in P] == [1, 2, 3, 3, 4, 5, None], P)
+        ok('(f) the debrief: both stalls, seven rows, all passed', [x[0] for x in d['rows']] == ['Altitude lost under 150 ft', 'Full power within 2 s', 'Wings within 20 degrees', 'No secondary stall',
+           'Power on: lost under 150 ft', 'Power on: wings within 20 degrees', 'Power on: no secondary stall'] and all(x[1] for x in d['rows']) and d['letter'] in 'AB', d)
+        ok('(f) Dana: two stalls, the power on stall, its recovery', any(t.startswith('Two stalls') for t in d['dana']) and any('Now the power on stall' in t for t in d['dana'])
+           and any('The power is already in' in t for t in d['dana']), d['dana'])
+        ok('(f) no page errors', not pg.errs, pg.errs[:3])
         await pg.context.close()
         await b.close()
     srv.shutdown()

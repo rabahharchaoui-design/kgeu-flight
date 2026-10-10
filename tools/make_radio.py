@@ -160,6 +160,8 @@ PILOT = {
     # school1 item 5: the pattern lesson's request at the hold and the touch and go readback (Glendale)
     'hold_closed':     'holding short runway one, request closed traffic.',
     'rb_cleared_tg':   'Cleared touch and go runway one,',
+    # school1 item 6: the landings lesson's readback of the option clearance
+    'rb_cleared_option': 'Cleared for the option runway one,',
     'load_away':       'load away, one bundle.',
     'rifle':           'Rifle,',
     # C-130 jump calls on the intercom
