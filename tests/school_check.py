@@ -17,11 +17,18 @@ async def main():
     srv, url = serve()
     async with async_playwright() as p:
         b = await launch(p)
-        # first launch as a rookie: the funnel starts lesson 1 by itself
+        # first launch as a rookie: the funnel starts lesson 1 by itself, through its briefing (school1 item 3)
         pg = await page(b, url, storage={})
         await finger(pg, '#fRookie'); await pg.wait_for_timeout(1500)
+        br = await pg.evaluate(f"()=>({{on:{K}.lesBrief.on,les:{K}.LES.on,paused:{K}.paused()}})")
+        ok('New to flying opens lesson 1 with its briefing first', br == {'on': True, 'les': 'first', 'paused': True}, br)
+        for i in range(3):
+            await finger(pg, '#brNext')
+            await pg.wait_for_function(f"()=>{{const t=document.getElementById('brTrack');return {K}.lesBrief.slide=={i + 1}&&Math.abs(t.scrollLeft-{i + 1}*t.clientWidth)<2}}", timeout=8000)
+        await finger(pg, '#brTrack .brQ .brAns:nth-child(4)'); await pg.wait_for_timeout(200)
+        await finger(pg, '#brNext'); await pg.wait_for_timeout(1200)
         s = await st(pg)
-        ok('New to flying launches lesson 1 at once', s['on'] == 'first' and s['g'], s)
+        ok('New to flying launches lesson 1 after NEXT x3, an answer and LET\'S FLY', s['on'] == 'first' and s['g'] and not await pg.evaluate(f"()=>{K}.lesBrief.on||{K}.paused()"), s)
         info = await pg.evaluate(f"()=>({{type:{K}.state().type,base:{K}.state().base,skip:document.getElementById('lesQuit').textContent,arrow:document.getElementById('tutArrow').classList.contains('on')}})")
         ok('it is the Cessna at Glendale with a big Skip and an arrow', info == {'type': 'cessna', 'base': 'kgeu', 'skip': 'Skip', 'arrow': True}, info)
         r = await pg.evaluate("()=>{const r=document.getElementById('lesQuit').getBoundingClientRect();return [r.width,r.height]}")
@@ -58,7 +65,7 @@ async def main():
         ok('result screen fits with 44 px targets', not bad, bad)
         ok('lesson 1 takes about a minute of flying', 45 < sim < 100, f'{sim:.0f} s simulated')
         await finger(pg, '#gNext'); await pg.wait_for_timeout(1200)
-        ok('Next lesson starts the pattern (school1: the curriculum order)', await pg.evaluate(f"()=>{K}.LES.on") == 'pattern')
+        ok('Next lesson starts the pattern (school1: the curriculum order), its briefing first', await pg.evaluate(f"()=>[{K}.LES.on,{K}.lesBrief.on]") == ['pattern', True])
         await pg.evaluate("()=>document.getElementById('lesQuit').click()")
         # home and the school screen
         await pg.evaluate(f"()=>{K}.openMenu()"); await pg.wait_for_timeout(300)
@@ -88,7 +95,7 @@ async def main():
         ok('flight school is not a Challenges card', await pg.evaluate("()=>{window.__kgeu.nav('sArc');return !document.querySelector('#arcCards [data-m=school]')}"))
         await pg.evaluate(f"()=>{K}.nav('sSchool')"); await pg.wait_for_timeout(200)
         await finger(pg, '#school [data-l="pattern"]'); await pg.wait_for_timeout(1200)
-        ok('one tap on a lesson starts it', await pg.evaluate(f"()=>{K}.LES.on") == 'pattern')
+        ok('one tap on a lesson starts it (its briefing up)', await pg.evaluate(f"()=>[{K}.LES.on,{K}.lesBrief.on]") == ['pattern', True])
         ok('no page errors', not pg.errs, pg.errs[:3])
         await pg.context.close()
 
@@ -97,7 +104,7 @@ async def main():
         ok('Start here shows for a rookie until lesson 1', await pg.evaluate("()=>document.getElementById('startHere').classList.contains('on')"))
         await pg.evaluate(f"()=>{K}.setSkill('pilot')"); await pg.evaluate(f"()=>{K}.nav('sHome',true)")
         ok('no Start here for pilots', not await pg.evaluate("()=>document.getElementById('startHere').classList.contains('on')"))
-        await pg.evaluate(f"()=>{{{K}.setSkill('rookie');{K}.startLesson('first')}}"); await pg.wait_for_timeout(800)
+        await pg.evaluate(f"()=>{{{K}.setSkill('rookie');{K}.startLesson('first');{K}.lesBriefSkip()}}"); await pg.wait_for_timeout(800)
         await finger(pg, '#lesQuit'); await pg.wait_for_timeout(300)
         ok('Skip ends it, flight carries on', await pg.evaluate(f"()=>{K}.LES.on===null&&!{K}.paused()"))
         await pg.evaluate(f"()=>{{{K}.openMenu('sSet')}}"); await pg.wait_for_timeout(200)

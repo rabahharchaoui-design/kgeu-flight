@@ -49,10 +49,10 @@ MODES = [
     ('landing challenge', f"{K}.pick('cessna');{K}.arcStart('landing')", 3704),
     ('1 mile challenge', f"{K}.pick('f16');{K}.arcStart('landing1')", None),
     ('daily', f"{K}.dailyRegion('az');{K}.arcStart('daily')", 3704),
-    ('lesson first flight', f"{K}.startLesson('first')", None),
-    ('lesson pattern', f"{K}.startLesson('pattern',true)", None),
-    ('lesson engine failure', f"{K}.startLesson('engine',true)", 3704),
-    ('lesson slow flight', f"{K}.startLesson('slow',true)", 3704),
+    ('lesson first flight', f"{K}.startLesson('first');{K}.lesBriefSkip()", None),
+    ('lesson pattern', f"{K}.startLesson('pattern',true);{K}.lesBriefSkip()", None),
+    ('lesson engine failure', f"{K}.startLesson('engine',true);{K}.lesBriefSkip()", 3704),
+    ('lesson slow flight', f"{K}.startLesson('slow',true);{K}.lesBriefSkip()", 3704),
 ]
 VIEWS = [(844, 390), (568, 320), (667, 375), (390, 844)]
 

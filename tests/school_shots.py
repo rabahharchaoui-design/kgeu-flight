@@ -1,6 +1,7 @@
 # School1 item 2 screenshots: the stage map and the placement intake.
 # map_<WxH>: stage 1 selected, a student placement with first and pattern passed; map_s3_<WxH>: stage 3 selected (locked);
 # intake_<WxH>: the intake with one option picked. At 844x390, 568x320 and 390x844, the intake also at 667x375.
+# brief_card1_<WxH>, brief_quiz_<WxH> (item 3): slow flight's briefing, card 1 and the quiz answered wrong.
 # Run: .venv/bin/python tests/school_shots.py
 import asyncio, os
 from playwright.async_api import async_playwright
@@ -33,6 +34,16 @@ async def main():
             await pg.evaluate(f"()=>{{document.body.classList.add('portraitok');{K}.openMenu('sSchool')}}"); await pg.wait_for_timeout(300)
             await pg.evaluate("()=>document.querySelector('#plOpts [data-lv=solo]').click()")
             await shot(pg, f'intake_{W}x{H}.png')
+            await pg.context.close()
+        # school1 item 3: the lesson briefing, card 1 and the quiz with an answer tapped (a wrong one: red, the right one outlined)
+        for W, H in SIZES:
+            pg = await page(b, url, vp={'width': W, 'height': H}, storage=dict(BASE, kgeuPlace='{"level":"solo","hours":null}'))
+            await pg.evaluate(f"()=>{{document.body.classList.add('portraitok');{K}.startLesson('slow')}}")
+            await shot(pg, f'brief_card1_{W}x{H}.png')
+            for i in range(3): await pg.evaluate(f"()=>{K}.lesBriefNext()"); await pg.wait_for_timeout(400)
+            await pg.wait_for_function(f"()=>{{const t=document.getElementById('brTrack');return Math.abs(t.scrollLeft-3*t.clientWidth)<2}}", timeout=8000)
+            await pg.evaluate("()=>document.querySelector('#brTrack .brQ .brAns:nth-child(2)').click()")
+            await shot(pg, f'brief_quiz_{W}x{H}.png')
             await pg.context.close()
         await b.close()
     srv.shutdown()

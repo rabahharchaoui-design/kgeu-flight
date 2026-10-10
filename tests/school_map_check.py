@@ -100,7 +100,7 @@ async def main():
         await finger(pg, '#school [data-l=short]'); await pg.wait_for_timeout(300)
         ok('(d) a soon row does nothing', await pg.evaluate(SAY) == ['Finish Stage 1 first'] * 2 and await pg.evaluate(f"()=>{K}.LES.on===null"))
         await pg.evaluate(f"()=>{K}.startLesson('stall')"); await pg.wait_for_timeout(300)
-        ok('(d) startLesson refuses a locked lesson, force starts it', await pg.evaluate(f"()=>{K}.LES.on") is None and await pg.evaluate(f"()=>{{{K}.startLesson('stall',true);return {K}.LES.on}}") == 'stall')
+        ok('(d) startLesson refuses a locked lesson, force starts it', await pg.evaluate(f"()=>{K}.LES.on") is None and await pg.evaluate(f"()=>{{{K}.startLesson('stall',true);{K}.lesBriefSkip();return {K}.LES.on}}") == 'stall')
         await pg.evaluate("()=>document.getElementById('lesQuit').click()")
         await pg.evaluate("()=>localStorage.removeItem('kgeuPlace')")
         await pg.evaluate(f"()=>{K}.togglePause()"); await pg.wait_for_timeout(300)

@@ -57,7 +57,7 @@ async def main():
             await scan(pg, f'mission {k}')
         # ---- a lesson panel ----
         for les in ('slow', 'steep'):
-            await pg.evaluate(f"()=>{K}.startLesson('{les}',true)"); await pg.wait_for_timeout(300)
+            await pg.evaluate(f"()=>{K}.startLesson('{les}',true)"); await pg.evaluate("()=>window.__kgeu.lesBriefSkip()"); await pg.wait_for_timeout(300)
             await pg.evaluate("()=>{for(let i=0;i<30;i++)window.__kgeu.stepFrame(1/30,false,true)}")
             await scan(pg, f'lesson {les}')
         # ---- crash card ----
