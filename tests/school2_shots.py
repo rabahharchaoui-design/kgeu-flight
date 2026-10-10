@@ -36,9 +36,24 @@
 # --item4call844 / --item4call568 (to the Bravo CALL, one size each), --item4deb844 (the full out-and-back to the debrief,
 # then straight on to the Logbook for logbook_xc_844x390, no replay), --item4deb568 (the debrief only). --item4 runs the
 # whole group end to end (well over 110s: never call it directly in one foreground Bash call).
+#
+# School2 item 5: Stage 4 lesson 1, the oral exam (#orOv over the Flight school screen, the result on #gradeOv, no
+# flight). map_s4_844x390: the Flight school screen, Stage 4 selected (the Oral exam START row, Mock checkride Coming
+# soon row). oral_q1_<WxH> (844x390, 568x320, 390x844): Question 1 of 15 unanswered, the Back button present.
+# oral_wrong_<WxH> (844, 568): the longest question in the oralSeed(1) draw (by question + answers length), answered
+# wrong (the red answer, the right one outlined, the explanation shown, NEXT enabled). oral_pass_<WxH> (844, 568): all
+# 15 right (A, 15 of 15, six topic rows). oral_fail_844x390: 10 right then 5 wrong (F, the Missed list). Each shot also
+# prints the FIT/MEAS_ORAL measurement (answer/Back/NEXT button heights at the shot's size, the question block's
+# scrollHeight vs clientHeight). A page load + the school navigation alone runs about 25-30s in this headless
+# harness, so each shot gets its own per-size flag to stay under the 110s cap: --item5map (map only, ~10s),
+# --item5q1_844 / --item5q1_568 / --item5q1_390x844 (~30s each; --item5q1 combines all three, ~90s, risks the cap),
+# --item5wrong_844 / --item5wrong_568 (steps to the longest question first, ~35-45s each; --item5wrong combines both),
+# --item5pass_844 / --item5pass_568 (15 answers, ~45-60s each; --item5pass combines both), --item5fail (844 only, 15
+# answers, ~45s). --item5 runs the whole group end to end (well over 110s: never call it directly in one foreground
+# Bash call).
 import asyncio, os, sys
 from playwright.async_api import async_playwright
-from harness import serve, launch, page, PLACED
+from harness import serve, launch, page, PLACED, finger
 from school_fly import K, BASE, start, rwy, call, final, touchdown, stop, DANA, DEBRIEF, downwind, base
 import school_fly as SF  # SF.climbout: the circuit climb-out; this file's own climbout() (item1) is the nav lesson's departure, a different flight
 
@@ -545,6 +560,134 @@ async def item4(b, url):
     await solo_debrief(b, url, 844, 390, logbook=True)
     await solo_debrief(b, url, 568, 320)
 
+# ---------------- item 5: Stage 4 lesson 1, the oral exam (#orOv, the result on #gradeOv, no flight) ----------------
+ORAL_SHEET = f"""()=>{{const o=document.getElementById('orOv');return {{on:o.classList.contains('on')&&!o.classList.contains('out'),n:document.getElementById('orN').textContent,
+  chip:document.getElementById('orChip').textContent,ans:[...document.querySelectorAll('#orA .orAns')].map(b=>{{const r=b.getBoundingClientRect();return [Math.round(r.width),Math.round(r.height)]}}),
+  back:!document.getElementById('orBack').hidden,next:document.getElementById('orNext').textContent,dis:document.getElementById('orNext').disabled,
+  why:!document.getElementById('orWhy').hidden,cls:[...document.querySelectorAll('#orA .orAns')].map(b=>b.className.replace('orAns','').trim())}}}}"""
+ORAL_IDLE = "()=>{const o=document.getElementById('orOv');return o.getAnimations({subtree:true}).every(a=>a.playState==='finished')}"
+ORAL_FIT = """()=>{const s=document.querySelector('#orOv .sheet'),W=innerWidth,H=innerHeight,bad=[];
+  if(s.scrollHeight>s.clientHeight+1)bad.push('sheet scrolls '+s.scrollHeight+'>'+s.clientHeight);
+  s.querySelectorAll('button').forEach(e=>{const r=e.getBoundingClientRect();if(!r.width)return;
+    if(r.left<-0.5||r.top<-0.5||r.right>W+0.5||r.bottom>H+0.5)bad.push('off '+e.textContent.trim().slice(0,14));
+    if(r.width<43.5||r.height<43.5)bad.push('small '+e.textContent.trim().slice(0,14)+' '+Math.round(r.width)+'x'+Math.round(r.height));});
+  return bad;}"""
+MEAS_ORAL = """()=>{const h=s=>[...document.querySelectorAll(s)].map(e=>Math.round(e.getBoundingClientRect().height));
+  const qb=document.querySelector('#orOv .orQ'),sheet=document.querySelector('#orOv .sheet');
+  return {ansH:h('#orA .orAns'),backH:h('#orBack'),nextH:h('#orNext'),
+    qScrollH:qb&&qb.scrollHeight,qClientH:qb&&qb.clientHeight,
+    sheetScrollH:sheet.scrollHeight,sheetClientH:sheet.clientHeight};}"""
+ORAL_CARD = """()=>{const o=document.getElementById('gradeOv');return {on:o.classList.contains('on'),letter:document.getElementById('gLetter').textContent,
+  score:document.getElementById('gScore').textContent,topics:[...o.querySelectorAll('.rLines .gt')].map(r=>[r.firstChild.textContent,r.lastChild.textContent,r.classList.contains('ok')]),
+  missed:[...o.querySelectorAll('.rLines .orMs')].map(r=>[r.firstChild.textContent,r.lastChild.textContent]),mh:!!o.querySelector('.orMh')};}"""
+
+async def school_s4(pg):
+    await pg.evaluate(f"()=>{K}.openMenu()"); await pg.wait_for_timeout(200)
+    await finger(pg, '#hSch'); await pg.wait_for_timeout(400)
+    await finger(pg, '.sNode[data-st=s4]'); await pg.wait_for_timeout(400)
+
+async def open_oral(pg):
+    await finger(pg, '#school .lrow[data-l=oral]'); await pg.wait_for_timeout(300)
+    await pg.wait_for_function(ORAL_IDLE, timeout=8000)
+
+async def oral_answer(pg, i, right):
+    """tap the answer for drawn question i (0-based): right picks the correct one, else the next (wrong) one"""
+    q = await pg.evaluate(f"(i)=>{{const Q={K}.ORAL[i];return {{ok:Q.ok}}}}", i)
+    k = q['ok'] if right else (q['ok'] + 1) % 4
+    await finger(pg, f'#orA .orAns:nth-child({k + 1})'); await pg.wait_for_timeout(120)
+    return k
+
+async def oral_next(pg):
+    await finger(pg, '#orNext'); await pg.wait_for_timeout(120)
+
+async def map_s4(b, url):
+    # map_s4_844x390: the Flight school screen, Stage 4 selected (Oral exam START row, Mock checkride Coming soon row)
+    pg = await page(b, url, vp={'width': 844, 'height': 390}, storage=ST)
+    await school_s4(pg)
+    rows = await pg.evaluate("()=>[...document.querySelectorAll('#school .lrow')].map(r=>[r.dataset.l,r.classList.contains('soon'),r.textContent.includes('START')])")
+    print('  map_s4 rows', rows)
+    await shot(pg, 'map_s4_844x390.png')
+    await pg.context.close()
+
+async def oral_q1(b, url, W, H):
+    # oral_q1_<WxH>: Question 1 of 15 unanswered, Back present; also the FIT/MEAS_ORAL measurement at this size
+    pg = await page(b, url, vp={'width': W, 'height': H}, storage=ST)
+    if H > W:
+        await pg.evaluate("()=>document.body.classList.add('portraitok')")
+    await school_s4(pg)
+    await pg.evaluate(f"()=>{K}.oralSeed(1)")
+    await open_oral(pg)
+    s = await pg.evaluate(ORAL_SHEET)
+    bad = await pg.evaluate(ORAL_FIT)
+    m = await pg.evaluate(MEAS_ORAL)
+    print(f'  oral_q1 {W}x{H} n={s["n"]!r} chip={s["chip"]!r} back={s["back"]} next={s["next"]!r} dis={s["dis"]} FIT bad={bad} MEAS {m}')
+    await shot(pg, f'oral_q1_{W}x{H}.png')
+    await pg.context.close()
+
+async def oral_goto_worst(pg):
+    """draws the oral exam (oralSeed(1)), finds the question with the longest question+answers text in the draw,
+    steps to it answering every one before it right, then answers that one wrong; returns (idx, k, sheet state)"""
+    await pg.evaluate(f"()=>{K}.oralSeed(1)")
+    await open_oral(pg)
+    draw = await pg.evaluate(f"()=>{K}.ORAL.map(q=>q.q.length+q.a.join('').length)")
+    idx = draw.index(max(draw))
+    for i in range(idx):
+        await oral_answer(pg, i, right=True)
+        await oral_next(pg)
+    k = await oral_answer(pg, idx, right=False)
+    s = await pg.evaluate(ORAL_SHEET)
+    return idx, k, s
+
+async def oral_wrong(b, url, W, H):
+    # oral_wrong_<WxH>: the longest question in the draw, answered wrong: red answer, the right one outlined (should),
+    # the explanation shown, NEXT enabled; also the FIT/MEAS_ORAL measurement at this size
+    pg = await page(b, url, vp={'width': W, 'height': H}, storage=ST)
+    await school_s4(pg)
+    idx, k, s = await oral_goto_worst(pg)
+    bad = await pg.evaluate(ORAL_FIT)
+    m = await pg.evaluate(MEAS_ORAL)
+    print(f'  oral_wrong {W}x{H} idx={idx} k={k} cls={s["cls"]} next={s["next"]!r} dis={s["dis"]} why={s["why"]} FIT bad={bad} MEAS {m}')
+    await shot(pg, f'oral_wrong_{W}x{H}.png')
+    await pg.context.close()
+
+async def oral_pass(b, url, W, H):
+    # oral_pass_<WxH>: all 15 right -> the result card A, 15 of 15, six topic rows
+    pg = await page(b, url, vp={'width': W, 'height': H}, storage=ST)
+    await school_s4(pg)
+    await pg.evaluate(f"()=>{K}.oralSeed(1)")
+    await open_oral(pg)
+    for i in range(15):
+        await oral_answer(pg, i, right=True)
+        await oral_next(pg)
+    await pg.wait_for_timeout(300)
+    c = await pg.evaluate(ORAL_CARD)
+    print(f'  oral_pass {W}x{H} on={c["on"]} letter={c["letter"]!r} score={c["score"]!r} topics={len(c["topics"])} missed={len(c["missed"])}')
+    await shot(pg, f'oral_pass_{W}x{H}.png')
+    await pg.context.close()
+
+async def oral_fail(b, url):
+    # oral_fail_844x390: 10 right then 5 wrong -> F, the Missed list (5 rows)
+    pg = await page(b, url, vp={'width': 844, 'height': 390}, storage=ST)
+    await school_s4(pg)
+    await pg.evaluate(f"()=>{K}.oralSeed(7)")
+    await open_oral(pg)
+    for i in range(15):
+        await oral_answer(pg, i, right=(i < 10))
+        await oral_next(pg)
+    await pg.wait_for_timeout(300)
+    c = await pg.evaluate(ORAL_CARD)
+    print(f'  oral_fail 844x390 on={c["on"]} letter={c["letter"]!r} score={c["score"]!r} missed={len(c["missed"])} mh={c["mh"]}')
+    await shot(pg, 'oral_fail_844x390.png')
+    await pg.context.close()
+
+async def item5(b, url):
+    # the whole item5 group, end to end; may run over 110s, never call this one directly in a single foreground Bash call
+    await map_s4(b, url)
+    await oral_q1(b, url, 844, 390); await oral_q1(b, url, 568, 320); await oral_q1(b, url, 390, 844)
+    await oral_wrong(b, url, 844, 390); await oral_wrong(b, url, 568, 320)
+    await oral_pass(b, url, 844, 390); await oral_pass(b, url, 568, 320)
+    await oral_fail(b, url)
+
 async def main():
     srv, url = serve()
     async with async_playwright() as p:
@@ -594,6 +737,35 @@ async def main():
             await solo_debrief(b, url, 568, 320); await b.close(); srv.shutdown(); return
         if '--item4' in sys.argv:
             await item4(b, url); await b.close(); srv.shutdown(); return
+        if '--item5map' in sys.argv:
+            await map_s4(b, url); await b.close(); srv.shutdown(); return
+        # oral_q1 (~25-30s a size): per-size flags stay safely under the 110s cap; --item5q1 combines all three but
+        # can border on it (never call it in a single foreground Bash call; use the per-size flags instead)
+        if '--item5q1_844' in sys.argv:
+            await oral_q1(b, url, 844, 390); await b.close(); srv.shutdown(); return
+        if '--item5q1_568' in sys.argv:
+            await oral_q1(b, url, 568, 320); await b.close(); srv.shutdown(); return
+        if '--item5q1_390x844' in sys.argv:
+            await oral_q1(b, url, 390, 844); await b.close(); srv.shutdown(); return
+        if '--item5q1' in sys.argv:
+            await oral_q1(b, url, 844, 390); await oral_q1(b, url, 568, 320); await oral_q1(b, url, 390, 844)
+            await b.close(); srv.shutdown(); return
+        if '--item5wrong_844' in sys.argv:
+            await oral_wrong(b, url, 844, 390); await b.close(); srv.shutdown(); return
+        if '--item5wrong_568' in sys.argv:
+            await oral_wrong(b, url, 568, 320); await b.close(); srv.shutdown(); return
+        if '--item5wrong' in sys.argv:
+            await oral_wrong(b, url, 844, 390); await oral_wrong(b, url, 568, 320); await b.close(); srv.shutdown(); return
+        if '--item5pass_844' in sys.argv:
+            await oral_pass(b, url, 844, 390); await b.close(); srv.shutdown(); return
+        if '--item5pass_568' in sys.argv:
+            await oral_pass(b, url, 568, 320); await b.close(); srv.shutdown(); return
+        if '--item5pass' in sys.argv:
+            await oral_pass(b, url, 844, 390); await oral_pass(b, url, 568, 320); await b.close(); srv.shutdown(); return
+        if '--item5fail' in sys.argv:
+            await oral_fail(b, url); await b.close(); srv.shutdown(); return
+        if '--item5' in sys.argv:
+            await item5(b, url); await b.close(); srv.shutdown(); return
         if '--item1b' in sys.argv:
             await item1b(b, url); await b.close(); srv.shutdown(); return
         if '--item1a' in sys.argv:
