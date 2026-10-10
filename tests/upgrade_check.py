@@ -92,8 +92,9 @@ async def main():
             em = await pg.evaluate(f"()=>{K}.SCORE.best['arc:landing']&&{K}.SCORE.best['arc:landing'].pts")
             ok('local best still in the records (ui1: the landing challenge has no card)', em == 777, em)
             await pg.evaluate(f"()=>{K}.nav('sSchool')"); await pg.wait_for_timeout(300)
-            sch = await pg.evaluate("()=>[...document.querySelectorAll('#school .lrow')].map(r=>r.className.includes('done'))")
-            ok('lesson progress still ticked', sch[:2] == [True, True], sch)
+            # school1: the rows are the selected stage's; first is in stage 1, steep in stage 2
+            sch = await pg.evaluate(f"()=>{{const K={K},d=id=>{{const r=document.querySelector('#school .lrow[data-l='+id+']');return !!r&&r.classList.contains('done')}};const a=d('first');K.schSelect('s2');return [a,d('steep')]}}")
+            ok('lesson progress still ticked', sch == [True, True], sch)
             pr = await pg.evaluate(f"()=>{K}.prefs()")
             ok('saved aircraft, base and start kept', pr.get('type') == 'f16' and pr.get('base') == 'luke' and pr.get('pos') == 'ramp', pr)
             ok('settings kept (stick, radio volume, mode)', await pg.evaluate(f"()=>({K}.TOUCH.sens===3&&Math.abs({K}.RADIO.vol-0.4)<1e-6&&localStorage.getItem('kgeuOnboard')==='pilot')"))

@@ -52,7 +52,7 @@ async def main():
 
         # flight school pattern lesson: a long instructor line, then queue a tower
         # clearance behind it while the instructor is still talking
-        await pg.evaluate(f"()=>{{const K={K};K.stepFrame(0,false,true);K.startLesson('pattern');}}")
+        await pg.evaluate(f"()=>{{const K={K};K.stepFrame(0,false,true);K.startLesson('pattern',true);}}")
         await pg.evaluate(f"()=>{{const K={K};K.coach2('Pattern work. Take off, climb to 700 above the ground, then fly the circuit at 2,100 feet and bring it back to runway 1.');"
                            "K.vqAdd('Glendale Tower 121.0','tower','Skyhawk 31G, runway 1, cleared for takeoff.',['t_cleared_to'],{pri:2});}")
         await pg.evaluate(DRIVE)

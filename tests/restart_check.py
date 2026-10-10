@@ -65,7 +65,7 @@ AZ = [
     ('arcade 1 mile', f"{K}.pick('f16');{K}.arcStart('landing1')"),
     ('arcade daily', f"{K}.dailyRegion('az');{K}.arcStart('daily')"),
     ('dogfight', f"{K}.dfStart()"),
-] + [(f'lesson {l}', f"{K}.startLesson('{l}')") for l in ('first', 'steep', 'slow', 'stall', 'engine', 'pattern')]
+] + [(f'lesson {l}', f"{K}.startLesson('{l}',true)") for l in ('first', 'steep', 'slow', 'stall', 'engine', 'pattern')]
 
 WORLD = [
     ('rjtt runway', f"{K}.pick('cessna');{K}.start('runway')"),

@@ -4,7 +4,7 @@
 # Run: .venv/bin/python tests/quiet_check.py
 import asyncio, sys
 from playwright.async_api import async_playwright
-from harness import serve, page, Checks
+from harness import serve, page, Checks, PLACED
 ok = Checks()
 ST = "()=>window.__kgeu.radioState()"
 LOGN = "()=>window.__kgeu.radioLog().length"
@@ -40,7 +40,7 @@ async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(args=['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist',
             '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'])
-        pg = await page(b, url, vp={'width': 844, 'height': 390}, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'})
+        pg = await page(b, url, vp={'width': 844, 'height': 390}, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3', **PLACED})
         await pg.evaluate("()=>window.__kgeu.initAudio()")
         for _ in range(40):   # clips load six at a time over localhost
             r = await pg.evaluate("()=>{const R=window.__kgeu.RADIO;return R.want&&R.got+Math.max(0,R.err)>=R.want}")

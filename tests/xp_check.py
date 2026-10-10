@@ -99,7 +99,7 @@ async def main():
         h = await pg.evaluate(HR)
         ok('(c) Home: the top rank reads Top Gun, the bar full', h['rk'] == 'Top Gun' and h['n'].startswith('Top rank') and h['v'] == 100, h)
         await pg.evaluate(f"()=>{{const K={K};K.LB.P.xp={m.xp};K.LB.ui()}}")
-        sent, last = await run('lesson:steep', f"()=>{K}.startLesson('steep')", 80, 22)
+        sent, last = await run('lesson:steep', f"()=>{K}.startLesson('steep',true)", 80, 22)
         ok('(b) a lesson: +22 (whatever the server says), "Lesson: Steep turns"', sent and last and last['amount'] == 22 and last['reason'].startswith('Lesson: Steep turns'), last)
         sent, last = await run('arc:drop', f"()=>{{const K={K};K.pick('c130',1);K.start('drop')}}", 12.5, 41)
         ok('(b) a challenge (the airdrop): +41 "Airdrop"', sent and last and last['amount'] == 41 and last['reason'].startswith('Airdrop'), last)

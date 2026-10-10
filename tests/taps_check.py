@@ -7,7 +7,7 @@
 # Run: .venv/bin/python tests/taps_check.py
 import asyncio, sys, io, math, struct, base64, wave
 from playwright.async_api import async_playwright
-from harness import serve, page, Checks
+from harness import serve, page, Checks, PLACED
 ok = Checks()
 K = 'window.__kgeu'
 SR = 8000
@@ -75,7 +75,7 @@ async def main():
             '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'])
         for vp in SIZES:
             tag = f"{vp['width']}x{vp['height']}"
-            pg = await page(b, url, vp=vp, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3', 'kgeuMusicFree': '1', 'kgeuStickSens': '2'})
+            pg = await page(b, url, vp=vp, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3', 'kgeuMusicFree': '1', 'kgeuStickSens': '2', **PLACED})
             await pg.evaluate(f"(l)=>{K}.musicLoad(l)", TONES)
             await pg.touchscreen.tap(vp['width'] / 2, 6); await pg.wait_for_timeout(300)
 
@@ -84,7 +84,7 @@ async def main():
                 ('launch: free flight (FLY, GO)', ['#hFly', '#bGo'], f"()=>{K}.running()&&!{K}.paused()&&{K}.state().mode==='runway'"),
                 ('launch: a challenge (CHALLENGES, card)', ['#hChal', '#arcCards .mcard[data-m=drop]'], f"()=>{K}.running()&&{K}.MISS.kind==='drop'"),
                 ('launch: a challenge (Challenges tab, card)', ['#tChal', '#arcCards .mcard[data-m=range]'], f"()=>{K}.running()&&{K}.state().mode==='range'"),
-                ('launch: a lesson (FLIGHT SCHOOL, lesson)', ['#hSch', '#school .lrow[data-l=steep]'], f"()=>{K}.running()&&{K}.LES.on==='steep'"),
+                ('launch: a lesson (FLIGHT SCHOOL, lesson)', ['#hSch', '#school .lrow[data-l=first]'], f"()=>{K}.running()&&{K}.LES.on==='first'"),
                 ('launch: leaderboards (1 tap, the Boards tab)', ['#tLb'], f"()=>{K}.curScr()==='sLb'"),
             ):
                 await pg.evaluate(f"()=>{{const K={K};K.pick('cessna');K.pickBase('kgeu');K.pickPos('runway');K.openMenu()}}"); await pg.wait_for_timeout(400)
@@ -122,7 +122,7 @@ async def main():
             for name, btn, scr, card, chk in (
                 ('challenges', '#pArc', 'sArc', '#arcCards .mcard[data-m=drop]', f"()=>{K}.MISS.kind==='drop'&&{K}.running()"),
                 ('challenges 2', '#pArc', 'sArc', '#arcCards .mcard[data-m=range]', f"()=>{K}.state().mode==='range'&&{K}.running()"),
-                ('flight school', '#pSch', 'sSchool', '#school .lrow[data-l=steep]', f"()=>{K}.LES.on==='steep'&&{K}.running()"),
+                ('flight school', '#pSch', 'sSchool', '#school .lrow[data-l=first]', f"()=>{K}.LES.on==='first'&&{K}.running()"),
             ):
                 t = await run(pg, tag, name + ' list', ['#bPause', btn], f"()=>{K}.curScr()==='{scr}'&&document.getElementById('menu').classList.contains('on')")
                 if name == 'challenges':

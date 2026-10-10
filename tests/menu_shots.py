@@ -3,7 +3,7 @@
 # iPhone landscape 844x390 and 568x320, portrait 390x844. Prints nothing but the paths.
 import asyncio, os, sys
 from playwright.async_api import async_playwright
-from harness import serve, launch, page, IPHONE_15
+from harness import serve, launch, page, IPHONE_15, PLACED
 K = 'window.__kgeu'
 TAG = sys.argv[1] if len(sys.argv) > 1 else 'shot'
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'overnight-screenshots', 'phone2', 'menus')
@@ -21,11 +21,11 @@ async def main():
         b = await launch(p)
         for vp in SIZES:
             # first launch: the Easy / Hard funnel
-            pg = await page(b, url, vp=vp, storage={'kgeuTut': '1', 'kgeuCoach': '3'})
+            pg = await page(b, url, vp=vp, storage={'kgeuTut': '1', 'kgeuCoach': '3', **PLACED})
             await pg.evaluate("()=>{const r=document.getElementById('rotOk');if(r&&r.offsetParent)r.click();}")
             await shot(pg, 'funnel', vp)
             await pg.context.close()
-            pg = await page(b, url, vp=vp, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'})
+            pg = await page(b, url, vp=vp, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3', **PLACED})
             await pg.evaluate("()=>{const r=document.getElementById('rotOk');if(r&&r.offsetParent)r.click();}")
             for scr in ('sHome', 'sFly', 'sSchool', 'sArc', 'sSet', 'sHelp', 'sCredits', 'sLb'):
                 await pg.evaluate(f"(s)=>{{const K={K};K.openMenu();K.nav(s)}}", scr)

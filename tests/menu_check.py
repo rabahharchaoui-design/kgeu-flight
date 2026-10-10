@@ -4,7 +4,7 @@
 # keyboard chart never shows on a touch device. Run: .venv/bin/python tests/menu_check.py
 import asyncio, sys
 from playwright.async_api import async_playwright
-from harness import serve, launch, page, Checks, finger
+from harness import serve, launch, page, Checks, finger, PLACED
 ok = Checks()
 CAR = ['cessna','alpha','f16','reaper','mq9b','c130']
 CAR_AFTER_10 = CAR[(CAR.index('c130') + 10) % 6]
@@ -48,7 +48,7 @@ async def main():
     async with async_playwright() as p:
         b = await launch(p)
         for vp in ({'width': 667, 'height': 375}, {'width': 844, 'height': 390}, {'width': 932, 'height': 430}):
-            pg = await page(b, url, vp=vp, storage={'kgeuOnboard': 'rookie', 'kgeuTut': '1', 'kgeuCoach': '3'})
+            pg = await page(b, url, vp=vp, storage={'kgeuOnboard': 'rookie', 'kgeuTut': '1', 'kgeuCoach': '3', **PLACED})
             tag = f"{vp['width']}x{vp['height']}"
             for sid in SCREENS:
                 await pg.evaluate(f"()=>{{window.__kgeu.openFly();window.__kgeu.nav('{sid}')}}"); await pg.wait_for_timeout(250)
@@ -60,7 +60,8 @@ async def main():
                     if ntk:
                         tb = await pg.evaluate(TK_SCROLLED)
                         ok(f'{tag} sArc: the Taskings cards, scrolled to, inside the list and the screen, 44 px, no overlaps', not tb, tb[:4])
-                bad = await pg.evaluate(FIT, [sid, '.mcard.tk,.cgrp'] if sid == 'sArc' else [sid, None])
+                # school1: the lesson cards scroll inside their grid by design (school_map_check checks them); the rest must fit
+                bad = await pg.evaluate(FIT, [sid, '.mcard.tk,.cgrp'] if sid == 'sArc' else [sid, '#school .lrow'] if sid == 'sSchool' else [sid, None])
                 if sid == 'sArc': bad = [x for x in bad if not x.startswith('scrolls')]
                 ok(f'{tag} {sid} fits with no scrolling, 44 px targets, no overlaps', not bad, bad[:4])
             if vp['width'] == 667:

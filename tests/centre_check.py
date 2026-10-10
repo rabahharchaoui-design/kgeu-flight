@@ -50,9 +50,9 @@ MODES = [
     ('1 mile challenge', f"{K}.pick('f16');{K}.arcStart('landing1')", None),
     ('daily', f"{K}.dailyRegion('az');{K}.arcStart('daily')", 3704),
     ('lesson first flight', f"{K}.startLesson('first')", None),
-    ('lesson pattern', f"{K}.startLesson('pattern')", None),
-    ('lesson engine failure', f"{K}.startLesson('engine')", 3704),
-    ('lesson slow flight', f"{K}.startLesson('slow')", 3704),
+    ('lesson pattern', f"{K}.startLesson('pattern',true)", None),
+    ('lesson engine failure', f"{K}.startLesson('engine',true)", 3704),
+    ('lesson slow flight', f"{K}.startLesson('slow',true)", 3704),
 ]
 VIEWS = [(844, 390), (568, 320), (667, 375), (390, 844)]
 

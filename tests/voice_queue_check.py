@@ -62,7 +62,7 @@ async def main():
 
         # (1) pattern lesson: the instructor's long opening line, the takeoff clearance at 0.6 s,
         # chatter and a tower advisory fired while the instructor talks
-        await pg.evaluate(f"()=>{{const K={K};K.stepFrame(0,false,true);K.startLesson('pattern');K.vqLog(true);K.radioLog(true);window.__spk.length=0;}}")
+        await pg.evaluate(f"()=>{{const K={K};K.stepFrame(0,false,true);K.startLesson('pattern',true);K.vqLog(true);K.radioLog(true);window.__spk.length=0;}}")
         # startLesson spoke before we cleared the logs: say it again so it is on record
         await pg.evaluate(f"()=>{{const K={K};K.coach2('Pattern work. Take off, climb to 700 above the ground, then fly the circuit at 2,100 feet and bring it back to runway 1.');K.vqAdd('Viper 99','fighter','Viper 99, chatter test one.',['p_ch_p1'],{{pri:3}});}}")
         await pg.evaluate(DRIVE)

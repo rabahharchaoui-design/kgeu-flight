@@ -70,7 +70,7 @@ async def main():
             await pg.context.close()
         # Flight School: no WASTED
         pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'})
-        await pg.evaluate(f"()=>{K}.startLesson('pattern')"); await pg.wait_for_timeout(400); await run(pg, 3)
+        await pg.evaluate(f"()=>{K}.startLesson('pattern',true)"); await pg.wait_for_timeout(400); await run(pg, 3)
         await pg.evaluate(f"()=>{K}.crashNow('Test crash.')"); await run(pg, 5)
         s = await pg.evaluate(ST)
         ok('lesson: no WASTED, no slow motion', not s['on'] and not s['body'], s)

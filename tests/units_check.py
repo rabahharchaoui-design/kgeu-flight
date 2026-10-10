@@ -4,7 +4,7 @@
 # in knots. iPhone landscape. Run: .venv/bin/python tests/units_check.py
 import asyncio, os, re, sys
 from playwright.async_api import async_playwright
-from harness import serve, launch, page, Checks, IPHONE_15, ROOT
+from harness import serve, launch, page, Checks, IPHONE_15, ROOT, PLACED
 ok = Checks()
 K = "window.__kgeu"
 BAD = r"\bmph\b|km/h|\bkph\b|\bkmh\b|miles per hour|miles an hour|\bm/s\b"
@@ -28,7 +28,7 @@ async def main():
     srv, url = serve()
     async with async_playwright() as p:
         b = await launch(p)
-        pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'rookie', 'kgeuTut': '1'})
+        pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'rookie', 'kgeuTut': '1', **PLACED})
         # ---- menus ----
         for s in ('sHome', 'sFly', 'sSchool', 'sArc', 'sSet', 'sHelp', 'sCredits', 'sLb'):
             await pg.evaluate(f"()=>{{{K}.openMenu();{K}.nav('{s}')}}"); await pg.wait_for_timeout(250)
@@ -57,7 +57,7 @@ async def main():
             await scan(pg, f'mission {k}')
         # ---- a lesson panel ----
         for les in ('slow', 'steep'):
-            await pg.evaluate(f"()=>{K}.startLesson('{les}')"); await pg.wait_for_timeout(300)
+            await pg.evaluate(f"()=>{K}.startLesson('{les}',true)"); await pg.wait_for_timeout(300)
             await pg.evaluate("()=>{for(let i=0;i<30;i++)window.__kgeu.stepFrame(1/30,false,true)}")
             await scan(pg, f'lesson {les}')
         # ---- crash card ----

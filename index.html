@@ -518,6 +518,34 @@ body.dfOn #uiroot > #dfSub{ display:flex; }
   #tkBrief .tkHow{ margin-bottom:6px; font-size:11px; } #tkBrief #tkGo, #tkBrief #tkBack{ min-height:48px; } #tkBrief #tkGo{ font-size:19px; } }
 @media (max-width:600px){ #tkBrief .tkBody{ grid-template-columns:1fr 1fr; } #tkBrief .tkSit{ font-size:12.5px; } }
 @media (orientation:portrait){ #tkBrief .tkBody{ grid-template-columns:1fr; } }
+/* school1: the placement intake over the flight school screen. Six levels, optional hours, CONTINUE */
+#plOv{ z-index:32; }
+#plOv.on{ animation:plFade 200ms ease-out both; } #plOv.on .sheet{ animation:plIn 200ms cubic-bezier(.23,1,.32,1) both; }
+#plOv.out{ animation:plOut 180ms ease-out both; }
+@keyframes plFade{ from{ opacity:0; } } @keyframes plIn{ from{ opacity:0; transform:scale(.96); } } @keyframes plOut{ to{ opacity:0; } }
+#plOv .sheet{ max-width:660px; padding:12px 18px 14px; background:rgba(18,13,9,.95); text-align:left; max-height:calc(var(--vvh) - 16px); overflow-y:auto; overscroll-behavior:contain; }
+#plOv .plK{ margin:0; font:800 11px var(--font); letter-spacing:.14em; color:var(--orange); text-align:center; }
+#plOv h3{ margin:1px 0 0; font:800 23px/1.1 var(--font); letter-spacing:.02em; color:var(--sand); text-align:center; }
+#plOv .plSub{ margin:3px 0 0; font-size:13px; line-height:1.3; color:var(--soft); text-align:center; }
+.plOpts{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:10px 0; }
+#plOv button{ -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:manipulation; }
+#plOv .plO{ min-height:52px; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:2px; padding:6px 12px; text-align:left; border-radius:12px;
+  background:rgba(246,193,119,.1); color:var(--sand); border:2px solid rgba(246,193,119,.22); transition:transform 120ms ease-out; }
+#plOv .plO b{ font-size:14px; font-weight:800; line-height:1.15; } #plOv .plO span{ font-size:11.5px; font-weight:600; color:#e8cfa5; }
+#plOv .plO:active{ transform:scale(.97); }
+#plOv .plO[aria-checked=true]{ background:var(--night); color:#fff4e0; border-color:var(--rust); box-shadow:0 0 0 3px rgba(168,89,42,.35); } #plOv .plO[aria-checked=true] span{ color:var(--orange); }
+@media (hover:hover) and (pointer:fine){ #plOv .plO:hover{ border-color:rgba(246,193,119,.5); } }
+.plRow{ display:flex; align-items:center; flex-wrap:wrap; gap:8px 10px; }
+.plH{ display:flex; align-items:center; gap:8px; margin-right:auto; font-size:13px; font-weight:700; color:var(--soft); }
+.plH input{ width:100px; height:44px; padding:0 10px; font:600 16px var(--font); color:#fff; background:rgba(246,193,119,.08); border:2px solid rgba(246,193,119,.22); border-radius:10px; }
+#plOv .plDay{ min-height:44px; padding:0 8px; background:transparent; border:0; color:var(--sand); font-size:14px; font-weight:700; text-decoration:underline; text-underline-offset:3px; }
+#plOv #plBack{ min-height:56px; min-width:90px; border-radius:14px; }
+#plOv #plGo{ min-height:56px; min-width:170px; font:800 20px var(--font); letter-spacing:.06em; border-radius:14px; }
+#plOv #plGo:disabled{ opacity:.4; }
+@media (max-height:360px){ #plOv .sheet{ padding:8px 14px 10px; } #plOv h3{ font-size:19px; } #plOv .plSub{ font-size:12px; } .plOpts{ gap:6px; margin:7px 0; } #plOv .plO{ padding:4px 10px; } #plOv .plO b{ font-size:13px; } }
+@media (max-width:700px) and (orientation:landscape){ .plH input{ width:84px; } #plOv #plBack{ min-width:70px; } #plOv #plGo{ min-width:120px; font-size:18px; padding:0 14px; } }   /* 568: hours, day one, Back and CONTINUE on one line */
+@media (orientation:portrait){ .plOpts{ grid-template-columns:repeat(2,minmax(0,1fr)); } #plOv #plGo{ flex:1 1 60%; } }
+@media (prefers-reduced-motion:reduce){ #plOv.on .sheet{ animation-name:plFade; } #plOv .plO{ transition:none; } }
 #tkReply{ position:absolute; top:var(--padT); left:calc(50% + var(--icon) / 2 + 8px); width:min(268px, calc(50% - var(--icon) / 2 - 8px - var(--padR))); z-index:7;
   display:flex; gap:6px; pointer-events:none; opacity:0; transform:translateY(-6px) scale(.96); transform-origin:left center;
   transition:opacity 180ms cubic-bezier(.23,1,.32,1), transform 180ms cubic-bezier(.23,1,.32,1); }
@@ -933,11 +961,18 @@ label.sens b{ color:var(--ink); min-width:74px; }
 @media (prefers-reduced-motion:reduce){ #menu .mtRow button{ transition:none; } }
 /* Settings: Controls help and Music credits are rows that open a page */
 #menu .slink{ display:flex; align-items:center; gap:8px; }
+/* the Help row (school1: three buttons): short labels when its column is narrow */
+#helpRow{ container-type:inline-size; } #helpRow .hS{ display:none; }
+@container (max-width:380px){ #helpRow .hL, #helpRow .chev{ display:none; } #helpRow .hS{ display:inline; } #menu #helpRow > button{ padding-left:9px; padding-right:9px; } }
 #menu .slink .chev{ width:8px; height:8px; border-right:2.4px solid currentColor; border-top:2.4px solid currentColor; transform:rotate(45deg); margin-left:2px; opacity:.8; }
-/* flight school: the aircraft to train in and the progress, above the lessons */
-.schHead{ display:flex; align-items:center; gap:10px; flex:none; min-height:44px; }
-.schHead .gcap{ font-size:12px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--brown); }
-.schProg{ margin-left:auto; font-size:14px; font-weight:800; color:var(--brown); white-space:nowrap; }
+/* flight school: the course title, the progress and Start from day one, above the stage map */
+.schHead{ display:flex; align-items:center; flex-wrap:wrap; gap:4px 12px; flex:none; min-height:44px; }
+.schT{ display:flex; flex-direction:column; min-width:0; margin-right:auto; }
+.schT b{ font-size:18px; font-weight:900; line-height:1.1; }
+.schT .gcap{ padding-left:0; }
+.schProg{ font-size:14px; font-weight:800; color:var(--brown); white-space:nowrap; }
+.schRef{ font-size:10px; font-weight:900; letter-spacing:.1em; padding:3px 7px; border-radius:6px; background:var(--rust); color:#fff4e0; }
+#menu .schDay{ min-height:44px; padding:0 12px; font-size:14px; font-weight:800; background:rgba(42,22,8,.1); color:var(--night); border:2px solid rgba(42,22,8,.16); white-space:nowrap; }
 /* home */
 #sHome{ align-items:center; justify-content:center; }
 #sHome .dunes{ position:absolute; left:0; right:0; bottom:0; width:100%; height:46%; pointer-events:none; }
@@ -1140,11 +1175,9 @@ label.sens b{ color:var(--ink); min-width:74px; }
 .pzMus input[type=range]{ width:clamp(70px,12vw,130px); height:44px; accent-color:var(--orange); margin:0; }
 body.photoOn #uiroot, body.photoOn #badges, body.photoOn #sixpack, body.photoOn #tutArrow, body.photoOn #miss, body.photoOn #lesson{ display:none !important; }
 .sc.soon{ color:var(--orange); letter-spacing:.08em; text-transform:uppercase; font-size:11px; }
-.schAc{ flex:none; } #menu .schAc .chip{ min-height:44px; padding:0 12px; } #menu .schAc .chip b{ font-size:14px; }
 /* the lessons: one learning path, finished ones ticked, the next one lit */
 .lessons{ flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); grid-auto-rows:min-content; gap:8px; align-content:start; align-self:stretch; padding:3px; margin:-3px; overflow-y:auto; touch-action:pan-y; overscroll-behavior:contain; }
 #sSchool{ overscroll-behavior:contain; }
-.lessons .lcap{ grid-column:1/-1; margin:2px 2px -2px; font-size:12px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; white-space:pre; color:var(--brown); }
 #menu .lrow.soon{ opacity:.5; cursor:default; padding-right:12px; } .lrow .soonTag{ flex:none; font-style:normal; font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--brown); }
 #menu .lrow{ display:flex; align-items:center; gap:10px; text-align:left; padding:6px 12px; background:rgba(42,22,8,.1); color:var(--night); border:2px solid rgba(42,22,8,.16); border-radius:14px; min-height:48px; }
 .lrow .ln{ flex:none; width:30px; height:30px; border-radius:50%; display:grid; place-items:center; font-weight:900; font-size:15px; background:rgba(42,22,8,.14); }
@@ -1155,6 +1188,37 @@ body.photoOn #uiroot, body.photoOn #badges, body.photoOn #sixpack, body.photoOn 
 #menu .lrow.next{ background:var(--night); color:var(--sand); border-color:var(--rust); box-shadow:0 0 0 3px rgba(168,89,42,.35); }
 #menu .lrow.next .lt span{ color:#f0d6ad; } #menu .lrow.next .ln{ background:var(--rust); color:#fff4e0; }
 .lrow .go1{ display:none; font-size:11px; font-weight:800; letter-spacing:.08em; color:var(--orange); } .lrow.next .go1{ display:inline; }
+/* school1: the stage map. Four stage nodes on one track (the line filled to the last open stage), each a progress ring
+   round its number; the selected stage's lessons are the cards below, the only part that scrolls */
+.schMap{ position:relative; display:flex; flex:none; }
+.schMap .trk{ position:absolute; left:12.5%; right:12.5%; top:21px; height:4px; border-radius:2px; background:rgba(42,22,8,.16); pointer-events:none; }
+.schMap .trk i{ display:block; height:100%; border-radius:2px; background:var(--rust); }
+#menu .sNode{ flex:1; min-width:0; min-height:44px; display:flex; flex-direction:column; align-items:center; gap:3px; padding:0 2px 2px; background:transparent; color:var(--night); border-radius:12px;
+  -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; touch-action:manipulation; }
+.sNode .ring{ position:relative; width:46px; height:46px; flex:none; border-radius:50%; display:grid; place-items:center; background:var(--sand); font-size:18px; font-weight:900; transition:transform 120ms ease-out; }
+.sNode .ring svg{ position:absolute; inset:0; width:100%; height:100%; transform:rotate(-90deg); }
+.sNode .ring circle{ fill:none; stroke-width:3; } .sNode .ring .bg{ stroke:rgba(42,22,8,.2); } .sNode .ring .fg{ stroke:var(--rust); stroke-linecap:round; }
+.sNode .ring .lkG{ position:static; width:16px; height:16px; transform:none; }
+#menu .sNode:active .ring{ transform:scale(.94); }
+.sNode .cap{ display:flex; flex-direction:column; align-items:center; text-align:center; line-height:1.12; max-width:100%; }
+.sNode .cap i{ font-style:normal; font-size:10px; font-weight:800; letter-spacing:.12em; color:var(--brown); }
+.sNode .cap b{ font-size:13px; font-weight:800; }
+.sNode .cap em{ font-style:normal; font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--rust); }
+.sNode.locked .ring, .sNode.locked .cap, .sNode.soon .ring, .sNode.soon .cap{ opacity:.55; }
+.sNode.done .ring{ color:#3f8f4f; } .sNode.done .ring .fg{ stroke:#3f8f4f; }
+.sNode.sel .ring{ opacity:1; background:var(--night); color:var(--sand); box-shadow:0 0 0 3px rgba(168,89,42,.35); }
+.sNode.sel .ring .bg{ stroke:rgba(246,193,119,.22); } .sNode.sel .ring .fg{ stroke:var(--orange); } .sNode.sel .cap b{ color:var(--rust); }
+#menu .lrow.locked{ opacity:.55; } .lrow .lk{ flex:none; display:grid; place-items:center; color:var(--brown); }
+.lessons.fade{ animation:schFade 160ms ease-out; } @keyframes schFade{ from{ opacity:0; } }
+.schMsg{ position:absolute; left:50%; bottom:calc(var(--padB) + 6px); z-index:3; transform:translateX(-50%); max-width:86%; margin:0; padding:9px 16px; border-radius:12px; background:var(--night); color:var(--sand);
+  font-size:14px; font-weight:700; text-align:center; box-shadow:0 4px 14px rgba(42,22,8,.3); opacity:0; transition:opacity .2s ease-out; pointer-events:none; }
+.schMsg.on{ opacity:1; }
+@media (max-height:360px){ #sSchool{ gap:6px; } .schMap .trk{ top:20px; }   /* short screens: the caption beside the ring, the map one ring tall */
+  #menu .sNode{ flex-direction:row; justify-content:center; gap:6px; padding:0 2px; } .sNode .ring{ width:44px; height:44px; }
+  .sNode .cap{ align-items:flex-start; text-align:left; min-width:0; padding-right:4px; background:var(--sand); } .sNode .cap i{ display:none; }
+  .sNode .cap b{ font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; } .sNode .cap em{ font-size:9px; white-space:nowrap; } }
+@media (max-width:600px){ .sNode .cap b{ font-size:12px; } }
+@media (prefers-reduced-motion:reduce){ .lessons.fade{ animation:none; } .sNode .ring{ transition:none; } }
 /* tutorial arrow and the bigger prompt card */
 #tutArrow{ position:fixed; left:0; top:0; width:64px; height:40px; z-index:7; pointer-events:none; display:none; }
 #tutArrow.on{ display:block; }
@@ -1638,8 +1702,10 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   </div>
  </div>
  <div class="scr" id="sSchool">
-  <div class="schHead"><span class="gcap">Train in</span><div class="chips schAc"><button class="pick chip" data-sch="cessna"><b>Cessna 172</b></button><button class="pick chip" data-sch="alpha"><b>Pipistrel Alpha</b></button></div><span class="schProg" id="schProg"></span></div>
+  <div class="schHead"><div class="schT"><b>Private pilot course</b><span class="gcap">Cessna 172 at Glendale</span></div><span class="schRef" id="schRef" hidden>REFRESHER</span><span class="schProg" id="schProg"></span><button class="schDay" id="schDay">Start from day one</button></div>
+  <div class="schMap" id="schMap" role="group" aria-label="Stages"></div>
   <div class="lessons" id="school"></div>
+  <p class="schMsg" id="schMsg" role="status" aria-live="polite"></p>
  </div>
  <div class="scr" id="sArc">
     <div class="cards" id="arcCards"></div>
@@ -1659,7 +1725,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
     <div class="srow"><span>Stick</span><div class="chips"><label class="sens"><input type="range" class="oSens" min="0" max="4" step="1" value="2" aria-label="Stick sensitivity"><b class="oSensV">Medium</b></label></div></div>
     <div class="srow"><span>Flying</span><div class="chips"><button class="tog oInv">Invert pitch: Off</button><button class="tog oTcas" id="oTcas">TCAS: On</button></div></div>
     <div class="srow"><span>Sound</span><div class="chips"><button class="tog oSound" id="oSound">Sound: On</button><button class="tog oHap" id="oHap">Haptics: On</button></div></div>
-    <div class="srow"><span>Help</span><div class="chips" id="helpRow"><button class="slink" id="bHelp">Controls help<i class="chev" aria-hidden="true"></i></button><button id="bReplay">Replay lesson 1</button></div></div>
+    <div class="srow"><span>Help</span><div class="chips" id="helpRow"><button class="slink" id="bHelp" aria-label="Controls help"><span class="hL">Controls help</span><span class="hS">Controls</span><i class="chev" aria-hidden="true"></i></button><button id="bReplay" aria-label="Replay lesson 1"><span class="hL">Replay lesson 1</span><span class="hS">Lesson 1</span></button><button id="bPlace" aria-label="Retake placement"><span class="hL">Retake placement</span><span class="hS">Placement</span></button></div></div>
     <div class="srow"><span>About</span><div class="chips"><button class="slink" id="bCredits">Music credits<i class="chev" aria-hidden="true"></i></button></div></div>
    </div>
   </div>
@@ -1817,6 +1883,21 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   </div>
   <p class="tkHow" id="tkbHow"></p>
   <div class="tkBtns"><button id="tkBack">Back</button><button class="primary" id="tkGo">ACCEPT TASKING</button></div>
+</div></div>
+<div class="overlay" id="plOv" role="dialog" aria-modal="true" aria-labelledby="plT"><div class="sheet">
+  <p class="plK">FLIGHT SCHOOL</p>
+  <h3 id="plT">Where are you in training?</h3>
+  <p class="plSub">Dana opens the stages you are ready for. Nothing you have passed is ever locked again.</p>
+  <div class="plOpts" id="plOpts" role="radiogroup" aria-labelledby="plT">
+   <button class="plO" role="radio" aria-checked="false" data-lv="never"><b>Never flown, or a discovery flight</b><span>Lesson 1</span></button>
+   <button class="plO" role="radio" aria-checked="false" data-lv="student"><b>Student pilot, not soloed</b><span>Stage 1 open</span></button>
+   <button class="plO" role="radio" aria-checked="false" data-lv="solo"><b>Soloed</b><span>Stages 1 and 2</span></button>
+   <button class="plO" role="radio" aria-checked="false" data-lv="xc"><b>Flying cross countries</b><span>Stages 1 to 3</span></button>
+   <button class="plO" role="radio" aria-checked="false" data-lv="ride"><b>Checkride soon</b><span>Everything open</span></button>
+   <button class="plO" role="radio" aria-checked="false" data-lv="cert"><b>Already licensed</b><span>Everything, as a refresher</span></button>
+  </div>
+  <div class="plRow"><label class="plH" for="plHrs">Total hours<input id="plHrs" type="number" inputmode="decimal" min="0" max="20000" step="0.1" placeholder="optional"></label>
+   <button class="plDay" id="plDay">Start from day one</button><button id="plBack" hidden>Back</button><button class="primary" id="plGo" disabled>CONTINUE</button></div>
 </div></div>
 <div class="overlay res" id="gradeOv" role="dialog" aria-label="Lesson results"><div class="sheet">
   <div class="rHead"><p class="gLetter" id="gLetter">A</p><div class="rT"><p class="sub" id="gTitle"></p><p class="rScore" id="gScore"></p></div></div>
@@ -13790,7 +13871,7 @@ function runName(){const R=RUNSTART;
   return RUN_NAMES[R.mode]||'FLIGHT';}
 function runRestart(){const R=RUNSTART;
   if(R.k==='arc'){arcStart(R.kind);return;}
-  if(R.k==='les'){startLesson(R.id);return;}
+  if(R.k==='les'){startLesson(R.id,true);return;}
   if(R.k==='df'){dfStart(R.daily?{daily:1}:null);return;}
   if(R.k==='task'){taskStart(R.id);return;}   // a fresh roll: a replay differs
   if(R.type&&R.type!==acType)pickType(R.type,1);
@@ -14199,33 +14280,77 @@ function airStart(u,v,altFt,hdg,kt,flap,thr){
   st.pos.set(wX(u,v),y,wZ(u,v));st.vel.set(Math.sin(h)*V,0,-Math.cos(h)*V);st.quat.setFromEuler(new THREE.Euler(0.03,-h,0,'YXZ'));st.w.set(0,0,0);
   st.onGround=false;st.airTime=30;st.flapIdx=flap;st.throttle=st.power=thr;st.gearDown=true;st.gearPos=1;st.ezCfg='clean';st.ez=0;st.ias=kt/MS2KT;st.mode='school';snapCamera=true;
 }
-let schoolAc='cessna';try{if(localStorage.getItem('kgeuSchoolAc')==='alpha')schoolAc='alpha';}catch(e){}
+const schoolAc='cessna';   // school1: the course is the Cessna 172 only (an old kgeuSchoolAc in storage is ignored)
 function lessonGrade(id){return schoolBest[(id==='first'?'cessna':schoolAc)+':'+id];}
 function lessonDone(id){const g=lessonGrade(id);return !!g&&g!=='F';}
-function nextLesson(after){const i0=after?LES_FLY.findIndex(l=>l.id===after)+1:0;
-  for(let i=i0;i<LES_FLY.length;i++)if(!lessonDone(LES_FLY[i].id))return LES_FLY[i];
-  return after&&i0<LES_FLY.length?LES_FLY[i0]:(LES_FLY.find(l=>!lessonDone(l.id))||null);}
-function schoolList(){
-  const el=document.getElementById('school');el.innerHTML='';
-  document.querySelectorAll('[data-sch]').forEach(b=>b.classList.toggle('sel',b.dataset.sch===schoolAc));
-  const nx=nextLesson();
-  const nd=LES_FLY.filter(l=>lessonDone(l.id)).length;$('schProg').textContent=nd+' of '+LES_FLY.length+' done';
-  SCHOOL.stages.filter(s=>!s.soon).forEach(s=>{const c=document.createElement('div');c.className='lcap';c.textContent='Stage '+s.n+'  '+s.name;el.appendChild(c);
-   s.lessons.forEach((l,i)=>{const b=document.createElement('button');const g=lessonGrade(l.id),done=lessonDone(l.id);
-    if(l.soon){b.className='lrow soon';b.dataset.l=l.id;b.setAttribute('aria-disabled','true');   // no flight yet: dimmed, no tap
+// ---- placement (school1): where the player is in training opens stages. PLACE={level,hours,at} in kgeuPlace. Stages a
+// level opens; a later stage opens once every flyable lesson of the one before is passed (a soon lesson counts as passed
+// for that chaining only; a stage that is all soon opens nothing after it). Never flown: lesson by lesson. A passed lesson is always open, whatever the placement
+const PL_OPEN={never:1,student:1,solo:2,xc:3,ride:4,cert:4};
+const PL_SAY={never:'Lesson 1 open. Pass each lesson to open the next',student:'Stage 1 open',solo:'Stages 1 and 2 open',xc:'Stages 1 to 3 open',ride:'Everything open',cert:'Everything open as a refresher'};
+let PLACE=null;try{const p=JSON.parse(localStorage.getItem('kgeuPlace')||'null');if(p&&PL_OPEN[p.level])PLACE={level:p.level,hours:typeof p.hours==='number'?p.hours:null,at:p.at||0};}catch(e){}
+const plLevel=()=>PLACE?PLACE.level:'never';
+function plHours(v){if(v===null||v===undefined||v==='')return null;v=parseFloat(v);return isFinite(v)?Math.round(clamp(v,0,20000)*10)/10:null;}   // negatives and over 20,000 clamp silently
+function setPlace(level,hours){if(!PL_OPEN[level])return;PLACE={level:level,hours:plHours(hours),at:Date.now()};try{localStorage.setItem('kgeuPlace',JSON.stringify(PLACE));}catch(e){}}
+function stageOpen(sid){const i=SCHOOL.stages.findIndex(s=>s.id===sid);if(i<0)return false;if(i<PL_OPEN[plLevel()])return true;
+  const p=SCHOOL.stages[i-1];return stageOpen(p.id)&&p.lessons.some(l=>!l.soon)&&p.lessons.every(l=>l.soon||lessonDone(l.id));}   // a stage with no flights yet cannot be finished
+function lessonOpen(id){const l=LES_BY[id];if(!l)return false;if(lessonDone(id))return true;const s=stageOf(id);if(!stageOpen(s.id))return false;
+  if(plLevel()!=='never')return true;
+  let j=s.lessons.indexOf(l)-1;while(j>=0&&s.lessons[j].soon)j--;return j<0||lessonDone(s.lessons[j].id);}   // the lesson before it (skipping soon ones) passed
+function schSay(m){toast(m);const e=$('schMsg');e.textContent=m;e.classList.add('on');clearTimeout(schSay.t);schSay.t=setTimeout(()=>e.classList.remove('on'),2600);}   // the HUD toast is hidden under the menu
+function lockSay(id){const s=stageOf(id);if(!stageOpen(s.id)){schSay('Finish Stage '+(s.n-1)+' first');return;}
+  const i=s.lessons.findIndex(l=>l.id===id),b=s.lessons.slice(0,i).find(l=>!l.soon&&!lessonDone(l.id));schSay('Pass '+(b?b.name:'the lesson before')+' first');}
+function nextLesson(after){const i0=after?LES_FLY.findIndex(l=>l.id===after)+1:0,R=LES_FLY.slice(i0).filter(l=>lessonOpen(l.id));   // open, flyable lessons only
+  const n=R.find(l=>!lessonDone(l.id));if(n)return n;
+  return after&&R.length?R[0]:(LES_FLY.find(l=>lessonOpen(l.id)&&!lessonDone(l.id))||null);}
+const LOCK_SVG='<svg class="lkG" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7.5" rx="1.6" fill="currentColor"/><path d="M5.4 7V5.1a2.6 2.6 0 0 1 5.2 0V7" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
+let SCH_SEL=null;
+// the school screen: the stage map (on open the stage holding the next lesson is selected) and that stage's lessons
+function schoolList(keep){
+  const nx=nextLesson();if(!keep||!SCH_SEL)SCH_SEL=nx?nx.stage:'s1';
+  const all=SCHOOL.stages.filter(s=>!s.soon).flatMap(s=>s.lessons);
+  $('schProg').textContent=all.filter(l=>lessonDone(l.id)).length+' of '+all.length+' passed';$('schRef').hidden=plLevel()!=='cert';
+  const map=$('schMap'),C=2*Math.PI*19;let lo=0,h='';
+  SCHOOL.stages.forEach((s,i)=>{const op=stageOpen(s.id),fl=s.lessons.filter(l=>!l.soon),np=fl.filter(l=>lessonDone(l.id)).length,done=fl.length>0&&np===fl.length;if(op)lo=i;
+    const cls='sNode'+(s.soon?' soon':!op?' locked':'')+(done?' done':'')+(s.id===SCH_SEL?' sel':'');
+    h+='<button class="'+cls+'" data-st="'+s.id+'" aria-pressed="'+(s.id===SCH_SEL)+'" aria-label="Stage '+s.n+', '+s.name+(s.soon?', coming soon':', '+np+' of '+fl.length+' passed')+(!op?', locked':'')+'">'
+      +'<span class="ring"><svg viewBox="0 0 46 46" aria-hidden="true"><circle class="bg" cx="23" cy="23" r="19"/><circle class="fg" cx="23" cy="23" r="19" stroke-dasharray="'+C.toFixed(2)+'" stroke-dashoffset="'+(C*(1-(fl.length?np/fl.length:0))).toFixed(2)+'"/></svg>'
+      +(!op&&!s.soon?LOCK_SVG:done?'✓':s.n)+'</span><span class="cap"><i>STAGE '+s.n+'</i><b>'+s.name+'</b>'+(s.soon?'<em>Coming soon</em>':'')+'</span></button>';});
+  map.innerHTML='<div class="trk"><i style="width:'+(lo/(SCHOOL.stages.length-1)*100).toFixed(1)+'%"></i></div>'+h;
+  map.querySelectorAll('.sNode').forEach(b=>b.onclick=()=>schSelect(b.dataset.st));
+  const el=$('school');el.innerHTML='';const S=SCHOOL.stages.find(s=>s.id===SCH_SEL);
+  S.lessons.forEach((l,i)=>{const b=document.createElement('button');const g=lessonGrade(l.id),done=lessonDone(l.id);b.dataset.l=l.id;
+    if(l.soon){b.className='lrow soon';b.setAttribute('aria-disabled','true');   // no flight yet: dimmed, no tap
       b.innerHTML='<span class="ln">'+(i+1)+'</span><div class="lt"><b></b><span></span></div><i class="soonTag">Coming soon</i>';
-      b.querySelector('b').textContent=l.name;b.querySelector('.lt span').textContent=l.sub;b.setAttribute('aria-label',l.name+', coming soon');el.appendChild(b);return;}
-    b.className='lrow'+(done?' done':'')+(nx&&nx.id===l.id?' next':'');b.dataset.l=l.id;
-    b.innerHTML='<span class="ln">'+(done?'\u2713':i+1)+'</span><div class="lt"><b></b><span></span></div><span class="lg">'+(g&&g!=='F'?g:'')+'<i class="go1">START</i></span>'+(l.server?troHTML('lesson:'+l.id):'');
+      b.querySelector('b').textContent=l.name;b.querySelector('.lt span').textContent=l.sub||'';b.setAttribute('aria-label',l.name+', coming soon');el.appendChild(b);return;}
+    const op=lessonOpen(l.id),nxt=op&&nx&&nx.id===l.id;
+    b.className='lrow'+(done?' done':'')+(nxt?' next':'')+(op?'':' locked');
+    b.innerHTML='<span class="ln">'+(done?'✓':i+1)+'</span><div class="lt"><b></b><span></span></div>'+(op?'<span class="lg">'+(g&&g!=='F'?g:'')+'<i class="go1">START</i></span>':'<span class="lk">'+LOCK_SVG+'</span>')+(l.server?troHTML('lesson:'+l.id):'');
     b.querySelector('b').textContent=l.name;b.querySelector('.lt span').textContent=l.sub;
     if(!REGION.az){const t=document.createElement('i');t.className='azTag';t.textContent='ARIZONA';b.appendChild(t);}   // flight school is at Glendale
-    b.setAttribute('aria-label',l.name+(done?', finished':'')+(nx&&nx.id===l.id?', next lesson':''));
-    b.onclick=()=>startLesson(l.id);const tr=b.querySelector('.tro');if(tr)tr.addEventListener('click',e=>{e.stopPropagation();e.preventDefault();if(LB)LB.lbOpen('lesson:'+l.id);});el.appendChild(b);});});
+    b.setAttribute('aria-label',l.name+(done?', finished':'')+(nxt?', next lesson':'')+(op?'':', locked'));
+    b.onclick=op?()=>startLesson(l.id):()=>lockSay(l.id);   // a locked row says what opens it and starts nothing
+    const tr=b.querySelector('.tro');if(tr)tr.addEventListener('click',e=>{e.stopPropagation();e.preventDefault();if(LB)LB.lbOpen('lesson:'+l.id);});el.appendChild(b);});
 }
+function schSelect(id){if(!SCHOOL.stages.some(s=>s.id===id))return;SCH_SEL=id;schoolList(true);const L=$('school');L.scrollTop=0;L.classList.remove('fade');void L.offsetWidth;L.classList.add('fade');}
+$('schDay').onclick=()=>{setPlace('never',PLACE?PLACE.hours:null);schoolList();schSay('Starting from lesson 1. Your passed lessons stay passed');};
+// the placement intake: on the school screen when there is no placement yet (no way out but a choice), and from Settings
+// (with Back, which keeps the old placement). Only ever inside the menu on #sSchool, never over a flight or the pause sheet
+const plOv=$('plOv');let plPick=null;
+function plUI(){plOv.querySelectorAll('.plO').forEach(b=>b.setAttribute('aria-checked',String(b.dataset.lv===plPick)));$('plGo').disabled=!plPick;}
+function plOpen(back){if(!menu.classList.contains('on')||curScr!=='sSchool')return;clearTimeout(plClose.t);
+  back=!!back&&!!PLACE;plPick=back?PLACE.level:null;$('plHrs').value=back&&PLACE.hours!=null?PLACE.hours:'';$('plBack').hidden=!back;plUI();
+  plOv.classList.remove('out');plOv.classList.add('on');}
+function plClose(now){clearTimeout(plClose.t);if(!plOv.classList.contains('on'))return;if(now){plOv.classList.remove('on','out');return;}
+  plOv.classList.add('out');plClose.t=setTimeout(()=>plOv.classList.remove('on','out'),180);}
+function plDone(){if(!plPick)return;setPlace(plPick,$('plHrs').value);plClose();schoolList();schSay(PL_SAY[plPick]);}
+plOv.querySelectorAll('.plO').forEach(b=>b.onclick=()=>{plPick=b.dataset.lv;plUI();});
+$('plHrs').addEventListener('change',e=>{const v=plHours(e.target.value);e.target.value=v==null?'':v;});
+$('plGo').onclick=plDone;$('plDay').onclick=()=>{plPick='never';plDone();};$('plBack').onclick=()=>plClose();
 function startHereUI(){let sk=false;try{sk=!!localStorage.getItem('kgeuTut');}catch(e){}$('startHere').classList.toggle('on',rookie()&&!lessonDone('first')&&!sk);}
-document.querySelectorAll('[data-sch]').forEach(b=>b.onclick=()=>{schoolAc=b.dataset.sch;try{localStorage.setItem('kgeuSchoolAc',schoolAc);}catch(e){}schoolList();});
-function startLesson(id){
+function startLesson(id,force){
   const L=lessonDef(id);if(!L||!L.fly)return;   // a lesson still to come has no flight yet
+  if(!force&&!lessonOpen(id)){lockSay(id);return;}   // locked by the placement (force: a retry, a restart, the tests)
   if(!REGION.az){pickRegion('az',{resume:{lesson:id,tod:TOD.id}});return;}   // flight school is at Glendale
   if(id==='first')pickType('cessna',1);else if(acType!==schoolAc)pickType(schoolAc,1);
   const S=SCH[acType];gradeOv.classList.remove('on');
@@ -14251,9 +14376,10 @@ function grade(score,title,lines,failWhy){
   resShow(gradeOv,false);
   coach2(L2==='A'?'Excellent. That is checkride standard.':L2==='F'?'Unsatisfactory. Let us try that again.':'Not bad. Grade '+L2+'.',null,{offAir:1});
 }
-document.getElementById('gRetry').onclick=()=>{resClose(gradeOv);startLesson(LES.last);};
+document.getElementById('gRetry').onclick=()=>{resClose(gradeOv);startLesson(LES.last,true);};
 $('gNext').onclick=()=>{resClose(gradeOv);startLesson($('gNext').dataset.l);};
 $('bReplay').onclick=()=>startLesson('first');
+$('bPlace').onclick=()=>{openMenu('sSchool');plOpen(true);};
 document.getElementById('gSchool').onclick=()=>resMenu(gradeOv);
 document.getElementById('gFree').onclick=()=>{resClose(gradeOv);paused=false;};
 document.getElementById('lesQuit').onclick=()=>{const f=LES.on==='first';lesEnd();
@@ -14452,7 +14578,7 @@ function showScr(id){
   curScr=id;document.body.classList.toggle('menuOn',menu.classList.contains('on'));document.querySelectorAll('#menu .scr').forEach(e=>e.classList.toggle('on',e.id===id));
   menu.classList.toggle('see3d',id==='sFly');SHOW.on=id==='sFly'&&menu.classList.contains('on');
   if(id==='sFly'){CARM.sync();sumUI();requestAnimationFrame(locShow);}
-  if(id==='sSchool')schoolList();if(id==='sHome')startHereUI();if(id==='sArc')arcList();
+  if(id==='sSchool'){schoolList();if(!PLACE)plOpen();}else plClose(true);if(id==='sHome')startHereUI();if(id==='sArc')arcList();
   if(LB){if(id==='sLb')LB.lbRender();else LB.sheet(false);if(id==='sSet'||id==='sFly'||id==='sHome')LB.ui();}
   tabsUI();
 }
@@ -14468,7 +14594,7 @@ function navBack(){
   if(fromPause&&!NAV.length){fromPause=false;menuClose();pauseOv.classList.add('on');CARP.sync();return;}
   showScr(NAV.pop()||'sHome');
 }
-function menuClose(){fromPause=false;menu.classList.remove('on','see3d');SHOW.on=false;document.body.classList.remove('menuOn');}
+function menuClose(){plClose(true);fromPause=false;menu.classList.remove('on','see3d');SHOW.on=false;document.body.classList.remove('menuOn');}
 document.querySelectorAll('#menu .back').forEach(b=>b.onclick=navBack);
 $('hFly').onclick=()=>tabGo('sFly');$('hSch').onclick=()=>tabGo('sSchool');$('hChal').onclick=()=>tabGo('sArc');
 $('hRec').onclick=()=>recOpen();$('bHelp').onclick=()=>nav('sHelp');
@@ -17621,7 +17747,7 @@ window.__kgeu={TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()
   RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,ticker:()=>{const e=document.getElementById('tk'),c=document.getElementById('tkCtl');return {on:e.classList.contains('on'),paused:e.classList.contains('paused'),anim:getComputedStyle(document.getElementById('tkT')).animationName,scroll:e.classList.contains('scroll'),open:c.classList.contains('on'),text:e.querySelector('#tkT i').textContent,vis:e.offsetParent!==null&&getComputedStyle(e).display!=='none',ctlVis:c.offsetParent!==null};},tickerForce:n=>{TK.force=n||null;tkUI();},tickerOpen:()=>tkOpen(),tickerClose:()=>{TK.open=false;tkUI();},musicTick:musicTick,MUSIC:MUSIC,actx:()=>actx,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,VQ:VQ,vqLog:clear=>{const r=VQ.log.map(e=>Object.assign({},e));if(clear)VQ.log.length=0;return r;},vqAdd:(who,kind,text,clips,o)=>vqAdd(L(who,kind,text,clips),o),coach2:coach2,chatNow:()=>chatNow(),atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),bannerShow:(k,t)=>bannerShow(k,t),badgeHide:()=>badgeHide(),auto:()=>autoSmart(),mission:k=>{if(k==='gunrun'){pickType('a10',1);start('range');return;}pickType(k==='range'?'reaper':'c130',1);start(k);},HOG:HOG,strikeScore:()=>strikeScore(),CRASH_FX:CRASH_FX,baseOK:baseOK,rwyLenOf:rwyLenOf,FD:FD,BASES:BASES,setThr:setThr,setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
-  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day,kind:d.kind}},dfDayOf:k=>dfDayOf(k),aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,SCHOOL:SCHOOL,lessonDef:lessonDef,stageOf:stageOf,tolOf:tolOf,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day,kind:d.kind}},dfDayOf:k=>dfDayOf(k),aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,SCHOOL:SCHOOL,get PLACE(){return PLACE;},setPlace:(l,h)=>{setPlace(l,h);if(curScr==='sSchool')schoolList(true);},lessonOpen:lessonOpen,stageOpen:stageOpen,get schSel(){return SCH_SEL;},schSelect:schSelect,lessonDef:lessonDef,stageOf:stageOf,tolOf:tolOf,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   // @OhRabah easter eggs (3.10): where each one is, whether its lights are on, and the tow banner
   eggs:()=>EGG.list.map(o=>{const p=o.getWorldPosition(new V3()),r={name:o.name,x:p.x,y:p.y,z:p.z,ry:o.rotation.y,lit:(o.name==='egg_billboard'||o.name==='egg_rooftop')&&EGG.lit,visible:o.visible};
     if(o.name==='egg_tow'){const b=EGG.tow.ban.getWorldPosition(new V3()),f=new V3(0,0,-1).applyQuaternion(o.quaternion);r.banner={x:b.x,y:b.y,z:b.z};r.fwd=[f.x,f.y,f.z];}return r;}),
@@ -17699,7 +17825,7 @@ worldLoad();
       if(S.df)dfStart(S.daily?{daily:1}:null);
       else if(S.task)taskStart(S.task);
       else if(S.arc){if(S.type&&TYPES[S.type])pickType(S.type);arcStart(S.arc);}
-      else if(S.lesson)startLesson(S.lesson);
+      else if(S.lesson)startLesson(S.lesson,true);
       else if(S.mode==='free'){if(S.type&&TYPES[S.type])pickType(S.type);if(S.base)pickBase(S.base);freeStart(S.pos);}   // the pause sheet's Apply
       else{if(S.type&&TYPES[S.type])pickType(S.type,1);start(S.mode||'runway',S.base);}}
     else openMenu('sFly');};
