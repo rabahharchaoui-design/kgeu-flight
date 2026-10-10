@@ -529,6 +529,8 @@ body.dfOn #uiroot > #dfSub{ display:flex; }
 #tkReply button.act{ border-color:var(--caution); } #tkReply button.act b{ color:var(--caution); }
 #tkReply button.neg{ border-color:rgba(255,255,255,.28); } #tkReply button.neg b{ color:var(--soft); }
 @media (prefers-reduced-motion: reduce){ #tkReply{ transform:none; transition:opacity 150ms ease; } }
+/* the C-130 drop: the LOOK pad owns the top right corner, the replies stop short of it */
+body.lookOn.touch #tkReply{ width:min(268px, calc(50% - var(--icon) / 2 - 8px - var(--padR) - 74px)); }
 /* the ball view keeps its own readouts along the top edge (DAY TV x1 left, CAM / R / EL right): the replies step down
    under them, right aligned, clear of the mission card in the centre column */
 body.sensorOn #tkReply{ top:calc(var(--padT) + 30px); left:auto; right:var(--padR); transform-origin:right center;
@@ -10030,6 +10032,7 @@ function recOpen(){scUI();resetArmed=0;
 // airport taxiway. Both score on distance, which is what the crews are judged on.
 const MISS={on:false,kind:'',armed:false,dropped:false,pallet:null,result:null,td:null,stopT:0};
 const missEl=document.getElementById('miss'),missT=document.getElementById('missT'),missS=document.getElementById('missS');
+window.missHudG=missHud;
 function missHud(title,sub,warn){
   if(!title){missEl.classList.remove('on');return;}
   setTxt(missT,title);setTxt(missS,sub||'');missEl.classList.toggle('warn',!!warn);missEl.classList.toggle('on',true);
@@ -10071,6 +10074,7 @@ function makePallet(){
 }
 function missDrop(){
   if(!MISS.on||MISS.kind!=='drop'||MISS.dropped)return;
+  if(TASK.on&&TASK.def.noDrop&&TASK.def.noDrop(TASK.d)){toast(TASK.def.noDrop(TASK.d));return;}   // Lifeline: not before the smoke call
   if(!MISS.armed){toast('Not in the drop window. 500 to 1,500 ft, under 160 kt, ramp level.');return;}
   const p=makePallet();
   // it leaves the ramp, so start it a little aft and below the aeroplane
@@ -10085,6 +10089,7 @@ function missDrop(){
 const _pw=new V3();
 function missUpdate(dt){
   if(!MISS.on||!running||paused)return;
+  const missHud=TASK.on?(t,s,w)=>{MISS.ht=t?[t,s,w]:null;}:window.missHudG;   // a tasking shows these on its own stage card
   const p=MISS.pallet;
   if(MISS.kind==='drop'){
     if(!MISS.dropped){
@@ -10127,7 +10132,7 @@ function missUpdate(dt){
       if(p.open)p.g.rotation.y+=dt*0.4;
     }
     if(p&&p.down&&!MISS.result)missHud(null);
-    if(MISS.cardT>0){MISS.cardT-=dt;if(MISS.cardT<=0)missScore(MISS.result);}
+    if(MISS.cardT>0){MISS.cardT-=dt;if(MISS.cardT<=0&&!TASK.on)missScore(MISS.result);}
   }
   else if(MISS.kind==='short'){
     const Z=lzUV(st.pos.x,st.pos.z);
@@ -10292,6 +10297,7 @@ $('aRetry').onclick=()=>{resClose(arcOv);runRestart();};
 // Hard keeps only the map marker, the smoke, the panels and the jump lights.
 const DZ={on:false,built:false,g:null,smoke:[],flares:[],glow:null,letter:null,runG:null,gates:[],f:new V3(),rel:null,
   t:0,simT:0,tRel:1e9,err:1e9,along:0,cross:0,light:'',c1:false,c10:false,cg:false,seen:false,uiT:0,lastL:''};
+const DZ_RED=[0.85,0.13,0.11];   // the smoke's colour (DZ.tint: a Lifeline team's own)
 const DZ_SMOKE=34,DZ_LIFE=46,DZ_ALT=305,DZ_KT=140,DZ_TOL={easy:140,hard:60};
 const DZ_DEST={x:DROPZ.x,z:DROPZ.z,name:'Drop zone',short:'DZ',kind:'drop',dz:true};
 const flareTex=tex(64,64,(x,w,h)=>{const g=x.createRadialGradient(32,32,1,32,32,31);
@@ -10333,6 +10339,7 @@ function dzPredict(px,py,pz,vx,vy,vz,out){
 }
 const _dzp=[0,0];
 function dzDest(on){
+  if(TASK.on)return;   // a tasking keeps its own waypoints (Lifeline: the IP, then Hilltop)
   if(on&&!(DEST&&DEST.dz)){DEST=DZ_DEST;document.body.classList.add('hasDest');destUI(true);}
   else if(!on&&DEST&&DEST.dz){DEST=null;document.body.classList.remove('hasDest');destUI(true);}
 }
@@ -10341,8 +10348,8 @@ function dzStart(){
   Object.assign(DZ,{on:true,t:0,simT:0,tRel:1e9,err:1e9,light:'',c1:false,c10:false,cg:false,seen:false,uiT:0,lastL:''});DZ.g.visible=true;
   dzRunIn();
   dzDest(rookie());
-  $('dzHint').classList.add('on');
-  vqAdd(L('Drop Zone Control','tower',AC.cs+', drop zone is marked. Head for the red smoke.',['t_cs_herky','t_dz_smoke']));
+  if(!TASK.on)$('dzHint').classList.add('on');   // "Head for the red smoke": not a Lifeline team's, whose colour is the test
+  if(!TASK.on)vqAdd(L('Drop Zone Control','tower',AC.cs+', drop zone is marked. Head for the red smoke.',['t_cs_herky','t_dz_smoke']));   // a tasking's team calls for itself
 }
 // the best run in: into the wind at 1,000 ft and 140 kt, released where the drift puts the bundle
 // on the centre. Worked out again whenever the wind shifts (a haboob swings it hard).
@@ -10380,12 +10387,12 @@ function dzUpdate(dt){
   DZ.smoke.forEach((sp,i)=>{const a=((tt/DZ_LIFE)+i/DZ_SMOKE)%1,s=a*DZ_LIFE;
     // drift a touch exaggerated so even a light wind shows its direction
     sp.position.set(DROPZ.x+_fw.x*s*1.3+Math.sin(tt*0.3+i)*a*25,gh+4+1100*Math.pow(a,0.8),DROPZ.z+_fw.z*s*1.3+Math.cos(tt*0.27+i*1.7)*a*25);
-    sp.scale.setScalar(110+a*420);sp.visible=true;
+    sp.scale.setScalar(110+a*420);sp.visible=!DZ.noSmoke;   // Lifeline: none until Hilltop pops it
     const base=night?0.5*(1-a)+0.08:1;
     // thick all the way up; thinned when the camera is inside it, so flying through does not flood the screen
     const near=clamp((sp.position.distanceTo(camera.position)-sp.scale.x*0.4)/250,0.12,1);
     sp.material.opacity=(night?0.7:0.95)*Math.min(1,a/0.04)*Math.pow(1-a,0.6)*near*(dusty?0.6:1);
-    const k=night?base:Math.max(0.5,lit);sp.material.color.setRGB(0.85*k,0.13*k,0.11*k);});
+    const k=night?base:Math.max(0.5,lit),c=DZ.tint||DZ_RED;sp.material.color.setRGB(c[0]*k,c[1]*k,c[2]*k);});
   DZ.flares.forEach((sp,i)=>{sp.visible=night;if(night){const fl=0.8+0.25*Math.sin(tt*13+i*2.1)+0.1*Math.sin(tt*31+i);sp.scale.setScalar(9*fl);sp.material.opacity=0.95;}});
   DZ.glow.visible=night;if(night){DZ.glow.scale.setScalar(300+20*Math.sin(tt*3));DZ.glow.material.opacity=0.85;}
   // Easy only: the run in line and the gates
@@ -13383,6 +13390,132 @@ function owTalk(d){const v=d.veh;
   tqPilot('Saber 6, '+AC.csS+', your vehicle is the white pickup, '+(r/1609.34).toFixed(1)+' miles '+tqDir(b)+' of you, '+(v.moving?'heading '+tqDir(((v.h*180/Math.PI)%360+360)%360)+' on the dirt track, about '+mph+' miles an hour.':'stopped on the dirt track.'));
   tqSay('Saber 6','Contact the white pickup. Saber 6 has it from here. Thanks for the eyes.',{plain:'The team sees it. Job done.'});
   d.talk=1;d.end=st.time;
+}
+// ---- LIFELINE (C-130H Hercules, resupply) ----
+// A ground team (Hilltop) calls for one bundle at a rolled position 11 to 18 km south-west to north-west of Luke. Fly
+// the route (start, the IP 5 km out on the run in, into the wind), call their smoke's colour when they pop it, drop on
+// it from 1,000 ft (the airdrop's own window, jump lights and pallet), then a low pickup pass over their panels to
+// confirm the extraction lane. Scored on drop accuracy, time to the drop against par, the smoke call and the pass.
+// The drop zone is the airdrop's, moved to the team for the run (DROPZ, rebuilt; put back by cleanup).
+const LL_SMOKE={green:[0.2,0.72,0.26],yellow:[0.95,0.83,0.2],violet:[0.55,0.27,0.78],red:[0.85,0.13,0.11]};
+const DZ_HOME={x:DROPZ.x,z:DROPZ.z};
+function dzMove(x,z){DROPZ.x=x;DROPZ.z=z;DZ_DEST.x=x;DZ_DEST.z=z;
+  if(DZ.built){dzStop();scene.remove(DZ.g);DZ.g.traverse(o=>{if(o.geometry)o.geometry.dispose();});DZ.built=false;DZ.g=null;DZ.smoke=[];DZ.flares=[];DZ.gates=[];DZ.runG=null;DZ.letter=null;DZ.glow=null;}}
+function llSite(R){
+  for(let i=0;i<50;i++){const b=tqR(R,170,330)*Math.PI/180,r=tqR(R,11000,18000),x=LUKE.x+Math.sin(b)*r,z=LUKE.z-Math.cos(b)*r;
+    if([[DZ_HOME.x,DZ_HOME.z],[LZ.x,LZ.z],[RANGE.x,RANGE.z]].some(p=>Math.hypot(x-p[0],z-p[1])<2500))continue;
+    let lo=1e9,hi=-1e9;for(const [ox,oz] of [[0,0],[400,0],[-400,0],[0,400],[0,-400],[900,900],[-900,-900],[900,-900],[-900,900]]){const h=groundHeight(x+ox,z+oz);lo=Math.min(lo,h);hi=Math.max(hi,h);}
+    if(hi-lo>10||hi>90)continue;
+    // open desert all round (the run in, the turn and the pass): rings at 3, 5 and 7 km no more than 80 m above the team
+    let rise=0;for(const rr of [3000,5000,7000])for(let k=0;k<12;k++){const q=k/12*Math.PI*2;rise=Math.max(rise,groundHeight(x+Math.sin(q)*rr,z-Math.cos(q)*rr)-lo);}
+    if(rise>80)continue;return {x:x,z:z};}
+  return {x:LUKE.x-3000,z:LUKE.z+8000};
+}
+TASKS.lifeline={name:'Lifeline',role:'Resupply',ac:'c130',base:'luke',airStart:1,limit:480,
+  roll(R,d){const c=llSite(R);d.c=c;d.wdir=Math.round(tqR(R,0,36))*10||360;d.wkt=Math.round(tqR(R,4,16));
+    const cols=Object.keys(LL_SMOKE);d.smoke=tqPick(R,cols);d.decoy=tqPick(R,cols.filter(k=>k!==d.smoke));d.swap=R()<0.5;
+    // the run in: into the wind; the IP 5 km before the team on it; the start 6 to 9 km before the IP, off to one side
+    const h=d.wdir*Math.PI/180;d.f={x:Math.sin(h),z:-Math.cos(h)};d.ip={x:c.x-d.f.x*5000,z:c.z-d.f.z*5000};
+    const a=Math.atan2(-d.f.x,d.f.z)+tqR(R,-1.1,1.1),r=tqR(R,6000,9000);   // back along the run in, swung up to 63 degrees
+    d.s={x:d.ip.x+Math.sin(a)*r,z:d.ip.z-Math.cos(a)*r};d.leg=r;
+    d.runHdg=Math.round(((h*180/Math.PI)%360+360)%360/10)*10||360;
+    d.par=Math.round((d.leg)/100+5000/74+40);   // to the drop: the leg at 195 kt, the run in at 145, the turn at the IP
+    d.smokeCall=null;d.wrong=0;},
+  brief(d){return {ac:'C-130H Hercules · airborne out of Luke, 1,500 ft',
+    sit:'Hilltop, a ground team '+tqDs(Math.hypot(d.c.x-LUKE.x,d.c.z-LUKE.z))+' '+tqDir(tqBrg(LUKE.x,LUKE.z,d.c.x,d.c.z))+' of Luke, needs one bundle. Fly to the IP, call their smoke by its colour, drop from 1,000 ft into the wind, then a low pass over their panels.',
+    facts:[['PAR TO DROP',tqClock(d.par)],['RUN IN',String(d.runHdg).padStart(3,'0')+'°'],['WIND',tqWind(d.wdir,d.wkt)],['DROP','1,000 ft, 140 kt']]};},
+  spawn(d){dzMove(d.c.x,d.c.z);
+    placeAir(d.s.x,d.s.z,1500,Math.atan2(d.ip.x-d.s.x,-(d.ip.z-d.s.z)),195);st.gearDown=false;st.gearPos=0;trimSpawn(st,0);
+    missStart('drop');dzStart();DZ.noSmoke=true;DZ.tint=LL_SMOKE[d.smoke];
+    d.wp=d.ip;tqDest(d.ip.x,d.ip.z,'IP Hilltop','IP');},
+  // AUTO: the route at 1,000 ft (the IP, then the team, 145 kt on the run in); for the pass, low over the panels; again: off
+  noDrop:d=>d.smokeCall==null?'Not cleared yet: call Hilltop\'s smoke first':'',
+  autoLbl:(d,ap)=>ap&&ap.tk?'Auto Off':'Auto Nav',
+  auto(d){if(st.ap&&st.ap.tk){st.ap=null;st.apW=null;toast('Autopilot off, your airplane');return true;}
+    initAudio();apEngage(st,'hold');const a=st.ap;a.tk=1;a.y=st.pos.y-GEAR;a.trk=Math.atan2(st.vel.x,-st.vel.z);a.v=AC.vcruise;llAp(d,0);
+    toast(TASK.stage&&TASK.stage.id==='pass'?'Autopilot: the pass over the panels':'Autopilot: the route at 1,000 ft. AUTO again: your airplane',3);return true;},
+  always(d,dt){llAp(d,dt);
+    // the bundle down (whatever stage we are in by then): Hilltop says where
+    if(MISS.result&&MISS.result.kind==='drop'&&d.dist==null){d.dist=MISS.result.dist;
+      const p=MISS.pallet.pos,b=tqBrg(d.c.x,d.c.z,p.x,p.z),m=Math.round(d.dist);
+      tqSay('Hilltop','Bundle on the ground, '+(m<12?'right on the smoke':m+' metres '+tqDir(b)+' of the smoke')+'. '+(m<30?'Outstanding drop.':m<80?'Good drop.':m<150?'We can get to it.':'That is a long walk.'),
+        {plain:'The bundle landed '+m+' m from the smoke.'});}
+    if(DEST&&DEST.task&&d.wp){DEST.x=d.wp.x;DEST.z=d.wp.z;}},
+  stages:[
+    {id:'route',name:'Fly the route to the IP',
+      obj:d=>{const r=tqD(d.ip.x,d.ip.z);return ['Route to the IP',tqDs(r)+'. Then run in '+String(d.runHdg).padStart(3,'0')+'°, the drop at 1,000 ft'];},
+      enter(d){tqQuiet(()=>{const l=tqMC(AC.csS+', Mission Control. Hilltop needs resupply, one bundle, at '+tqLL(d.c.x,d.c.z)+'. Route via the IP, run in heading '+String(d.runHdg).padStart(3,'0')+', drop from 1,000 feet. Hilltop will mark with smoke.',
+          {plain:'Fly to the IP on your map, then turn toward the team and drop the bundle from 1,000 ft.'});
+        tqAsk([{k:'WILCO'},{k:'UNABLE',fn:()=>tqMC('Copy. The IP is on your map. Hilltop is waiting on that bundle.',{plain:'No rush: follow the arrow to the IP.'})}],{line:l});},2);},
+      tick:d=>tqD(d.ip.x,d.ip.z)<1500||tqD(d.c.x,d.c.z)<4200},
+    {id:'smoke',name:'Call Hilltop\'s smoke by its colour',
+      obj:d=>['Call the smoke','Which colour is Hilltop\'s smoke?'],
+      enter(d){d.wp=d.c;if(DEST&&DEST.task){DEST.name='Hilltop';DEST.short='DZ';destUI(true);}
+        tqPilot('Hilltop, '+AC.csS+', IP inbound, one bundle. Pop smoke.');
+        DZ.noSmoke=false;DZ.t=0;
+        const l=tqSay('Hilltop','Herky, Hilltop, smoke is out.',{plain:'The team has lit a smoke. Tap its colour.'});
+        llAskSmoke(d,l);},
+      tick:d=>d.smokeCall!=null},
+    {id:'drop',name:'Drop on the smoke from 1,000 ft',
+      obj:d=>{const h=MISS.ht;return ['Drop on the smoke',h?(MISS.dropped?h[0].replace(/^TO CENTER: /,'To the smoke: '):h[1]):'1,000 ft, under 160 kt, wings level',h&&h[2]&&!MISS.dropped];},
+      enter(d){},
+      tick(d){if(MISS.dropped&&d.dropT==null)d.dropT=st.time-d.t0;return d.dropT!=null&&st.time-d.t0-d.dropT>6;}},
+    {id:'pass',name:'Pickup pass low over the panels',
+      obj:d=>{const r=tqD(d.c.x,d.c.z),ft=Math.round(st.agl*M2FT/10)*10;return ['Pickup pass',(r>1200?tqDs(r)+' to the panels. ':'')+'Under '+(rookie()?400:300)+' ft over them: '+ft.toLocaleString('en-US')+' ft',false];},
+      enter(d){d.p0=st.time;const l=tqSay('Hilltop','Good chute. Hilltop is moving to it. Request a pickup pass to confirm the extraction lane: low over our panels, below 300 feet.',{plain:'Fly low over the team, under 300 ft, so they can check the pickup lane.'});
+        tqAsk([{k:'WILCO'}],{line:l,wait:15});d.best=null;},
+      tick(d){const r=tqD(d.c.x,d.c.z),ft=st.agl*M2FT,lat=rookie()?250:150,top=rookie()?400:300;
+        if(!d.pass&&!st.onGround&&r<lat&&ft<top){d.pass={r:r,ft:ft};
+          tqSay('Hilltop','Pass confirmed, the lane is good. Hilltop is complete. Thanks for the lift.',{plain:'The team saw your pass. Job done.'});d.end=st.time;}
+        if(!d.pass&&st.time-d.p0>200&&!d.passLate){d.passLate=1;d.end=st.time;tqSay('Hilltop','Herky, Hilltop, we will walk the lane ourselves. Thanks for the bundle.',{plain:'The team gave up on the pass.'});}
+        return d.end!=null&&d.dist!=null&&st.time-d.end>4;}}],
+  score(d){
+    const m=d.dist==null?1e9:d.dist;
+    const acc=m>=250?0:m<=15?50:50*Math.pow(1-(m-15)/235,1.35);
+    const tm=d.dropT==null?0:25*clamp(1-(d.dropT-d.par)/120,0,1);
+    const sm=d.smokeCall==='right'?(d.wrong?4:10):0;
+    const ps=d.pass?(d.pass.r<100&&d.pass.ft<200?15:10):0;
+    const sc=acc+tm+sm+ps;
+    return {score:sc,title:m<15?'On the smoke':m<50?'Good bundle':m<150?'Bundle delivered':d.dist==null?'No drop':'Long walk for Hilltop',
+      lines:[['Drop from the smoke',d.dist==null?'no drop':Math.round(m)+' m  ('+Math.round(m*M2FT)+' ft)'],
+        ['Time to the drop',d.dropT==null?'no drop':tqClock(d.dropT)+'  (par '+tqClock(d.par)+')'],
+        ['Smoke call',d.smokeCall==='right'?(d.wrong?d.smoke+' on the second call':d.smoke+', first call'):'Hilltop told you'],
+        ['Pickup pass',d.pass?Math.round(d.pass.ft)+' ft, '+Math.round(d.pass.r)+' m off the panels':'not flown'],
+        ['Wind at the drop',tqWind(d.wdir,d.wkt)]],
+      tip:d.dist==null?'The DROP button is live from 500 to 1,500 ft, under 160 kt, wings level.':m>80?'Release on the green light: the jump lights count the wind drift for you.':!d.pass?'After the drop, come round low over the panels, under 300 ft.':'Fly it again: the team, the wind and the smoke change every time.'};},
+  cleanup(d){DZ.noSmoke=false;DZ.tint=null;dzMove(DZ_HOME.x,DZ_HOME.z);if(MISS.on)missReset();}
+};
+// the smoke call: the right colour and a decoy, in rolled order; a wrong call: "not our smoke", ask again
+function llAskSmoke(d,line){const cols=[d.smoke,d.decoy];if(d.swap)cols.reverse();
+  tqAsk(cols.map(c=>({k:c.toUpperCase(),sub:'smoke',say:'Hilltop, '+AC.csS+', I see '+c+' smoke.',fn:()=>{
+    if(c===d.smoke){d.smokeCall='right';tqSay('Hilltop','Correct, '+c+' smoke. Wind on the ground '+tqWind(d.wdir,Math.max(2,d.wkt-3))+'. You are cleared to drop.',{plain:'Right colour. You may drop.'});}
+    else{d.wrong++;const Ks=Object.keys(LL_SMOKE).filter(k=>k!==d.smoke&&k!==c);d.decoy=Ks[d.wrong%Ks.length];
+      const l=tqSay('Hilltop','Negative, that is not our smoke. Look again.',{plain:'Wrong colour. Look again at the smoke by the team.'});llAskSmoke(d,l);}}})),
+    {line:line,wait:25,late:()=>{d.smokeCall='told';tqSay('Hilltop','Herky, our smoke is '+d.smoke+'. We have you in sight. Cleared to drop.',{plain:'The team told you their colour. You may drop.'});}});
+}
+// AUTO's route: toward the IP, then the team at 1,000 ft and 145 kt (the run in), then low over the panels for the pass
+function llAp(d,dt){const a=st.ap;if(!a||!a.tk||a.mode!=='hold')return;
+  const S=TASK.stage&&TASK.stage.id,w=S==='route'?d.ip:d.c,gh=groundHeight(d.c.x,d.c.z);
+  a.trk=Math.atan2(w.x-st.pos.x,-(w.z-st.pos.z));
+  // heights over the higher of the ground here and 800 m ahead, so AUTO never flies the Hercules into a rise
+  const gv=Math.hypot(st.vel.x,st.vel.z)||1,ga=Math.max(gh,groundHeight(st.pos.x,st.pos.z),groundHeight(st.pos.x+st.vel.x/gv*800,st.pos.z+st.vel.z/gv*800));
+  if(S==='pass'){a.v=150*KT;
+    // a racetrack, the way a crew sets up a low pass: already pointed at the panels from 2 km out, fly the line through
+    // them; otherwise run on 2.5 km past them, two turn widths (3.2 km) to the side, and turn back in onto the line. On the
+    // line the aim is 2.5 km ahead of our point on it (the Hercules turns wide on autopilot; chasing the panels circles)
+    const r=tqD(d.c.x,d.c.z),gs=Math.hypot(st.vel.x,st.vel.z)||1,vx=st.vel.x/gs,vz=st.vel.z/gs,bx=(d.c.x-st.pos.x)/r,bz=(d.c.z-st.pos.z)/r;
+    if(!d.pm){if(vx*bx+vz*bz>0.77&&r>2000){d.pm='in';d.pu={x:bx,z:bz};}
+      else{d.pm='out';const ux=-vx,uz=-vz,sd=Math.sign((st.pos.x-d.c.x)*uz-(st.pos.z-d.c.z)*ux)||1;d.pu={x:ux,z:uz};
+        d.po={x:d.c.x-ux*2500+uz*sd*3200,z:d.c.z-uz*2500-ux*sd*3200};}}
+    if(d.pm==='out'){a.trk=Math.atan2(d.po.x-st.pos.x,-(d.po.z-st.pos.z));if(tqD(d.po.x,d.po.z)<2000)d.pm='in';}   // a wide capture: chasing a point at this turn radius circles it
+    if(d.pm==='in'){const u=d.pu,px=st.pos.x-d.c.x,pz=st.pos.z-d.c.z,s0=px*u.x+pz*u.z;
+      if(s0>500)d.pm=null;   // past them: round again
+      else{const s1=s0+2500,ax=d.c.x+u.x*s1,az=d.c.z+u.z*s1;a.trk=Math.atan2(ax-st.pos.x,-(az-st.pos.z));
+        // the turn in goes toward the line: the autopilot's shorter way round can swing out 3 km wide of it
+        const mx=-u.z,mz=u.x,lat=px*mx+pz*mz,sg=lat<0?-1:1;if(Math.abs(wrapPi(a.trk-Math.atan2(vx,-vz)))>1.4)a.trk=Math.atan2(-sg*mx,sg*mz);}}
+    a.y=ga+(d.pm==='in'&&r<5000?70:305);}   // down to 230 ft from 5 km out (the hold autopilot descends at 6 m/s at most)
+  else if(S==='route'){a.y=ga+305;a.v=180*KT;}
+  else{a.y=ga+305;a.v=140*KT;if(MISS.dropped&&tqD(d.c.x,d.c.z)<600)a.trk=Math.atan2(d.f.x,-d.f.z);}
 }
 // (results cards) flies exactly the same start: a free flight / segment / mission start keeps its spawn
 // (final1 is not final), base and aircraft; an arcade game, lesson or dogfight goes back through its own
