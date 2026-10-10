@@ -20,6 +20,8 @@ def arg(name, default=None):
     return sys.argv[sys.argv.index(name) + 1] if name in sys.argv and sys.argv.index(name) + 1 < len(sys.argv) else default
 
 # event: (menu screen, the button tapped to start it, js run first)
+# school1: the school list scrolls (fifteen lessons), so bring the row into view before the tap
+SCROLL = "document.querySelector('#school .lrow[data-l=%s]').scrollIntoView({block:'nearest'})"
 EVENTS = {
     'free_runway':    ('sFly', '#bGo', f"{K}.pickPos('runway')"),
     'free_final1':    ('sFly', '#bGo', f"{K}.pickPos('final1')"),
@@ -27,12 +29,12 @@ EVENTS = {
     'short':          ('sArc', '#arcCards .mcard[data-m=short]', ''),
     'drop':           ('sArc', '#arcCards .mcard[data-m=drop]', ''),
     'range':          ('sArc', '#arcCards .mcard[data-m=range]', ''),
-    'lesson_first':   ('sSchool', '#school .lrow[data-l=first]', ''),
-    'lesson_steep':   ('sSchool', '#school .lrow[data-l=steep]', ''),
-    'lesson_slow':    ('sSchool', '#school .lrow[data-l=slow]', ''),
-    'lesson_stall':   ('sSchool', '#school .lrow[data-l=stall]', ''),
-    'lesson_engine':  ('sSchool', '#school .lrow[data-l=engine]', ''),
-    'lesson_pattern': ('sSchool', '#school .lrow[data-l=pattern]', ''),
+    'lesson_first':   ('sSchool', '#school .lrow[data-l=first]', SCROLL % 'first'),
+    'lesson_steep':   ('sSchool', '#school .lrow[data-l=steep]', SCROLL % 'steep'),
+    'lesson_slow':    ('sSchool', '#school .lrow[data-l=slow]', SCROLL % 'slow'),
+    'lesson_stall':   ('sSchool', '#school .lrow[data-l=stall]', SCROLL % 'stall'),
+    'lesson_engine':  ('sSchool', '#school .lrow[data-l=engine]', SCROLL % 'engine'),
+    'lesson_pattern': ('sSchool', '#school .lrow[data-l=pattern]', SCROLL % 'pattern'),
     # the in-flight ways back in: RETRY on the crash card, Restart on the pause sheet (#pApply, it reads Restart until a pick changes), Retry on a lesson grade
     'crash_retry':    (None, '#cRetry', 'crash'),
     'pause_restart':  (None, '#pApply', 'pause'),

@@ -1142,7 +1142,10 @@ body.photoOn #uiroot, body.photoOn #badges, body.photoOn #sixpack, body.photoOn 
 .sc.soon{ color:var(--orange); letter-spacing:.08em; text-transform:uppercase; font-size:11px; }
 .schAc{ flex:none; } #menu .schAc .chip{ min-height:44px; padding:0 12px; } #menu .schAc .chip b{ font-size:14px; }
 /* the lessons: one learning path, finished ones ticked, the next one lit */
-.lessons{ flex:1; min-height:0; display:grid; grid-template-columns:1fr 1fr; grid-auto-rows:1fr; gap:8px; max-height:300px; align-self:stretch; margin:auto 0; }
+.lessons{ flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); grid-auto-rows:min-content; gap:8px; align-content:start; align-self:stretch; padding:3px; margin:-3px; overflow-y:auto; touch-action:pan-y; overscroll-behavior:contain; }
+#sSchool{ overscroll-behavior:contain; }
+.lessons .lcap{ grid-column:1/-1; margin:2px 2px -2px; font-size:12px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; white-space:pre; color:var(--brown); }
+#menu .lrow.soon{ opacity:.5; cursor:default; padding-right:12px; } .lrow .soonTag{ flex:none; font-style:normal; font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--brown); }
 #menu .lrow{ display:flex; align-items:center; gap:10px; text-align:left; padding:6px 12px; background:rgba(42,22,8,.1); color:var(--night); border:2px solid rgba(42,22,8,.16); border-radius:14px; min-height:48px; }
 .lrow .ln{ flex:none; width:30px; height:30px; border-radius:50%; display:grid; place-items:center; font-weight:900; font-size:15px; background:rgba(42,22,8,.14); }
 .lrow .lt{ flex:1; min-width:0; display:flex; flex-direction:column; }
@@ -1390,7 +1393,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   .frows .frow:not(.starts) .grp{ flex:1 1 100%; }
   #misCards, #arcCards, .cards{ grid-template-columns:1fr; align-content:start; overflow-y:auto; touch-action:pan-y; }
   #misCards .mcard[data-m=daily]{ grid-column:auto; }
-  .lessons{ grid-template-columns:1fr; grid-auto-rows:min-content; max-height:none; align-content:start; margin:0; overflow-y:auto; touch-action:pan-y; }
+  .lessons{ grid-template-columns:minmax(0,1fr); grid-auto-rows:min-content; max-height:none; align-content:start; margin:0 -3px; overflow-y:auto; touch-action:pan-y; }
   .setGrid{ grid-template-columns:1fr; gap:2px; align-content:start; overflow-y:auto; touch-action:pan-y; }
   .setCol{ display:contents; }
   .setFoot{ flex-wrap:wrap; justify-content:flex-start; }
@@ -14038,13 +14041,151 @@ easyUI();stickUI();radioUI();soundUI();musicUI();
 // ================= Flight school: graded checkride maneuvers for the C172 and the Alpha =================
 const SCH={cessna:{turn:95,slow:55,glide:68,thrTurn:0.79,thrSlow:0.53,cruise:100,thrCruise:0.89},
            alpha:{turn:85,slow:47,glide:69,thrTurn:0.45,thrSlow:0.36,cruise:95,thrCruise:0.59}};
-const LESSONS=[
-  {id:'first',name:'First flight',desc:'60 seconds: take off, one turn, land'},
-  {id:'steep',name:'Steep turns',desc:'45 degree bank, full 360, hold altitude'},
-  {id:'slow',name:'Slow flight',desc:'Just above the stall for 45 seconds'},
-  {id:'stall',name:'Power off stall',desc:'Stall it, recover with the least altitude lost'},
-  {id:'engine',name:'Engine failure',desc:'Best glide, land on the runway'},
-  {id:'pattern',name:'Pattern and touch and go',desc:'Fly the circuit, land in the zone'}];
+// ---- the curriculum (school1): one data structure, stages of lessons. Each lesson has three briefing cards, one quiz
+// question, the gradeable tasks (weights sum to 100, tol a number or a key into SCHOOL.tol), its logbook credit when
+// passed, and fly, the flight itself (start, tick, event; attached below from LESFLY). A lesson with no fly yet is soon:
+// listed, dimmed, not startable. server: the Worker knows that lesson: board; the others will rank on the device only
+const SCHOOL={
+  cfi:{name:'Dana Reyes',title:'CFI',short:'Dana'},
+  // Private Pilot ACS tolerances, the Hard values; item 4's Easy toggle doubles them
+  tol:{alt:100,hdg:10,spd:10,bank:5,roll:10,slowUp:10,slowDn:0,landNorm:400,landShort:200,instAlt:200,instHdg:20,instSpd:10},
+  stages:[
+  {id:'s1',n:1,name:'Pre solo',lessons:[
+    {id:'first',name:'First flight',sub:'60 seconds: take off, one turn, land',min:1,server:true,
+      cards:[{h:'The four fundamentals',b:'Every flight is built from four things: straight and level, climbs, descents and turns. Learn these and every later maneuver is just a mix of them.'},
+        {h:'Stick and throttle',b:'Slide the throttle on the right edge up for power. Pull the stick toward you to raise the nose and climb, push it away to descend, push it sideways to bank and turn.'},
+        {h:'Your first landing',b:'A landing is just a descent that ends on the runway. On this first one the plane flares and lands for you. Keep your moves small.'}],
+      quiz:{q:'Which of these is not one of the four fundamentals?',a:['Straight and level','Climbs and descents','Turns','Spins'],ok:3,why:'The four fundamentals are straight and level, climbs, descents and turns. A spin is something you learn to avoid and recover from.'},
+      tasks:[{id:'to',name:'Took off',w:25,kind:'event'},{id:'turn',name:'One turn, wings levelled',w:25,kind:'event'},
+        {id:'fpm',name:'Touchdown under 300 fpm',w:25,kind:'range',tol:300,unit:'fpm'},{id:'rwy',name:'Landed on the runway',w:25,kind:'event'}],
+      log:{dual:0.5,ldg:1}},
+    {id:'climbs',name:'Climbs, descents and turns',sub:'Climb at Vy, level off, descend, turn to a heading',min:6,
+      cards:[{h:'Climb at Vy, 74 kt',b:'Vy is the best rate of climb speed: the most height in the least time. Full power, then set the nose so the airspeed sits on 74 kt. In the climb, pitch controls the speed.'},
+        {h:'Level off, then descend',b:'Start lowering the nose about 50 ft before the altitude you want, so you do not overshoot. To descend, reduce power and let the nose drop to about 500 feet a minute.'},
+        {h:'Medium bank turns',b:'Bank 20 to 30 degrees and add a little back pressure to hold altitude. Start the rollout about half your bank angle, in degrees, before the heading you want.'}],
+      quiz:{q:'Climbing at Vy with full power, what controls your airspeed?',a:['Pitch, the nose attitude','The throttle','The rudder','The flaps'],ok:0,why:'With full power set, raising the nose slows you and lowering it speeds you up. Pitch sets the speed in a climb.'},
+      tasks:[{id:'vy',name:'Climb at Vy, 74 kt',w:30,kind:'hold',tol:'spd',unit:'kt'},{id:'lvl',name:'Level off at 3,500 ft',w:20,kind:'range',tol:'alt',unit:'ft'},
+        {id:'desc',name:'Descend at 500 fpm to 3,000 ft',w:20,kind:'range',tol:'alt',unit:'ft'},{id:'turn',name:'Medium bank turn to a heading',w:30,kind:'range',tol:'hdg',unit:'deg'}],
+      log:{dual:1.0}},
+    {id:'pattern',name:'Pattern and touch and go',sub:'Fly the circuit, land in the zone',min:6,server:true,note:'The game flies final at 65 kt; the POH normal approach is 60 to 70 kt.',
+      cards:[{h:'The traffic pattern',b:'A rectangle flown 1,000 ft above the field, 2,100 ft at Glendale: upwind, crosswind, downwind, base and final, then you land on runway 1.'},
+        {h:'Talking to the tower',b:'On 121.0: "Glendale Tower, Skyhawk 8401L, ready for departure runway 1, closed traffic." The tower answers "runway 1, cleared for takeoff". Read that back.'},
+        {h:'The touch and go',b:'Land on the numbers at 65 kt on the centerline, then flaps up a notch and full power to take off again without stopping. Many landings in one flight.'}],
+      quiz:{q:'At Glendale, what altitude do you fly on downwind?',a:['1,071 ft MSL','2,100 ft MSL','3,500 ft MSL','700 ft above the field'],ok:1,why:'Pattern altitude is about 1,000 ft above the field. Glendale sits at 1,071 ft, so downwind is 2,100 ft MSL.'},
+      tasks:[{id:'dw',name:'Downwind altitude held',w:25,kind:'hold',tol:'alt',unit:'ft'},{id:'zone',name:'Touchdown in the zone',w:20,kind:'range',tol:600,min:60,unit:'m'},
+        {id:'fpm',name:'Touchdown under 300 fpm',w:25,kind:'range',tol:300,unit:'fpm'},{id:'cl',name:'On the centerline',w:15,kind:'range',tol:6,unit:'m'},
+        {id:'vapp',name:'Final approach speed',w:15,kind:'range',tol:'spd',unit:'kt'}],
+      log:{dual:1.0,ldg:1}},
+    {id:'slow',name:'Slow flight',sub:'Just above the stall for 45 seconds',min:3,server:true,note:'The game flies slow flight at 55 kt. In the real 172 it is nearer 50 kt, just above the stall; the game wing stalls a little later.',
+      cards:[{h:'What slow flight is',b:'Flying just above the stall, with full flaps, the nose high and plenty of power. The controls feel soft and slow to answer. It shows you how the plane behaves near the edge.'},
+        {h:'Power for altitude',b:'It works the other way round from cruise: the nose holds the airspeed at 55 kt and the power holds the altitude. Sinking? Add power. Climbing? Take some off.'},
+        {h:'Hold it steady',b:'Hold heading north and 3,500 ft for 45 seconds without letting it stall. Near the stall the nose likes to wander, so use small, smooth moves.'}],
+      quiz:{q:'In slow flight you start to sink. What do you do first?',a:['Add power','Pull the nose up','Raise the flaps','Push the nose down'],ok:0,why:'Pulling up near the stall slows you further and can stall the wing. In slow flight, power is what holds the altitude.'},
+      tasks:[{id:'alt',name:'Altitude within 100 ft',w:35,kind:'hold',tol:'alt',unit:'ft'},{id:'spd',name:'Airspeed on target',w:35,kind:'hold',tol:5,unit:'kt'},
+        {id:'hdg',name:'Heading within 10 degrees',w:20,kind:'hold',tol:'hdg',unit:'deg'},{id:'nostall',name:'No stall',w:10,kind:'event'}],
+      log:{dual:1.0}},
+    {id:'stall',name:'Power off stall',sub:'Stall it, recover with the least altitude lost',min:3,server:true,
+      cards:[{h:'What a stall is',b:'The wing passes its critical angle of attack, the angle it meets the air at: the air stops flowing smoothly over it and lift falls away. Most stalls happen slow and nose high.'},
+        {h:'The power off stall',b:'Power at idle, as on approach. Hold altitude by easing the nose up until the warning horn, the buffet and the nose dropping tell you it has stalled.'},
+        {h:'The recovery',b:'Nose down first to lower the angle of attack, then full power, wings level, and climb away at Vy, 74 kt. Pulling up too soon stalls it again: a secondary stall.'}],
+      quiz:{q:'What is the first step to recover from a stall?',a:['Lower the nose','Add full power','Level the wings','Raise the flaps'],ok:0,why:'The wing stalls because its angle of attack is too high. Lowering the nose brings it back so the wing flies again; power and wings level follow.'},
+      tasks:[{id:'loss',name:'Altitude lost under 150 ft',w:50,kind:'range',tol:150,unit:'ft'},{id:'pwr',name:'Full power within 2 s',w:20,kind:'event',tol:2,unit:'s'},
+        {id:'wings',name:'Wings within 20 degrees',w:20,kind:'range',tol:20,unit:'deg'},{id:'sec',name:'No secondary stall',w:10,kind:'event'}],
+      log:{dual:1.0}},
+    {id:'ground',name:'Ground reference',sub:'Rectangular course, S turns, turns around a point',min:8,
+      cards:[{h:'Why fly over the ground',b:'Wind drifts the plane across the ground. These maneuvers teach you to see the drift and correct for it, which is just what you do in the traffic pattern.'},
+        {h:'Bank more downwind',b:'With the wind behind you your groundspeed, the speed over the ground, is highest, so bank steepest there and shallowest heading into the wind. The path stays even.'},
+        {h:'Height and speed',b:'Fly 600 to 1,000 ft above the ground at about 100 kt and hold altitude within 100 ft. Pick a road, a field edge or a lone tree and keep your eyes outside.'}],
+      quiz:{q:'Turning around a point, where is your bank steepest?',a:['Heading straight downwind','Heading straight into the wind','On the crosswind sides','The same all the way round'],ok:0,why:'With the wind behind you the groundspeed is highest, so you need the steepest bank to keep the same distance from the point.'},
+      tasks:[{id:'alt',name:'Altitude within 100 ft',w:30,kind:'hold',tol:'alt',unit:'ft'},{id:'spd',name:'Airspeed within 10 kt',w:20,kind:'hold',tol:'spd',unit:'kt'},
+        {id:'rect',name:'Rectangular course flown',w:15,kind:'event'},{id:'sturn',name:'S turns even on both sides',w:15,kind:'event'},
+        {id:'point',name:'Even radius around the point',w:20,kind:'range',tol:150,unit:'m'}],
+      log:{dual:1.0}},
+    {id:'landings',name:'Takeoffs and landings',sub:'Normal takeoffs and landings, and a go around',min:10,note:'The game flies final at 65 kt with full flaps; the POH normal approach is 60 to 70 kt.',
+      cards:[{h:'The normal takeoff',b:'Full power, keep the centerline, and at 55 kt ease the nose up and let it fly off. Then climb at Vy, 74 kt.'},
+        {h:'The stable approach',b:'Final at 65 kt, full flaps, a steady descent toward your aiming point. Touch down within 400 ft past it. Not stable by 300 ft above the ground? Go around.'},
+        {h:'The go around',b:'Full power, nose up to stop the descent, then flaps up in steps as you climb. It is a normal, safe choice, never a failure. The tower may also tell you to go around.'}],
+      quiz:{q:'On short final you are too high and too fast. What is best?',a:['Go around','Push the nose down hard','Land long anyway','Cut the power and pull up'],ok:0,why:'An unstable approach is fixed by going around and trying again. Forcing it onto the runway is how landing accidents happen.'},
+      tasks:[{id:'tdz',name:'Touchdown within 400 ft of the point',w:30,kind:'range',tol:'landNorm',unit:'ft'},{id:'fpm',name:'Touchdown under 300 fpm',w:20,kind:'range',tol:300,unit:'fpm'},
+        {id:'cl',name:'On the centerline',w:15,kind:'range',tol:6,unit:'m'},{id:'vapp',name:'Approach speed held',w:15,kind:'hold',tol:'spd',unit:'kt'},
+        {id:'ga',name:'Went around on command',w:20,kind:'event'}],
+      log:{dual:1.0,ldg:2}},
+    {id:'engine',name:'Engine failure',sub:'Best glide, land on the runway',min:4,server:true,
+      cards:[{h:'A: Airspeed, best glide',b:'Pitch for best glide, 68 kt, at once. It carries you the farthest for the height you have. Hold it there.'},
+        {h:'B: Best field',b:'Pick the best place to land within gliding reach: a runway first, then a long flat field, into the wind if you can. Turn toward it right away.'},
+        {h:'C and D: Checklist, Declare',b:'Checklist: fuel on, mixture rich, magnetos on both, primer in and locked, then try a restart. Declare: call the tower, or 121.5, the emergency frequency.'}],
+      quiz:{q:'The engine quits. What comes first?',a:['Pitch for best glide, 68 kt','Call Mayday on 121.5','Try to restart it','Look for a field'],ok:0,why:'Airspeed first: every second at the wrong speed costs height you cannot get back. Then the field, the checklist and the radio call.'},
+      tasks:[{id:'rwy',name:'Made the runway',w:25,kind:'event'},{id:'glide',name:'Held best glide, 68 kt',w:30,kind:'hold',tol:5,unit:'kt'},
+        {id:'fpm',name:'Touchdown under 300 fpm',w:30,kind:'range',tol:300,unit:'fpm'},{id:'cl',name:'On the centerline',w:15,kind:'range',tol:6,unit:'m'}],
+      log:{dual:1.0}},
+    {id:'solo',name:'Stage check and first solo',sub:'Three full stop landings, no help from Dana',min:15,endorse:'solo',
+      cards:[{h:'The stage check',b:'Dana flies with you to check you are safe on your own: a pattern, a go around and landings with no coaching. She stays quiet unless something is unsafe.'},
+        {h:'Your solo endorsement',b:'Pass and she signs your logbook. A student pilot needs that endorsement from a CFI, a certified flight instructor, before flying alone.'},
+        {h:'Three full stop landings',b:'Alone in the plane, fly three patterns, each to a full stop on runway 1. Without her weight the plane climbs faster and floats a little longer.'}],
+      quiz:{q:'Who signs your solo endorsement?',a:['Your flight instructor','The control tower','The airport manager','You sign it yourself'],ok:0,why:'A student pilot may fly solo only with a logbook endorsement from an authorized flight instructor, after the training and a check.'},
+      tasks:[{id:'dw',name:'Pattern altitude held',w:25,kind:'hold',tol:'alt',unit:'ft'},{id:'three',name:'Three full stop landings',w:30,kind:'event'},
+        {id:'fpm',name:'Touchdowns under 300 fpm',w:20,kind:'range',tol:300,unit:'fpm'},{id:'tdz',name:'Touchdowns within 400 ft of the point',w:15,kind:'range',tol:'landNorm',unit:'ft'},
+        {id:'cl',name:'On the centerline',w:10,kind:'range',tol:6,unit:'m'}],
+      log:{dual:0.5,solo:0.5,ldg:3}}]},
+  {id:'s2',n:2,name:'Precision',lessons:[
+    {id:'steep',name:'Steep turns',sub:'45 degree bank, full 360, hold altitude',min:4,server:true,
+      cards:[{h:'Steep turns',b:'A full 360 degree turn at 45 degrees of bank, entered at 95 kt. It builds smooth control and shows you how a steep bank changes the way the plane flies.'},
+        {h:'Hold the altitude',b:'Banked steeply, part of the lift pulls you round the turn instead of up, so you need more back pressure and a little power to stay level. Watch the horizon on the nose.'},
+        {h:'The rollout',b:'Start rolling out about 20 degrees before your entry heading, half the bank. Standard: altitude within 100 ft, bank 45 plus or minus 5, speed within 10 kt.'}],
+      quiz:{q:'In a 45 degree bank, what holds your altitude?',a:['More back pressure','Less power','Pushing forward','More bank'],ok:0,why:'Banked, part of the lift pulls you round the turn instead of up. Extra back pressure, plus a little power, makes up for it.'},
+      tasks:[{id:'alt',name:'Altitude within 100 ft',w:35,kind:'hold',tol:'alt',unit:'ft'},{id:'bank',name:'Bank held at 45 degrees',w:30,kind:'hold',tol:'bank',unit:'deg'},
+        {id:'spd',name:'Airspeed within 10 kt',w:15,kind:'hold',tol:'spd',unit:'kt'},{id:'roll',name:'Rollout on the entry heading',w:20,kind:'range',tol:'roll',unit:'deg'}],
+      log:{dual:1.0}},
+    {id:'short',name:'Short field',sub:'Climb at Vx, land within 200 ft of the point',min:10,note:'Vx 62 kt is the POH figure; the game has no Vx of its own. The POH short field approach is 61 kt; the game lands at 65 kt.',
+      cards:[{h:'Short field takeoff',b:'Flaps 10, hold the brakes, full power, then go. Rotate at 55 kt and climb at Vx, 62 kt, the best angle: the most height for the distance, to clear trees at the end.'},
+        {h:'Short field approach',b:'Full flaps and a slower, steeper final. The POH says 61 kt; the game holds 65. Power controls the glide path, so you arrive at the point with little float.'},
+        {h:'Land on the point',b:'Touch down within 200 ft past your aiming point, then brakes, flaps up, and stop as short as is safe. That 200 ft is the checkride standard.'}],
+      quiz:{q:'Which speed gives the most height for the distance?',a:['Vx, 62 kt','Vy, 74 kt','Cruise, 100 kt','Best glide, 68 kt'],ok:0,why:'Vx is the best angle of climb speed: the most height per distance over the ground. Vy gives the most height per minute.'},
+      tasks:[{id:'vx',name:'Climb at Vx, 62 kt',w:25,kind:'hold',tol:'spd',unit:'kt'},{id:'tdz',name:'Touchdown within 200 ft of the point',w:35,kind:'range',tol:'landShort',unit:'ft'},
+        {id:'fpm',name:'Touchdown under 300 fpm',w:15,kind:'range',tol:300,unit:'fpm'},{id:'vapp',name:'Approach speed held',w:15,kind:'hold',tol:'spd',unit:'kt'},
+        {id:'cl',name:'On the centerline',w:10,kind:'range',tol:6,unit:'m'}],
+      log:{dual:1.0,ldg:2}},
+    {id:'soft',name:'Soft field',sub:'Keep the weight off the nosewheel on grass',min:10,
+      cards:[{h:'Why soft fields differ',b:'Grass, sand or mud grabs the wheels and can dig the nosewheel in. Keep moving, and keep the nose light the whole time you are on the ground.'},
+        {h:'Soft field takeoff',b:'Flaps 10, stick held back as you roll. It lifts off early in ground effect, extra lift near the surface. Stay low until 74 kt, Vy, then climb.'},
+        {h:'Soft field landing',b:'Touch down as slowly and gently as you can, with a little power, holding the nose up. Let the nosewheel down softly and do not brake.'}],
+      quiz:{q:'Soft field takeoff: just after liftoff, what do you do?',a:['Stay just above the ground to gain speed','Climb steeply at once','Raise the flaps at once','Pull the power back'],ok:0,why:'It lifts off below a safe climb speed, held up by ground effect. Stay low until you reach Vy, then climb.'},
+      tasks:[{id:'nose',name:'Nose held up on the takeoff roll',w:20,kind:'event'},{id:'low',name:'Accelerated in ground effect',w:20,kind:'event'},
+        {id:'fpm',name:'Touchdown under 150 fpm',w:30,kind:'range',tol:150,unit:'fpm'},{id:'cl',name:'On the centerline',w:15,kind:'range',tol:6,unit:'m'},
+        {id:'nobrk',name:'No braking after touchdown',w:15,kind:'event'}],
+      log:{dual:1.0,ldg:2}},
+    {id:'xwind',name:'Crosswind landings',sub:'Land in a crosswind, then a forward slip',min:10,
+      cards:[{h:'Crab, then wing low',b:'The wind drifts you sideways on final. Point the nose into it, a crab, to track the centerline. Just before touchdown, lower the upwind wing and line the nose up.'},
+        {h:'Upwind wheel first',b:'In a crosswind the upwind main wheel touches first, then the other. Keep the stick into the wind as you slow down, more and more of it.'},
+        {h:'The forward slip',b:'Too high? Cross the controls: bank one way, rudder the other. The plane flies a little sideways and sinks fast without speeding up. Straighten it before the flare.'}],
+      quiz:{q:'In a crosswind landing, which wing is held low?',a:['The upwind wing, into the wind','The downwind wing','Neither, wings level','Whichever is easier'],ok:0,why:'Lowering the upwind wing stops the sideways drift; rudder keeps the nose pointing straight down the runway.'},
+      tasks:[{id:'track',name:'Tracked the centerline on final',w:25,kind:'hold',tol:10,unit:'m'},{id:'slip',name:'Forward slip to lose height',w:20,kind:'event'},
+        {id:'drift',name:'No sideways drift at touchdown',w:20,kind:'event'},{id:'fpm',name:'Touchdown under 300 fpm',w:15,kind:'range',tol:300,unit:'fpm'},
+        {id:'cl',name:'On the centerline',w:20,kind:'range',tol:6,unit:'m'}],
+      log:{dual:1.0,ldg:2}},
+    {id:'emerg',name:'Emergency descent',sub:'Get down fast, then a forced landing to a field',min:8,
+      cards:[{h:'The emergency descent',b:'For a fire or a sick passenger: power to idle, bank 30 to 45 degrees and lower the nose. Stay under 163 kt, Vne, the never exceed speed, and roll out to level off.'},
+        {h:'Forced landing to a field',b:'With no engine, fly the ABCD flow: best glide 68 kt, a field, the checklist, declare. Arrive a little high over the field, then use flaps to come down on its first third.'},
+        {h:'Flaps once you make it',b:'Lower the flaps only once you are sure to reach the field: they cost glide distance. Below 85 kt, Vfe, the flap limit speed, they are safe to use.'}],
+      quiz:{q:'Clean, in an emergency descent, what limits your speed?',a:['Vne, 163 kt','Best glide, 68 kt','Vy, 74 kt','Vfe, 85 kt'],ok:0,why:'With the flaps up you may descend right up to the never exceed speed, 163 kt. With the flaps out the limit drops to Vfe, 85 kt.'},
+      tasks:[{id:'idle',name:'Idle and banked within 5 s',w:15,kind:'event',tol:5,unit:'s'},{id:'vne',name:'Stayed below Vne, 163 kt',w:20,kind:'event'},
+        {id:'lvl',name:'Levelled off within 100 ft',w:15,kind:'range',tol:'alt',unit:'ft'},{id:'glide',name:'Best glide held, 68 kt',w:20,kind:'hold',tol:'spd',unit:'kt'},
+        {id:'field',name:'Landed in the field',w:30,kind:'event'}],
+      log:{dual:1.0}},
+    {id:'hood',name:'Under the hood',sub:'Fly on instruments, recover from unusual attitudes',min:10,
+      cards:[{h:'Why fly by instruments',b:'In cloud or haze you cannot see the horizon, and your inner ear will lie about which way is up. The instruments do not. A hood blocks your view outside.'},
+        {h:'The attitude indicator',b:'The attitude indicator, the artificial horizon, is the centre of your scan. Glance to altitude, heading and airspeed, then back to it. Small corrections only.'},
+        {h:'Unusual attitudes',b:'Nose low and fast: power idle, wings level, then raise the nose. Nose high and slow: full power, nose down, then wings level. Hold 200 ft, 20 degrees, 10 kt.'}],
+      quiz:{q:'Nose low and the speed building fast. What comes first?',a:['Power to idle','Pull back hard','Add full power','Bank toward the horizon'],ok:0,why:'Take the power off first so the speed stops building, then level the wings before raising the nose, so you do not overstress the wing.'},
+      tasks:[{id:'alt',name:'Altitude within 200 ft',w:25,kind:'hold',tol:'instAlt',unit:'ft'},{id:'hdg',name:'Heading within 20 degrees',w:25,kind:'hold',tol:'instHdg',unit:'deg'},
+        {id:'spd',name:'Airspeed within 10 kt',w:20,kind:'hold',tol:'instSpd',unit:'kt'},{id:'low',name:'Nose low recovery',w:15,kind:'event'},
+        {id:'high',name:'Nose high recovery',w:15,kind:'event'}],
+      log:{dual:1.0,inst:1.0}}]},
+  {id:'s3',n:3,name:'Cross country',soon:true,lessons:[{id:'xc1',name:'Pilotage and dead reckoning'},{id:'xc2',name:'Diversion and lost procedures'},{id:'xc3',name:'Night flying'},{id:'xc4',name:'Solo cross country'}]},
+  {id:'s4',n:4,name:'Checkride prep',soon:true,lessons:[{id:'cr1',name:'Maneuvers review'},{id:'cr2',name:'Emergency review'},{id:'cr3',name:'Mock checkride'}]}]};
+const LESSONS=SCHOOL.stages.flatMap(s=>s.lessons);   // every lesson in order, soon ones too (the Boards code walks this)
+const LES_BY={};SCHOOL.stages.forEach(s=>s.lessons.forEach(l=>{l.stage=s.id;LES_BY[l.id]=l;}));
+const lessonDef=id=>LES_BY[id]||null,stageOf=id=>{const l=LES_BY[id];return l?SCHOOL.stages.find(s=>s.id===l.stage):null;},tolOf=k=>typeof k==='number'?k:SCHOOL.tol[k];
 const LES={on:null,t:0,ph:0,d:{}};let schoolBest={};try{schoolBest=JSON.parse(localStorage.getItem('kgeuSchool')||'{}');}catch(e){}
 const lesEl=document.getElementById('lesson'),lesT=document.getElementById('lesT'),lesI=document.getElementById('lesI'),lesM=document.getElementById('lesM'),gradeOv=document.getElementById('gradeOv');
 const _le=new THREE.Euler(0,0,0,'YXZ');
@@ -14061,42 +14202,37 @@ function airStart(u,v,altFt,hdg,kt,flap,thr){
 let schoolAc='cessna';try{if(localStorage.getItem('kgeuSchoolAc')==='alpha')schoolAc='alpha';}catch(e){}
 function lessonGrade(id){return schoolBest[(id==='first'?'cessna':schoolAc)+':'+id];}
 function lessonDone(id){const g=lessonGrade(id);return !!g&&g!=='F';}
-function nextLesson(after){const i0=after?LESSONS.findIndex(l=>l.id===after)+1:0;
-  for(let i=i0;i<LESSONS.length;i++)if(!lessonDone(LESSONS[i].id))return LESSONS[i];
-  return after&&i0<LESSONS.length?LESSONS[i0]:(LESSONS.find(l=>!lessonDone(l.id))||null);}
+function nextLesson(after){const i0=after?LES_FLY.findIndex(l=>l.id===after)+1:0;
+  for(let i=i0;i<LES_FLY.length;i++)if(!lessonDone(LES_FLY[i].id))return LES_FLY[i];
+  return after&&i0<LES_FLY.length?LES_FLY[i0]:(LES_FLY.find(l=>!lessonDone(l.id))||null);}
 function schoolList(){
   const el=document.getElementById('school');el.innerHTML='';
   document.querySelectorAll('[data-sch]').forEach(b=>b.classList.toggle('sel',b.dataset.sch===schoolAc));
   const nx=nextLesson();
-  const nd=LESSONS.filter(l=>lessonDone(l.id)).length;$('schProg').textContent=nd+' of '+LESSONS.length+' done';
-  LESSONS.forEach((l,i)=>{const b=document.createElement('button');const g=lessonGrade(l.id),done=lessonDone(l.id);
+  const nd=LES_FLY.filter(l=>lessonDone(l.id)).length;$('schProg').textContent=nd+' of '+LES_FLY.length+' done';
+  SCHOOL.stages.filter(s=>!s.soon).forEach(s=>{const c=document.createElement('div');c.className='lcap';c.textContent='Stage '+s.n+'  '+s.name;el.appendChild(c);
+   s.lessons.forEach((l,i)=>{const b=document.createElement('button');const g=lessonGrade(l.id),done=lessonDone(l.id);
+    if(l.soon){b.className='lrow soon';b.dataset.l=l.id;b.setAttribute('aria-disabled','true');   // no flight yet: dimmed, no tap
+      b.innerHTML='<span class="ln">'+(i+1)+'</span><div class="lt"><b></b><span></span></div><i class="soonTag">Coming soon</i>';
+      b.querySelector('b').textContent=l.name;b.querySelector('.lt span').textContent=l.sub;b.setAttribute('aria-label',l.name+', coming soon');el.appendChild(b);return;}
     b.className='lrow'+(done?' done':'')+(nx&&nx.id===l.id?' next':'');b.dataset.l=l.id;
-    b.innerHTML='<span class="ln">'+(done?'\u2713':i+1)+'</span><div class="lt"><b></b><span></span></div><span class="lg">'+(g&&g!=='F'?g:'')+'<i class="go1">START</i></span>'+troHTML('lesson:'+l.id);
-    b.querySelector('b').textContent=l.name;b.querySelector('.lt span').textContent=l.desc;
+    b.innerHTML='<span class="ln">'+(done?'\u2713':i+1)+'</span><div class="lt"><b></b><span></span></div><span class="lg">'+(g&&g!=='F'?g:'')+'<i class="go1">START</i></span>'+(l.server?troHTML('lesson:'+l.id):'');
+    b.querySelector('b').textContent=l.name;b.querySelector('.lt span').textContent=l.sub;
     if(!REGION.az){const t=document.createElement('i');t.className='azTag';t.textContent='ARIZONA';b.appendChild(t);}   // flight school is at Glendale
     b.setAttribute('aria-label',l.name+(done?', finished':'')+(nx&&nx.id===l.id?', next lesson':''));
-    b.onclick=()=>startLesson(l.id);b.querySelector('.tro').addEventListener('click',e=>{e.stopPropagation();e.preventDefault();if(LB)LB.lbOpen('lesson:'+l.id);});el.appendChild(b);});
+    b.onclick=()=>startLesson(l.id);const tr=b.querySelector('.tro');if(tr)tr.addEventListener('click',e=>{e.stopPropagation();e.preventDefault();if(LB)LB.lbOpen('lesson:'+l.id);});el.appendChild(b);});});
 }
 function startHereUI(){let sk=false;try{sk=!!localStorage.getItem('kgeuTut');}catch(e){}$('startHere').classList.toggle('on',rookie()&&!lessonDone('first')&&!sk);}
 document.querySelectorAll('[data-sch]').forEach(b=>b.onclick=()=>{schoolAc=b.dataset.sch;try{localStorage.setItem('kgeuSchoolAc',schoolAc);}catch(e){}schoolList();});
 function startLesson(id){
+  const L=lessonDef(id);if(!L||!L.fly)return;   // a lesson still to come has no flight yet
   if(!REGION.az){pickRegion('az',{resume:{lesson:id,tod:TOD.id}});return;}   // flight school is at Glendale
   if(id==='first')pickType('cessna',1);else if(acType!==schoolAc)pickType(schoolAc,1);
   const S=SCH[acType];gradeOv.classList.remove('on');
-  start(id==='pattern'||id==='first'?'runway':'final','kgeu');A.land=1;
+  start(L.fly.at||'final','kgeu');A.land=1;
   lesEl.classList.toggle('tut',id==='first');$('lesQuit').textContent=id==='first'?'Skip':'End';
-  RUNSTART={k:'les',id:id};LES.on=id;LES.t=0;LES.ph=0;LES.d={};LES.name=LESSONS.find(l=>l.id===id).name;if(LB)LB.runStart('lesson:'+id);lesT.textContent=id==='first'?'Lesson 1: First flight':'Flight school: '+LES.name;lesEl.classList.add('on');
-  st.ezManFlap=id!=='pattern'&&id!=='engine'&&id!=='first'?1:0;
-  if(id==='first'){st.easy=true;st.noPF=true;coach2('Your first flight. Follow the arrows. It takes about a minute.');return;}
-  if(id==='steep'){airStart(7000,2500,3500,360,S.turn,0,S.thrTurn);st.bankMax=0.95;
-    coach2('Steep turns. Roll into a 45 degree bank, left or right, and hold 3,500 feet all the way around.');}
-  else if(id==='slow'){airStart(7000,2500,3500,360,S.slow+8,FLAPS.length-1,S.thrSlow);st.noProt=1;
-    coach2('Slow flight. Full flaps. Slow to '+S.slow+' knots and hold 3,500 feet, heading north. Use power for altitude.');}
-  else if(id==='stall'){airStart(7000,2500,3500,360,S.slow+14,FLAPS.length-1,0);st.noProt=1;
-    coach2('Power off stall. Power is at idle. Hold altitude and keep easing back until it breaks. Then nose down, full power, wings level.');}
-  else if(id==='engine'){airStart(THR01-4500,2500,3571,10,S.cruise,0,S.thrCruise);
-    coach2('Cruising at 2,500 above the ground. Stand by.');}
-  else coach2('Pattern work. Take off, climb to 700 above the ground, then fly the circuit at 2,100 feet and bring it back to runway 1.','Pattern work. Take off, climb to seven hundred above the ground, then fly the circuit at two thousand one hundred feet, and bring it back to runway one.');
+  RUNSTART={k:'les',id:id};LES.on=id;LES.t=0;LES.ph=0;LES.d={};LES.name=L.name;if(LB)LB.runStart('lesson:'+id);lesT.textContent=id==='first'?'Lesson 1: First flight':'Flight school: '+LES.name;lesEl.classList.add('on');
+  st.ezManFlap=0;L.fly.start(S,LES.d);
 }
 function lesEnd(){LES.on=null;lesEl.classList.remove('on','tut');tutArrow.classList.remove('on');if(st){st.noProt=0;st.bankMax=0;st.easy=easy;}}
 const GR=[[90,'A'],[80,'B'],[70,'C'],[60,'D'],[-1e9,'F']];
@@ -14123,15 +14259,22 @@ document.getElementById('gFree').onclick=()=>{resClose(gradeOv);paused=false;};
 document.getElementById('lesQuit').onclick=()=>{const f=LES.on==='first';lesEnd();
   if(f){try{localStorage.setItem('kgeuTut','skip');}catch(e){}startHereUI();}toast(f?'First flight skipped. Free flight':'Lesson ended. Free flight');};
 function lessonEvent(ev){
-  const d=LES.d;
+  const d=LES.d,L=lessonDef(LES.on);
   if(ev.type==='touchdown'){d.td=ev;d.tdU=toU(ev.x,ev.z);d.tdV=Math.abs(toV(ev.x,ev.z));}
-  if(ev.type==='liftoff'&&LES.on==='pattern'&&d.td)d.tng=1;
+  if(L&&L.fly&&L.fly.event)L.fly.event(ev,d);
 }
 function lessonTick(dt){
   if(!LES.on||st.crashed)return;
-  const S=SCH[acType],d=LES.d,id=LES.on,a=lesAtt(),alt=altMSL(),kt=kts();LES.t+=dt;
-  if(id==='first'){firstTick(dt,d,a);return;}
-  if(id==='steep'){
+  const S=SCH[acType],d=LES.d,L=lessonDef(LES.on),a=lesAtt(),alt=altMSL(),kt=kts();LES.t+=dt;
+  if(L&&L.fly)L.fly.tick(dt,S,d,a,alt,kt);
+}
+// ---- each lesson's flight: start(S,d) after the common set up in startLesson (at: the start position, final by default),
+// tick(dt,S,d,a,alt,kt) every frame, event(ev,d) for liftoff and the like (the touchdown is stored for every lesson first)
+const LESFLY={
+  first:{at:'runway',start(S,d){st.easy=true;st.noPF=true;coach2('Your first flight. Follow the arrows. It takes about a minute.');},tick(dt,S,d,a){firstTick(dt,d,a);}},
+  steep:{start(S,d){st.ezManFlap=1;airStart(7000,2500,3500,360,S.turn,0,S.thrTurn);st.bankMax=0.95;
+    coach2('Steep turns. Roll into a 45 degree bank, left or right, and hold 3,500 feet all the way around.');},
+  tick(dt,S,d,a,alt,kt){
     if(LES.ph===0){if(d.h0===undefined)d.h0=a.hdg;
       lesShow('Roll into 45 degrees of bank, either way. Hold 3,500 ft.','Bank '+Math.abs(a.bank).toFixed(0)+'\u00b0   '+dev(alt-3500)+'   '+kt.toFixed(0)+' kt');
       if(Math.abs(a.bank)>30){LES.ph=1;d.hp=a.hdg;d.turned=0;d.dir=Math.sign(a.bank);d.altMax=0;d.spdMax=0;d.out=0;d.tin=0;d.t=0;}
@@ -14145,8 +14288,10 @@ function lessonTick(dt){
         grade(sc,'',[[d.altMax<=100,'Altitude within 100 ft (worst '+Math.round(d.altMax)+' ft)'],[bf<=0.2,'Bank held at 45 \u00b1 5 degrees ('+Math.round((1-bf)*100)+'% of the turn)'],
           [d.spdMax<=10,'Airspeed within 10 kt (worst '+Math.round(d.spdMax)+' kt)'],[err<=10,'Rolled out within 10 degrees of '+h3(d.h0)+' (off by '+Math.round(err)+')']]);}
       else if(d.t>150)grade(0,'',[[0,'Did not finish the 360 in time']],'took too long');}
-  }
-  else if(id==='slow'){
+  }},
+  slow:{start(S,d){st.ezManFlap=1;airStart(7000,2500,3500,360,S.slow+8,FLAPS.length-1,S.thrSlow);st.noProt=1;
+    coach2('Slow flight. Full flaps. Slow to '+S.slow+' knots and hold 3,500 feet, heading north. Use power for altitude.');},
+  tick(dt,S,d,a,alt,kt){
     if(st.stalled){grade(0,'',[[0,'Stalled during slow flight. Stay just above it: lower the nose or add power.']],'stalled');return;}
     const inBand=Math.abs(kt-S.slow)<=5;
     if(LES.ph===0){lesShow('Slow to '+S.slow+' kt. Hold 3,500 ft, heading 360.',kt.toFixed(0)+' kt   '+dev(alt-3500)+'   HDG '+h3(a.hdg));
@@ -14156,8 +14301,10 @@ function lessonTick(dt){
       if(d.t>=45){const me=d.spdSum/d.n;
         const sc=100-(d.altMax<=100?0:Math.min(40,(d.altMax-100)/4))-Math.min(35,Math.max(0,me-3)*6)-(d.hMax<=10?0:Math.min(20,(d.hMax-10)*1.5));
         grade(sc,'',[[d.altMax<=100,'Altitude within 100 ft (worst '+Math.round(d.altMax)+' ft)'],[me<=5,'Airspeed on target (average off by '+me.toFixed(1)+' kt)'],[d.hMax<=10,'Heading within 10 degrees (worst '+Math.round(d.hMax)+')'],[1,'No stall']]);}}
-  }
-  else if(id==='stall'){
+  }},
+  stall:{start(S,d){st.ezManFlap=1;airStart(7000,2500,3500,360,S.slow+14,FLAPS.length-1,0);st.noProt=1;
+    coach2('Power off stall. Power is at idle. Hold altitude and keep easing back until it breaks. Then nose down, full power, wings level.');},
+  tick(dt,S,d,a,alt,kt){
     if(LES.ph===0){lesShow('Idle. Hold altitude, keep easing back until it stalls.',kt.toFixed(0)+' kt   '+dev(alt-3500)+(st.throttle>0.2?'   keep the power at idle':''));
       if(st.stalled){LES.ph=1;d.a0=alt;d.amin=alt;d.t=0;d.pwr=null;d.bmax=0;warnFlash();coach2('Stall! Nose down, full power, wings level.',null,{urgent:1});}
       if(LES.t>90)grade(0,'',[[0,'It never stalled. Pull back further with the power at idle.']],'no stall');}
@@ -14170,8 +14317,9 @@ function lessonTick(dt){
         const sc=100-Math.min(50,Math.max(0,loss-100)/5)-(pw<=2?0:Math.min(20,(pw-2)*6))-Math.min(20,Math.max(0,d.bmax-20))-(d.sec?20:0);
         grade(sc,'',[[loss<=150,'Altitude lost '+Math.round(loss)+' ft (under 150 is excellent)'],[pw<=2,d.pwr===null?'Never added full power':'Full power in '+pw.toFixed(1)+' s'],
           [d.bmax<=20,'Wings kept within 20 degrees (worst '+Math.round(d.bmax)+')'],[!d.sec,'No secondary stall']]);}}
-  }
-  else if(id==='engine'){
+  }},
+  engine:{start(S,d){airStart(THR01-4500,2500,3571,10,S.cruise,0,S.thrCruise);coach2('Cruising at 2,500 above the ground. Stand by.');},
+  tick(dt,S,d,a,alt,kt){
     if(LES.ph===0){lesShow('Cruising at 2,500 ft AGL. Stand by.',kt.toFixed(0)+' kt');
       if(LES.t>4){LES.ph=1;d.sum=0;d.n=0;warnFlash();coach2('Engine failure! Pitch for '+S.glide+' knots, best glide, and turn toward the field.',null,{urgent:1});}}
     else{st.throttle=0;
@@ -14182,8 +14330,9 @@ function lessonTick(dt){
         if(!d.td.paved)return grade(0,'',[[0,'Touched down off the runway']],'off field');
         const sc=100-Math.min(30,Math.max(0,me-5)*3)-(f<=300?0:Math.min(30,(f-300)/10))-Math.min(15,Math.max(0,d.tdV-6)*2);
         grade(sc,'',[[1,'Made the runway'],[me<=5,'Held best glide (average off by '+me.toFixed(1)+' kt)'],[f<=300,'Touchdown '+f+' fpm'],[d.tdV<=6,'On centerline ('+d.tdV.toFixed(1)+' m off)']]);}}
-  }
-  else if(id==='pattern'){
+  }},
+  pattern:{at:'runway',start(S,d){coach2('Pattern work. Take off, climb to 700 above the ground, then fly the circuit at 2,100 feet and bring it back to runway 1.','Pattern work. Take off, climb to seven hundred above the ground, then fly the circuit at two thousand one hundred feet, and bring it back to runway one.');},
+  tick(dt,S,d,a,alt,kt){
     const ag=aglFt(),tgt=FIELD_FT+1000,rh=RH*180/Math.PI,trk=(Math.atan2(st.vel.x,-st.vel.z)*180/Math.PI+360)%360,u=toU(st.pos.x,st.pos.z),v=Math.abs(toV(st.pos.x,st.pos.z));
     if(LES.ph===0){lesShow('Take off, climb straight ahead to 700 ft AGL.',Math.round(ag)+' ft AGL   '+kt.toFixed(0)+' kt');if(!st.onGround&&ag>700){LES.ph=1;coach2('Turn crosswind. Level at 2,100 feet.');}}
     else if(LES.ph===1){lesShow('Turn crosswind, then downwind. Level at 2,100 ft.',dev(alt-tgt)+'   '+kt.toFixed(0)+' kt');if(angD(trk,rh+180)<40&&v>450){LES.ph=2;d.sum=0;d.n=0;d.max=0;}}
@@ -14198,8 +14347,10 @@ function lessonTick(dt){
         grade(sc,'',[[me<=100,'Downwind altitude (average off '+Math.round(me)+' ft)'],[z>=60&&z<=600,'Touchdown in the zone ('+Math.round(z)+' m past the threshold)'],[f<=300,'Touchdown '+f+' fpm'],
           [d.tdV<=6,'On centerline ('+d.tdV.toFixed(1)+' m off)'],[se<=10,'Final approach speed '+Math.round(fk)+' kt'],[1,d.tng?'Touch and go':'Full stop']]);}}
     if(LES.t>600)grade(0,'',[[0,'Ran out of time']],'too long');
-  }
-}
+  },
+  event(ev,d){if(ev.type==='liftoff'&&d.td)d.tng=1;}}};
+LESSONS.forEach(l=>{if(LESFLY[l.id])l.fly=LESFLY[l.id];if(!l.fly)l.soon=true;});   // no flight yet: listed, not startable
+const LES_FLY=LESSONS.filter(l=>!l.soon);
 // ---- lesson 1, first flight: about a minute, arrows point at what to touch ----
 const tutArrow=$('tutArrow');
 function tutPoint(sel){
@@ -16888,7 +17039,7 @@ const APP_VER='2026-10-10-tasking';          // keep version.json in step when s
   board('arc:drop',{name:'Airdrop accuracy',group:'Arcade',dir:-1,fmt:'m',how:'Metres from the drop zone centre'});
   board('arc:strike',{name:'Strike accuracy',group:'Arcade',how:'0 to 100: hits 45%, average miss 30%, time on target 25%'});
   board('arc:gunrun',{name:'A-10 gun run',group:'Arcade',go:()=>{pickType('a10',1);start('range');},how:'0 to 100: hits 45%, average miss 30%, time on target 25%'});
-  LESSONS.forEach(l=>board('lesson:'+l.id,{name:l.name,group:'Flight school',how:'The lesson score, 0 to 100'}));
+  LESSONS.filter(l=>l.server).forEach(l=>board('lesson:'+l.id,{name:l.name,group:'Flight school',how:'The lesson score, 0 to 100'}));
   board('free:landing',{name:'Free flight landing',group:'Free flight',how:'The landing grade points, 0 to 100'});
   // Taskings: one board each, 0 to 100. local: the Worker refuses an id it does not know (boardOf in server/src/boards.js
   // has no task: entry), so these rank the runs flown on this device until it does; nothing is sent
@@ -17292,7 +17443,7 @@ const APP_VER='2026-10-10-tasking';          // keep version.json in step when s
   // with its EASY or HARD chip. Hidden boards (the landing challenges, the dash, the gun run, the world airports) keep
   // their rows on the server and still open from code (lbOpen), they just have no entry
   const V={b:'daily',p:'today',seq:0,cache:{},dm:null,ds:'score'};
-  const PICK=[['Challenges',['daily','df','arc:strike','arc:drop','mission:short']],['Taskings',TASK_IDS.map(id=>'task:'+id)],['Free flight',['free:landing']],['Flight school',LESSONS.map(l=>'lesson:'+l.id)]];
+  const PICK=[['Challenges',['daily','df','arc:strike','arc:drop','mission:short']],['Taskings',TASK_IDS.map(id=>'task:'+id)],['Free flight',['free:landing']],['Flight school',LESSONS.filter(l=>l.server).map(l=>'lesson:'+l.id)]];
   const PNAME={daily:'Daily challenge',df:'Red Flag Dogfight','arc:strike':'Strike range','arc:drop':'Airdrop','mission:short':'Short field landing','free:landing':'Landings'};
   const DF_STAT={score:'Score',kills:'Kills',clear:'Clear time',guns:'Gun kills'};
   const isDf=b=>/^df:/.test(b),entryOf=b=>isDf(b)?'df':b;
@@ -17470,7 +17621,7 @@ window.__kgeu={TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()
   RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,ticker:()=>{const e=document.getElementById('tk'),c=document.getElementById('tkCtl');return {on:e.classList.contains('on'),paused:e.classList.contains('paused'),anim:getComputedStyle(document.getElementById('tkT')).animationName,scroll:e.classList.contains('scroll'),open:c.classList.contains('on'),text:e.querySelector('#tkT i').textContent,vis:e.offsetParent!==null&&getComputedStyle(e).display!=='none',ctlVis:c.offsetParent!==null};},tickerForce:n=>{TK.force=n||null;tkUI();},tickerOpen:()=>tkOpen(),tickerClose:()=>{TK.open=false;tkUI();},musicTick:musicTick,MUSIC:MUSIC,actx:()=>actx,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,VQ:VQ,vqLog:clear=>{const r=VQ.log.map(e=>Object.assign({},e));if(clear)VQ.log.length=0;return r;},vqAdd:(who,kind,text,clips,o)=>vqAdd(L(who,kind,text,clips),o),coach2:coach2,chatNow:()=>chatNow(),atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),bannerShow:(k,t)=>bannerShow(k,t),badgeHide:()=>badgeHide(),auto:()=>autoSmart(),mission:k=>{if(k==='gunrun'){pickType('a10',1);start('range');return;}pickType(k==='range'?'reaper':'c130',1);start(k);},HOG:HOG,strikeScore:()=>strikeScore(),CRASH_FX:CRASH_FX,baseOK:baseOK,rwyLenOf:rwyLenOf,FD:FD,BASES:BASES,setThr:setThr,setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
-  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day,kind:d.kind}},dfDayOf:k=>dfDayOf(k),aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day,kind:d.kind}},dfDayOf:k=>dfDayOf(k),aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,LES:LES,SCHOOL:SCHOOL,lessonDef:lessonDef,stageOf:stageOf,tolOf:tolOf,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   // @OhRabah easter eggs (3.10): where each one is, whether its lights are on, and the tow banner
   eggs:()=>EGG.list.map(o=>{const p=o.getWorldPosition(new V3()),r={name:o.name,x:p.x,y:p.y,z:p.z,ry:o.rotation.y,lit:(o.name==='egg_billboard'||o.name==='egg_rooftop')&&EGG.lit,visible:o.visible};
     if(o.name==='egg_tow'){const b=EGG.tow.ban.getWorldPosition(new V3()),f=new V3(0,0,-1).applyQuaternion(o.quaternion);r.banner={x:b.x,y:b.y,z:b.z};r.fwd=[f.x,f.y,f.z];}return r;}),
