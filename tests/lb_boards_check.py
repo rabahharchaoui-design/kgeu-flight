@@ -21,7 +21,9 @@ async def main():
         pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1'})
         # tasking item 1: the Taskings boards are device boards (local: the Worker does not know task: ids), left out here
         loc = await pg.evaluate(f"()=>Object.keys({K}.LB.BOARDS).filter(k=>{K}.LB.BOARDS[k].local)")
-        ok('the device boards are the four Taskings, none of them on the server', sorted(loc) == sorted('task:' + t for t in ('overwatch', 'lifeline', 'shepherd', 'finder')) and not [k for k in loc if k in srv['b']], loc)
+        # school1 item 9: and the nine lessons the Worker does not know (lesson:climbs and the rest), ranked on the device
+        want = ['task:' + t for t in ('overwatch', 'lifeline', 'shepherd', 'finder')] + ['lesson:' + t for t in ('climbs', 'ground', 'landings', 'solo', 'short', 'soft', 'xwind', 'emerg', 'hood')]
+        ok('the device boards are the four Taskings and the nine new lessons, none of them on the server', sorted(loc) == sorted(want) and not [k for k in loc if k in srv['b']], loc)
         g = await pg.evaluate(f"()=>{{const B={K}.LB.BOARDS,o={{}};for(const k in B)if(!B[k].local)o[k]={{dir:B[k].dir,mode:B[k].mode||null}};return o}}")
         gd = await pg.evaluate(f"()=>{{const d=[];for(let i=0;i<60;i++){{const t=new Date(Date.UTC(2026,9,1+i));d.push({K}.dfDayOf(t.getUTCFullYear()*10000+(t.getUTCMonth()+1)*100+t.getUTCDate()));}}return d}}")
         ok('every game board is on the server', not [k for k in g if k not in srv['b']], [k for k in g if k not in srv['b']])

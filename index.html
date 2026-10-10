@@ -14730,7 +14730,7 @@ function startLesson(id,force,o){   // o.brief false: a restart (pause Restart, 
 // the flight begins: the briefing goes, the lesson card shows, the clock starts and the instructor's opening line goes out
 function lesGo(direct){if(!LES.on||(!LES.brief&&!direct))return;const L=lessonDef(LES.on);audioSess();initAudio();
   brClose();LES.brief=false;paused=false;pauseOv.classList.remove('on');LES.t=0;lesEl.classList.add('on');
-  gBegin(L);if(LB)LB.runStart('lesson:'+LES.on);if(L.fly.open)L.fly.open(SCH[acType],LES.d);
+  gBegin(L);if(LB&&L.server)LB.runStart('lesson:'+LES.on);if(L.fly.open)L.fly.open(SCH[acType],LES.d);   // a device board (item 9) asks the Worker for nothing
 }
 // a lesson's marks in the world (pylons, lines, the aiming bar): lesAdd puts one in, lesClear (lesEnd) takes them all out
 const LES_OBJ=[];
@@ -14786,8 +14786,12 @@ function grade(score,title,lines,failWhy){
   if(!old||'ABCDF'.indexOf(L2)<'ABCDF'.indexOf(old)){schoolBest[key]=L2;try{localStorage.setItem('kgeuSchool',JSON.stringify(schoolBest));}catch(e){}}
   runLog('lesson',{lesson:LES.on,letter:L2,score:score});
   logbookAdd(LES.on,{letter:L2,score:score});   // the logbook: a pass credits the lesson's time, an F is an entry with none
-  if(LB){if(failWhy)LB.runCancel('lesson:'+LES.on);else LB.runEnd('lesson:'+LES.on,score);}
-  const id=LES.on;LES.last=id;
+  const id=LES.on,lb='lesson:'+id,srv=!!(lessonDef(id)||{}).server;LES.last=id;
+  if(LB&&srv){if(failWhy)LB.runCancel(lb);else LB.runEnd(lb,score);}
+  // school1 item 9: a device lesson board: the run on this device's board (Easy when the run went Easy, runMode), XP by the
+  // Worker's formula (taskXp) banked in kgeuTaskXP with the Taskings', popped at the debrief; nothing for an F
+  const loc=LB&&!srv&&!failWhy&&LB.BOARDS[lb]?LB.localAdd(lb,score,LES.t):null,lxp=loc&&L2!=='F'?taskXp(score,runMode(),loc.pb):0;
+  if(lxp){try{localStorage.setItem('kgeuTaskXP',String((+localStorage.getItem('kgeuTaskXP')||0)+lxp));}catch(e){}}
   // the debrief (item 4): a row a task with what was measured, then the quiz, then the board line (resBoard)
   const row=l=>Array.isArray(l)?'<div class="'+(l[0]?'ok':'no')+'">'+resEsc(l[1])+'</div>':l.why?'<div class="no">'+resEsc(l.name)+'</div>'
     :'<div class="gl gt '+(l.ok?'ok':'no')+'"><span>'+resEsc(l.name)+'</span><b>'+resEsc(l.detail||'')+'</b></div>';
@@ -14797,12 +14801,17 @@ function grade(score,title,lines,failWhy){
   const ek=L2!=='F'&&((lessonDef(id)||{}).endorse||(G.def&&G.def.endorse)),en=ek?endorseSign(ek,id||G.def.id):null;
   const er=en?'<div class="gl gEnd"><span>Endorsement</span><b>'+resEsc((ENDORSE_NAME[ek]||ek)+', signed by '+en.by)+'</b></div>':'';
   resFill(gradeOv,{letter:L2,title:(id==='first'?'Lesson 1: ':'Debrief: ')+LES.name+(failWhy?': '+failWhy:''),score:failWhy?'':score+' of 100',
-    lines:er+lines.concat(qz).map(row).join(''),board:failWhy?'':'lesson:'+id,tip:tl.length?dbTip(dr):''});
+    lines:er+lines.concat(qz).map(row).join(''),board:failWhy||!srv?'':lb,tip:tl.length?dbTip(dr):''});
+  if(loc){const row=document.createElement('div');row.className='gl lbLine';row.innerHTML='<span>Board, this device</span><b></b>';   // as tqCard's
+    row.lastChild.textContent='#'+loc.rank+' of '+loc.total+(lxp?'  +'+lxp+' XP':'');
+    if(loc.pb){const e=document.createElement('em');e.textContent=loc.total>1?'PERSONAL BEST':'FIRST RUN';row.lastChild.appendChild(e);}
+    gradeOv.querySelector('.rLines').appendChild(row);}
   if(G.def&&G.easy){const t=document.createElement('span');t.className='modeTag ezTag';t.textContent='EASY TOLERANCES, x2';$('gScore').appendChild(t);}
   lesEnd();
   if(id==='first'&&L2!=='F'){try{localStorage.setItem('kgeuTut','1');}catch(e){}}
   const nx=nextLesson(id),gn=$('gNext');gn.hidden=!nx||(L2==='F'&&nx.id!==id);if(nx)gn.textContent='Next lesson: '+nx.name;gn.dataset.l=nx?nx.id:'';
   resShow(gradeOv,false);
+  if(lxp)xpPop(lxp,'Lesson: '+(lessonDef(id)||{name:LES.name}).name+(loc.pb&&loc.total>1?'  \u00b7  Personal best':''));
   cfi((tl.length?dbSay(dr):L2==='F'?'Not to standard. Let us set it up again.':'Good flight.')+(en?' That is your '+lc1(ENDORSE_NAME[ek]||ek)+' endorsement. I am signing your logbook.':''),null,{offAir:1});
 }
 document.getElementById('gRetry').onclick=()=>{resClose(gradeOv);startLesson(LES.last,true,{brief:false});};
@@ -17955,6 +17964,9 @@ const APP_VER='2026-10-10-tasking';          // keep version.json in step when s
   board('arc:strike',{name:'Strike accuracy',group:'Arcade',how:'0 to 100: hits 45%, average miss 30%, time on target 25%'});
   board('arc:gunrun',{name:'A-10 gun run',group:'Arcade',go:()=>{pickType('a10',1);start('range');},how:'0 to 100: hits 45%, average miss 30%, time on target 25%'});
   LESSONS.filter(l=>l.server).forEach(l=>board('lesson:'+l.id,{name:l.name,group:'Flight school',how:'The lesson score, 0 to 100'}));
+  // school1 item 9: the other lessons (climbs, ground, landings, solo, short, soft, xwind, emerg, hood) rank on the device, as
+  // the Taskings do: the Worker refuses a lesson: id it does not know (boardOf, no lesson: family). Not in PICK; the debrief's line only
+  LESSONS.filter(l=>!l.server&&l.fly).forEach(l=>board('lesson:'+l.id,{name:l.name,group:'Flight school',local:1,how:'The lesson score, 0 to 100. Runs on this device'}));
   board('free:landing',{name:'Free flight landing',group:'Free flight',how:'The landing grade points, 0 to 100'});
   // Taskings: one board each, 0 to 100. local: the Worker refuses an id it does not know (boardOf in server/src/boards.js
   // has no task: entry), so these rank the runs flown on this device until it does; nothing is sent
