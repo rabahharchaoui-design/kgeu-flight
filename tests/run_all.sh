@@ -26,6 +26,12 @@ for t in event_start_check; do
   echo "== $t (exit $code)"; echo "$out" | grep -E "FAIL|passed|clear|FAILS" | tail -4
   [[ $code -ne 0 ]] && fail+=("$t")
 done
+# tasking item 6: break-ui on the mission UI at the smallest landscape and in portrait (each size runs alone, ~2 min)
+for sz in 568x320 390x844; do
+  out=$($PY tests/tasking_break_check.py --size $sz 2>&1); code=$?
+  echo "== tasking_break_check $sz (exit $code)"; echo "$out" | grep -E "FAIL|passed" | tail -4
+  [[ $code -ne 0 ]] && fail+=("tasking_break_check $sz")
+done
 for t in ab_check; do
   out=$($PY tests/$t.py --noshots 2>&1); code=$?
   echo "== $t (exit $code)"; echo "$out" | grep -E "FAIL|passed|clear|FAILS" | tail -4

@@ -189,6 +189,8 @@ body.appr #lesM{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #miss.chip{ padding:2px 10px; border-width:1.5px; gap:0; }
 #miss.chip span{ display:none; }
 #miss.chip b{ font-size:13px; -webkit-line-clamp:1; }
+/* one line (the chip, the approach strip): an ellipsis at the end, never a hard cut mid letter */
+#miss.chip b, body.appr #miss b{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #warn{ font-size:24px; text-align:center; font-weight:800; letter-spacing:.06em; color:#fff; background:var(--warn); border-radius:6px; padding:2px 16px; display:none; line-height:1.15; }
 body.touch #warn{ font-size:20px; padding:2px 12px; }
 #warn.on{ display:block; animation:blink .5s steps(2) infinite; }
@@ -526,21 +528,29 @@ body.dfOn #uiroot > #dfSub{ display:flex; }
 #tkReply button:active{ transform:scale(.97); background:rgba(127,212,255,.22); transition-duration:60ms; }
 #tkReply button b{ font:800 16px/1 var(--font); letter-spacing:.08em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
 #tkReply button small{ font:600 10px/1.1 var(--font); letter-spacing:.04em; color:var(--soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+/* a narrow bar (568 wide, beside the LOOK pad or under the ball's readouts: about 82 px a button) keeps every label whole */
+@media (max-width:700px){ #tkReply button{ padding:3px 4px; } #tkReply button b{ font-size:14px; letter-spacing:.03em; } #tkReply button small{ letter-spacing:0; } }
+body.sensorOn #tkReply button b, body.lookOn.touch #tkReply button b{ letter-spacing:.03em; }
 #tkReply button.act{ border-color:var(--caution); } #tkReply button.act b{ color:var(--caution); }
 #tkReply button.neg{ border-color:rgba(255,255,255,.28); } #tkReply button.neg b{ color:var(--soft); }
 @media (prefers-reduced-motion: reduce){ #tkReply{ transform:none; transition:opacity 150ms ease; } }
 /* the C-130 drop: the LOOK pad owns the top right corner, the replies stop short of it */
 body.lookOn.touch #tkReply{ width:min(268px, calc(50% - var(--icon) / 2 - 8px - var(--padR) - 74px)); }
+/* portrait has no room for both: the LOOK pad steps aside while a reply is up (it is back the moment you answer) */
+@media (orientation:portrait){ body.lookOn.touch #tkReply{ width:min(268px, calc(50% - var(--icon) / 2 - 8px - var(--padR))); } body.lookOn.tkReplyOn #lookPad{ visibility:hidden; } }
 /* the ball view keeps its own readouts along the top edge (DAY TV x1 left, CAM / R / EL right): the replies step down
    under them, right aligned, clear of the mission card in the centre column */
 body.sensorOn #tkReply{ top:calc(var(--padT) + 30px); left:auto; right:var(--padR); transform-origin:right center;
   width:min(268px, calc(100% - max(50%, calc(var(--padL) + var(--map) + var(--hudW) + 16px + var(--topW) / 2)) - var(--topW) / 2 - var(--padR) - 8px)); }
+/* portrait: the ball's readouts sit under the map, so the replies keep their place right of pause */
+@media (orientation:portrait){ body.sensorOn #tkReply{ top:var(--padT); left:calc(50% + var(--icon) / 2 + 8px); right:auto; transform-origin:left center;
+  width:min(268px, calc(50% - var(--icon) / 2 - 8px - var(--padR))); } }
 /* Easy's ball readout runs to three lines (bearing, from the nose, down): while a reply is up it keeps its first */
 body.sensorOn.tkReplyOn #shTR{ display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:1; overflow:hidden; }
 /* the music ticker lives top right: it steps aside while a reply is up */
 body.tkReplyOn #uiroot > #tk, body.tkReplyOn #tkCtl{ visibility:hidden; }
 body:not(.touch) #tkReply{ width:min(268px, calc(50% - var(--icon) / 2 - 130px - var(--padR))); }
-.lbRow.lbLoc .c span{ white-space:normal; font-size:12px; color:var(--soft); }
+.lbRow.lbLoc .c span{ white-space:normal; font-size:12px; font-weight:600; color:var(--brown); }   /* on the sand row: the rows' own brown, not the HUD grey */
 #dfBrief{ z-index:30; }
 #dfBrief .sheet{ max-width:600px; padding:12px 18px 14px; background:rgba(18,13,9,.95); text-align:center; }
 #dfBrief h3{ margin:0; font:800 22px/1.15 var(--font); letter-spacing:.06em; color:var(--sand); }
@@ -13128,7 +13138,7 @@ function taskStart(id,o){const D=TASKS[id];if(!D)return;
   Object.assign(TASK,{on:true,id:id,def:D,seed:seed,R:tqRng(seed),si:0,stage:null,t:0,brief:false,ask:null,quiet:null,later:[],done:false,res:null,sens:false,log:[]});
   tqClear();
   const d=TASK.d={id:id,seed:seed,mode:runMode(),t0:0,replies:0,replyT:0,missed:0};
-  D.roll(TASK.R,d);
+  D.roll(TASK.R,d);if(TASK.test.roll)TASK.test.roll(d,id);   // tests: push a roll to its extremes (tasking_break_check)
   st.windBase=st.windDir=d.wdir;st.windKt=d.wkt;st.windPh=TASK.R()*6.28;
   D.spawn(d);
   st.mode=D.airStart?'task':st.mode;if(D.airStart){A.tko=1;A.land=1;A.pattern=1;A.ground=0;}
@@ -13389,8 +13399,8 @@ function owTalk(d){const v=d.veh;
   if(!owOn(v,rookie()?110:70)){d.talkMiss=(d.talkMiss||0)+1;tqPilot('Saber 6, '+AC.csS+', stand by, reacquiring.');
     const l=tqMC(AC.csS+', get your sensor back on the pickup.',{plain:'Point the camera at the pickup first, then REPORT.'});
     tqAsk([{k:'REPORT',sub:'talk-on',say:'',fn:()=>owTalk(d)}],{line:l,wait:30,late:()=>{d.talk=0;d.end=st.time;}});return;}
-  const r=Math.hypot(v.x-d.sab.x,v.z-d.sab.z),b=tqBrg(d.sab.x,d.sab.z,v.x,v.z),mph=Math.round(d.vk*2.237/5)*5;
-  tqPilot('Saber 6, '+AC.csS+', your vehicle is the white pickup, '+(r/1609.34).toFixed(1)+' miles '+tqDir(b)+' of you, '+(v.moving?'heading '+tqDir(((v.h*180/Math.PI)%360+360)%360)+' on the dirt track, about '+mph+' miles an hour.':'stopped on the dirt track.'));
+  const r=Math.hypot(v.x-d.sab.x,v.z-d.sab.z),b=tqBrg(d.sab.x,d.sab.z,v.x,v.z),kt=Math.round(d.vk*MS2KT/5)*5;   // knots: the game speaks knots everywhere (units_check)
+  tqPilot('Saber 6, '+AC.csS+', your vehicle is the white pickup, '+(r/1609.34).toFixed(1)+' miles '+tqDir(b)+' of you, '+(v.moving?'heading '+tqDir(((v.h*180/Math.PI)%360+360)%360)+' on the dirt track, about '+kt+' knots.':'stopped on the dirt track.'));
   tqSay('Saber 6','Contact the white pickup. Saber 6 has it from here. Thanks for the eyes.',{plain:'The team sees it. Job done.'});
   d.talk=1;d.end=st.time;
 }
