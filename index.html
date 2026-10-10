@@ -821,6 +821,7 @@ body.lookOn:not(.touch) #badges{ top:calc(var(--padT) + var(--icon) + 80px); }
 .rTip.good{ border-left-color:#4cd97b; } .rTip:empty{ display:none; }
 .rLines{ margin:0 0 10px; font-size:14px; line-height:1.4; display:grid; grid-template-columns:1fr 1fr; gap:0 18px; }
 .rLines .gl{ padding:3px 0; gap:10px; min-width:0; } .rLines .gl b{ overflow:hidden; text-overflow:ellipsis; }
+.rLines .gl.gEnd span{ flex:none; } .rLines .gl.gEnd b{ white-space:normal; overflow:visible; text-overflow:clip; text-align:right; line-height:1.25; }   /* the endorsement wraps to two lines, never cut */
 .rLines .lbLine b, .rLines .lbX b{ white-space:normal; overflow:visible; text-overflow:clip; text-align:right; }   /* ranks and bests wrap, never cut */
 .rLines .lbLine{ grid-column:1 / -1; border-bottom:none; margin-top:2px; } .rLines .lbLine b{ color:#F6C177; }
 .rLines .lbLine em{ font-style:normal; font-weight:900; margin-left:8px; color:#4cd97b; letter-spacing:.06em; }
@@ -10240,12 +10241,12 @@ function badgeOn(el){
 function badgeOff(el){clearTimeout(el._t1);clearTimeout(el._t2);el._next=null;el.classList.remove('on','fade');}
 // school2 item 2: an achievement or record pop during a lesson or over its debrief (#gradeOv) waits; the latest shows once
 // both are gone (bannerFlush from resClose and lesEnd). The achievement itself is saved at once
-let bannerHeld=null;
+let bannerHeld=null,bannerWait=false;   // bannerWait: grade() between its lesEnd and the debrief opening (the pop waits for resClose)
 function bannerShow(kind,text){
-  if(LES.on||gradeOv.classList.contains('on')){bannerHeld=[kind,text];return;}
+  if(LES.on||bannerWait||gradeOv.classList.contains('on')){bannerHeld=[kind,text];return;}
   bannerEl.innerHTML='<b>'+kind+'</b><span>'+text+'</span>';badgeOn(bannerEl);
 }
-function bannerFlush(){if(!bannerHeld||LES.on||gradeOv.classList.contains('on'))return;const b=bannerHeld;bannerHeld=null;bannerShow(b[0],b[1]);}
+function bannerFlush(){if(!bannerHeld||LES.on||bannerWait||gradeOv.classList.contains('on'))return;const b=bannerHeld;bannerHeld=null;bannerShow(b[0],b[1]);}
 function gradeBadge(g){
   const L=document.getElementById('gbL');L.textContent=g.letter;L.className='g'+g.letter;
   document.getElementById('gbT').textContent=g.line;badgeOn(gBadge);
@@ -14595,7 +14596,19 @@ const SCHOOL={
         {id:'fpm',name:'Touchdowns under 300 fpm',w:15,kind:'range',tol:300,unit:'fpm'},{id:'cl',name:'On the centerline',w:10,kind:'range',tol:6,unit:'m'},
         {id:'vapp',name:'Final approach speed',w:10,kind:'hold',tol:'spd',unit:'kt'},{id:'three',name:'Three full stop landings',w:15,kind:'event'},
         {id:'calls',name:'Made the tower calls',w:10,kind:'event'}],
-      log:{dual:1.0,night:1.0,ldg:3}},{id:'soloxc',name:'Solo cross country',soon:true}]},
+      log:{dual:1.0,night:1.0,ldg:3}},
+    // school2 item 4: the pilotage trip flown alone (LESFLY.soloxc, d.solo): Dana silent after her start line; a pass signs
+    // the solo cross country endorsement (61.93)
+    {id:'soloxc',name:'Solo cross country',short:'Solo XC',sub:'The same trip, alone. Your first cross country endorsement',min:22,endorse:'xc',quiet:true,
+      cards:[{h:'Before a solo cross country',b:'Under 61.93 your instructor reviews your planning and the weather, then signs an endorsement for that flight. You fly the plan you briefed.'},
+        {h:'Alone in the airplane',b:'Nobody will call the checkpoints: use the clock and the log. If a checkpoint does not show up on time, hold the heading and look again before you change the plan.'},
+        {h:'The calls are yours',b:'Phoenix Approach for the Bravo, Phoenix Tower, Glendale Tower. The words are the same as last time. If in doubt, ask.'}],
+      quiz:{q:'Your checkpoint is not in sight at its ETA. What first?',a:['Hold the heading and keep looking','Turn back','Descend to find it','Call Approach for a position'],ok:0,why:'A minute or two late is normal. Hold the plan and look, then work the lost procedure if it stays missing.'},
+      tasks:[{id:'alt',name:'Cruise altitude held',tip:'cruise altitude',w:15,kind:'hold',tol:'instAlt',unit:'ft'},{id:'hdg',name:'Heading on each leg',tip:'heading on each leg',w:15,kind:'hold',tol:15,unit:'deg'},
+        {id:'route',name:'Within 3 nm of the route',tip:'route tracking',w:15,kind:'hold',tol:3,unit:'nm',cue:'route'},{id:'eta',name:'Checkpoints within 5 min of ETA',tip:'checkpoint timing',w:15,kind:'range',tol:5,unit:'min'},
+        {id:'bravo',name:'Class Bravo clearance obtained',tip:'Class Bravo call',w:15,kind:'event'},{id:'phx',name:'Landed at Sky Harbor',tip:'Sky Harbor landing',w:10,kind:'event'},
+        {id:'home',name:'Landed back at Glendale',tip:'landing back home',w:10,kind:'event'},{id:'fpm',name:'Touchdowns under 300 fpm',tip:'touchdowns',w:5,kind:'range',tol:300,unit:'fpm'}],
+      log:{solo:1.5,xc:1.5,ldg:2}}]},
   {id:'s4',n:4,name:'Checkride prep',soon:true,lessons:[{id:'cr1',name:'Maneuvers review'},{id:'cr2',name:'Emergency review'},{id:'cr3',name:'Mock checkride'}]}]};
 const LESSONS=SCHOOL.stages.flatMap(s=>s.lessons);   // every lesson in order, soon ones too (the Boards code walks this)
 const LES_BY={};SCHOOL.stages.forEach(s=>s.lessons.forEach(l=>{l.stage=s.id;LES_BY[l.id]=l;}));
@@ -14696,7 +14709,7 @@ function dbSay(r){const p=dbPick(r),k=p.k?(p.k.tip||lc1(p.k.name)):'the details'
   if(r.failWhy||p.why)return 'Not to standard. Let us set it up again.';
   return 'Not to standard today. We fly it again.';}
 // endorsements Dana signs (kgeuEndorse): {solo:{at,by,lesson}}; the logbook reads them
-const ENDORSE_NAME={solo:'Solo'};
+const ENDORSE_NAME={solo:'Solo',xc:'Solo cross country'};
 function endorsements(){try{const e=JSON.parse(localStorage.getItem('kgeuEndorse')||'{}');return e&&typeof e==='object'?e:{};}catch(e){return {};}}
 function endorseSign(kind,lesson){const E=endorsements();if(!E[kind])E[kind]={at:Date.now(),by:SCHOOL.cfi.name+', '+SCHOOL.cfi.title,lesson:lesson};
   try{localStorage.setItem('kgeuEndorse',JSON.stringify(E));}catch(e){}return E[kind];}
@@ -14907,7 +14920,7 @@ function grade(score,title,lines,failWhy){
     if(loc.pb){const e=document.createElement('em');e.textContent=loc.total>1?'PERSONAL BEST':'FIRST RUN';row.lastChild.appendChild(e);}
     gradeOv.querySelector('.rLines').appendChild(row);}
   if(G.def&&G.easy){const t=document.createElement('span');t.className='modeTag ezTag';t.textContent='EASY TOLERANCES, x2';$('gScore').appendChild(t);}
-  lesEnd();
+  bannerWait=true;lesEnd();bannerWait=false;   // a held pop waits for the debrief to close (resClose flushes it)
   if(id==='first'&&L2!=='F'){try{localStorage.setItem('kgeuTut','1');}catch(e){}}
   const nx=nextLesson(id),gn=$('gNext');gn.hidden=!nx||(L2==='F'&&nx.id!==id);if(nx)gn.textContent='Next lesson: '+nx.name;gn.dataset.l=nx?nx.id:'';
   resShow(gradeOv,false);
@@ -15233,7 +15246,8 @@ const LESFLY={
       const l=NV.legs[0],e=wX(THR01+RWY_LEN,0),f=wZ(THR01+RWY_LEN,0),b=(Math.atan2(l.to.x-e,-(l.to.z-f))*180/Math.PI-RH*180/Math.PI+540)%360-180;
       d.turn=b>=0?'right':'left';},   // the first checkpoint off the departure end: the turn out
   open(S,d){NV.tol=gTolOf('eta')*60;navPoint();
-    cfi('Cross country to Sky Harbor. Nav log is on the card: stadium, Tolleson, downtown, then the field. Climb to 3,500 after the pattern.');
+    cfi(d.solo?'This one is yours. I signed your endorsement for Sky Harbor and back. Fly the log, make the calls, and come home. I will be on the radio if you need me.'
+      :'Cross country to Sky Harbor. Nav log is on the card: stadium, Tolleson, downtown, then the field. Climb to 3,500 after the pattern.');
     cirTwr(d,'to');},
   tick(dt,S,d,a,alt,kt){if(lesStall())return;
     const ag=aglFt(),gnd=st.onGround,F=d.F,dSH=Math.hypot(st.pos.x-SKY_HARBOR.x,st.pos.z-SKY_HARBOR.z),dG=Math.hypot(st.pos.x-F.G.x,st.pos.z-F.G.z);
@@ -15247,19 +15261,19 @@ const LESFLY={
     pilHolds(d,a,alt);
     const c=navCur(),cr=d.cr.toLocaleString('en-US'),nums=()=>(c?c.to.short+' '+(NV.d/NM).toFixed(1)+' nm   ':'')+'HDG '+hM(a.hdg)+'   '+dev(alt-d.cr);
     if(LES.ph===0){const call=gnd&&TASK.ask&&TASK.ask===d.ask;
-      if(!gnd&&ag>50&&!d.up){d.up=1;cfi('Turn '+d.turn+' on course after 700 feet.');}
-      if(!gnd&&ag>700&&d.up===1){d.up=2;cfi('Turn '+d.turn+' on course, flaps up, climb to 3,500.');}
+      if(!gnd&&ag>50&&!d.up){d.up=1;pilSay(d,'Turn '+d.turn+' on course after 700 feet.');}
+      if(!gnd&&ag>700&&d.up===1){d.up=2;pilSay(d,'Turn '+d.turn+' on course, flaps up, climb to 3,500.');}
       lesShow(call?'Read back: tap CALL. Then full power.':gnd?'Full power, rotate at 55 kt.':ag<700?'74 kt. Turn '+d.turn+' after 700 ft.':'Turn '+d.turn+' on course, climb 3,500.',Math.round(ag)+' ft AGL   '+kt.toFixed(0)+' kt');
       if(!gnd&&ag>1500)pilGo(d,0);}
-    else if(LES.ph<=2){lesShow(c?hM(c.course)+'\u00b0 to '+c.to.short+'. Hold '+cr+' ft.':'Hold '+cr+' ft.',nums());
+    else if(LES.ph<=2){lesShow(pilAskLine(d)||(c?hM(c.course)+'\u00b0 to '+c.to.short+'. Hold '+cr+' ft.':'Hold '+cr+' ft.'),nums());
       if(dSH<5*NM&&!d.near){d.near=1;pilHoldsEnd(d);}}
     else if(LES.ph===3){if(dSH<5*NM&&!d.near){d.near=1;pilHoldsEnd(d);}
-      lesShow(d.phx?'Brake to a stop on the runway.':'Line up on 7L, 2,100 ft.',d.phx?'Touchdown '+d.phx.fpm+' fpm   '+kt.toFixed(0)+' kt':Math.round(ag)+' ft AGL   '+kt.toFixed(0)+' kt   '+(dSH/NM).toFixed(1)+' nm');
+      lesShow(d.phx?'Brake to a stop on the runway.':pilAskLine(d)||'Line up on 7L, 2,100 ft.',d.phx?'Touchdown '+d.phx.fpm+' fpm   '+kt.toFixed(0)+' kt':Math.round(ag)+' ft AGL   '+kt.toFixed(0)+' kt   '+(dSH/NM).toFixed(1)+' nm');
       if(d.phx&&gnd&&st.vel.length()<2){if(!isPaved(st.pos.x,st.pos.z))return gEnd('off the runway','Stopped off the runway');
         LES.ph=4;d.ret=0;d.near=0;d.cr=4500;pilArrive(0);navPoint(true);
-        cfi('Welcome to Sky Harbor. No taxiing today: back-taxi is not needed, we have a long runway. When you are ready, full power, climb to 4,500 and fly the log home.');}}
+        pilSay(d,'Welcome to Sky Harbor. No taxiing today: back-taxi is not needed, we have a long runway. When you are ready, full power, climb to 4,500 and fly the log home.');}}
     else if(LES.ph===4){if(!d.ret&&!gnd&&aglFt()>700&&!d.up2){d.up2=1;const c2=navCur(),r=c2?((NV.brg-a.hdg)%360+540)%360-180:0;
-        cfi('Turn '+(r>=0?'right':'left')+' on course, flaps up, climb to 4,500.');}
+        pilSay(d,'Turn '+(r>=0?'right':'left')+' on course, flaps up, climb to 4,500.');}
       if(!d.ret){lesShow(gnd?'Full power, take off. Climb to 4,500.':'74 kt, climb to 4,500 ft.',Math.round(ag)+' ft AGL   '+kt.toFixed(0)+' kt');
         if(!gnd&&ag>1500)pilGo(d,1);}
       else{lesShow(c?hM(c.course)+'\u00b0 to '+c.to.short+'. Hold '+cr+' ft.':'Hold '+cr+' ft.',nums());
@@ -15276,6 +15290,11 @@ const LESFLY={
     else if(LES.ph===4&&!d.ret){if(sh)return;}
     else if(home){if(!d.home){d.home={fpm:ev.fpm};if(LES.ph<5){LES.ph=5;pilHoldsEnd(d);}}return;}
     gEnd('off field','Touched down off the airport');}},
+  // ---- school2 item 4: the solo cross country. The pilotage trip with d.solo: Dana's start line on the ground, then nothing
+  // from her until the debrief (pilSay drops her lines, G.def.quiet her cues); the CALLs and the controllers stay, the card
+  // carries her prompts (pilAskLine)
+  soloxc:{at:'runway',twr:1,start(S,d){d.solo=1;LESFLY.pilotage.start(S,d);},open(S,d){LESFLY.pilotage.open(S,d);},
+    tick(dt,S,d,a,alt,kt){LESFLY.pilotage.tick(dt,S,d,a,alt,kt);},event(ev,d){LESFLY.pilotage.event(ev,d);}},
   // ---- school2 item 2: diversion and lost procedures. Airborne on the pilotage route's third leg at 3,500, 2.5 nm short of
   // downtown (its 1.5 nm passage ring 1 nm on), on time (LES.ph 1); past downtown (2) a dust storm closes Sky Harbor 20 to 30 s
   // later and the GPS fails (Glendale about 12 nm and 7 minutes away, about 290 magnetic): no mini map, no log, no marker, the diversion card (3) until SET (or 90 s); the plan to Glendale
@@ -15494,13 +15513,18 @@ function pilFix(){const lm=LANDMARKS.find(l=>l.name==='State Farm Stadium')||{x:
   return {G:G,S:S,T:T,D:D,H:H,out:[G,S,T,D,H],back:[H,D,T,S,G]};}
 // a Sky Harbor runway under (x, z), named for the direction of the roll; null off them
 function shRwy(x,z){const K=shUV(x,z);for(const r of SH_RWY)if(Math.abs(K[0])<=r.len/2+60&&Math.abs(K[1]-r.v)<=60)return st.vel.x*SHs-st.vel.z*SHc>=0?r.lo:r.hi;return null;}
+// Dana in the pilotage helpers: silent on the solo cross country (d.solo); returns her line or null (a CALL then shows at once)
+function pilSay(d,t,sp,o){return d.solo?null:cfi(t,sp,o);}
+// the solo's card line for the CALL up (what Dana would have said), null otherwise
+function pilAskLine(d){const a=TASK.ask;if(!d.solo||!a||a!==d.ask||!a.shown)return null;
+  return {req:'Call Phoenix Approach: tap CALL.',rb:'Read back the Bravo: tap CALL.',twr:'Read back the landing: tap CALL.'}[d.askK]||null;}
 const pilHdg={get:()=>G.a.hdg,target:()=>{const l=navCur();return l?l.course:G.a.hdg;},wrap:true,grace:0};
 // on course (1,500 ft above the ground on the climb out): the segment's clock, the log open, the holds (the altitude once
 // within 200 ft of the cruise or 90 s on, so the climb is never graded)
 function pilGo(d,seg){navStamp(seg);for(let i=0;i<4&&navTick(0);i++);navPoint();navShow(true);LES.ph=seg?4:1;if(seg)d.ret=1;
   d.hOn=1;d.altOn=0;d.altW=LES.t;d.hdgW=LES.t;gHold('route',{get:()=>NV.xtk/NM,target:0,grace:0});
   const c=navCur(),cr=d.cr.toLocaleString('en-US');if(!c)return;
-  const t='On course to '+c.to.say+', heading '+hM(c.course)+'. Hold '+cr+'.';cfi(t,cfiSp(t.replace(hM(c.course),hSay(c.course))));}
+  const t='On course to '+c.to.say+', heading '+hM(c.course)+'. Hold '+cr+'.';pilSay(d,t,cfiSp(t.replace(hM(c.course),hSay(c.course))));}
 function pilHolds(d,a,alt){if(!d.hOn)return;
   if(!d.altOn&&(Math.abs(alt-d.cr)<200||LES.t-d.altW>90)){d.altOn=1;const h=G.tasks.alt;if(h)h.t=0;gHold('alt',{get:()=>G.alt,target:()=>d.cr,grace:Math.max(0,60-(LES.t-d.altW))});}
   const c=navCur();if(d.hdgW!=null&&c&&(angD(a.hdg,c.course)<10||LES.t-d.hdgW>45)){d.hdgW=null;gHold('hdg',pilHdg);}}   // the turn onto a new leg is not graded
@@ -15513,21 +15537,21 @@ function pilPass(d,p){const n=navCur(),F=d.F;if(d.hOn){gHoldEnd('hdg');d.hdgW=LE
   if(!n||n.seg!==p.seg)return;   // the segment's last fix: the landing takes over
   const m=Math.max(1,Math.round(n.ete)),bq=p.seg===0&&p.to===F.T&&!d.bAsk&&d.brv===0;
   const t=p.to.short+'. Next is '+n.to.say+', heading '+hM(n.course)+', '+m+(m===1?' minute.':' minutes.')+(bq?' Call Phoenix Approach for the Bravo clearance now.':'');
-  const l=cfi(t,cfiSp(t.replace(hM(n.course),hSay(n.course))));if(bq){d.bAsk=1;pilBravoAsk(d,l,false);}}
+  const l=pilSay(d,t,cfiSp(t.replace(hM(n.course),hSay(n.course))));if(bq){d.bAsk=1;pilBravoAsk(d,l,false);}}
 // past downtown: Phoenix Tower's landing clearance (read back on CALL, not graded) and the descent; it waits for the Bravo
 // exchange (cleared, or no CALL up, or 30 s) so the two never talk over each other
 function pilTwr(d){const B=BASES.phx;
-    cfi('Descend to pattern altitude, 2,100, and line up on 7L. It is long; aim for the numbers.','Descend to pattern altitude, twenty-one hundred, and line up on seven left. It is long; aim for the numbers.');
+    pilSay(d,'Descend to pattern altitude, 2,100, and line up on 7L. It is long; aim for the numbers.','Descend to pattern altitude, twenty-one hundred, and line up on seven left. It is long; aim for the numbers.');
     const tl=say(B.twr,AC.csS+', Phoenix Tower, runway 7L, cleared to land.',[csTs(),'t_'+B.twrClip,'t_'+B.rwyClip,'t_cleared_land'],{ok:inAir,ttl:30});
-    d.ask=tqAsk([{k:'CALL',sub:'Read back',say:'',fn:()=>vqAdd(L(AC.cs,'pilot','Cleared to land, '+AC.csS+'.',['p_rb_cleared_land',csPs()]),{ttl:60})}],{line:tl,wait:20,tag:'les'});d.askDep=0;}
+    d.ask=tqAsk([{k:'CALL',sub:'Read back',say:'',fn:()=>vqAdd(L(AC.cs,'pilot','Cleared to land, '+AC.csS+'.',['p_rb_cleared_land',csPs()]),{ttl:60})}],{line:tl,wait:20,tag:'les'});d.askDep=0;d.askK='twr';}
 // the Class Bravo: the request on CALL (25 s, one nudge, then it waits), Approach's clearance, the readback on CALL. Both
 // before the 5 nm ring: the task passes; airborne inside it without them: a violation, the call still offered once
-function pilBravo(d,dSH){if(!d.bAsk&&d.brv===0&&dSH<10.5*NM){d.bAsk=1;pilBravoAsk(d,cfi('Call Phoenix Approach for the Bravo clearance now.'),false);}
+function pilBravo(d,dSH){if(!d.bAsk&&d.brv===0&&dSH<10.5*NM){d.bAsk=1;pilBravoAsk(d,pilSay(d,'Call Phoenix Approach for the Bravo clearance now.'),false);}
   if(dSH<5*NM&&!d.bIn&&!st.onGround){d.bIn=1;if(d.brv>=2)return;d.bViol=1;gEvent('bravo',false,'entered the Bravo without a clearance');
-    const l=cfi('We just entered the Bravo without a clearance. That is a violation. Call them now.',null,{urgent:1});
+    const l=pilSay(d,'We just entered the Bravo without a clearance. That is a violation. Call them now.',null,{urgent:1});
     if(d.brv===0)pilBravoAsk(d,l,true);else pilRbAsk(d,l,true);}}
 function pilBravoAsk(d,l,again){d.ask=tqAsk([{k:'CALL',sub:'Request the Bravo',say:'',fn:()=>pilBravoReq(d)}],{line:l,wait:25,tag:'les',keep:!!again,
-  late:again?null:()=>{if(LES.on==='pilotage'&&d.brv===0&&!d.bIn)pilBravoAsk(d,cfi('Make the call before the shelf, we need the clearance.'),true);}});d.askDep=0;}
+  late:again?null:()=>{if(LES.on&&LES.d===d&&d.brv===0&&!d.bIn)pilBravoAsk(d,pilSay(d,'Make the call before the shelf, we need the clearance.'),true);}});d.askDep=0;d.askK='req';}
 function pilBravoReq(d){const ap='Phoenix Approach 120.7';d.brv=1;
   const p=vqAdd(L(AC.cs,'pilot','Phoenix Approach, '+AC.cs+', 10 miles west of the field, 3,500, landing Sky Harbor, request Class Bravo clearance.',['p_phoenix_approach',csP(),'p_req_bravo']),{ttl:60});
   const t=vqAdd(L(ap,'tower',AC.cs+', Phoenix Approach, squawk 4521, cleared into the Class Bravo airspace, maintain 3,500, Sky Harbor runway 7L.',
@@ -15536,14 +15560,14 @@ function pilBravoReq(d){const ap='Phoenix Approach 120.7';d.brv=1;
 function pilRbAsk(d,l,again){d.ask=tqAsk([{k:'CALL',sub:'Read back',say:'',fn:()=>{d.brv=2;
     vqAdd(L(AC.cs,'pilot','Cleared into the Class Bravo, 3,500, squawk 4521, '+AC.csS+'.',['p_rb_bravo',csPs()]),{ttl:60});
     if(!d.bViol)gEvent('bravo',true,'cleared into the Class Bravo, read back');}}],{line:l,wait:25,tag:'les',keep:!!again,
-  late:again?null:()=>{if(LES.on==='pilotage'&&d.brv===1&&!d.bIn)pilRbAsk(d,cfi('Read back the clearance. Tap CALL.'),true);}});d.askDep=0;}
+  late:again?null:()=>{if(LES.on&&LES.d===d&&d.brv===1&&!d.bIn)pilRbAsk(d,pilSay(d,'Read back the clearance. Tap CALL.'),true);}});d.askDep=0;d.askK='rb';}
 // 5 nm from Glendale: the inbound call on CALL, then the tower's landing clearance and its readback (cirTwr)
 function pilHome(d,o){o=o||{};const B=BASES.kgeu,tw=B.twr.split(' ').slice(0,2).join(' '),q=st.pos,F=d.F,b=(Math.atan2(q.x-F.G.x,-(q.z-F.G.z))*180/Math.PI+360)%360,
     dir=['north','northeast','east','southeast','south','southwest','west','northwest'][Math.round(b/45)%8],mi=o.mi||5;   // o (the diversion): mi, the opening line
-  const l=cfi(o.line||'Five miles out. Call Glendale Tower for the landing.');
+  const l=pilSay(d,o.line||'Five miles out. Call Glendale Tower for the landing.');
   const ask=(l2,again)=>{d.ask=tqAsk([{k:'CALL',sub:'Inbound full stop',say:'',fn:()=>{d.calls++;
       d.twrW=vqAdd(L(AC.cs,'pilot',tw+', '+AC.cs+', '+mi+' miles '+dir+', 4,500, inbound full stop.',['p_'+B.twrClip,csP()]),{ttl:60});}}],{line:l2,wait:25,tag:'les',keep:again,
-    late:again?null:()=>{if(LES.on&&LES.d===d&&!d.home)ask(cfi('Make the call to Glendale Tower.'),true);}});d.askDep=0;};
+    late:again?null:()=>{if(LES.on&&LES.d===d&&!d.home)ask(pilSay(d,'Make the call to Glendale Tower.'),true);}});d.askDep=0;};
   ask(l,false);}
 // ---- school2 item 2: the diversion lesson's helpers. The event: Sky Harbor closes, the GPS fails (navOff: no log, no marker,
 // no route; body.navMapOff: no mini map), the card opens on the current magnetic heading

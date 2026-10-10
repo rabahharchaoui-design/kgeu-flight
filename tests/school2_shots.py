@@ -22,6 +22,20 @@
 # ahead, the lesson card. night_debrief_<WxH>: the debrief after three clean full stops (7 rows). night_after_844x390: a
 # frame after the debrief's CONTINUE IN FREE FLIGHT, the sky back to day. Split for the 110s cap: --n844 (rwy+final at
 # 844, ~25s), --n568 (rwy only at 568, ~10s), --ndeb844 (debrief+after at 844, ~75s), --ndeb568 (debrief only at 568, ~65s).
+#
+# School2 item 4: Stage 3 lesson 4, the solo cross country (the pilotage trip, nobody in the right seat). map_s3_full_844x390:
+# the Flight school screen, Stage 3 selected, all four real rows (pilotage, divert, night, soloxc), kgeuSchool seeded with
+# pilotage A, divert B, night A so soloxc is the next lesson. solo_call_<WxH>: the moment the Bravo CALL button is up (the
+# same leg as item1's xc_bravo, flown as 'soloxc' instead), the lesson card's "Call Phoenix Approach: tap CALL." prompt, and
+# whether the #atc subtitle is live (it should not be a Dana line: she is silent after her start line). solo_debrief_<WxH>:
+# the debrief after a clean run (the same shape as school_soloxc_check.py's run_b: out to Sky Harbor, a stop, back to
+# Glendale, a stop): the Endorsement row first ("Solo cross country, signed by Dana Reyes, CFI"). logbook_xc_844x390: the
+# Logbook screen right after that same run, no replay: kgeuEndorse seeded with the Stage 1 solo endorsement already signed
+# (so it reads as earned, same as a real student who soloed before their XC), plus the solo cross country endorsement this
+# run grants; the last logbook entry 1.5 solo / 1.5 XC. Split for the 110s cap: --item4map (map only, no flight, ~5s),
+# --item4call844 / --item4call568 (to the Bravo CALL, one size each), --item4deb844 (the full out-and-back to the debrief,
+# then straight on to the Logbook for logbook_xc_844x390, no replay), --item4deb568 (the debrief only). --item4 runs the
+# whole group end to end (well over 110s: never call it directly in one foreground Bash call).
 import asyncio, os, sys
 from playwright.async_api import async_playwright
 from harness import serve, launch, page, PLACED
@@ -32,6 +46,12 @@ SHOTS = os.path.join(os.path.dirname(__file__), '..', 'overnight-screenshots', '
 os.makedirs(SHOTS, exist_ok=True)
 ST = dict(BASE, **PLACED)
 SIZES = [(844, 390), (568, 320)]
+# item 4: Stage 3 progress seeded directly (pilotage A, divert B, night A) so soloxc is the next lesson; kgeuEndorse is
+# seeded only for the logbook shot, with the Stage 1 solo endorsement already signed (soloxc itself grants 'xc', not 'solo')
+SCH_SEED = '{"cessna:pilotage":"A","cessna:divert":"B","cessna:night":"A"}'
+ENDORSE_SEED = '{"solo":{"at":1759000000000,"by":"Dana Reyes, CFI","lesson":"solo"}}'
+ST4 = dict(ST, kgeuSchool=SCH_SEED)
+ST4E = dict(ST4, kgeuEndorse=ENDORSE_SEED)
 R = "()=>{const K=window.__kgeu;for(let i=0;i<6;i++)K.stepFrame(0.03,false,false);K.stepFrame(0,true)}"
 NAVS = f"()=>{{const N={K}.NAV;return {{leg:N.leg,on:N.on,show:N.show,legs:N.legs.map(l=>({{to:l.to.short,c:l.course,seg:l.seg,at:l.at,miss:l.miss,eta:l.eta}})),x:N.legs.map(l=>[l.from.x,l.from.z,l.to.x,l.to.z])}}}}"
 ASK = "K.TASK.ask&&K.TASK.ask.shown"
@@ -428,6 +448,103 @@ async def ndeb(b, url, W, H, after=False):
         await shot(pg, 'night_after_844x390.png')
     await pg.context.close()
 
+# ---------------- item 4: the solo cross country (the pilotage trip flown alone) ----------------
+LESI = "()=>document.getElementById('lesI').textContent"
+
+async def map_s3_full(b, url):
+    # map_s3_full: Stage 3 selected with all four real rows, pilotage/divert/night already passed so soloxc is next
+    pg = await page(b, url, vp={'width': 844, 'height': 390}, storage=ST4)
+    await pg.evaluate(f"()=>{{{K}.openMenu('sSchool');{K}.schSelect('s3')}}")
+    rows = await pg.evaluate("()=>[...document.querySelectorAll('#school .lrow')].map(r=>[r.dataset.l,r.classList.contains('soon'),r.classList.contains('done'),r.classList.contains('next')])")
+    print('  map_s3_full rows', rows)
+    await shot(pg, 'map_s3_full_844x390.png')
+    await pg.context.close()
+
+async def solo_to_bravo(pg):
+    """soloxc flown like item1's fly_size, up to (or just past) the Bravo CALL coming up near Tolleson/downtown"""
+    F = await rwy(pg)
+    await call(pg)   # the takeoff clearance read back
+    await climbout(pg, F)
+    n = await pg.evaluate(NAVS)
+    await fly(pg, 150, hold=3500, kt=90, vs=0, hdg=n['legs'][n['leg']]['c'])
+    start_leg = (await pg.evaluate(NAVS))['leg']
+    for i in range(start_leg, 2):
+        await leg(pg, i, 3500)
+    return F
+
+async def solo_call(b, url, W, H):
+    pg = await page(b, url, vp={'width': W, 'height': H}, storage=ST4)
+    await start(pg, 'soloxc')
+    await solo_to_bravo(pg)
+    ask = await pg.evaluate(f"()=>{{const a={K}.TASK.ask;return !!(a&&a.shown)}}")
+    atc_on = await pg.evaluate("()=>document.getElementById('atc').classList.contains('on')")
+    card = await pg.evaluate(LESI)
+    dana = await pg.evaluate(DANA)
+    print(f'  solo_call {W}x{H} CALL up {ask} atc.on {atc_on} card {card!r} Dana lines so far {len(dana)}')
+    await shot(pg, f'solo_call_{W}x{H}.png')
+    await pg.context.close()
+
+async def solo_fly_full(pg):
+    """the whole soloxc lesson, clean, the same shape as school_soloxc_check.py's run_b: out to Sky Harbor, a stop,
+    back to Glendale, a stop. Identical in substance to this file's own debrief_size (item1), lesson id swapped"""
+    F = await rwy(pg)
+    await call(pg)
+    await climbout(pg, F)
+    n = await pg.evaluate(NAVS)
+    await fly(pg, 150, hold=3500, kt=90, vs=0, hdg=n['legs'][n['leg']]['c'])
+    start_leg = (await pg.evaluate(NAVS))['leg']
+    for i in range(start_leg, 4):
+        await fly_leg(pg, i, 3500)
+    # Sky Harbor runway 7L: a touchdown 300 m past the threshold, then a stop
+    tx, tz = await pg.evaluate("()=>{const K=window.__kgeu;return [K.shX(-1751+300,-300),K.shZ(-1751+300,-300)]}")
+    await fly(pg, 2, x=tx, z=tz, agl=20, kt=62, vs=-200, hdg=92)
+    await pg.evaluate(f"([x,z])=>{{const K={K};K.events.push({{type:'touchdown',fpm:180,paved:K.isPaved(x,z),x:x,z:z,ias:33,bank:0}})}}", [tx, tz])
+    await fly(pg, 2, agl=10, kt=55, vs=-100, hdg=92)
+    sx, sz = await pg.evaluate("()=>{const K=window.__kgeu;return [K.shX(-1751+900,-300),K.shZ(-1751+900,-300)]}")
+    await pg.evaluate(f"""([x,z])=>{{const K={K};for(let i=0;i<30&&K.LES.on;i++){{const s=K.state();s.pos.set(x,K.groundHeight(x,z)+K.rwyFrame().gear,z);s.vel.set(0,0,0);s.w.set(0,0,0);s.onGround=true;s.throttle=0;K.stepFrame(0.1,false,true);}}
+      K.stepFrame(0,true);}}""", [sx, sz])
+    # the climb out home
+    await fly(pg, 200, x=sx, z=sz, agl=1300, kt=74, vs=700, hdg=287, until='K.LES.d.ret===1')
+    n = await pg.evaluate(NAVS)
+    await fly(pg, 150, hold=4500, kt=90, vs=0, hdg=n['legs'][n['leg']]['c'])
+    for i in range(4, 7):
+        await fly_leg(pg, i, 4500)
+    hg = await pg.evaluate(f"()=>{{const K={K},s=K.state(),F=K.rwyFrame(),u=F.thr;return (Math.atan2(K.wX(u,0)-s.pos.x,-(K.wZ(u,0)-s.pos.z))*180/Math.PI+360)%360}}")
+    await taps(pg, 4500, hg, k=2, n=300)
+    await final(pg, F)
+    await touchdown(pg, F, past=60, fpm=160)
+    await stop(pg, F)
+    await pg.wait_for_timeout(800)
+    return F
+
+async def solo_debrief(b, url, W, H, logbook=False):
+    # solo_debrief_<WxH>; at 844 with logbook=True, continues on (no replay) to the Logbook screen for logbook_xc_844x390
+    st = ST4E if logbook else ST4
+    pg = await page(b, url, vp={'width': W, 'height': H}, storage=st)
+    await start(pg, 'soloxc')
+    await solo_fly_full(pg)
+    d = await pg.evaluate(DEBRIEF)
+    dana = await pg.evaluate(DANA)
+    print(f'  solo_debrief {W}x{H} on {d["on"]} letter {d["letter"]} gl[0] {d["gl"][0] if d["gl"] else None} Dana lines {len(dana)}')
+    await shot(pg, f'solo_debrief_{W}x{H}.png')
+    if logbook:
+        await pg.evaluate(f"()=>{{{K}.resClose(document.getElementById('gradeOv'));{K}.openMenu();{K}.nav('sLog')}}")
+        await pg.wait_for_timeout(400)
+        rings = await pg.evaluate("()=>[...document.querySelectorAll('#logRings .lRing')].map(r=>r.dataset.k)")
+        endo = await pg.evaluate("()=>document.getElementById('logEnd').textContent")
+        entry = await pg.evaluate("()=>{const e=JSON.parse(localStorage.getItem('kgeuLogbook')||'{}').entries||[];return e[e.length-1]}")
+        print(f'  logbook_xc rings {rings} endorsements {endo!r} last entry {entry}')
+        await shot(pg, 'logbook_xc_844x390.png')
+    await pg.context.close()
+
+async def item4(b, url):
+    # the whole item4 group, end to end; well over 110s, never call this one directly in a single foreground Bash call
+    await map_s3_full(b, url)
+    await solo_call(b, url, 844, 390)
+    await solo_call(b, url, 568, 320)
+    await solo_debrief(b, url, 844, 390, logbook=True)
+    await solo_debrief(b, url, 568, 320)
+
 async def main():
     srv, url = serve()
     async with async_playwright() as p:
@@ -465,6 +582,18 @@ async def main():
         if '--item3' in sys.argv:
             await n844(b, url); await n568(b, url); await ndeb(b, url, 844, 390, after=True); await ndeb(b, url, 568, 320, after=False)
             await b.close(); srv.shutdown(); return
+        if '--item4map' in sys.argv:
+            await map_s3_full(b, url); await b.close(); srv.shutdown(); return
+        if '--item4call844' in sys.argv:
+            await solo_call(b, url, 844, 390); await b.close(); srv.shutdown(); return
+        if '--item4call568' in sys.argv:
+            await solo_call(b, url, 568, 320); await b.close(); srv.shutdown(); return
+        if '--item4deb844' in sys.argv:
+            await solo_debrief(b, url, 844, 390, logbook=True); await b.close(); srv.shutdown(); return
+        if '--item4deb568' in sys.argv:
+            await solo_debrief(b, url, 568, 320); await b.close(); srv.shutdown(); return
+        if '--item4' in sys.argv:
+            await item4(b, url); await b.close(); srv.shutdown(); return
         if '--item1b' in sys.argv:
             await item1b(b, url); await b.close(); srv.shutdown(); return
         if '--item1a' in sys.argv:

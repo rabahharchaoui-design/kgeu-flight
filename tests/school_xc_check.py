@@ -64,7 +64,7 @@ async def main():
         ok('(a) the Stage 3 node is open, no Coming soon', node and 'soon' not in node[0] and 'locked' not in node[0] and 'Coming soon' not in node[1], node)
         await finger(pg, '.sNode[data-st=s3]'); await pg.wait_for_timeout(400)
         rows = await pg.evaluate("()=>[...document.querySelectorAll('#school .lrow')].map(r=>[r.dataset.l,r.classList.contains('soon')])")
-        ok('(a) Stage 3: pilotage and divert lesson rows, then two Coming soon rows', rows == [['pilotage', False], ['divert', False], ['night', True], ['soloxc', True]], rows)
+        ok('(a) Stage 3: the four lesson rows, none Coming soon', rows == [['pilotage', False], ['divert', False], ['night', False], ['soloxc', False]], rows)
         await finger(pg, '#school .lrow[data-l=pilotage]'); await pg.wait_for_timeout(600)
         r = await pg.evaluate(f"()=>({{on:{K}.LES.on,brief:document.getElementById('brOv').classList.contains('on'),t:document.getElementById('brT').textContent}})")
         ok('(a) the row tap opens the briefing for the pilotage lesson', r == {'on': 'pilotage', 'brief': True, 't': 'Pilotage and dead reckoning'}, r)
