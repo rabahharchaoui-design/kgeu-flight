@@ -13034,7 +13034,7 @@ const menu=document.getElementById('menu'),crashEl=document.getElementById('cras
 // know them (server/src/boards.js has no task: entry, it refuses an unknown board), so they live on this device
 // (LB.localAdd) and the XP is counted here (taskXp, the Worker's formula) until the Worker takes them.
 const TASK={on:false,id:null,def:null,d:null,R:null,seed:0,si:0,stage:null,t:0,st0:0,brief:false,ask:null,asks:[],done:false,res:null,
-  tgts:[],sens:false,objs:[],askN:0,test:{seed:null,noBrief:false},log:[]};
+  tgts:[],sens:false,objs:[],later:[],askN:0,test:{seed:null,noBrief:false},log:[]};
 const TASK_IDS=['overwatch','lifeline','shepherd','finder'];
 const TASKS={};
 const tqBoard=id=>'task:'+id;
@@ -13064,6 +13064,8 @@ function tqSay(who,text,o){o=o||{};
   return vqAdd(l,{pri:o.pri!=null?o.pri:2,ttl:o.ttl||60});
 }
 const tqMC=(text,o)=>tqSay('Mission Control',text,o);
+// fn after sec of the tasking's sim time (a follow up call)
+function tqLater(sec,fn){TASK.later.push({t:st.time+sec,fn:fn});}
 // fn once the air is quiet: the tower's takeoff clearance and its readback are out and nothing waits (or after max s)
 function tqQuiet(fn,max){TASK.quiet={fn:fn,t:0,max:max||12};}
 function tqQuietTick(dt){const q=TASK.quiet;if(!q)return;q.t+=dt;
@@ -13123,7 +13125,7 @@ function taskStart(id,o){const D=TASKS[id];if(!D)return;
   start('runway',D.base||'luke');RUNSTART={k:'task',id:id};
   // no haboob for a tasking: the day sky for this run, the saved choice comes back on the next start() (as the dogfight)
   if(TOD.id==='haboob'){const p=TOD.id;setTOD('day');try{localStorage.setItem('kgeuTOD',p);}catch(e){}ARC.prevTod=p;hbSync(true);}
-  Object.assign(TASK,{on:true,id:id,def:D,seed:seed,R:tqRng(seed),si:0,stage:null,t:0,brief:false,ask:null,quiet:null,done:false,res:null,sens:false,log:[]});
+  Object.assign(TASK,{on:true,id:id,def:D,seed:seed,R:tqRng(seed),si:0,stage:null,t:0,brief:false,ask:null,quiet:null,later:[],done:false,res:null,sens:false,log:[]});
   tqClear();
   const d=TASK.d={id:id,seed:seed,mode:runMode(),t0:0,replies:0,replyT:0,missed:0};
   D.roll(TASK.R,d);
@@ -13142,7 +13144,7 @@ function taskGo(){if(!TASK.on||TASK.done)return;audioSess();initAudio();
 }
 function taskStop(){if(!TASK.on&&!TASK.objs.length)return;
   const D=TASK.def;if(D&&D.cleanup)try{D.cleanup(TASK.d);}catch(e){console.warn(e);}
-  TASK.on=false;TASK.brief=false;TASK.ask=null;TASK.quiet=null;TASK.sens=false;tqReplyUI();tqClear();
+  TASK.on=false;TASK.brief=false;TASK.ask=null;TASK.quiet=null;TASK.later=[];TASK.sens=false;tqReplyUI();tqClear();
   $('tkBrief').classList.remove('on');
   if(DEST&&DEST.task){DEST=null;document.body.classList.remove('hasDest');destUI(true);}
   for(let i=radioQ.length-1;i>=0;i--)if(radioQ[i].task){radioQ[i].dead=true;radioQ.splice(i,1);}
@@ -13160,6 +13162,7 @@ function taskUpdate(dt){
   const D=TASK.def,d=TASK.d;
   if(D.always)D.always(d,dt);
   tqQuietTick(dt);tqAskTick(dt);
+  for(let i=TASK.later.length-1;i>=0;i--)if(st.time>=TASK.later[i].t){const f=TASK.later[i].fn;TASK.later.splice(i,1);f();}
   const S=TASK.stage;if(!S)return;
   if(S.obj){const o=S.obj(d);if(o){const k=o.join('|');if(k!==TASK.objK){TASK.objK=k;tqObj(o[0],o[1],o[2]);}}}
   if(S.tick&&S.tick(d,dt)){if(TASK.si+1<D.stages.length)tqStageGo(TASK.si+1);else taskEnd();}
@@ -13517,6 +13520,142 @@ function llAp(d,dt){const a=st.ap;if(!a||!a.tk||a.mode!=='hold')return;
   else if(S==='route'){a.y=ga+305;a.v=180*KT;}
   else{a.y=ga+305;a.v=140*KT;if(MISS.dropped&&tqD(d.c.x,d.c.z)<600)a.trk=Math.atan2(d.f.x,-d.f.z);}
 }
+// ---- SHEPHERD (F-16C Viper, escort) ----
+// Join on a C-130 (Herky 21, the game's C-130H model, cloned as it is) and hold the escort position, right side about
+// 1,000 ft out and 1,100 ft aft, through a corridor south-west of Luke while Mission Control calls traffic (a Cessna and
+// a 737 that are really there) and weather (a buildup the lead deviates around). Stay in the lane, stay in the band.
+// No combat. Scored on station keeping, the lane and the join. Rolled: the corridor (start, heading, three legs and their
+// turns), the lead's altitude, the weather's leg and side, the traffic's clock and timing, the wind.
+const SH_SLOT={r:300,b:350},SH_V=118;   // the escort position: 300 m right, 350 m aft (he is at 10 to 11 o'clock, in view); 230 kt true
+function tqClone(src){const c=src.clone(true),A=[],B=[];src.traverse(o=>A.push(o));c.traverse(o=>B.push(o));const M=new Map();A.forEach((o,i)=>M.set(o,B[i]));return {c:c,M:M};}
+// the lead: the C-130H as the player flies it, props turning (its own rig, mapped onto the clone), gear up
+function shLead(){const m=getModel('c130'),k=tqClone(m.g),P=m.propRig,g=k.c;g.visible=true;
+  const L={g:g,ps:P?P.ps.map(p=>k.M.get(p)).filter(Boolean):[],ds:P?P.ds.map(p=>k.M.get(p)).filter(Boolean):[],bl:P?P.blades.map(p=>k.M.get(p)).filter(Boolean):[],P:P};
+  if(m.gear){const gg=k.M.get(m.gear);if(gg)gg.visible=false;}
+  if(m.canopy){const c=k.M.get(m.canopy);if(c)c.visible=true;}
+  return L;}
+function shLeadFrame(L,dt){if(!L.P)return;const K=L.P.K,rate=K.idle+0.75*(K.max-K.idle);
+  for(const p of L.ps)p.rotation.z+=rate*dt;for(const b of L.bl)b.visible=false;for(const d of L.ds){d.visible=true;d.rotation.z+=rate*0.02*dt;}
+  if(L.P.dm)L.P.dm.opacity=Math.max(L.P.dm.opacity,0.6);}
+// traffic that is really there: a clone of the game's own model flying a straight line
+function shFlyer(id,x,y,z,h,kt){const m=getModel(id),k=tqClone(m.g),g=k.c;g.visible=true;if(m.gear){const gg=k.M.get(m.gear);if(gg)gg.visible=false;}
+  tqAdd(g);return {g:g,x:x,y:y,z:z,h:h,v:kt*KT,t:0};}
+function shCorridor(R){const L0=LUKE;
+  const b=tqR(R,200,290)*Math.PI/180,s={x:L0.x+Math.sin(b)*5000,z:L0.z-Math.cos(b)*5000};
+  let h=tqR(R,185,245)*Math.PI/180;const W=[s];let x=s.x,z=s.z;
+  for(let i=0;i<3;i++){const len=tqR(R,8500,11000);x+=Math.sin(h)*len;z-=Math.cos(h)*len;W.push({x:x,z:z});h+=(R()<0.5?-1:1)*tqR(R,15,35)*Math.PI/180;}
+  return W;}
+function shLane(d,x,z){let best=1e12;for(let i=0;i<d.W.length-1;i++){const a=d.W[i],b=d.W[i+1];best=Math.min(best,segD(x,z,a.x,a.z,b.x,b.z));}return best;}
+// where we are against the escort position, in the lead's frame: right, aft, above (m)
+function shRel(d){const L=d.L,f={x:Math.sin(L.h),z:-Math.cos(L.h)},r={x:Math.cos(L.h),z:Math.sin(L.h)},dx=st.pos.x-L.x,dz=st.pos.z-L.z;
+  const right=dx*r.x+dz*r.z,fwd=dx*f.x+dz*f.z,up=(st.pos.y-GEAR)-L.y;
+  return {right:right,aft:-fwd,up:up,ex:right-SH_SLOT.r,ea:-fwd-SH_SLOT.b,err:Math.hypot(right-SH_SLOT.r,-fwd-SH_SLOT.b)};}
+function shIn(d){const q=shRel(d),e=rookie();return q.err<=(e?700:400)&&Math.abs(q.up)*M2FT<=(e?500:300);}
+TASKS.shepherd={name:'Shepherd',role:'Escort',ac:'f16',base:'luke',airStart:1,limit:420,
+  roll(R,d){d.W=shCorridor(R);d.alt=Math.round(tqR(R,8,11))*1000;d.wdir=Math.round(tqR(R,18,30))*10;d.wkt=Math.round(tqR(R,8,22));
+    d.devAt=tqR(R,75,110);d.devSide=R()<0.5?-1:1;d.devDur=tqR(R,40,55);
+    d.t1=tqR(R,25,40);d.t1c=tqPick(R,[1,2,10,11]);d.t1u=R()<0.5?-1:1;d.t2=tqR(R,140,175);d.t2c=tqPick(R,[2,3,9,10]);
+    let len=0;for(let i=0;i<d.W.length-1;i++)len+=Math.hypot(d.W[i+1].x-d.W[i].x,d.W[i+1].z-d.W[i].z);d.len=len;
+    d.par=Math.round(len/SH_V+20);d.joinPar=60;d.inT=0;d.inS=0;d.laneT=0;d.laneS=0;d.join=null;d.inRun=0;},
+  brief(d){const h0=tqBrg(d.W[0].x,d.W[0].z,d.W[1].x,d.W[1].z);return {ac:'F-16C Viper · airborne, 2 miles behind the package',
+    sit:'Herky 21, a C-130H, is crossing corridor Bravo '+tqDir(h0)+' of Luke at '+d.alt.toLocaleString('en-US')+' ft, 230 kt. Join on his right side, about 1,000 ft out and back, and hold it through the corridor. Mission Control will call traffic and weather. No weapons today.',
+    facts:[['CORRIDOR',tqDs(d.len)],['PAR',tqClock(d.par)],['ALTITUDE',d.alt.toLocaleString('en-US')+' ft'],['WIND ALOFT',tqWind(d.wdir,d.wkt)]]};},
+  spawn(d){const W=d.W,h=Math.atan2(W[1].x-W[0].x,-(W[1].z-W[0].z)),y=(d.alt-FIELD_FT)/M2FT+GEAR;
+    const Lm=shLead();tqAdd(Lm.g);d.L={x:W[0].x,z:W[0].z,y:y,h:h,bank:0,k:1,Lm:Lm,done:false,dev:0};shLeadPose(d,0);
+    const f={x:Math.sin(h),z:-Math.cos(h)},r={x:Math.cos(h),z:Math.sin(h)},x=W[0].x-f.x*3600-r.x*900,z=W[0].z-f.z*3600-r.z*900;
+    placeAir(x,z,Math.max(500,d.alt-1500-FIELD_FT-Math.max(0,groundHeight(x,z))*M2FT),h,300);st.gearDown=false;st.gearPos=0;st.flapIdx=0;trimSpawn(st,0);
+    tqDest(d.L.x,d.L.z,'Herky 21','HERKY');
+    // Easy: a diamond on the escort position
+    if(rookie()){const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:SH_DIA,color:0x9fffc8,transparent:true,depthWrite:false,depthTest:false,sizeAttenuation:false,fog:false}));sp.scale.set(0.05,0.05,1);sp.renderOrder=6;d.mk=tqAdd(sp);}
+  },
+  // Easy: AUTO holds the escort position (Hard flies it by hand); again: off
+  autoLbl:(d,ap)=>rookie()?(ap&&ap.tk?'Auto Off':'Hold Slot'):'Hand Fly',
+  auto(d){if(!rookie()){toast('Hard: you hold the escort position by hand. Easy has a slot hold',3);return true;}
+    if(st.ap&&st.ap.tk){st.ap=null;st.apW=null;toast('Autopilot off, your airplane');return true;}
+    initAudio();apEngage(st,'hold');st.ap.tk=1;shAp(d);toast('Holding the escort position. AUTO again: your airplane',3);return true;},
+  always(d,dt){shLeadMove(d,dt);shAp(d);
+    if(DEST&&DEST.task){DEST.x=d.L.x;DEST.z=d.L.z;}
+    if(d.mk){const L=d.L,r={x:Math.cos(L.h),z:Math.sin(L.h)},f={x:Math.sin(L.h),z:-Math.cos(L.h)};d.mk.position.set(L.x+r.x*SH_SLOT.r-f.x*SH_SLOT.b,L.y,L.z+r.z*SH_SLOT.r-f.z*SH_SLOT.b);d.mk.visible=!shIn(d);}
+    for(const T of d.tfc||[]){T.t+=dt;T.x+=Math.sin(T.h)*T.v*dt;T.z-=Math.cos(T.h)*T.v*dt;T.g.position.set(T.x,T.y,T.z);T.g.rotation.set(0,-T.h,0,'YXZ');if(T.t>120)T.g.visible=false;}
+  },
+  stages:[
+    {id:'join',name:'Join on Herky 21, right side, 1,000 ft out and back',
+      obj:d=>['Join on Herky 21',shCue(d)],
+      enter(d){d.j0=st.time;
+        const l=tqMC(AC.csS+', Mission Control. Herky 21 is your package, 2 miles ahead, '+d.alt.toLocaleString('en-US')+'. Join on his right side and escort him through corridor Bravo.',{plain:'Catch up with the C-130 ahead and fly beside its right wing.'});
+        tqAsk([{k:'WILCO',fn:()=>tqSay('Herky 21','Herky 21, 230 knots, '+d.alt.toLocaleString('en-US')+', looking for you.',{plain:'The C-130 is waiting for you.'})},
+          {k:'UNABLE',fn:()=>tqMC('Copy. Herky 21 presses on regardless; join when able.',{plain:'Catch up when you can.'})}],{line:l});},
+      tick(d,dt){d.inRun=shIn(d)?d.inRun+dt:0;
+        if(d.inRun>=4){d.join=st.time-d.j0;tqSay('Herky 21','Viper in sight, welcome aboard. Herky 21, steady 230.',{plain:'The C-130 sees you. Stay beside it.'});return true;}
+        if(st.time-d.j0>150){d.join=null;tqMC(AC.csS+', Herky 21 is pressing on through the corridor. Join when able.',{plain:'Catch up: the C-130 will not wait.'});return true;}return false;}},
+    {id:'escort',name:'Hold escort position through the corridor',
+      obj:d=>['Escort Herky 21',shCue(d),!shIn(d)],
+      enter(d){d.e0=st.time;},
+      tick(d,dt){const t=st.time-d.e0;
+        if(shIn(d))d.inS+=dt;d.inT+=dt;
+        const lw=d.devOn||(d.devEnd&&st.time-d.devEnd<60)?5556:2778;if(shLane(d,st.pos.x,st.pos.z)<=lw)d.laneS+=dt;d.laneT+=dt;
+        if(t>=d.t1&&!d.c1){d.c1=1;shTraffic(d,1);}
+        if(t>=d.devAt&&!d.cw){d.cw=1;shWeather(d);}
+        if(d.devOn&&st.time-d.devT0>d.devDur){d.devOn=0;d.devEnd=st.time;d.L.dev=0;tqSay('Herky 21','Herky 21, clear of the weather, back on course.',{plain:'The C-130 turns back onto the route.'});}
+        if(t>=d.t2&&!d.c2){d.c2=1;shTraffic(d,2);}
+        return d.L.done;}},
+    {id:'handoff',name:'Hand off and RTB',
+      obj:d=>['Hand off','WILCO, Mission Control'],
+      enter(d){tqSay('Herky 21','Herky 21, end of corridor Bravo. Thanks for the escort, Viper.',{plain:'The C-130 thanks you.'});
+        const l=tqMC(AC.csS+', Herky 21 is clear of the corridor. You are released. RTB. Good work.',{plain:'Job done. You can head home.'});
+        tqAsk([{k:'WILCO'}],{line:l,wait:12,late:()=>{}});d.h0=st.time;},
+      tick:d=>!TASK.ask&&st.time-d.h0>3}],
+  score(d){const k=d.inT>0?d.inS/d.inT:0,la=d.laneT>0?d.laneS/d.laneT:0,j=d.join==null?0:15*clamp(1-(d.join-d.joinPar)/105,0,1);
+    const sc=60*k+25*la+j;
+    return {score:sc,title:k>=0.9?'Glued to his wing':k>=0.7?'Solid escort':k>=0.4?'Loose escort':'Herky 21 flew alone',
+      lines:[['Escort position held',Math.round(k*100)+' %  ('+Math.round(d.inS)+' of '+Math.round(d.inT)+' s)'],['In the corridor',Math.round(la*100)+' %'],
+        ['Join',d.join==null?'not made':tqClock(d.join)+'  (par '+tqClock(d.joinPar)+')'],
+        ['Traffic called',[d.r1,d.r2].filter(Boolean).join(', ')||'no answer'],['Weather',d.cw?'deviated '+(d.devSide<0?'left':'right'):'none']],
+      tip:k<0.6?(rookie()?'AUTO holds the slot in Easy. The green diamond is where to be.':'Match his 230 kt first, then close the gap a little at a time.'):la<0.8?'Stay with him through the deviation: the corridor widens while he goes round.':'Fly it again: the corridor, the weather and the traffic change every time.'};},
+  cleanup(d){}
+};
+const SH_DIA=tex(64,64,(x,w,h)=>{x.clearRect(0,0,w,h);x.strokeStyle='#fff';x.lineWidth=6;x.beginPath();x.moveTo(32,6);x.lineTo(58,32);x.lineTo(32,58);x.lineTo(6,32);x.closePath();x.stroke();});
+// the lead: towards the next waypoint at standard rate (3 deg/s), the deviation added on, bank from the turn, props turning
+function shLeadMove(d,dt){const L=d.L;if(L.done||dt<=0){shLeadPose(d,dt);return;}
+  const w=d.W[L.k];if(Math.hypot(w.x-L.x,w.z-L.z)<700){L.k++;if(L.k>=d.W.length){L.done=true;}}
+  const tgt=L.k<d.W.length?d.W[L.k]:null;
+  if(tgt){const want=Math.atan2(tgt.x-L.x,-(tgt.z-L.z))+L.dev,e=wrapPi(want-L.h),w0=Math.min(Math.abs(e),0.0524*dt)*Math.sign(e);L.h+=w0;
+    const bk=Math.atan(SH_V*(w0/Math.max(dt,1e-3))/9.81);L.bank+=(bk-L.bank)*Math.min(1,dt*1.5);}
+  L.x+=Math.sin(L.h)*SH_V*dt;L.z-=Math.cos(L.h)*SH_V*dt;shLeadPose(d,dt);}
+const _shE=new THREE.Euler(0,0,0,'YXZ');
+function shLeadPose(d,dt){const L=d.L;L.Lm.g.position.set(L.x,L.y,L.z);L.Lm.g.quaternion.setFromEuler(_shE.set(0.03,-L.h,-L.bank,'YXZ'));shLeadFrame(L.Lm,dt);}
+// the HUD cue: how far off the escort position and which way to fix it
+function shCue(d){const q=shRel(d),E=rookie(),gap=q.err;
+  const dv=(Math.hypot(st.vel.x,st.vel.z)-SH_V)*MS2KT,up=q.up*M2FT;
+  if(gap>1500)return (E?tqMi(gap):tqNm(gap))+' to the slot. '+(q.ea>0?'Faster: he is at 230':'Ease off');
+  const a=q.ea>120?(E?'Speed up a bit':'Close, '+Math.round(q.ea)+' m aft'):q.ea<-120?(E?'Slow down a bit':Math.round(-q.ea)+' m ahead'):'';
+  const s=q.ex>150?(E?'Move left':'Wide '+Math.round(q.ex)+' m'):q.ex<-150?(E?'Move right':'Tight '+Math.round(-q.ex)+' m'):'';
+  const v=up>200?(E?'Lower':Math.round(up/10)*10+' ft high'):up<-200?(E?'Higher':Math.round(-up/10)*10+' ft low'):'';
+  const t=[a,s,v].filter(Boolean).join('. ');return t||(shIn(d)?'In position'+(Math.abs(dv)>15?(dv>0?'. A touch fast':'. A touch slow'):''):'Nearly there');}
+// Easy's slot hold: aim 1 km ahead of the slot on the lead's heading, its altitude, its speed plus the gap to close
+function shAp(d){const a=st.ap;if(!a||!a.tk||a.mode!=='hold')return;const L=d.L,f={x:Math.sin(L.h),z:-Math.cos(L.h)},r={x:Math.cos(L.h),z:Math.sin(L.h)};
+  const q=shRel(d),sx=L.x+r.x*SH_SLOT.r-f.x*SH_SLOT.b,sz=L.z+r.z*SH_SLOT.r-f.z*SH_SLOT.b,ax=sx+f.x*1000,az=sz+f.z*1000;
+  a.trk=Math.atan2(ax-st.pos.x,-(az-st.pos.z));a.y=L.y-GEAR;a.v=clamp(SH_V+q.ea*0.08,SH_V-25,SH_V+60)*Math.sqrt(1.097*Math.exp(-st.pos.y/9200)/1.225);}   // indicated, from true
+// traffic: a Cessna 2 to 3 thousand below crossing, then a 737 above going the other way; really there, called by clock
+function shTraffic(d,n){const id=n===1?'cessna':'b737',clk=n===1?d.t1c:d.t2c,mi=n===1?5:7,dy=(n===1?-2200*d.t1u:-2000)/M2FT;
+  const hd=-_euH.setFromQuaternion(st.quat,'YXZ').y,b=hd+clk*Math.PI/6,r=mi*1609,x=st.pos.x+Math.sin(b)*r,z=st.pos.z-Math.cos(b)*r;
+  const th=n===1?b+Math.PI*0.5*(clk<6?1:-1):hd+Math.PI+(clk<6?-0.35:0.35);
+  if(!d.tfc)d.tfc=[];d.tfc.push(shFlyer(id,x,st.pos.y+dy,z,th,n===1?110:280));
+  const what=n===1?'a Cessna':'a Boeing 737',alt=Math.round(Math.abs(dy*M2FT)/100)*100,dir=tqDir(((th*180/Math.PI)%360+360)%360);
+  const l=tqMC(AC.csS+', traffic, '+clk+' o\'clock, '+mi+' miles, '+dir+'bound, '+what+', '+alt.toLocaleString('en-US')+' '+(dy>0?'above':'below')+'.',{plain:'Another aircraft at '+clk+' o\'clock, '+mi+' miles away. Look for it.'});
+  tqAsk([{k:'CONTACT',say:AC.csS+', contact.',fn:()=>{d['r'+n]='contact';}},{k:'LOOKING',say:AC.csS+', looking.',fn:()=>{d['r'+n]='looking';
+      tqLater(7,()=>tqMC(AC.csS+', that traffic is no factor.',{plain:'The other aircraft is no danger.'}));}}],{line:l,wait:20});}
+// weather: a buildup on the route; Mission Control approves the deviation, the lead turns 20 degrees and the lane widens
+function shWeather(d){const L=d.L,f={x:Math.sin(L.h),z:-Math.cos(L.h)},r={x:Math.cos(L.h),z:Math.sin(L.h)},cx=L.x+f.x*7000-r.x*d.devSide*600,cz=L.z+f.z*7000-r.z*d.devSide*600;
+  const g=new THREE.Group(),R=TASK.R;
+  for(let i=0;i<16;i++){const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:puffTex,color:0xf4f6f8,transparent:true,opacity:0.92,depthWrite:false}));
+    const s=tqR(R,500,1100);sp.scale.set(s,s*tqR(R,0.8,1.2),1);sp.position.set(cx+tqR(R,-900,900),L.y+tqR(R,-350,900)+i*40,cz+tqR(R,-900,900));g.add(sp);}
+  tqAdd(g);d.cloud=g;
+  const side=d.devSide<0?'left':'right';
+  tqMC('Herky 21, Mission Control, buildups on your route, 4 miles ahead. Deviation 20 '+side+' approved, the corridor widens with you.',{plain:'Bad weather ahead. The C-130 will turn '+side+' around it. Stay with it.'});
+  tqSay('Herky 21','Herky 21, 20 '+side+' for weather. Viper, stay with me.',{plain:'The C-130 turns '+side+'. Follow it.'});
+  L.dev=d.devSide*20*Math.PI/180;d.devOn=1;d.devT0=st.time;
+  const l=tqMC(AC.csS+', copy the deviation?',{plain:'Tap WILCO to say you will follow.'});tqAsk([{k:'WILCO'}],{line:l,wait:15});}
 // (results cards) flies exactly the same start: a free flight / segment / mission start keeps its spawn
 // (final1 is not final), base and aircraft; an arcade game, lesson or dogfight goes back through its own
 // starter (arcStart, startLesson, dfStart), which sets its own position. Each starter stamps it after start().
