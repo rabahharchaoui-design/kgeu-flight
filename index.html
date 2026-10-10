@@ -14584,7 +14584,18 @@ const SCHOOL={
         {id:'hdg',name:'Diversion heading held',tip:'diversion heading',w:15,kind:'hold',tol:15,unit:'deg'},{id:'alt',name:'Altitude held',tip:'altitude',w:15,kind:'hold',tol:'instAlt',unit:'ft'},
         {id:'eta',name:'Arrived within 5 min of the estimate',tip:'arrival time',w:15,kind:'range',tol:5,unit:'min'},{id:'call',name:'Confessed and asked for vectors',tip:'call for vectors',w:10,kind:'event'},
         {id:'land',name:'Landed at Glendale',tip:'landing at Glendale',w:10,kind:'event'}],
-      log:{dual:1.0,xc:1.0,ldg:1}},{id:'night',name:'Night flying',soon:true},{id:'soloxc',name:'Solo cross country',soon:true}]},
+      log:{dual:1.0,xc:1.0,ldg:1}},
+    // school2 item 3: night flying. The landings lesson's circuit after dark at Glendale, three full stops (61.57's night currency)
+    {id:'night',name:'Night flying',short:'Night',sub:'Three full stop landings in the dark',min:12,
+      cards:[{h:'Seeing at night',b:'Your eyes take 30 minutes to adapt to the dark. Look slightly off centre to see dim lights, and keep the cockpit light red or dim. Over dark ground a black hole approach makes you fly low: trust the PAPI.'},
+        {h:'Airport lighting',b:'White lights line the runway edges, green lights mark the threshold and red the far end. The PAPI: two white and two red is on the glide path, three or four white is high, three or four red is low. A white and green beacon is a lighted civil airport.'},
+        {h:'The rules',b:'Night runs from the end of evening civil twilight to the start of morning civil twilight. To carry passengers at night you need three full stop night landings in the last 90 days (61.57). Position lights on from sunset to sunrise, the landing light on near an airport.'}],
+      quiz:{q:'On the PAPI you see three white lights and one red. You are:',a:['Slightly high','Slightly low','On the glide path','Too low to land'],ok:0,why:'Two white and two red is on the path. More white is high, more red is low: three white and one red is slightly high.'},
+      tasks:[{id:'dw',name:'Downwind altitude held',w:20,kind:'hold',tol:'alt',unit:'ft'},{id:'tdz',name:'Touchdown within 400 ft of the point',w:20,kind:'range',tol:'landNorm',min:0,unit:'ft'},
+        {id:'fpm',name:'Touchdowns under 300 fpm',w:15,kind:'range',tol:300,unit:'fpm'},{id:'cl',name:'On the centerline',w:10,kind:'range',tol:6,unit:'m'},
+        {id:'vapp',name:'Final approach speed',w:10,kind:'hold',tol:'spd',unit:'kt'},{id:'three',name:'Three full stop landings',w:15,kind:'event'},
+        {id:'calls',name:'Made the tower calls',w:10,kind:'event'}],
+      log:{dual:1.0,night:1.0,ldg:3}},{id:'soloxc',name:'Solo cross country',soon:true}]},
   {id:'s4',n:4,name:'Checkride prep',soon:true,lessons:[{id:'cr1',name:'Maneuvers review'},{id:'cr2',name:'Emergency review'},{id:'cr3',name:'Mock checkride'}]}]};
 const LESSONS=SCHOOL.stages.flatMap(s=>s.lessons);   // every lesson in order, soon ones too (the Boards code walks this)
 const LES_BY={};SCHOOL.stages.forEach(s=>s.lessons.forEach(l=>{l.stage=s.id;LES_BY[l.id]=l;}));
@@ -15088,6 +15099,17 @@ const LESFLY={
     if(LES.ph===0&&d.s===3&&!st.onGround&&aglFt()>50&&kt<55&&d.fin){cfi('Too slow on final. My airplane.',null,{urgent:1});gEnd('stage check failed','Stage check: final under 55 kt');return;}
     cirTick(dt,d,a,alt,kt);if(LES.on&&LES.t>1200)gEnd('took too long','Took too long. Ran out of time');},
   event(ev,d){cirEvent(ev,d);}},
+  // school2 item 3: night flying. The landings lesson's circuit with the sky at night (lesNight: the player's own time of day
+  // kept and put back by lesEnd), three full stops, each a takeoff again from the stop. Dana coaches; her lines queue (d.cq)
+  night:{at:'runway',twr:1,start(S,d){A.tko=1;A.pattern=1;cirInit(d,['stop','stop','stop']);d.cq=[];lesNight();lesAim();},
+  open(S,d){cirDepart(d,'Night pattern. Three full stops. The runway lights are on, the PAPI is on the left: two white, two red. Call the tower for closed traffic.');},
+  tick(dt,S,d,a,alt,kt){if(lesStall())return;const n=d.stops;
+    if(d.c===0&&d.s===3&&d.fin&&!d.papi&&!st.onGround&&aglFt()<=300){d.papi=1;cirSay(d,'Watch the PAPI. Do not duck under.',3);}
+    cirTick(dt,d,a,alt,kt);if(!LES.on)return;
+    if(n===0&&d.stops===1)cirSay(d,'Good. Two more. Taxi back is free tonight: just add power and go again.');
+    if(d.cq.length&&!cfiBusy()){const q=d.cq.shift();if(q[1]==null||q[1]===d.s)cfi(q[0]);}   // the next once hers is off the air; a line for a step gone by is dropped
+    if(LES.t>1200)gEnd('took too long','Took too long. Ran out of time');},
+  event(ev,d){cirEvent(ev,d);}},
   // ---- school1 item 7: Stage 2 ----
   // short field: flaps 10, the brakes held to full power, Vx to 500 ft, one circuit, a full flap approach on the bar and a stop
   short:{at:'runway',twr:1,start(S,d){A.tko=1;A.pattern=1;cirInit(d,['stop']);lesAim();d.baseMsg='Base, then final. Full flaps, 65 knots, aim at the bar, power for the glide path.';},
@@ -15335,6 +15357,9 @@ function lesAim(){const u0=THR01+AIM,W=HM.wid/2,e=0.35,pos=[],col=[],cS=new THRE
 // circuits: d.K the kind of each (tg touch and go, ga Dana calls a go around on short final, stop a full stop), d.c the
 // circuit, d.s the step (0 takeoff and climb, 1 crosswind, 2 downwind, 3 base and final, 4 on the runway). The tower clears
 // each one and the CALL button reads it back (d.calls of d.callN made). d.quiet: the solo, Dana silent
+// Dana in the circuit: straight out, or with d.cq (the night lesson) queued behind her line on the air; s: the step it is for
+function cirSay(d,t,s){if(!d.cq)return cfi(t);if(!d.cq.length&&!cfiBusy())cfi(t);else d.cq.push([t,s==null?null:s]);}
+function cfiBusy(){return radioQ.some(isCFI)||(!!VQ.cur&&isCFI(VQ.cur.line));}
 function cirInit(d,K){Object.assign(d,{K:K,c:0,s:0,ldg:[],calls:0,callN:0,stops:0,pto:0});}
 function cirDepart(d,t){const l=cfi(t);d.callN++;
   d.ask=tqAsk([{k:'CALL',sub:'Request closed traffic',say:'',fn:()=>{d.calls++;patCall(d,1);}}],{line:l,wait:20,tag:'les',
@@ -15347,7 +15372,7 @@ function cirTwr(d,k){const B=BASES.kgeu,r='t_'+B.rwyClip,cs=AC.csS,w=', runway '
   const l=say(B.twr,cs+w+T[0],[csTs(),r,T[1]],{ok:T[4],ttl:30});d.callN++;
   d.ask=tqAsk([{k:'CALL',sub:'Read back',say:'',fn:()=>{d.calls++;vqAdd(L(AC.cs,'pilot',T[2]+cs+'.',[T[3],csPs()]),{ttl:60});}}],{line:l,wait:20,tag:'les'});d.askDep=k==='to';}
 function cirTick(dt,d,a,alt,kt){const ag=aglFt(),tgt=FIELD_FT+1000,rh=RH*180/Math.PI,trk=(Math.atan2(st.vel.x,-st.vel.z)*180/Math.PI+360)%360,
-    u=toU(st.pos.x,st.pos.z),v=Math.abs(toV(st.pos.x,st.pos.z)),k=d.K[d.c],va=Math.round(AC.vapp*MS2KT),say1=t=>{if(!d.quiet)cfi(t);};
+    u=toU(st.pos.x,st.pos.z),v=Math.abs(toV(st.pos.x,st.pos.z)),k=d.K[d.c],va=Math.round(AC.vapp*MS2KT),say1=t=>{if(!d.quiet)cirSay(d,t,d.s);};
   if(!st.onGround){d.pto=0;if(d.askDep&&TASK.ask&&TASK.ask===d.ask){TASK.ask=null;tqReplyUI();}d.askDep=0;}   // airborne without the call: that one is missed
   if(d.s===0){if(d.pto>0&&st.onGround){d.pto-=dt;if(d.pto<=0)cirTwr(d,'to');}
     const call=st.onGround&&TASK.ask&&TASK.ask===d.ask;
@@ -15389,7 +15414,8 @@ function cirFinish(d){const W=d.ldg,tol=gTolOf('tdz'),mz=x=>x<0?-x:Math.max(0,x-
     gRange('tdz',z,(z<0?gNum(-z)+' ft short of':gNum(z)+' ft past')+' the point'+n+', standard 0 to '+gNum(tol)+' ft'+(d.tdzX||''));
     gRange('fpm',f,f+' fpm'+n+', standard '+gNum(gTolOf('fpm'))+' fpm');gRange('cl',c,gNum(c)+' m off'+n+', standard '+gNum(gTolOf('cl'))+' m');}
   if(gTask('calls'))gEvent('calls',d.calls>=d.callN,d.calls+' of '+d.callN+' made');
-  if(gTask('three'))gEvent('three',(d.sstops||0)>=3,(d.sstops||0)+' of 3');
+  const n3=LES.on==='solo'?(d.sstops||0):d.stops;   // the solo counts its own three after the stage check
+  if(gTask('three'))gEvent('three',n3>=3,n3+' of 3');
   gEnd();}
 // ---- school2 item 1: the nav engine (the pilotage lesson now; the diversion and the solo cross country reuse it). A route is
 // a list of fixes {name, short (the card), say (Dana), x, z}. navPlan(fixes, gs, seg): its legs, the true course from atan2 in
@@ -15609,7 +15635,12 @@ function hoodOn(){if(!HOOD.on){HOOD.on=true;HOOD.cam=camMode;}camMode=1;snapCame
 // lesEnd: the hood off and the camera back, the flight's wind back, the forced landing field gone
 function lesRestore(){if(HOOD.on){HOOD.on=false;document.body.classList.remove('hoodOn');camMode=HOOD.cam;snapCamera=true;}
   if(LES_W){if(st){st.windBase=st.windDir=LES_W.base;st.windKt=LES_W.kt;st.windPh=LES_W.ph;st.gustAmp=LES_W.gust;st.windHold=0;}LES_W=null;}
-  LES_FIELD=null;divClose();document.body.classList.remove('navMapOff');}
+  LES_FIELD=null;divClose();document.body.classList.remove('navMapOff');
+  if(LES_TOD){const p=LES_TOD;LES_TOD=null;if(ARC.prevTod===p)ARC.prevTod=null;if(TOD.id==='night')setTOD(p);}}   // the night lesson: the player's time of day back
+// the night lesson's sky without saving it as the player's choice (as the daily does): the kept one stays in kgeuTOD and
+// ARC.prevTod (the next start() puts it back: a restart sets night again), LES_TOD for lesRestore
+let LES_TOD=null;
+function lesNight(){const k=LES_TOD||TOD.id;setTOD('night');try{localStorage.setItem('kgeuTOD',k);}catch(e){}ARC.prevTod=k;LES_TOD=k;hbSync(true);}
 // the forced landing field: 600 by 150 m of flat open ground 1.5 to 2.5 nm downwind of us, its long side along the wind;
 // the first spot that is flat (under 5 m across it), dry, unpaved, clear of obstacles, the runway and the mission sites
 function emOK(cx,cz,ax,az){let lo=1e9,hi=-1e9;

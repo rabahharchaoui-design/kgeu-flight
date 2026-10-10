@@ -15,10 +15,18 @@
 # instruction line). div_call_<WxH>: the vectors CALL button up (Approach's radar contact subtitle if it landed in time).
 # div_debrief_<WxH>: the debrief after a clean run (7 rows). Split for the 110s cap: --div844 (card+set+call at 844),
 # --div568 (card+call at 568), --divdeb844, --divdeb568 (the full flown lesson, one size each: ~60s alone).
+#
+# School2 item 3: Stage 3's night lesson (three full stops at KGEU, night mode for the lesson only). night_rwy_<WxH>: on
+# the runway at the start, chase, the runway edge lights/threshold/PAPI lit, Dana's opening subtitle, the CALL button up.
+# night_final_844x390: short final on the first circuit (about 0.8 nm, 300 ft AGL) at night, the runway lights and PAPI
+# ahead, the lesson card. night_debrief_<WxH>: the debrief after three clean full stops (7 rows). night_after_844x390: a
+# frame after the debrief's CONTINUE IN FREE FLIGHT, the sky back to day. Split for the 110s cap: --n844 (rwy+final at
+# 844, ~25s), --n568 (rwy only at 568, ~10s), --ndeb844 (debrief+after at 844, ~75s), --ndeb568 (debrief only at 568, ~65s).
 import asyncio, os, sys
 from playwright.async_api import async_playwright
 from harness import serve, launch, page, PLACED
-from school_fly import K, BASE, start, rwy, call, final, touchdown, stop, DANA, DEBRIEF
+from school_fly import K, BASE, start, rwy, call, final, touchdown, stop, DANA, DEBRIEF, downwind, base
+import school_fly as SF  # SF.climbout: the circuit climb-out; this file's own climbout() (item1) is the nav lesson's departure, a different flight
 
 SHOTS = os.path.join(os.path.dirname(__file__), '..', 'overnight-screenshots', 'school2')
 os.makedirs(SHOTS, exist_ok=True)
@@ -344,6 +352,82 @@ async def divdebrief(b, url, W, H):
     await shot(pg, f'div_debrief_{W}x{H}.png')
     await pg.context.close()
 
+# ---------------- item 3: the night lesson (KGEU home runway, three circuits, the sky toggled for the lesson only) ----------------
+NIGHT_WAIT_RB = f"()=>{{const K=window.__kgeu;for(let i=0;i<500;i++){{K.stepFrame(0.1,false,true);if(K.radioLog().some(l=>/^Cleared for takeoff/.test(l.text)))break;}}K.stepFrame(0,true)}}"
+WAIT_CALL = f"(n)=>{{const K={K};for(let i=0;i<n&&K.LES.on;i++){{if(K.TASK.ask&&K.TASK.ask.shown)break;K.stepFrame(0.1,false,true);}}K.stepFrame(0,true);return !!(K.TASK.ask&&K.TASK.ask.shown)}}"
+NIGHT_SKY = f"()=>{{const L={K}.lights();return {{tod:{K}.TOD().id,saved:localStorage.getItem('kgeuTOD'),lit:L.layers.every(l=>l.visible&&l.inScene),u:L.uLights}}}}"
+
+async def night_start(pg):
+    """start the night lesson, wait for the takeoff clearance CALL (not yet tapped), report the sky + Dana's subtitle"""
+    await start(pg, 'night')
+    F = await rwy(pg)
+    shown = await pg.evaluate(WAIT_CALL, 400)
+    sub = await pg.evaluate("()=>document.getElementById('atc').textContent")
+    sky = await pg.evaluate(NIGHT_SKY)
+    return F, shown, sub, sky
+
+async def night_circuit(pg, F, past=60):
+    """one circuit to a full stop, the same shape as school_night_check.py's circuit()"""
+    await SF.climbout(pg, F)
+    await downwind(pg, F)
+    await call(pg)
+    await downwind(pg, F, 80)
+    await base(pg, F)
+    await final(pg, F)
+    await touchdown(pg, F, past=past)
+    await stop(pg, F)
+
+async def night_rwy(b, url, W, H):
+    pg = await page(b, url, vp={'width': W, 'height': H}, storage=ST)
+    F, shown, sub, sky = await night_start(pg)
+    print(f'  night_rwy {W}x{H} CALL up {shown} sky {sky} Dana: {sub[:90]}')
+    await shot(pg, f'night_rwy_{W}x{H}.png')
+    return pg, F
+
+async def n844(b, url):
+    # night_rwy_844x390, then on into the first circuit to short final for night_final_844x390
+    pg, F = await night_rwy(b, url, 844, 390)
+    await pg.evaluate(f"()=>{K}.tqAnswer('CALL')")
+    await pg.evaluate(NIGHT_WAIT_RB)
+    await SF.climbout(pg, F)
+    await downwind(pg, F)
+    await call(pg)
+    await downwind(pg, F, 80)
+    await base(pg, F)
+    x, z = await pg.evaluate(f"([u,v])=>{{const K={K};return [K.wX(u,v),K.wZ(u,v)]}}", [F['thr'] - 1482, 0])
+    r = await fly(pg, 50, x=x, z=z, agl=300, kt=65, vs=-500, hdg=F['rh'])
+    st = await pg.evaluate(f"()=>({{s:{K}.LES.d.s,fin:{K}.LES.d.fin,alt:Math.round({K}.G.alt),kt:Math.round({K}.G.kt)}})")
+    card = await pg.evaluate("()=>({t:document.getElementById('lesT').textContent,cue:document.getElementById('lesCue').classList.contains('on')})")
+    print(f'  night_final 844x390 ph {r["ph"]} state {st} card {card}')
+    await shot(pg, 'night_final_844x390.png')
+    await pg.context.close()
+
+async def n568(b, url):
+    # night_rwy_568x320 only
+    pg, F = await night_rwy(b, url, 568, 320)
+    await pg.context.close()
+
+async def ndeb(b, url, W, H, after=False):
+    # night_debrief_<WxH> after three clean full stops; at 844 also night_after_844x390 past CONTINUE IN FREE FLIGHT
+    pg = await page(b, url, vp={'width': W, 'height': H}, storage=ST)
+    F, shown, sub, sky0 = await night_start(pg)
+    await pg.evaluate(f"()=>{K}.tqAnswer('CALL')")
+    await pg.evaluate(NIGHT_WAIT_RB)
+    for k in range(3):
+        if k: await call(pg)
+        await night_circuit(pg, F, past=40 + 30 * k)
+    await pg.wait_for_timeout(800)
+    d = await pg.evaluate(DEBRIEF)
+    print(f'  night_debrief {W}x{H} on {d["on"]} letter {d["letter"]} rows {len(d["rows"])} all_ok {all(x[1] for x in d["rows"])}')
+    await shot(pg, f'night_debrief_{W}x{H}.png')
+    if after:
+        await pg.evaluate("()=>document.getElementById('gFree').click()")
+        await pg.wait_for_timeout(300)
+        sky1 = await pg.evaluate(NIGHT_SKY)
+        print(f'  night_after sky0(lesson) {sky0} sky1(after CONTINUE) {sky1}')
+        await shot(pg, 'night_after_844x390.png')
+    await pg.context.close()
+
 async def main():
     srv, url = serve()
     async with async_playwright() as p:
@@ -370,6 +454,17 @@ async def main():
             await divdebrief(b, url, 844, 390); await b.close(); srv.shutdown(); return
         if '--divdeb568' in sys.argv:
             await divdebrief(b, url, 568, 320); await b.close(); srv.shutdown(); return
+        if '--n844' in sys.argv:
+            await n844(b, url); await b.close(); srv.shutdown(); return
+        if '--n568' in sys.argv:
+            await n568(b, url); await b.close(); srv.shutdown(); return
+        if '--ndeb844' in sys.argv:
+            await ndeb(b, url, 844, 390, after=True); await b.close(); srv.shutdown(); return
+        if '--ndeb568' in sys.argv:
+            await ndeb(b, url, 568, 320, after=False); await b.close(); srv.shutdown(); return
+        if '--item3' in sys.argv:
+            await n844(b, url); await n568(b, url); await ndeb(b, url, 844, 390, after=True); await ndeb(b, url, 568, 320, after=False)
+            await b.close(); srv.shutdown(); return
         if '--item1b' in sys.argv:
             await item1b(b, url); await b.close(); srv.shutdown(); return
         if '--item1a' in sys.argv:
