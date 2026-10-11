@@ -85,8 +85,23 @@ async def main():
         s = await pg.evaluate(f"()=>({{tier:{K}.GFX.tier,pr:{K}.R3().renderer.getPixelRatio(),ls:localStorage.getItem('kgeuTier')}})")
         ok('back to Auto: medium, 1.5, saved', s == {'tier': 'medium', 'pr': 1.5, 'ls': 'auto'}, s)
 
+        # graphics item 6: the sun shadow cascades follow the tier (Low: no light and no shadow map at all)
+        CSM = f"()=>{K}.csm()"
+        await pg.evaluate(f"()=>{K}.GFX.setTier('low')"); c = await pg.evaluate(CSM)
+        ok('Low: no cascade light in the scene, the shadow map off, the sun the one directional light',
+           c['n'] == 0 and c['lights'] == 0 and c['inScene'] == 0 and c['enabled'] is False and c['dirLights'] == 1, c)
+        await pg.evaluate(f"()=>{K}.GFX.setTier('medium')"); c = await pg.evaluate(CSM)
+        ok('Medium: 2 cascades, 1,024 near and 512 mid', c['n'] == 2 and c['inScene'] == 2 and c['enabled'] is True and c['sizes'] == [1024, 512] and c['dirLights'] == 3, c)
+        await pg.evaluate(f"()=>{K}.GFX.setTier('high')"); c = await pg.evaluate(CSM)
+        ok('High: 3 cascades at 1,024', c['n'] == 3 and c['inScene'] == 3 and c['enabled'] is True and c['sizes'] == [1024, 1024, 1024] and c['dirLights'] == 4, c)
+        await pg.evaluate(f"()=>{K}.GFX.setTier('auto')"); c = await pg.evaluate(CSM)
+        ok('back to Auto: the 2 Medium cascades again', c['n'] == 2 and c['inScene'] == 2 and c['dirLights'] == 3, c)
+
         # dynFeed state machine: in flight (the live loop puts the scale back to 1 on the menu; dyn is off under Playwright)
         await pg.evaluate(f"()=>{{const K={K};K.pick('cessna');K.start('runway');}}"); await pg.wait_for_timeout(600)
+        c = await pg.evaluate(f"()=>{{const K={K};K.setTOD('day');return K.csm();}}"); await pg.wait_for_timeout(600)
+        c2 = await pg.evaluate(CSM)
+        ok('Medium on the runway by day: near and mid cascades drawn, the maps redrawn', (c2['act'] & 3) == 3 and c2['renders'] > c['renders'], [c['renders'], c2])
         await pg.evaluate(f"()=>{{{K}.GFX.setScale(1);{K}.GFX.dynReset(true);}}")
         r = await feed(pg, 3.1, 50, 50)
         # graphics item 3: with the post chain on (medium) the canvas keeps 1.5 and the chain's scene target takes the scale

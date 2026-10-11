@@ -3408,7 +3408,7 @@ const GFX_HOOKS=[];   // fns(tier) the later effects push, run by GFX.setTier (l
 // screen skips the bloom passes. PFX_OCC: what can hide them (terrain, aircraft), drawn depth only before them.
 const PFX_BLOOM=2,PFX_OCC=3,PFX_SRC=[];
 function pfxBloomTag(o){o.layers.enable(PFX_BLOOM);PFX_SRC.push(o);return o;}
-var GFX={tier:'medium',auto:'medium',override:'auto',scale:1,bench:null,dyn:true,FX:{tone:'low',bloom:'medium',smaa:'medium'},gpu:'',renderer:null,
+var GFX={tier:'medium',auto:'medium',override:'auto',scale:1,bench:null,dyn:true,FX:{tone:'low',bloom:'medium',smaa:'medium',shadows:'medium',shadowFar:'high',air:'low',clouds:'medium',cloudRim:'high'},gpu:'',renderer:null,
   // post: the post chain is on (graphics item 3: bloom or SMAA), so the canvas keeps the tier's full pixel ratio and the
   // dynamic scale sizes the chain's scene target instead; rs: the render scale of the pass being drawn (point sizes)
   post:false,rs:1,
@@ -6534,9 +6534,166 @@ function pfsColorSetup(){
     get(){return !this._pfsTmOff&&(this.isShaderMaterial||this.blending!==THREE.AdditiveBlending);},
     set(v){this._pfsTmOff=!v;}});
 }
+// ================= atmosphere: cascaded sun shadows and desert air (graphics item 6) =================
+// Shared uniform values, plain objects so every material's clone of the ShaderLib uniforms points at the same one
+// (like PFS_TONE): CSM_U the cascade selection, AIR_U the haze model. Both are written by csmFrame and airSet.
+// CSM_U: per cascade i (x, y, z) the view depth weight clamp((z - a)*b) * clamp((c - z)*d): a ramp in over the
+// previous boundary's blend band and out over the next one, so two neighbours always sum to 1; a.w the shadow strength,
+// b.w the share of the sky light a shadow takes too (0.12 by day to 0.42 with the sun 5 degrees up or lower).
+const CSM_U={a:{x:0,y:0,z:0,w:0},b:{x:0,y:0,z:0,w:0},c:{x:-1,y:-1,z:-1,w:0},d:{x:0,y:0,z:0,w:0}};
+// AIR_U.k: x the dry air (Rayleigh like) share of the ground level extinction, y 1/height falloff of the dust (1,500 m),
+// z 1/height falloff of the air (8,000 m), w the optical depth over scene.fog.far - near/2 at ground level (airSet:
+// day and sunset 1.4 with x 0.12, night 1.9 and haboob 2.3 with x 0.35); sun: x, z the sun's horizontal direction, y the weight of the sky tint in the in scatter; s, a: the sky tint
+// toward and away from the sun; t: the dust tint on the fog colour; m: x, y the horizontal direction (world x, z) the
+// haze thickens toward (the monsoon builds), z how much, w how much its colour goes to mc
+const AIR_U={k:{x:0.35,y:1/1500,z:1/8000,w:2.3},sun:{x:0,y:0,z:-1},s:{x:1,y:1,z:1},a:{x:1,y:1,z:1},t:{x:1,y:1,z:1},
+  m:{x:0,y:0,z:0,w:0},mc:{x:1,y:1,z:1}};
+// Global ShaderChunk overrides, before any material compiles (called right after pfsColorSetup).
+// Shadows: N extra DirectionalLights (the cascades, intensity 0, sorted first by three as the shadow casters) are
+// skipped in the light loops; their maps only give the sun (the first plain directional light) its shadow, picked by
+// the fragment's view depth (1/gl_FragCoord.w, the log depth buffer leaves it alone). Medium: one bilinear PCF lookup
+// (4 taps), High (3 cascades): four, a soft tent. Lambert, lit per vertex, takes it through getShadowMask.
+// Fog: built in materials get PFS_AIR (ShaderLib only), so the raw and custom ShaderMaterials (the IR view, the haboob
+// wall, flames, lights) keep three's linear fog chunk untouched. The model: extinction through two layers along the
+// ray, dry air and a low dust layer, each integrated exactly for an exponential falloff with height between the camera
+// and the vertex; scene.fog stays the control (near/far set the density, its colour the dust's in scatter).
+function pfsAirSetup(){
+  if(THREE.PFS_AIR)return;THREE.PFS_AIR=true;
+  const C=THREE.ShaderChunk,L=THREE.ShaderLib;
+  const rep=(k,a,b)=>{if(C[k].indexOf(a)<0){console.warn('pfs air: no '+a.slice(0,40)+' in '+k);return;}C[k]=C[k].split(a).join(b);};
+  C.shadowmap_pars_fragment+=`
+#if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+uniform vec4 csmA;uniform vec4 csmB;uniform vec4 csmC;uniform vec4 csmD;
+float csmBil( sampler2D m, vec2 uv, float z, vec2 size ){
+	vec2 t = 1.0 / size, f = fract( uv * size + 0.5 ), c = uv - f * t;
+	return mix( mix( texture2DCompare( m, c, z ), texture2DCompare( m, c + vec2( t.x, 0.0 ), z ), f.x ),
+		mix( texture2DCompare( m, c + vec2( 0.0, t.y ), z ), texture2DCompare( m, c + t, z ), f.x ), f.y );
+}
+float csmTap( sampler2D m, vec2 size, float bias, float radius, vec4 sc ){
+	sc.xyz /= sc.w; sc.z += bias;
+	if ( sc.x < 0.0 || sc.x > 1.0 || sc.y < 0.0 || sc.y > 1.0 || sc.z > 1.0 ) return 1.0;
+	#if NUM_DIR_LIGHT_SHADOWS > 2
+	vec2 o = radius * 0.5 / size;
+	return 0.25 * ( csmBil( m, sc.xy - o, sc.z, size ) + csmBil( m, sc.xy + o, sc.z, size )
+		+ csmBil( m, sc.xy + vec2( o.x, - o.y ), sc.z, size ) + csmBil( m, sc.xy + vec2( - o.x, o.y ), sc.z, size ) );
+	#else
+	return csmBil( m, sc.xy, sc.z, size );
+	#endif
+}
+float csmShadow( bool rcv ){
+	if ( ! rcv || csmA.w <= 0.0 ) return 1.0;
+	float z = 1.0 / gl_FragCoord.w, occ = 0.0, w = 0.0;
+	DirectionalLightShadow dls;
+	#pragma unroll_loop_start
+	for ( int i = 0; i < NUM_DIR_LIGHT_SHADOWS; i ++ ) {
+		w = clamp( ( z - csmA[ i ] ) * csmB[ i ], 0.0, 1.0 ) * clamp( ( csmC[ i ] - z ) * csmD[ i ], 0.0, 1.0 );
+		if ( w > 0.0 ) { dls = directionalLightShadows[ i ]; occ += w * ( 1.0 - csmTap( directionalShadowMap[ i ], dls.shadowMapSize, dls.shadowBias, dls.shadowRadius, vDirectionalShadowCoord[ i ] ) ); }
+	}
+	#pragma unroll_loop_end
+	return 1.0 - occ * csmA.w;
+}
+#define CSM_AMB csmB.w
+#else
+#define CSM_AMB 0.0
+#endif`;
+  {const s=C.shadowmask_pars_fragment,i0=s.indexOf('\t#if NUM_DIR_LIGHT_SHADOWS > 0'),i1=s.indexOf('#endif',i0);
+   if(i0<0||i1<0)console.warn('pfs air: shadowmask');
+   else C.shadowmask_pars_fragment=s.slice(0,i0)+'\t#if NUM_DIR_LIGHT_SHADOWS > 0\n\tshadow *= csmShadow( receiveShadow );\n\t'+s.slice(i1);}
+  rep('lights_fragment_begin','\t#if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0\n\tDirectionalLightShadow directionalLightShadow;\n\t#endif',
+    '\t#if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0\n\tfloat csmS = csmShadow( receiveShadow );\n\t#endif');
+  // the shadow also takes CSM_AMB (csmB.w) of the sky light: a little by day, more with the sun low, so the long golden
+  // hour shadows read on flat ground the low sun hardly lights; the rest of the hemisphere stays (never black)
+  C.lights_fragment_begin+='\n#if defined( RE_IndirectDiffuse ) && defined( RE_Direct ) && defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0 && NUM_DIR_LIGHTS > 0\n\tirradiance *= mix( 1.0, csmS, CSM_AMB );\n#endif';
+  {const f=L.lambert.fragmentShader,a='reflectedLight.directDiffuse *= BRDF_Diffuse_Lambert( diffuseColor.rgb ) * getShadowMask();';
+   if(f.indexOf(a)<0)console.warn('pfs air: lambert shadow mask');
+   else L.lambert.fragmentShader=f.replace(a,'float csmM = getShadowMask();\n\treflectedLight.directDiffuse *= BRDF_Diffuse_Lambert( diffuseColor.rgb ) * csmM;\n\treflectedLight.indirectDiffuse *= mix( 1.0, csmM, CSM_AMB );');}
+  rep('lights_fragment_begin',`		directionalLight = directionalLights[ i ];
+		getDirectionalDirectLightIrradiance( directionalLight, geometry, directLight );
+		#if defined( USE_SHADOWMAP ) && ( UNROLLED_LOOP_INDEX < NUM_DIR_LIGHT_SHADOWS )
+		directionalLightShadow = directionalLightShadows[ i ];
+		directLight.color *= all( bvec2( directLight.visible, receiveShadow ) ) ? getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) : 1.0;
+		#endif
+		RE_Direct( directLight, geometry, material, reflectedLight );`,
+`		#if ! defined( USE_SHADOWMAP ) || ( UNROLLED_LOOP_INDEX >= NUM_DIR_LIGHT_SHADOWS )
+		directionalLight = directionalLights[ i ];
+		getDirectionalDirectLightIrradiance( directionalLight, geometry, directLight );
+		#if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+		directLight.color *= csmS;
+		#endif
+		RE_Direct( directLight, geometry, material, reflectedLight );
+		#endif`);
+  rep('lights_lambert_vertex',`		getDirectionalDirectLightIrradiance( directionalLights[ i ], geometry, directLight );
+		dotNL = dot( geometry.normal, directLight.direction );
+		directLightColor_Diffuse = PI * directLight.color;
+		vLightFront += saturate( dotNL ) * directLightColor_Diffuse;
+		#ifdef DOUBLE_SIDED
+			vLightBack += saturate( -dotNL ) * directLightColor_Diffuse;
+		#endif`,
+`		#if ! defined( USE_SHADOWMAP ) || ( UNROLLED_LOOP_INDEX >= NUM_DIR_LIGHT_SHADOWS )
+		getDirectionalDirectLightIrradiance( directionalLights[ i ], geometry, directLight );
+		dotNL = dot( geometry.normal, directLight.direction );
+		directLightColor_Diffuse = PI * directLight.color;
+		vLightFront += saturate( dotNL ) * directLightColor_Diffuse;
+		#ifdef DOUBLE_SIDED
+			vLightBack += saturate( -dotNL ) * directLightColor_Diffuse;
+		#endif
+		#endif`);
+  // the air. Per vertex (smooth over a triangle: the height terms, the direction): vAirW.xyz the vertex's offset from the
+  // camera in world axes (the view rotation transposed), vAirW.w the layers' mean density along the ray (each layer's
+  // exponential falloff integrated exactly between the camera's and the vertex's heights, the monsoon thickening),
+  // vAirC.rgb the in scatter colour toward it, vAirC.a how much of the old far cut applies (the low air only). Per
+  // fragment: the distance, one exp.
+  const P='#ifdef PFS_AIR\n',E='\n#else\n',Z='\n#endif';
+  const AIRU='uniform vec3 fogColor;\n\tuniform vec4 airK;uniform vec3 airSun;uniform vec3 airS;uniform vec3 airA;uniform vec3 airT;uniform vec4 airM;uniform vec3 airMC;';
+  C.fog_pars_vertex=P+`#ifdef USE_FOG
+	varying vec4 vAirW;
+	varying vec4 vAirC;
+	${AIRU}
+	float airF( float h0, float h1, float k ){
+		float a = exp( - h0 * k ), dh = ( h1 - h0 ) * k;
+		return abs( dh ) > 1e-3 ? a * ( 1.0 - exp( - dh ) ) / dh : a;
+	}
+#endif`+E+C.fog_pars_vertex+Z;
+  C.fog_vertex=P+`#ifdef USE_FOG
+	{vec3 w = ( vec4( mvPosition.xyz, 0.0 ) * viewMatrix ).xyz;
+	vec2 h = w.xz / max( length( w.xz ), 1e-3 );
+	float h0 = clamp( cameraPosition.y, 0.0, 2e4 ), h1 = clamp( cameraPosition.y + w.y, 0.0, 2e4 );
+	float mk = max( dot( h, airM.xy ), 0.0 ), a = 0.5 + 0.5 * dot( h, airSun.xz );
+	vAirW = vec4( w, ( 1.0 + airM.z * mk * mk ) * ( airK.x * airF( h0, h1, airK.z ) + ( 1.0 - airK.x ) * airF( h0, h1, airK.y ) ) );
+	vAirC = vec4( mix( mix( fogColor * airT, mix( airA, airS, a * a ), airSun.y ), airMC, airM.w * mk * mk ), exp( - 0.5 * h1 * airK.y ) );}
+#endif`+E+C.fog_vertex+Z;
+  C.fog_pars_fragment=P+`#ifdef USE_FOG
+	uniform vec3 fogColor;
+	uniform vec4 airK;
+	varying vec4 vAirW;
+	varying vec4 vAirC;
+	#ifdef FOG_EXP2
+		uniform float fogDensity;
+	#else
+		uniform float fogNear;
+		uniform float fogFar;
+	#endif
+#endif`+E+C.fog_pars_fragment+Z;
+  // the last line keeps three's "fogColor, fogFactor )" so the city windows' uWinFog patch (buildWorld) still finds it
+  C.fog_fragment=P+`#ifdef USE_FOG
+	#ifdef FOG_EXP2
+		float fogFactor = 1.0 - exp( - fogDensity * fogDensity * dot( vAirW.xyz, vAirW.xyz ) );
+	#else
+		float airD = length( vAirW.xyz );
+		float fogFactor = 1.0 - exp( - max( airD - 0.5 * fogNear, 0.0 ) * airK.w / max( fogFar - 0.5 * fogNear, 1.0 ) * vAirW.w );
+		fogFactor = max( fogFactor, smoothstep( 0.6 * fogFar, fogFar, airD ) * vAirC.a );   // the old far cut, in the low air (the ground's edge), not on a 9 km cloud top
+	#endif
+	gl_FragColor.rgb = mix( gl_FragColor.rgb, vAirC.rgb + 0.0 * fogColor, fogFactor );
+#endif`+E+C.fog_fragment+Z;
+  for(const k in L){const sh=L[k];if(!sh)continue;
+    if(sh.uniforms)Object.assign(sh.uniforms,{csmA:{value:CSM_U.a},csmB:{value:CSM_U.b},csmC:{value:CSM_U.c},csmD:{value:CSM_U.d},
+      airK:{value:AIR_U.k},airSun:{value:AIR_U.sun},airS:{value:AIR_U.s},airA:{value:AIR_U.a},airT:{value:AIR_U.t},airM:{value:AIR_U.m},airMC:{value:AIR_U.mc}});
+    if(typeof sh.vertexShader==='string')sh.vertexShader='#define PFS_AIR\n'+sh.vertexShader;
+    if(typeof sh.fragmentShader==='string')sh.fragmentShader='#define PFS_AIR\n'+sh.fragmentShader;}
+}
 function init(){
 const glc=document.getElementById('gl');let glcH=0;const _euH=new THREE.Euler(0,0,0,'YXZ');   // canvas CSS height, kept by resize() (no layout read per frame); HUD heading scratch
-pfsColorSetup();
+pfsColorSetup();pfsAirSetup();
 const renderer=new THREE.WebGLRenderer({canvas:glc,antialias:!isTouch,logarithmicDepthBuffer:true,powerPreference:'high-performance'});
 // graphics item 3: ACES filmic and sRGB output on every tier (pfsColorSetup above decodes the authored colours)
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.outputEncoding=THREE.sRGBEncoding;GFX.renderer=renderer;pfsTone('day');
@@ -6582,6 +6739,172 @@ scene.background=HAZE;
 const camera=new THREE.PerspectiveCamera(62,1,0.2,90000);
 const hemi=new THREE.HemisphereLight(0xdbe8ff,0xa08060,0.72);scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xfff0d8,1.0); sun.position.set(-0.55,0.75,0.37); scene.add(sun);
+// ---------- cascaded sun shadows (graphics item 6) ----------
+// GFX.FX.shadows (Medium): 2 cascades, a 1,024 map near and 512 for the ramp; GFX.FX.shadowFar (High): 3 at 1,024, the
+// third out to 12 km for the mountains at golden hour. Each cascade is a DirectionalLight that only casts (intensity 0,
+// skipped by the light loops, pfsAirSetup), giving the sun its shadow inside its own view depth range. csmFrame fits
+// each cascade's orthographic camera to the bounding sphere of its slice of the view frustum (a fixed size for a given
+// fov, in 9% steps, so it never breathes), centred on a whole shadow texel in the light's frame (so nothing standing
+// still swims), and asks for the maps to redraw. The shadow pass draws an explicit caster list per cascade
+// (renderer.shadowMap.render is wrapped below), never a walk of the scene to find them:
+//   near (0 to 120 m): the flown aircraft, a bandit or traffic within 250 m of the camera;
+//   mid (120 to 1,500 m): the aircraft, CSM.stat (buildings, towers, hangars, the stadium, billboards, the parked
+//     aircraft: csmStatic at build time), traffic and bandits within 2 km;
+//   far (1,500 to 12,000 m, High only): the terrain sectors (cast and receive, here only).
+// Redrawn: near and mid every frame, far every second frame. Off: at night (the moon casts none), under a sun lower
+// than a degree, in the IR view and the carousel (nothing asks for a map there); the haboob's dust fades them; near off
+// above 2,500 ft AGL (the camera's), mid above 8,000 ft, so on Medium nothing at all is drawn up there. Low: no lights,
+// no shadow map, no shadow code in any shader. The shadowed side keeps the hemisphere light, never black.
+const CSM={n:0,lights:[],L:[[],[],[]],stat:[],frame:0,act:0,prev:0,rc:-1,rt0:null,renders:0,recv:0,ai:[0,0,0],showScene:null,showL:[],skips:0,spin:null,spinOf:null,
+  SPLIT:[120,1500,12000],REACH:[250,2500,30000],BIAS:[0.04,0.5,10],NB:[0.03,0.4,12],
+  root:{visible:true,layers:{test:()=>true},children:null}};
+const _csmD=new V3(),_csmF=new V3(),_csmC=new V3(),_csmX=new V3(),_csmY=new V3(),_csmUp=new V3(0,1,0),_csmOne=[null];
+{const SM=renderer.shadowMap,orig=SM.render;
+ SM.render=function(lights,sc,cam){if(sc===CSM.showScene)return;if(sc!==scene||!CSM.n)return orig.call(this,lights,sc,cam);
+   for(let i=0;i<lights.length;i++){const L=lights[i],C=L.userData.csmL;if(!C||!L.shadow.needsUpdate)continue;
+     CSM.root.children=C;_csmOne[0]=L;orig.call(this,_csmOne,CSM.root,cam);CSM.renders++;}};}
+function csmLit(m,opaque){if(Array.isArray(m))return m.some(x=>csmLit(x,opaque));
+  return !!m&&(m.isMeshLambertMaterial||m.isMeshStandardMaterial||m.isMeshPhongMaterial)&&!(opaque&&m.transparent);}
+// the tier's cascades (GFX_HOOKS): Low removes every light and the shadow map itself
+function csmBuild(){
+  for(const L of CSM.lights){scene.remove(L);scene.remove(L.target);if(L.shadow.map){L.shadow.map.dispose();L.shadow.map=null;}}
+  CSM.lights.length=0;CSM.n=0;CSM.act=CSM.prev=0;CSM_U.a.w=0;
+  const on=GFX.on('shadows');renderer.shadowMap.enabled=on;
+  if(!on)return;
+  renderer.shadowMap.type=THREE.BasicShadowMap;   // the filtering is csmTap's own
+  const n=GFX.on('shadowFar')?3:2,sizes=n===3?[1024,1024,1024]:[1024,512];
+  for(let i=0;i<n;i++){const L=new THREE.DirectionalLight(0xffffff,0);L.castShadow=true;L.name='csm'+i;
+    L.shadow.mapSize.set(sizes[i],sizes[i]);L.shadow.autoUpdate=false;L.shadow.needsUpdate=false;L.shadow.radius=1.5;
+    L.userData.csmL=CSM.L[i];scene.add(L);scene.add(L.target);CSM.lights.push(L);}
+  CSM.n=n;csmShowSync();
+}
+// the carousel's scene carries as many cascade lights, never drawn (no map, and csmIdle zeroes the strength before it
+// renders), only so its aircraft share the main scene's compiled programs: no second compile per model in the menu
+function csmShowSync(){
+  const S=CSM.showScene;if(!S)return;
+  for(const L of CSM.showL){S.remove(L);L.shadow.map=null;}CSM.showL.length=0;
+  for(let i=0;i<CSM.n;i++){const L=new THREE.DirectionalLight(0xffffff,0);L.castShadow=true;L.shadow.autoUpdate=false;L.shadow.needsUpdate=false;S.add(L);CSM.showL.push(L);}
+}
+// a static caster: its opaque lit meshes over a metre tall cast (the flat ground layers never do); one walk, here
+function csmStatic(o){
+  let any=false;o.updateMatrixWorld(true);
+  o.traverse(m=>{if(!m.isMesh||m.isInstancedMesh||!csmLit(m.material,true))return;
+    const g=m.geometry;if(!g.boundingBox)g.computeBoundingBox();_csmB.copy(g.boundingBox).applyMatrix4(m.matrixWorld);
+    if(_csmB.max.y-_csmB.min.y>1){m.castShadow=true;any=true;}});
+  if(any&&!o.userData.csmS){o.userData.csmS=1;CSM.stat.push(o);}
+}
+const _csmB=new THREE.Box3();
+function csmScan(n0){for(let i=n0;i<scene.children.length;i++)csmStatic(scene.children[i]);}
+// a moving caster (the flown aircraft, traffic, a bandit): its opaque lit meshes (never the glass, the decals or the
+// prop discs, all transparent), marked the first time it is listed
+function csmMark(g){if(g.userData.csmM)return;g.userData.csmM=1;g.traverse(m=>{if(m.isMesh&&!m.isInstancedMesh&&!m.userData.blade&&csmLit(m.material,true))m.castShadow=true;});}
+// what a map was last drawn from: the light's spot and size, and every listed mover's pose down its tree (gear, flaps,
+// surfaces; a prop's spin and its blur disc left out, sp; nothing that does not cast); a map whose signature has not moved is kept, so a stationary aircraft on the
+// ramp costs no shadow pass at all
+function csmSigT(o,sp){if(o.isPoints||o.isSprite||o.isLine||(o.isMesh&&!o.castShadow))return 0;   // lights, flames, glass: not casters
+  let s=o.position.x+o.position.y*1.3+o.position.z*1.7+o.scale.x+o.scale.y*1.1+o.scale.z*1.2+(o.visible?0.5:0);
+  if(!sp||sp.indexOf(o)<0){const q=o.quaternion;s+=q.x*2.1+q.y*2.3+q.z*2.9+q.w*3.1;}
+  const c=o.children;for(let i=0;i<c.length;i++)s+=csmSigT(c[i],sp)*(1+i*1e-3);return s;}
+function csmSig(L,list,k){const p=L.position;let s=p.x*0.7+p.y*1.1+p.z*1.3+L.shadow.camera.right+list.length*17+k;
+  for(let i=0;i<list.length;i++){const o=list[i];if(o===terrain)s+=TLS.gen*31;else if(!o.userData.csmS)s+=csmSigT(o,o===plane.g&&plane.propRig?CSM.spin:null);}
+  return s;}
+// the receivers: every lit mesh but the clouds (userData.noRecv); one walk a flight, and when the scene gains an object
+function csmRecv(){CSM.rt0=RUN.t0;CSM.rc=scene.children.length;CSM.recv++;
+  scene.traverse(o=>{if(o.isMesh&&!o.userData.noRecv&&csmLit(o.material,false))o.receiveShadow=true;});}
+function csmIdle(){CSM.act=0;CSM_U.a.w=0;for(const L of CSM.lights)L.shadow.needsUpdate=false;
+  // the carousel's twins bind the cascades' own maps: the same sampler state, so no driver (SwiftShader) rebuilds a
+  // pipeline for the menu
+  for(let i=0;i<CSM.showL.length;i++){const T=CSM.showL[i],L=CSM.lights[i];if(L&&L.shadow.map&&T.shadow.map!==L.shadow.map){T.shadow.map=L.shadow.map;T.shadow.mapSize.copy(L.shadow.mapSize);}}}
+// cascade i's camera round the frustum slice n0..f0 (m), a size x size map
+function csmFit(L,i,n0,f0,size){
+  const tv=Math.tan(camera.fov*Math.PI/360),th=tv*camera.aspect,q=tv*tv+th*th;
+  let c=(f0+n0)*(1+q)/2,r;if(c>=f0){c=f0;r=f0*Math.sqrt(q);}else r=Math.sqrt((f0-c)*(f0-c)+f0*f0*q);
+  r=Math.pow(2,Math.ceil(Math.log2(r)*8)/8);
+  camera.getWorldDirection(_csmF);_csmC.copy(camera.position).addScaledVector(_csmF,c);
+  // the shadow camera's own lookAt basis (z toward the sun, x = up cross z), the centre on a whole texel of it
+  const z=_csmD;_csmX.crossVectors(_csmUp,z).normalize();_csmY.crossVectors(z,_csmX);
+  const t=2*r/size,px=Math.round(_csmC.dot(_csmX)/t)*t,py=Math.round(_csmC.dot(_csmY)/t)*t,pz=_csmC.dot(z);
+  _csmC.copy(_csmX).multiplyScalar(px).addScaledVector(_csmY,py).addScaledVector(z,pz);
+  const D=r+CSM.REACH[i],cam=L.shadow.camera;
+  L.target.position.copy(_csmC);L.position.copy(_csmC).addScaledVector(z,D);
+  if(cam.right!==r||cam.far!==D+r){cam.left=cam.bottom=-r;cam.right=cam.top=r;cam.near=0;cam.far=D+r;cam.updateProjectionMatrix();}
+  L.shadow.bias=-CSM.BIAS[i]/(D+r);L.shadow.normalBias=CSM.NB[i];
+}
+const CSM_K='xyz';
+// traffic or a bandit: into the mid list within 2 km of the camera, the near one within 250 m
+function csmNear(g,cp){if(!g.visible)return;const e=g.matrixWorld.elements,dx=e[12]-cp.x,dy=e[13]-cp.y,dz=e[14]-cp.z,d=dx*dx+dy*dy+dz*dz;
+  if(d<4e6){csmMark(g);CSM.L[1].push(g);if(d<62500)CSM.L[0].push(g);}}
+// every drawn frame of the world (not the IR view), after the camera is placed
+function csmFrame(){
+  const n=CSM.n,U=CSM_U;
+  if(!n)return;
+  csmIdle();CSM.frame++;
+  _csmD.copy(sun.position).normalize();
+  const k=TOD.night?0:clamp((_csmD.y-0.0175)/0.03,0,1)*(1-(HB.on?HB.d:0));
+  for(let i=0;i<3;i++){const c=CSM_K[i];U.a[c]=U.b[c]=U.d[c]=0;U.c[c]=-1;}
+  if(k<=0.001){CSM.prev=0;return;}
+  if(RUN.t0!==CSM.rt0||scene.children.length!==CSM.rc)csmRecv();
+  const cp=camera.position,agl=cp.y-groundHeight(cp.x,cp.z);
+  let mask=0;if(agl<762)mask|=1;if(agl<2438)mask|=2;if(n>2)mask|=4;
+  // the active cascades share 0..12 km in order; a 16% blend band at each boundary, the last fades over its last 20%
+  let lo=0,na=0,j=0;const act=CSM.ai;for(let i=0;i<n;i++)if(mask&(1<<i))act[na++]=i;
+  for(;j<na;j++){
+    const i=act[j],c=CSM_K[i],hi=CSM.SPLIT[i],last=j===na-1,m0=0.08*lo,m1=0.08*hi;
+    if(j===0){U.a[c]=-1;U.b[c]=1e3;}else{U.a[c]=lo-m0;U.b[c]=1/(2*m0);}
+    if(last){U.c[c]=hi;U.d[c]=1/(0.2*hi);}else{U.c[c]=hi+m1;U.d[c]=1/(2*m1);}
+    const L=CSM.lights[i];csmFit(L,i,Math.max(0,U.a[c]),U.c[c],L.shadow.mapSize.x);
+    // far: every second frame, unless it has just come on
+    L.shadow.needsUpdate=i<2||!(CSM.prev&(1<<i))||(CSM.frame&1)===0;
+    lo=hi;}
+  U.a.w=k;U.b.w=0.12+0.3*(1-clamp((Math.asin(_csmD.y)*180/Math.PI-5)/25,0,1));CSM.act=mask;CSM.prev=mask;
+  // the caster lists
+  const Ln=CSM.L[0],Lm=CSM.L[1],Lf=CSM.L[2];Ln.length=Lm.length=Lf.length=0;
+  if(plane.g.visible){csmMark(plane.g);Ln.push(plane.g);Lm.push(plane.g);const P=plane.propRig;if(P&&CSM.spinOf!==P){CSM.spinOf=P;CSM.spin=P.ps.concat(P.ds);}}
+  for(const o of TRAFFIC)csmNear(o.m.g,cp);
+  for(const b of DF.bandits)if(b.alive)csmNear(b.g,cp);
+  for(const o of CSM.stat)Lm.push(o);
+  Lf.push(terrain);
+  // a map drawn from the same light spot and the same caster poses is kept (statics never move: only their count)
+  for(let j=0;j<na;j++){const i=act[j],L=CSM.lights[i];if(!L.shadow.needsUpdate)continue;
+    const sg=csmSig(L,CSM.L[i],CSM.stat.length+mask*0.01);
+    if(L.shadow.map&&L.userData.sig===sg&&(CSM.prev2&(1<<i))){L.shadow.needsUpdate=false;CSM.skips++;}else L.userData.sig=sg;}
+  CSM.prev2=mask;
+  // the old soft blob under the aircraft stands in only while the real shadow is off
+  if(mask&3)shadow.visible=false;
+}
+csmBuild();
+GFX_HOOKS.push(()=>{csmBuild();if(typeof cloudsApply==='function'&&CLOUD_MESH)cloudsApply();});
+// ---------- desert air (graphics item 6) ----------
+// airSet fills AIR_U from the time of day (setTOD, before the dome is painted), the monsoon (cloudsApply) and the
+// haboob's dust (hbUpdate). The sky tint toward and away from the sun: by day the haze pulled 32% toward the zenith blue
+// away from the sun (the far ridges fade blue) and 35% toward the sun's glow facing it; at sunset the dome's own horizon
+// band colours (orange toward, pink violet away); none at night. The dust: the haze, a little warmer by day.
+// airHz is the in scatter the fog closes to in a horizontal direction, the exact colour fog_vertex works out: the dome
+// paints its horizon with it (skyAt), so the farthest ground and the sky meet without a seam.
+const AIR={r0:0,mon:0};
+const _airR=new THREE.Color(),_airQ=new THREE.Color();
+function airHz(x,z,out){
+  const A=AIR_U,l=Math.hypot(x,z)||1e-3,hx=x/l,hz=z/l,a=0.5+0.5*(hx*A.sun.x+hz*A.sun.z);
+  _airR.setRGB(A.a.x,A.a.y,A.a.z).lerp(_airQ.setRGB(A.s.x,A.s.y,A.s.z),a*a);
+  out.setRGB(HAZE.r*A.t.x,HAZE.g*A.t.y,HAZE.b*A.t.z).lerp(_airR,A.sun.y);
+  const m=Math.max(hx*A.m.x+hz*A.m.y,0);if(A.m.w>0&&m>0)out.lerp(_airQ.setRGB(A.mc.x,A.mc.y,A.mc.z),A.m.w*m*m);
+  return out;
+}
+function airSet(){
+  const T=TOD,A=AIR_U,band=T.sky.band||0,dust=T.dust||0,set=(o,c)=>{o.x=c.r;o.y=c.g;o.z=c.b;};
+  const sx=sun.position.x,sz=sun.position.z,l=Math.hypot(sx,sz)||1;A.sun.x=sx/l;A.sun.z=sz/l;
+  AIR.r0=T.night?0:0.6*(1-0.6*dust);// desert air is dry: by day and at sunset a thin air term (12% of the haze) and 1.4 at fog.far, so the White Tanks
+  // keep their rock under a 25 to 35% blue veil at 10 to 16 km and stand blue grey off the sky at 24; the night's dark
+  // haze and the haboob's dust as they were
+  A.k.w=T.night?1.9:T.id==='haboob'?2.3:1.4;A.k.x=T.night||T.id==='haboob'?0.35:0.12;
+  _airR.setHex(T.haze).lerp(_airQ.setHex(T.top),0.32*(1-band)).lerp(_airQ.setHex(T.sky.hA),band);set(A.a,_airR);
+  _airR.setHex(T.haze).lerp(_airQ.setHex(T.sky.glow),0.35).lerp(_airQ.setHex(T.sky.hS),band);set(A.s,_airR);
+  const wt=T.night?0:(1-band)*(1-dust);A.t.x=1;A.t.y=1-0.05*wt;A.t.z=1-0.12*wt;
+  // the monsoon builds lie south east of the field: the haze thickens (x1.6) and warms toward them
+  if(AIR.mon){A.m.x=0.5;A.m.y=0.866;A.m.z=0.6;A.m.w=T.night?0.08:0.25;set(A.mc,_airR.setHex(T.night?0x1c1e26:band>0.5?0xd08a60:0xc9a682));}
+  else{A.m.z=A.m.w=0;}
+  A.sun.y=AIR.r0*(1-(HB.on?HB.d:0));
+}
 const MAXANI=Math.min(8,renderer.capabilities.getMaxAnisotropy());
 const F='"Saira Condensed","Arial Narrow",sans-serif';
 
@@ -6712,16 +7035,16 @@ var CLOUD_MESH=null;
 // blue-grey at night so they never read as flat grey cutouts on the night sky
 const CLOUD_TOD={day:[0xffffff,0x6f7780],sunset:[0xffe2c8,0x5e4a48],night:[0x232a38,0x0d1119],haboob:[0xf0e2d0,0x6a5c50]};
 const _skyTop=new THREE.Color(),_skyCol=new THREE.Color(),HB_DUST=new THREE.Color(0xb8722e);
-const _skyHS=new THREE.Color(),_skyHA=new THREE.Color(),_skyG=new THREE.Color(),_skyB=new THREE.Color(),_skyS=new THREE.Vector3();
-// The dome's colour toward the unit direction (x,y,z), an analytic sky in the Preetham spirit: the haze at the horizon
-// (where the fog meets it) up to the zenith colour, the zenith darker away from the sun, a horizon band warm on the
+const _skyHS=new THREE.Color(),_skyHA=new THREE.Color(),_skyG=new THREE.Color(),_skyB=new THREE.Color(),_skyS=new THREE.Vector3(),_skyH=new THREE.Color();
+// The dome's colour toward the unit direction (x,y,z), an analytic sky in the Preetham spirit: the air's in scatter at
+// the horizon (airHz, exactly where the fog closes the ground to, graphics item 6) up to the zenith colour, the zenith darker away from the sun, a horizon band warm on the
 // sun's side and pink-violet opposite, and a wide plus a tight glow around the sun. top: the zenith (haboob lerped),
 // s: the sun's unit direction, P: TOD.sky, k: the haboob's dust (band and glow fade into it).
 function skyAt(x,y,z,top,s,P,k,out){
-  if(y<=0)return out.copy(HAZE);
+  if(y<=0)return airHz(x,z,out);
   const t=Math.min(y,1),cg=x*s.x+y*s.y+z*s.z,q=1-k;
   out.copy(top);if(P.anti)out.multiplyScalar(1-P.anti*q*(1-cg)*0.5);
-  out.lerp(HAZE,1-Math.pow(t,0.5));
+  out.lerp(airHz(x,z,_skyH),1-Math.pow(t,0.5));
   if(P.band>0){const hl=Math.hypot(x,z)||1,sl=Math.hypot(s.x,s.z)||1,a=(1+(x*s.x+z*s.z)/(hl*sl))*0.5;
     const w=P.band*q*(t/(t+0.012))*Math.exp(-t/P.bw);
     _skyB.copy(_skyHA).lerp(_skyHS,a*a);out.lerp(_skyB,Math.min(1,w));}
@@ -6752,7 +7075,7 @@ function setTOD(id){
   sun.color.setHex(TOD.sun);sun.intensity=TOD.sunI;
   sun.position.set(TOD.sunPos[0],TOD.sunPos[1],TOD.sunPos[2]);
   hemi.color.setHex(TOD.hemiSky);hemi.groundColor.setHex(TOD.hemiGnd);hemi.intensity=TOD.hemiI;
-  skyPaint();
+  airSet();skyPaint();
   // the sun's disc on the dome (never at night), its glow wider and warmer low down
   {const S=SUND,sc=TOD.discS||0;S.want=sc>0;S.dir.copy(sun.position).normalize();S.sp.position.copy(S.dir).multiplyScalar(S.R);
     S.sp.scale.setScalar(sc);S.sp.material.color.setHex(TOD.disc||0xffffff);S.ang=Math.atan(sc*0.5/S.R);if(!S.want)S.sp.visible=false;}
@@ -6761,7 +7084,7 @@ function setTOD(id){
   AL_MAT.uniforms.uLights.value=TOD.lights;
   for(const L of AL_LAYERS)if(L.pts)L.pts.visible=TOD.lights>0;
   EGG.lit=TOD.lights>0;EGG.litMat.emissiveIntensity=TOD.night?1:TOD.lights*0.6;EGG.mat.emissiveIntensity=TOD.night?0:0.3*(1-TOD.lights);   // @OhRabah signs: off by day, dim at sunset
-  if(cloudMat){const c=CLOUD_TOD[TOD.id]||CLOUD_TOD.day;cloudMat.color.setHex(c[0]);cloudMat.emissive.setHex(c[1]);}
+  if(cloudMat)cloudsAuto();   // the flight's cloud preset and its colours (graphics item 6)
   for(const f of TOD_HOOKS)f();
   // the gunmetal drones: a faint lift at dusk and night so the airframe still reads against a dark sky
   if(HD&&HD.MAT.gunmetal)HD.MAT.gunmetal.emissive.setHex(0x1f242b).multiplyScalar(TOD.night?1:TOD.id==='sunset'?0.35:0);
@@ -6879,7 +7202,7 @@ function hbSpawn(){
 // put back the clear air values the storm pulled on
 function hbRestore(){
   if(!HB.dirty)return;HB.dirty=false;
-  HAZE.setHex(TOD.haze);scene.fog.color.copy(HAZE);scene.fog.near=TOD.fog[0];scene.fog.far=TOD.fog[1];skyPaint();
+  HAZE.setHex(TOD.haze);scene.fog.color.copy(HAZE);scene.fog.near=TOD.fog[0];scene.fog.far=TOD.fog[1];AIR_U.sun.y=AIR.r0;skyPaint();
   sun.intensity=TOD.sunI;hemi.intensity=TOD.hemiI;
 }
 function hbClear(){
@@ -6913,7 +7236,7 @@ function hbUpdate(dt){
   const fn=5000+(150-5000)*d,ff=45000+(1200-45000)*Math.sqrt(d);
   scene.fog.near=fn;scene.fog.far=ff;
   HAZE.setHex(TOD.haze).lerp(HB_DUST,d);scene.fog.color.copy(HAZE);HB.dirty=true;
-  if(Math.abs(d-HB.paintD)>0.02||(d===0&&HB.paintD!==0)){HB.paintD=d;skyPaint(d);}
+  if(Math.abs(d-HB.paintD)>0.02||(d===0&&HB.paintD!==0)){HB.paintD=d;AIR_U.sun.y=AIR.r0*(1-d);skyPaint(d);}
   sun.intensity=TOD.sunI+(0.35-TOD.sunI)*d;hemi.intensity=TOD.hemiI*(1-0.45*d);
   // the dim sun disc, only there when the dust is
   const sp=HB.sun;sp.visible=d>0.01;
@@ -6921,7 +7244,7 @@ function hbUpdate(dt){
   // the wall hands over to the fog once you are into it
   const vis=1-clamp((d-0.55)/0.35,0,1);HB.g.visible=vis>0.001;
   if(HB.g.visible){const U=HB.U;HB.g.position.set(HB.C.x,groundHeight(HB.C.x,HB.C.z)-200,HB.C.z);
-    U.uT.value=HB.t;U.uVis.value=vis;U.uFogC.value.copy(HAZE);U.uFN.value=4000+(fn-4000)*d;U.uFF.value=26000+(ff-26000)*d;}
+    U.uT.value=HB.t;U.uVis.value=vis;airHz(HB.C.x-camera.position.x,HB.C.z-camera.position.z,U.uFogC.value);U.uFN.value=4000+(fn-4000)*d;U.uFF.value=26000+(ff-26000)*d;}
   if(running&&!st.crashed){
     if(!HB.t6&&dist<6000&&dist>-500){HB.t6=true;toast('Haboob approaching from the south-east',4);}
     if(!HB.called&&dist<3000&&dist>-HB.DEPTH){HB.called=true;const lk=st.base==='luke',B=BASES[st.base]||BASES[BASE0];
@@ -6976,7 +7299,8 @@ function tlBlock(L){
   g.setAttribute('position',at(nv,3));g.setAttribute('normal',at(nv,3));g.setAttribute('color',at(nv,3));g.setAttribute('uv',at(nv,2));
   const ix=new THREE.BufferAttribute(new Uint16Array(ni),1);ix.setUsage(THREE.DynamicDrawUsage);g.setIndex(ix);
   g.boundingBox=new THREE.Box3();g.boundingSphere=new THREE.Sphere();g.setDrawRange(0,0);
-  const m=new THREE.Mesh(g,TMAT);m.layers.enable(PFX_OCC);m.userData.terrain=true;m.matrixAutoUpdate=false;m.visible=false;tGroup.add(m);
+  const m=new THREE.Mesh(g,TMAT);m.layers.enable(PFX_OCC);m.userData.terrain=true;m.castShadow=m.receiveShadow=true;   // casts into the far cascade only (CSM)
+  m.matrixAutoUpdate=false;m.visible=false;tGroup.add(m);
   return {m:m,g:g,key:''};
 }
 for(const L of TRING){const n=L.N*L.N;L.ti=new Int32Array(n).fill(-2147483648);L.tk=new Int32Array(n);L.h=new Float32Array(n);L.y=new Float32Array(n);
@@ -7608,6 +7932,7 @@ if(REGION.az){windsock(300,70);windsock(1090,78);windsock(RWY_LEN-300,70);}
 
 // ---------- airport buildings ----------
 const stucco=lam(0xe7dcc6),roofM=lam(0xb7b3aa),darkM=lam(0x2a2f35),glassM=lam(0x37566f);
+const CSM_N0=scene.children.length;   // what this block adds casts sun shadows (csmScan below)
 if(REGION.az)(function(){
   // FBO terminal
   const term=boxLocal(20,8,46,[stucco,stucco,roofM,roofM,stucco,stucco],1100,-470,0);
@@ -7645,6 +7970,7 @@ if(REGION.az)(function(){
   const lot=tex(256,256,(x,w,h)=>{asphalt(x,w,h,'#4a4c4f');x.fillStyle='#e6e6e6';for(let r=0;r<2;r++)for(let i=0;i<w;i+=16)x.fillRect(i,r*128+20,2,50);},[3,2]);
   flatLocal(70,300,lam(0xffffff,{map:lot}),1100,-525,0.04);
 })();
+csmScan(CSM_N0);
 // chain link fence
 const fenceTex=tex(64,64,(x,w,h)=>{x.clearRect(0,0,w,h);x.strokeStyle='rgba(170,175,180,0.9)';x.lineWidth=1.3;for(let i=-64;i<128;i+=8){x.beginPath();x.moveTo(i,0);x.lineTo(i+64,64);x.stroke();x.beginPath();x.moveTo(i+64,0);x.lineTo(i,64);x.stroke();}x.fillStyle='rgba(120,120,120,1)';x.fillRect(0,0,64,3);},[1,1]);
 function fence(u0,v0,u1,v1){const du=u1-u0,dv=v1-v0,L=Math.hypot(du,dv);const t=fenceTex.clone();t.needsUpdate=true;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(L/2.4,1);
@@ -7778,6 +8104,7 @@ function updateCars(dt){cars.forEach((c,k)=>{c.s+=c.dir*c.sp*dt;
 
 // ---------- landmarks ----------
 const DT_TOP={x:0,z:0,h:0,w:0,d:0};     // the tallest downtown Phoenix block, for the @OhRabah rooftop sign
+const CSM_N1=scene.children.length;
 if(REGION.az)(function(){
   // State Farm Stadium and Westgate
   const lotT=tex(256,256,(x,w,h)=>{asphalt(x,w,h,'#505255');x.fillStyle='rgba(230,230,230,.8)';for(let r=0;r<256;r+=32)for(let i=0;i<w;i+=6)x.fillRect(i,r+4,1,20);},[12,10]);
@@ -7880,6 +8207,7 @@ if(REGION.az)(function(){
     b.position.set(21000+(hash(k,1)-0.5)*1600,hgt/2,7800+(hash(k,2)-0.5)*1300);scene.add(b);
     if(hgt>DT_TOP.h)Object.assign(DT_TOP,{x:b.position.x,z:b.position.z,h:hgt,w:wd,d:b.geometry.parameters.depth});}
 })();
+csmScan(CSM_N1);   // the stadium, the arena, Westgate, Luke's shelters and jets, Sky Harbor's terminals and tower, downtown
 // palms, desert scrub, clouds
 (function(){
   const trunks=[],crowns=[],shr=[];
@@ -7908,6 +8236,90 @@ if(REGION.az)(function(){
     for(let j=0;j<7;j++){const r=160+hash(k*9+j,5)*200;s.set(r*1.7,r*0.5,r);p.set(cx+(hash(k*9+j,1)-0.5)*600,cy+hash(k*9+j,2)*70,cz+(hash(k*9+j,3)-0.5)*400);m.compose(p,q,s);cl.setMatrixAt(i++,m);}}
   cl.count=i;cl.userData.heat=0.1;cl.userData.irVar=0;scene.add(cl);CLOUD_MESH=cl;
 })();
+// ---------- cloud presets (graphics item 6) ----------
+// CLOUDS.preset: 'clear' | 'scattered' | 'monsoon'. Low: today's puffs as they were (clear hides them, monsoon only
+// darkens them). Medium and High (GFX.FX.clouds): the same 196 puffs on CLOUD_HD, a Lambert whose colour is worked out
+// per vertex from the sun: bright sunlit tops, grey blue flat bases (each puff's underside pressed flat in the vertex
+// shader), orange tops at sunset; never a shadow caster. Monsoon adds six cumulonimbus 18 to 34 km south and east of the
+// field (CLOUDS.cb, one draw: 18 squashed icosahedra each, 1,440 triangles: a flat base, a leaning body of 10 overlapping
+// pieces +-25% in size, two side lumps, an overshooting top, an anvil of 4 offset tilted slabs spread north east; two
+// of the six tower to 9 km), dark grey blue bases and bright tops, and the haze thickens and warms toward them (AIR.mon).
+// High (GFX.FX.cloudRim): a silver lining on the silhouettes facing the sun, per vertex. The pick per flight, from
+// setTOD (cloudsAuto): day 70% scattered and 30% clear, sunset scattered, haboob monsoon, night scattered (dim), from the
+// daily seed (todayKey) so a day's flights and the tests agree; window.__kgeu.setClouds(p) forces one (null: back to
+// the pick). The dogfight hides them all as before (dfStart, dfStop puts back CLOUDS.vis).
+const CLOUD_HD_TOD={day:[0x97a4b6,0xffffff,0xfff0dc],sunset:[0x6c6276,0xffb27c,0xff9a52],night:[0x141a26,0x2a3242,0x000000],haboob:[0x8c7e72,0xf2dec6,0xffcf9c]};
+const CLOUDS={preset:'scattered',forced:null,vis:true,hd:null,cb:null,
+  U:{base:new THREE.Color(),top:new THREE.Color(),sunC:new THREE.Color(),sun:new V3(0,1,0),rim:{value:0}}};
+// the per instance shade (aCl: 0 at a cloud's base to 1 at its top) on a puff geometry
+function cloudAttr(g,n,f){const a=new Float32Array(n);for(let i=0;i<n;i++)a[i]=f(i);g.setAttribute('aCl',new THREE.InstancedBufferAttribute(a,1));}
+if(CLOUD_MESH){cloudAttr(CLOUD_MESH.geometry,CLOUD_MESH.count,i=>0.45+0.2*hash(i,77));
+  // three r128 culls an InstancedMesh by its one icosahedron at the origin: a sphere round the whole field of puffs
+  CLOUD_MESH.geometry.boundingSphere=new THREE.Sphere(new V3(APC.x,3150,APC.z),30000);CLOUD_MESH.userData.noRecv=true;}
+function cloudHD(){
+  if(CLOUDS.hd)return CLOUDS.hd;
+  const U=CLOUDS.U,m=new THREE.MeshLambertMaterial({color:0xffffff});
+  m.onBeforeCompile=sh=>{
+    Object.assign(sh.uniforms,{cBase:{value:U.base},cTop:{value:U.top},cSunC:{value:U.sunC},cSun:{value:U.sun},cRim:U.rim});
+    sh.vertexShader='attribute float aCl;\nuniform vec3 cBase;uniform vec3 cTop;uniform vec3 cSunC;uniform vec3 cSun;uniform float cRim;\nvarying vec3 vClC;\n'+sh.vertexShader
+      .replace('#include <beginnormal_vertex>','#include <beginnormal_vertex>\n\tif ( position.y < -0.35 ) objectNormal = vec3( 0.0, -1.0, 0.0 );')
+      .replace('#include <begin_vertex>','#include <begin_vertex>\n\ttransformed.y = max( transformed.y, -0.35 );')
+      .replace('#include <fog_vertex>',`#include <fog_vertex>
+	{mat3 im = mat3( instanceMatrix );
+	vec3 s2 = vec3( dot( im[ 0 ], im[ 0 ] ), dot( im[ 1 ], im[ 1 ] ), dot( im[ 2 ], im[ 2 ] ) );
+	vec3 nW = normalize( mat3( modelMatrix ) * im * ( objectNormal / s2 ) );
+	float k = clamp( 0.05 + 0.65 * aCl + 0.45 * nW.y, 0.0, 1.0 );
+	vClC = mix( cBase, cTop, k ) + cSunC * ( max( dot( nW, cSun ), 0.0 ) * ( 0.3 + 0.5 * k ) );
+	vec3 wp = ( modelMatrix * instanceMatrix * vec4( transformed, 1.0 ) ).xyz, vd = normalize( cameraPosition - wp );
+	float r = 1.0 - abs( dot( nW, vd ) );
+	vClC += cTop * ( cRim * r * r * r * ( 0.3 + 0.7 * max( dot( - vd, cSun ), 0.0 ) ) );}`);
+    sh.fragmentShader='varying vec3 vClC;\n'+sh.fragmentShader.replace('vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;',
+      'vec3 outgoingLight = pfsLin( vClC );');};
+  m.customProgramCacheKey=()=>'cloudHD';
+  return CLOUDS.hd=m;
+}
+// the cumulonimbus: built the first time a monsoon is shown on Medium or High
+const _cbE=new THREE.Euler();
+function cloudCB(){
+  const g=new THREE.IcosahedronGeometry(1,1),M=[],A=[],m=new THREE.Matrix4(),q=new Q4(),p=new V3(),s=new V3();
+  const add=(x,y,z,sx,sy,sz,a,rot,tx,tz)=>{q.setFromEuler(_cbE.set(tx||0,rot||0,tz||0,'YXZ'));m.compose(p.set(x,y,z),q,s.set(sx,sy,sz));M.push(m.clone());A.push(a);};
+  const N=6,yb=1800;
+  for(let k=0;k<N;k++){
+    // two of the six (k 1 and 4) tower to 8.5 to 9 km, the rest 4.5 to 7
+    const h=j=>hash(k*31+j,304),tall=k===1||k===4,H=tall?8500+h(0)*500:4500+h(1)*2500,
+      br=(100+(k+0.2+hash(k,301)*0.6)*100/N)*Math.PI/180,dist=18000+hash(k,302)*16000,
+      cx=APC.x+Math.sin(br)*dist,cz=APC.z-Math.cos(br)*dist,W=1500+H*0.22,Y=y=>clamp((y-yb)/(H-yb),0,1),
+      la=0.6+(h(2)-0.5)*0.8,lx=Math.cos(la)*W*0.35,lz=-Math.sin(la)*W*0.35;   // the lean: the top drifts this far north east
+    add(cx,yb+200,cz,W*1.25,420,W*1.1,0,h(3)*6);   // the dark flat base
+    for(let j=0;j<10;j++){const t=j/9,y=yb+350+t*(H*0.84-yb-350),r=W*(1-0.25*t)*(0.78+0.5*h(j+10));   // the body: 10 pieces, sizes +-25%, overlapping
+      add(cx+lx*t+(h(j+20)-0.5)*W*0.55,y,cz+lz*t+(h(j+30)-0.5)*W*0.55,r,r*(0.7+0.2*h(j+40)),r*(0.85+0.3*h(j+45)),Y(y),h(j+50)*6,(h(j+55)-0.5)*0.4,(h(j+57)-0.5)*0.4);}
+    for(let j=0;j<2;j++){const t=0.3+0.35*j+0.1*h(j+60),y=yb+(H-yb)*t,a=h(j+61)*6.283,r=W*(0.5+0.15*h(j+62));   // cauliflower lumps
+      add(cx+lx*t+Math.cos(a)*W*0.75,y,cz+lz*t+Math.sin(a)*W*0.75,r,r*0.8,r,Y(y),a,0.2,-0.15);}
+    // the anvil: four flattened pieces of different sizes spread mostly downwind, each turned and tilted a little so its
+    // outline is ragged, never one disc
+    for(let j=0;j<4;j++){const a=-0.5+(j-1.5)*0.75+(h(j+70)-0.5)*0.5,d=W*(0.35+0.55*h(j+71)),sw=W*(1.0+0.7*h(j+72));
+      add(cx+lx+Math.cos(a)*d+W*0.3,H-150-260*h(j+73),cz+lz-Math.sin(a)*d-W*0.2,sw,280+320*h(j+74),sw*(0.55+0.35*h(j+75)),1,h(j+76)*6.283,(h(j+77)-0.5)*0.12,(h(j+78)-0.5)*0.12);}
+    add(cx+lx,H*0.93,cz+lz,W*0.6,W*0.38,W*0.55,1,h(90)*6);}   // the overshooting top
+  const im=new THREE.InstancedMesh(g,cloudHD(),M.length);M.forEach((x,i)=>im.setMatrixAt(i,x));cloudAttr(g,M.length,i=>A[i]);
+  im.frustumCulled=false;im.userData.heat=0.1;im.userData.irVar=0;im.userData.noRecv=true;im.name='cumulonimbus';
+  CLOUD_MESH.add(im);CLOUDS.cb=im;CLOUDS.tris=M.length*80;
+}
+function cloudsPick(tod,key){
+  if(tod==='sunset'||tod==='night')return 'scattered';if(tod==='haboob')return 'monsoon';
+  return dayRng((key||todayKey())*7+3)()<0.7?'scattered':'clear';}
+function cloudsAuto(){CLOUDS.preset=CLOUDS.forced||cloudsPick(TOD.id);cloudsApply();}
+function cloudsApply(){
+  if(!CLOUD_MESH)return;
+  const p=CLOUDS.preset,hd=GFX.on('clouds'),c=CLOUD_TOD[TOD.id]||CLOUD_TOD.day,H=CLOUDS.U,T=CLOUD_HD_TOD[TOD.id]||CLOUD_HD_TOD.day;
+  cloudMat.color.setHex(c[0]);cloudMat.emissive.setHex(c[1]);
+  if(p==='monsoon'&&!hd){cloudMat.color.multiplyScalar(0.8);cloudMat.emissive.multiplyScalar(0.75);}
+  CLOUD_MESH.material=hd?cloudHD():cloudMat;
+  H.base.setHex(T[0]);H.top.setHex(T[1]);H.sunC.setHex(T[2]);if(p==='monsoon'){H.base.r*=0.74;H.base.g*=0.8;H.base.b*=0.92;}   // a storm's base: bluish grey
+  H.sun.copy(sun.position).normalize();H.rim.value=GFX.on('cloudRim')?0.55:0;
+  CLOUDS.vis=p!=='clear';if(!DF.on)CLOUD_MESH.visible=CLOUDS.vis;
+  const mon=p==='monsoon'&&hd;if(mon&&!CLOUDS.cb)cloudCB();if(CLOUDS.cb)CLOUDS.cb.visible=mon;
+  if(AIR.mon!==(mon?1:0)){AIR.mon=mon?1:0;airSet();if(HB.on)HB.paintD=-1;else skyPaint();}
+}
 
 // ---------- C-130 mission area: drop zone and assault strip ----------
 if(REGION.az)(function(){
@@ -8636,7 +9048,7 @@ if(REGION.az)(function(){
   {const x=2830,z=-1000,y0=groundHeight(x,z),G=new THREE.Group();G.position.set(x,y0,z);G.rotation.y=-Math.PI/2;
    const b=new THREE.Mesh(eggSheet(18,5,1,1,true,0.6),EGG.litMat);b.position.y=10.5;G.add(b);
    G.add(new THREE.Mesh(eggBoxes([[0.45,13,0.45,-5.5,6.5,0],[0.45,13,0.45,5.5,6.5,0]].concat(eggFrame(18,5,10.5,0.7))),steel));
-   scene.add(G);add(G,'egg_billboard');
+   scene.add(G);add(G,'egg_billboard');csmStatic(G);
    for(const s of [-1,1])for(const t of [-4.5,4.5])L.addLight(x+s*1.6,y0+7.9,z+t,WARM);
    OBST.push({kind:'circ',x:x,z:z,r:9,h:13.5,name:'a billboard'});}
   // 3. rooftop sign on the tallest downtown block, 30 x 7.5 m, facing west to the airports
@@ -8691,7 +9103,7 @@ function buildCityBillboard(x,z,hdg,cityName,L){
   const y0=groundHeight(x,z),G=new THREE.Group();G.position.set(x,y0,z);G.rotation.y=Math.PI-hdg*Math.PI/180;
   const b=new THREE.Mesh(eggSheet(18,5,1,1,true,0.6),mat);b.position.y=10.5;G.add(b);
   G.add(new THREE.Mesh(eggBoxes([[0.45,13,0.45,-5.5,6.5,0],[0.45,13,0.45,5.5,6.5,0]].concat(eggFrame(18,5,10.5,0.7))),lam(0x6b6e72)));
-  G.name='city_billboard';scene.add(G);G.updateMatrixWorld(true);
+  G.name='city_billboard';scene.add(G);G.updateMatrixWorld(true);csmStatic(G);
   const p=new V3();for(const s of [-1,1])for(const u of [-4.5,4.5]){p.set(u,7.9,s*1.6).applyMatrix4(G.matrixWorld);L.addLight(p.x,p.y,p.z,0xffd49a);}
   if(own){L.build();L.pts.visible=TOD.lights>0;}
   OBST.push({kind:'circ',x:x,z:z,r:9,h:y0+13.5,name:'a billboard'});
@@ -8731,7 +9143,7 @@ TRAFFIC.forEach(o=>{const t=TL[o.grp];if(t)o.m.lights=makeAircraftLights(o.m.g,A
 const FAR=[],FAR_PX=1.5,_farB=new THREE.Box3(),_farS=new V3();
 function farAdd(g){if(g.parent!==scene)return;_farB.setFromObject(g).getSize(_farS);const ms=[];g.traverse(o=>{if(o.isMesh)ms.push(o);});
   FAR.push({g:g,span:Math.max(_farS.x,_farS.y,_farS.z),ms:ms,off:false});}
-PARKED.forEach(farAdd);TRAFFIC.forEach(o=>{if(o.grp!=='b')farAdd(o.m.g);});
+PARKED.forEach(farAdd);PARKED.forEach(csmStatic);TRAFFIC.forEach(o=>{if(o.grp!=='b')farAdd(o.m.g);});
 // warm up (menu and pause sheet only, one model a step): one offscreen draw with the cull off, so a
 // model first seen from far away already has its buffers on the GPU when the player gets near
 function farWarm(f){for(const m of f.ms)m.layers.mask=1;try{warmObj(f.g);}finally{for(const m of f.ms)m.layers.mask=f.off?0:1;}}
@@ -10366,7 +10778,7 @@ function worldLoad(){
   fetch('assets/world/'+REGION.id+'.json?v=1').then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(d=>
     Promise.all([worldInflate(d.terrain.b64),worldInflate(d.terrain.waterB64),worldInflate(d.urban.b64)]).then(b=>{
       terrSet(d,new Int16Array(b[0]),new Uint8Array(b[1]));WORLD.data=d;WORLD.urb=new Uint8Array(b[2]);worldParks(d);
-      buildWorld(d);tfcRegion();if(LB)LB.fameApplyCity();   // the city billboard's champion, from the cached fame
+      {const n0=scene.children.length;buildWorld(d);csmScan(n0);}tfcRegion();if(LB)LB.fameApplyCity();   // the city billboard's champion, from the cached fame
       tlReset();rebuildTerrain(camera.position.x,camera.position.z);
       WORLD.ms=Math.round(performance.now()-t0);WORLD.ready=true;mapRegionData();}))
     .catch(e=>{WORLD.err=String(e);console.warn('world region',e);const m=$('spMsg');if(m)m.textContent='Could not load '+REGION.city+'. Check the connection and reload.';});
@@ -13088,7 +13500,7 @@ function dfStop(){
   // the air back to the tower, the clouds back, the damage and the warnings gone
   st.gLim=0;st.dfE=0;st.dfAB=0;st.dfEz=0;st.dfLef=0;st.dfRoll=1;st.dfPitch=1;st.dfBrk=0;DF.gv=0;
   DF_QUIET=false;DF_GK=1;DF.ej=false;DF.wTxt='';DF.rwr='none';DF.subT=0;DFS.el.classList.remove('on');document.body.classList.remove('dfEj');
-  missEl.classList.remove('dfH1','dfH2','dfH3');DFH.hk=-1;if(CLOUD_MESH)CLOUD_MESH.visible=true;
+  missEl.classList.remove('dfH1','dfH2','dfH3');DFH.hk=-1;if(CLOUD_MESH)CLOUD_MESH.visible=CLOUDS.vis;
   dfHudUpdate();
   if(MUSIC.forced==='dogfight.m4a')MUSIC.forced=null;if(st.mode==='dogfight')st.mode='runway';
   if(camMode===3){camMode=0;snapCamera=true;}DF.six6=false;DF.sixK=0;if(DFH.six){DFH.six.className='';DFH.sixK='';}
@@ -16978,6 +17390,7 @@ SHOW.scene.background=new THREE.Color(0xF6C177);
 SHOW.scene.fog=new THREE.Fog(0xF6C177,1e6,2e6);   // its environment: the day's (envDay), set when it first draws
 SHOW.scene.add(new THREE.HemisphereLight(0xfff4e2,0x8a5a3a,0.85));
 {const d=new THREE.DirectionalLight(0xffffff,0.95);d.position.set(-0.5,1,0.7);SHOW.scene.add(d);}
+CSM.showScene=SHOW.scene;csmShowSync();   // graphics item 6: the cascades' twins, never drawn
 function showItem(t){
   if(SHOW.items[t])return SHOW.items[t];
   const m=getModel(t),c=m.g.clone(true);c.visible=true;c.position.set(0,0,0);c.quaternion.identity();
@@ -19607,10 +20020,10 @@ function tick(t,skipRender){
   setTxt(warnEl,w);warnEl.classList.toggle('on',!!w);
   updateAudio();frameN++;if(frameN>=4&&!splashSeen&&WORLD.ready){splashSeen=true;splashDone();}   // a world region: once it is built
   if(skipRender){}
-  else if(SHOW.on){renderer.setClearColor(0xF6C177,1);renderer.clear();showRender(dt,CARM);}
+  else if(SHOW.on){csmIdle();renderer.setClearColor(0xF6C177,1);renderer.clear();showRender(dt,CARM);}
   else{if((!menu.classList.contains('on')||frameN<40)&&!FM.on){   // the open map is opaque: no 3D frame under it
       rebuildTerrain(camera.position.x,camera.position.z);   // the LOD rings round the camera this frame looks from
-      if(camMode===2&&SENSOR.mode!=='tv'&&!PHOTO.on&&!FREECAM)renderIR();else pfxRender();}
+      if(camMode===2&&SENSOR.mode!=='tv'&&!PHOTO.on&&!FREECAM){csmIdle();renderIR();}else{csmFrame();pfxRender();}}
     const po=pauseOv.classList.contains('on');document.body.classList.toggle('pauseOn',po);}
 }
 // test hook: headless UI checks need to reach a few internals
@@ -19622,7 +20035,7 @@ function tick(t,skipRender){
 // it switched off, so nothing is fetched and no request can fail in their console.
 var LB=null;
 LB=(function(){
-const APP_VER='2026-10-11-gfx5';          // keep version.json in step when shipping
+const APP_VER='2026-10-11-gfx6';          // keep version.json in step when shipping
   const ORIGINS=['https://rabahharchaoui-design.github.io','http://localhost:8765'];
   let over='';try{over=localStorage.getItem('kgeuLBUrl')||'';}catch(e){}
   const E={url:over||'https://pfs-scores.rabahharchaoui.workers.dev',enabled:!!over||ORIGINS.includes(location.origin),online:null,
@@ -20229,6 +20642,16 @@ window.__kgeu={PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,b
         col:[g.aCol.getX(i),g.aCol.getY(i),g.aCol.getZ(i)]});}
     return out;},
   cloudMat:()=>({color:cloudMat.color.getHex(),emissive:cloudMat.emissive.getHex()}),
+  // graphics item 6: the cloud preset (setClouds(null) hands it back to the per flight pick), the cascades and the air
+  setClouds:p=>{CLOUDS.forced=/^(clear|scattered|monsoon)$/.test(p)?p:null;cloudsAuto();return CLOUDS.preset;},
+  clouds:()=>({preset:CLOUDS.preset,forced:CLOUDS.forced,visible:!!(CLOUD_MESH&&CLOUD_MESH.visible),hd:!!(CLOUD_MESH&&CLOUD_MESH.material===CLOUDS.hd),
+    cb:!!(CLOUDS.cb&&CLOUDS.cb.visible),cbTris:CLOUDS.tris||0,cbN:CLOUDS.cb?CLOUDS.cb.count:0,puffs:CLOUD_MESH?CLOUD_MESH.count:0,pick:(t,k)=>cloudsPick(t,k)}),
+  cloudsPick:cloudsPick,
+  csm:()=>({n:CSM.n,lights:CSM.lights.length,inScene:CSM.lights.filter(l=>l.parent===scene).length,enabled:renderer.shadowMap.enabled,
+    sizes:CSM.lights.map(l=>l.shadow.mapSize.x),act:CSM.act,renders:CSM.renders,skips:CSM.skips,recv:CSM.recv,strength:CSM_U.a.w,stat:CSM.stat.length,
+    lists:CSM.L.map(l=>l.length),dirLights:scene.children.filter(o=>o.isDirectionalLight).length,
+    r:CSM.lights.map(l=>l.shadow.camera.right),split:[CSM_U.a,CSM_U.c].map(o=>[o.x,o.y,o.z])}),
+  AIR:()=>({k:AIR_U.k,sun:AIR_U.sun,s:AIR_U.s,a:AIR_U.a,t:AIR_U.t,m:AIR_U.m,mon:AIR.mon,r0:AIR.r0}),
   setTOD:setTOD,isNight:isNight,TOD:()=>TOD,
   haboob:()=>({on:HB.on,dist:HB.on?HB.dist:null,d:HB.d,windKt:st.windKt,gustAmp:st.gustAmp,fogNear:scene.fog.near,called:HB.called,
     wallVisible:!!(HB.g&&HB.g.visible),C:[HB.C.x,HB.C.z],T:[HB.T.x,HB.T.z],sunDisc:!!(HB.sun&&HB.sun.visible),dustDir:st.dustDir,windDir:st.windDir}),

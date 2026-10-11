@@ -47,8 +47,11 @@ async def open_page(b, url):
 
 CAM0 = f"let k=0;while({K}.camMode()!==0&&k++<5){K}.cycleCam();"
 UNMAP = f"if({K}.freeCam)({K}.freeCam(null));if(document.getElementById('mapOv').classList.contains('on')){K}.fmClose();"
+# graphics item 6: the clouds are picked per flight from the daily seed (30% of days clear by day), so the day shots hold
+# the scattered preset still for a stable before/after (a build without setClouds has them anyway)
 def fly(t, tod, pos, base='kgeu'):
-    return f"{UNMAP}{K}.setTOD('{tod}');{K}.pick('{t}');{K}.pickBase('{base}');{K}.start('{pos}');{CAM0}"
+    cl = "'scattered'" if tod == 'day' else 'null'
+    return f"{UNMAP}{K}.setTOD('{tod}');if({K}.setClouds){K}.setClouds({cl});{K}.pick('{t}');{K}.pickBase('{base}');{K}.start('{pos}');{CAM0}"
 AC = [('f16', 'f16'), ('c130', 'c130'), ('mq9a', 'reaper'), ('mq9b', 'mq9b'), ('cessna', 'cessna'), ('pipistrel', 'alpha')]
 
 # name -> list of steps: a JS body (run in the page) or a number (ms to wait in between)
@@ -76,9 +79,31 @@ SCENES['terrain_ramp'] = [fly('f16', 'day', 'runway'), 600,
     f"{K}.freeCam({{w:true,p:[48,4.5,-1],t:[-24000,350,-6400],fov:38}});"]
 # not in the sheet: the White Tanks close up by day, for the rock colours
 CLOSE = {'wt_close': [fly('f16', 'day', 'runway'), 600, air(-16000, -3000, 4500, 260, 330)]}
+# graphics item 6, atmosphere. A build without the hooks shoots the same views (setClouds and GFX guarded).
+# the F-16 on the KGEU runway by day, chase view, its shadow on the runway (main() takes it twice, 100 ms apart, and diffs)
+SCENES['shadow_ramp'] = [fly('f16', 'day', 'runway')]
+# the C-130 on the KGEU ramp at sunset, the camera behind its right wing (aircraft frame): the long shadow east
+SCENES['shadow_golden'] = [fly('c130', 'sunset', 'ramp'), 600, f"{K}.freeCam({{p:[24,16,36],t:[-10,0,-80],fov:50}});"]
+# High forced (main() puts Auto back after every shot): the Cessna at 4,000 ft at sunset east of the White Tanks
+# heading west south west at them, the range's shadows reaching out across the valley toward it
+SCENES['shadow_valley'] = [f"if({K}.GFX)({K}.GFX.setTier('high'));", fly('cessna', 'sunset', 'runway'), 600, air(-15000, -9000, 4000, 241, 82)]
+# the Cessna at 5,000 ft by day heading south east out of KGEU: the monsoon builds ahead
+SCENES['clouds_monsoon'] = [fly('cessna', 'day', 'runway'), 600, f"if({K}.setClouds){K}.setClouds('monsoon');", air(-2000, -2000, 5000, 140, 82)]
+# the same at 5,000 ft heading north west under the scattered cumulus
+SCENES['clouds_scattered'] = [fly('cessna', 'day', 'runway'), 600, f"if({K}.setClouds){K}.setClouds('scattered');", air(2000, 2000, 5000, 320, 82)]
 # 3 s of sim in 0.1 s ticks (the headless loop runs ~3 fps, so real time would be about 1 s of flight)
 SCENES['dogfight'] = [f"{UNMAP}{K}.setTOD('day');{K}.DF.test.seed=1;{K}.DF.test.noBrief=true;{K}.dfStart();{CAM0}", 600,
     f"for(let i=0;i<30;i++){K}.stepFrame(0.1,false,true);{K}.stepFrame(0,true);"]
+
+# the mean and the largest abs difference (0..255) over the aircraft and its shadow (the middle of the frame, under
+# the HUD), and the share of pixels there that moved more than 24
+def swim(a, b):
+    from PIL import Image, ImageChops, ImageStat
+    A, B = Image.open(a).convert('L'), Image.open(b).convert('L')
+    w, h = A.size; box = (int(w * 0.3), int(h * 0.48), int(w * 0.7), int(h * 0.78))
+    d = ImageChops.difference(A.crop(box), B.crop(box)); hg = d.histogram(); n = sum(hg)
+    mx = max(i for i, c in enumerate(hg) if c)
+    return f'mean {ImageStat.Stat(d).mean[0]:.2f} max {mx} moved {sum(hg[25:]) / n * 100:.2f}%'
 
 async def setup(pg, name):
     for s in SCENES[name]:
@@ -99,6 +124,10 @@ async def main():
             try:
                 await setup(pg, name)
                 await pg.screenshot(path=os.path.join(out, name + '.png'))
+                if name == 'shadow_ramp':   # two frames 100 ms apart: the shadow must not swim
+                    await pg.wait_for_timeout(100); await pg.screenshot(path=os.path.join(out, 'shadow_ramp_b.png'))
+                    print('  shadow_ramp vs 100 ms later: ' + swim(os.path.join(out, 'shadow_ramp.png'), os.path.join(out, 'shadow_ramp_b.png')))
+                await pg.evaluate(f"()=>{{if({K}.setClouds){K}.setClouds(null);if({K}.GFX&&{K}.GFX.setTier&&{K}.GFX.tier!=={K}.GFX.auto){K}.GFX.setTier('auto');}}")
                 info = await pg.evaluate(f"()=>({{scr:{K}.curScr(),run:{K}.running(),cam:{K}.camMode(),df:!!({K}.DF&&{K}.DF.on)}})")
                 print(f'{name}.png  {time.time()-t:.1f}s  {json.dumps(info)}')
             except Exception as e:
