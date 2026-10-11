@@ -51,7 +51,22 @@
 # --item5pass_844 / --item5pass_568 (15 answers, ~45-60s each; --item5pass combines both), --item5fail (844 only, 15
 # answers, ~45s). --item5 runs the whole group end to end (well over 110s: never call it directly in one foreground
 # Bash call).
-import asyncio, os, sys
+#
+# School2 item 6: Stage 4 lesson 2, the mock checkride (Frank Delgado, DPE; #RIDE draws steep, slow, stall, emerg,
+# hood, landings under rideSeed(42)). ride_task_<WxH>: mid ride, during the steep turns task (partway into the turn,
+# not complete): Frank's subtitle (#atc, "Frank" as the speaker), the lesson card (Checkride: Steep turns, or its
+# narrow form), the cue strip. ride_cert_<WxH>: the certificate card after the passed run (seed 42), shot at once and
+# again after 1.5s (the XP pop may still show, or may have faded); measures #gLines/.cert scrollHeight vs clientHeight
+# at 568x320 for clipping. ride_fail_844x390: the F card (Notice of disapproval) after the failed run (seed 1, slow
+# flight stalled), the Retrain row(s), RETRAIN at least 44px. boards_ride_844x390: the Boards screen, Checkride board
+# selected, one row. map_s4_cert_844x390: the Flight school screen after the pass (the header's certificate line,
+# Stage 4 ticked). A full pass drive (all six tasks) runs close to the 110s per-call cap on its own, so boards/map
+# are seeded from localStorage dumped by the --item6cert run instead of re-flying the whole ride: --item6task
+# (~15s), --item6fail (~20s), --item6cert (the full pass drive + both cert shots, ~90-100s: dumps every kgeu* key to
+# /tmp/ride_pass_storage.json), --item6boardsmap (needs --item6cert to have run first in this session; a page load +
+# two taps, ~15s). --item6 runs the whole group end to end (well over 110s: never call it directly in one foreground
+# Bash call).
+import asyncio, json, math, os, sys
 from playwright.async_api import async_playwright
 from harness import serve, launch, page, PLACED, finger
 from school_fly import K, BASE, start, rwy, call, final, touchdown, stop, DANA, DEBRIEF, downwind, base
@@ -688,6 +703,214 @@ async def item5(b, url):
     await oral_pass(b, url, 844, 390); await oral_pass(b, url, 568, 320)
     await oral_fail(b, url)
 
+# ---------------- item 6: Stage 4 lesson 2, the mock checkride (Frank Delgado, DPE; #RIDE) ----------------
+# Driving helpers duplicated from school_ride_check.py rather than imported: that module's last line is a bare
+# asyncio.run(main()) with no __main__ guard, so importing it would run the whole check (a second server/browser) as
+# a side effect. R-prefixed to avoid clashing with this file's own fly()/FLY (a different flight interpolation used
+# by the nav lessons).
+RFLY = SF.FLY.replace("let i=0;\n  for(;i<n&&K.LES.on;i++)", "let i=0;const tk=K.LES.on;\n  for(;i<n&&K.LES.on===tk;i++)")
+assert RFLY != SF.FLY
+RWAIT = "(id)=>{const K=window.__kgeu;let i=0;for(;i<900&&K.LES.on&&K.LES.on!==id;i++){const s=K.state();s.windKt=0;s.gustAmp=0;K.stepFrame(0.1,false,true);}K.stepFrame(0,true);return [K.LES.on,i,document.getElementById('lesT').textContent]}"
+RSTALL = """(o)=>{const K=window.__kgeu,u=o.u?new Function('K','return '+o.u):null;let i=0;const tk=K.LES.on;
+  for(;i<(o.n||400)&&K.LES.on===tk;i++){const s=K.state();s.windKt=0;s.gustAmp=0;s.throttle=s.power=o.thr;
+    const V=o.kt/1.943844/Math.sqrt(1.097*Math.exp(-s.pos.y/9200)/1.225);s.vel.set(0,o.vy||0,-V);s.quat.setFromEuler(new THREE.Euler(o.p,0,0,'YXZ'));s.w.set(0,0,0);
+    K.stepFrame(0.1,false,true);if(u&&u(K))break;}K.stepFrame(0,true);return {ph:K.LES.ph,on:K.LES.on,i:i}}"""
+RGROUND = """([x,z,n])=>{const K=window.__kgeu,tk=K.LES.on;for(let i=0;i<n&&K.LES.on===tk;i++){const s=K.state();s.pos.set(x,K.groundHeight(x,z)+K.rwyFrame().gear,z);s.vel.set(0,0,0);s.w.set(0,0,0);s.onGround=true;K.stepFrame(0.1,false,true);}K.stepFrame(0,true);return K.LES.on}"""
+RFIELD = """()=>{const K=window.__kgeu,O=K.lesObjs(),M=O.filter(o=>o.name==='fieldMk'),s=K.state();if(!M.length)return null;
+  const cx=M.reduce((p,o)=>p+o.x,0)/M.length,cz=M.reduce((p,o)=>p+o.z,0)/M.length;
+  return {cx:cx,cz:cz,brg:(Math.atan2(cx-s.pos.x,-(cz-s.pos.z))*180/Math.PI+360)%360,M:M.map(o=>[o.x,o.z])}}"""
+RCARD = """()=>{const g=document.getElementById('gradeOv'),q=s=>{const e=g.querySelector(s);return e?e.textContent:null};
+  return {on:g.classList.contains('on'),cert:g.classList.contains('cert'),letter:q('#gLetter'),
+    title:document.getElementById('gTitle').firstChild.textContent,kick:q('.cert .cK'),name:q('.cert .cN'),date:q('.cert .cD'),score:q('.cert .cS'),
+    rows:[...g.querySelectorAll('#gLines .gt')].map(r=>[r.querySelector('span').textContent,r.className.replace('gl gt rr','').trim(),r.querySelector('b').textContent]),
+    board:q('#gLines .lbLine'),rt:[...g.querySelectorAll('.rtGo')].map(b=>{const r=b.getBoundingClientRect();return [b.dataset.l,b.textContent,Math.round(r.width),Math.round(r.height)]}),
+    tip:q('.rTip'),retry:q('#gRetry')}}"""
+RFIT = """(sel)=>{const s=document.querySelector(sel);const W=innerWidth,H=innerHeight,bad=[];
+  s.querySelectorAll('button').forEach(e=>{const r=e.getBoundingClientRect();if(!r.width)return;
+    if(r.left<-0.5||r.top<-0.5||r.right>W+0.5||r.bottom>H+0.5)bad.push('off '+e.textContent.trim().slice(0,14));
+    if(r.width<43.5||r.height<43.5)bad.push('small '+e.textContent.trim().slice(0,14));});
+  const c=s.querySelector('.cert');if(c){const r=c.getBoundingClientRect();if(r.bottom>H||r.top<0)bad.push('cert off screen');}
+  const b=s.querySelector('.rLines');if(b&&b.scrollHeight>b.clientHeight+1)bad.push('lines scroll');return bad;}"""
+RMEAS = """()=>{const g=document.getElementById('gLines'),c=document.querySelector('#gradeOv .cert');
+  return {glScrollH:g&&g.scrollHeight, glClientH:g&&g.clientHeight, certScrollH:c&&c.scrollHeight, certClientH:c&&c.clientHeight};}"""
+RFRANK = "()=>window.__kgeu.radioLog().filter(l=>l.who==='Frank').map(l=>l.text)"
+
+async def rfly(pg, n, **o):
+    return await pg.evaluate(RFLY, [n, o])
+
+def rvs(kt, deg):
+    return kt * 101.27 * math.tan(math.radians(deg) - 0.04)
+
+async def rwait(pg, tid):
+    return await pg.evaluate(RWAIT, tid)
+
+async def r_t_steep(pg):
+    kt = await pg.evaluate(f"()=>Math.round({K}.state().ias*1.943844)")
+    await rfly(pg, 10, kt=kt, vs=0, hdg=0, bank=45, until="K.LES.ph===1")
+    await rfly(pg, 600, kt=kt, vs=0, hdg=0, bank=45, rate=10, until="K.LES.d.turned>=340")
+    await rfly(pg, 20, kt=kt, vs=0, hdg=360, bank=0)
+
+async def r_t_slow(pg):
+    await rfly(pg, 400, kt=58, vs=0, hdg=0, thr=0.5, until="K.LES.ph===1")
+    await rfly(pg, 600, kt=58, vs=0, hdg=0, thr=0.5)
+
+async def r_t_stall(pg):
+    for o in ({'kt': 48, 'p': 0.5, 'thr': 0, 'u': 'K.LES.ph===1'}, {'kt': 60, 'p': -0.05, 'vy': 1.2, 'thr': 1, 'u': 'K.LES.ph===2'}, {'kt': 74, 'p': 0.1, 'vy': 2, 'thr': 1, 'u': 'K.LES.ph===3'},
+              {'kt': 58, 'p': 0.1, 'vy': 0, 'thr': 0.4, 'n': 20}, {'kt': 52, 'p': 0.55, 'thr': 1, 'u': 'K.LES.ph===4'}, {'kt': 62, 'p': -0.05, 'vy': 1.2, 'thr': 1, 'u': 'K.LES.ph===5'},
+              {'kt': 74, 'p': 0.1, 'vy': 2, 'thr': 1}):
+        await pg.evaluate(RSTALL, o)
+
+async def r_t_emerg(pg):
+    await pg.evaluate(f"()=>{{const K={K};for(let i=0;i<60&&!K.LES.d.go;i++)K.stepFrame(0.1,false,true);K.stepFrame(0,true)}}")
+    await rfly(pg, 700, thr=0, bank=45, kt=130, vs=-2500, hdg=0, rate=8, until="K.LES.ph===1")
+    await rfly(pg, 80, alt=3500, thr=0.8, kt=100, vs=0, hdg=90, until="K.LES.ph===2")
+    await rfly(pg, 140, kt=100, vs=0, hdg=90, until="K.LES.ph===3")
+    f = await pg.evaluate(RFIELD)
+    await rfly(pg, 120, kt=68, vs=-650, hdg=f['brg'])
+    ax, az = (f['M'][1][0] - f['M'][0][0]), (f['M'][1][1] - f['M'][0][1]); L = math.hypot(ax, az); ax, az = ax / L, az / L
+    h = (math.degrees(math.atan2(ax, -az)) + 360) % 360
+    await rfly(pg, 10, x=f['cx'] - ax * 600, z=f['cz'] - az * 600, agl=250, kt=62, vs=-500, hdg=h)
+    await pg.evaluate(f"([x,z])=>{{const K={K};K.events.push({{type:'touchdown',fpm:220,paved:K.isPaved(x,z),x:x,z:z,ias:30,bank:0}})}}", [f['cx'], f['cz']])
+    await rfly(pg, 2, agl=20, kt=50, vs=-100, hdg=h)
+    await pg.evaluate(RGROUND, [f['cx'], f['cz'], 30])
+
+async def r_t_hood(pg):
+    await rfly(pg, 700, alt=3500, kt=90, vs=0, hdg=0, until="K.LES.ph===1")
+    await rfly(pg, 200, kt=90, vs=0, hdg=0, rate=4.5, bank=15)
+    await rfly(pg, 400, kt=90, vs=0, hdg=90, until="K.LES.ph===2")
+    await pg.evaluate("(n)=>{const K=window.__kgeu;for(let i=0;i<n&&K.LES.on==='hood';i++)K.stepFrame(0.1,false,true);K.stepFrame(0,true)}", 40)
+    await rfly(pg, 6, thr=0, bank=50, kt=118, vs=rvs(118, -25), hdg=90)
+    await rfly(pg, 6, bank=0, kt=125, vs=rvs(125, -25), hdg=90)
+    await rfly(pg, 30, bank=0, kt=125, vs=300, hdg=90, until="K.LES.ph===3")
+    await pg.evaluate("(n)=>{const K=window.__kgeu;for(let i=0;i<n&&K.LES.on==='hood';i++)K.stepFrame(0.1,false,true);K.stepFrame(0,true)}", 40)
+    await rfly(pg, 6, thr=1, bank=-40, kt=68, vs=rvs(68, 30), hdg=90)
+    await rfly(pg, 10, bank=-40, kt=70, vs=0, hdg=90)
+    await rfly(pg, 60, bank=0, kt=75, vs=0, hdg=90)
+
+async def r_t_landings(pg):
+    F = await rwy(pg)
+    assert await call(pg), 'no CALL at the hold'
+    await pg.evaluate("()=>{const K=window.__kgeu;for(let i=0;i<500;i++){K.stepFrame(0.1,false,true);if(K.radioLog().some(l=>/^Cleared for takeoff/.test(l.text)))break;}K.stepFrame(0,true)}")
+    for c in range(3):
+        await SF.climbout(pg, F); await downwind(pg, F)
+        assert await call(pg), ('no readback', c)
+        await downwind(pg, F, 80); await base(pg, F)
+        if c == 1:
+            await final(pg, F, to=320)
+            await SF.fly(pg, 3, agl=295, kt=65, vs=-400, hdg=F['rh'])
+            await SF.fly(pg, 120, thr=1, kt=70, vs=900, hdg=F['rh'], until="K.LES.d.c===2")
+            continue
+        await final(pg, F)
+        await touchdown(pg, F, past=60)
+        if c == 0:
+            await SF.fly(pg, 30, agl=30, kt=60, vs=0, hdg=F['rh'])
+            await SF.fly(pg, 10, agl=150, kt=70, vs=500, hdg=F['rh'], until="K.LES.d.c===1")
+        else:
+            await stop(pg, F)
+
+RDRIVE = {'steep': r_t_steep, 'slow': r_t_slow, 'stall': r_t_stall, 'emerg': r_t_emerg, 'hood': r_t_hood, 'landings': r_t_landings}
+RIDE_DUMP = '/tmp/ride_pass_storage.json'
+
+async def ride_task(b, url, W, H):
+    # ride_task_<WxH>: mid ride, during the steep turns task (the ride's first task under rideSeed(42), partway into
+    # the turn, not complete): Frank's subtitle (#atc, "Frank" as the speaker), the lesson card, the cue strip
+    pg = await page(b, url, vp={'width': W, 'height': H}, storage=ST)
+    seq = await pg.evaluate(f"()=>{{{K}.rideSeed(42);const s={K}.rideDraw();{K}.rideSeed(42);return s}}")
+    await pg.evaluate(f"()=>{{const K={K};K.radioLog(true);K.startLesson('ride');K.lesBriefSkip();const s=K.state();s.windKt=0;s.gustAmp=0;}}")
+    await pg.wait_for_timeout(200)
+    w = await rwait(pg, 'steep')
+    kt = await pg.evaluate(f"()=>Math.round({K}.state().ias*1.943844)")
+    await rfly(pg, 10, kt=kt, vs=0, hdg=0, bank=45, until="K.LES.ph===1")
+    await rfly(pg, 90, kt=kt, vs=0, hdg=0, bank=45, rate=10)  # partway into the 340 degree turn: mid-task
+    info = await pg.evaluate("""()=>{const a=document.getElementById('atc'),b=a.querySelector('b');
+      return {title:document.getElementById('lesT').textContent, cue:document.getElementById('lesCue').classList.contains('on'),
+        atcOn:a.classList.contains('on'), who:b&&b.textContent, turned:window.__kgeu.LES.d.turned};}""")
+    print(f'  ride_task {W}x{H} seq={seq} w={w} title={info["title"]!r} cue={info["cue"]} atcOn={info["atcOn"]} who={info["who"]!r} turned={round(info["turned"])}')
+    await shot(pg, f'ride_task_{W}x{H}.png')
+    await pg.context.close()
+
+async def ride_fail(b, url):
+    # ride_fail_844x390: rideSeed(1) (slow flight first) stalled: the F card (Notice of disapproval), the Retrain row(s)
+    pg = await page(b, url, vp={'width': 844, 'height': 390}, storage=ST)
+    seq = await pg.evaluate(f"()=>{{{K}.rideSeed(1);const s={K}.rideDraw();{K}.rideSeed(1);return s}}")
+    await pg.evaluate(f"()=>{{const K={K};K.radioLog(true);K.startLesson('ride');K.lesBriefSkip();}}")
+    w = await rwait(pg, seq[0])
+    await pg.evaluate(RSTALL, {'kt': 40, 'p': 0.6, 'thr': 0, 'n': 200})
+    await pg.wait_for_timeout(700)
+    c = await pg.evaluate(RCARD)
+    bad = await pg.evaluate(RFIT, '#gradeOv')
+    print(f'  ride_fail 844x390 seq={seq} w={w} letter={c["letter"]!r} title={c["title"]!r} row0={c["rows"][0]} rt={c["rt"]} FIT bad={bad}')
+    await shot(pg, 'ride_fail_844x390.png')
+    await pg.context.close()
+
+async def ride_cert(b, url):
+    # drives rideSeed(42) (steep, slow, stall, emerg, hood, landings) through to a pass, shoots ride_cert_844x390 at
+    # once and again 1.5s later (the XP pop), then resizes to 568x320 for the narrow shot (no redrive: same trick
+    # school_ride_check.py uses for its own 844/568 cert shots). Dumps every kgeu* localStorage key to RIDE_DUMP so
+    # ride_boards_map can be seeded straight to the passed state instead of re-flying the whole ride.
+    pg = await page(b, url, vp={'width': 844, 'height': 390}, storage=dict(ST, kgeuSchoolEasy='1'))
+    seq = await pg.evaluate(f"()=>{{{K}.rideSeed(42);const s={K}.rideDraw();{K}.rideSeed(42);return s}}")
+    await pg.evaluate(f"()=>{{const K={K};K.radioLog(true);K.startLesson('ride');K.lesBriefSkip();const s=K.state();s.windKt=0;s.gustAmp=0;}}")
+    await pg.wait_for_timeout(200)
+    w = await rwait(pg, 'steep')  # the lesson needs a few simulated frames to actually enter the first task
+    assert w[0] == 'steep', ('never started', 'steep', w)
+    for k, tid in enumerate(seq):
+        if k:
+            w = await rwait(pg, tid)
+            assert w[0] == tid, ('never started', tid, w)
+        await RDRIVE[tid](pg)
+    await pg.wait_for_timeout(700)
+    c = await pg.evaluate(RCARD)
+    bad = await pg.evaluate(RFIT, '#gradeOv')
+    xp = await pg.evaluate("()=>{const b=document.getElementById('xpPops');return {log:window.__kgeu.XPP.log.slice(-1),n:b?b.children.length:0,boxExists:!!b}}")
+    print(f'  ride_cert 844x390 seq={seq} letter={c["letter"]!r} cert={c["cert"]} score={c["score"]!r} rows={len(c["rows"])} board={c["board"]!r} FIT bad={bad} xp={xp}')
+    await shot(pg, 'ride_cert_844x390.png')
+    await pg.wait_for_timeout(1500)
+    xp2 = await pg.evaluate("()=>{const b=document.getElementById('xpPops'),e=b&&b.firstElementChild;return {n:b?b.children.length:0,op:e&&getComputedStyle(e).opacity,txt:e&&e.textContent}}")
+    print(f'  ride_cert 844x390 (+1.5s) xp={xp2}')
+    await shot(pg, 'ride_cert_844x390_t1500.png')
+    await pg.set_viewport_size({'width': 568, 'height': 320}); await pg.wait_for_timeout(400)
+    bad2 = await pg.evaluate(RFIT, '#gradeOv')
+    meas = await pg.evaluate(RMEAS)
+    print(f'  ride_cert 568x320 FIT bad={bad2} MEAS {meas}')
+    await shot(pg, 'ride_cert_568x320.png')
+    fr = await pg.evaluate(RFRANK)
+    print('\n  Frank, the passed ride, in order:')
+    for t in fr:
+        print('   - ' + t)
+    print()
+    dump = await pg.evaluate("()=>Object.fromEntries(Object.keys(localStorage).filter(k=>k.indexOf('kgeu')===0).map(k=>[k,localStorage.getItem(k)]))")
+    with open(RIDE_DUMP, 'w') as f:
+        json.dump(dump, f)
+    await pg.context.close()
+
+async def ride_boards_map(b, url):
+    # boards_ride_844x390 (Boards screen, Checkride board selected, one row) and map_s4_cert_844x390 (the Flight
+    # school screen after the pass: the header's certificate line, Stage 4 ticked); seeded from RIDE_DUMP (written by
+    # ride_cert) so this is a page load + two taps instead of a second full ride drive
+    with open(RIDE_DUMP) as f:
+        dump = json.load(f)
+    pg = await page(b, url, vp={'width': 844, 'height': 390}, storage=dict(ST, **dump))
+    await pg.evaluate(f"()=>{{{K}.openMenu('sLb');{K}.LB.lbOpen('lesson:ride')}}"); await pg.wait_for_timeout(500)
+    lb = await pg.evaluate("""()=>{const g=[...document.querySelectorAll('#lbList h3')].map(h=>[h.textContent,[...h.nextElementSibling.querySelectorAll('[data-lbb]')].map(b=>[b.dataset.lbb,b.textContent])]);
+      return {g:g,title:document.getElementById('lbTitle').textContent,rows:document.querySelectorAll('#lbRowsIn .lbRow').length,how:document.getElementById('lbHow').textContent}}""")
+    print(f'  boards_ride 844x390 title={lb["title"]!r} rows={lb["rows"]} how={lb["how"]!r}')
+    await shot(pg, 'boards_ride_844x390.png')
+    await pg.evaluate(f"()=>{K}.openMenu('sSchool')"); await pg.wait_for_timeout(300)
+    await pg.evaluate("()=>{const b=document.querySelector('#schMap [data-st=s4]');if(b)b.click()}"); await pg.wait_for_timeout(300)
+    h = await pg.evaluate("""()=>({c:document.getElementById('schCert').textContent,vis:!document.getElementById('schCert').hidden&&getComputedStyle(document.getElementById('schCert')).display!=='none',
+      ring:document.querySelector('#schMap [data-st=s4] .ring').textContent, row:[...document.querySelectorAll('#school .lrow')].map(r=>[r.dataset.l,r.className.replace('lrow','').trim()])})""")
+    print(f'  map_s4_cert 844x390 cert={h["c"]!r} vis={h["vis"]} ring={h["ring"]!r} rows={h["row"]}')
+    await shot(pg, 'map_s4_cert_844x390.png')
+    await pg.context.close()
+
+async def item6(b, url):
+    # the whole item6 group, end to end; well over 110s, never call this one directly in a single foreground Bash call
+    await ride_task(b, url, 844, 390); await ride_task(b, url, 568, 320)
+    await ride_fail(b, url)
+    await ride_cert(b, url)
+    await ride_boards_map(b, url)
+
 async def main():
     srv, url = serve()
     async with async_playwright() as p:
@@ -766,6 +989,16 @@ async def main():
             await oral_fail(b, url); await b.close(); srv.shutdown(); return
         if '--item5' in sys.argv:
             await item5(b, url); await b.close(); srv.shutdown(); return
+        if '--item6task' in sys.argv:
+            await ride_task(b, url, 844, 390); await ride_task(b, url, 568, 320); await b.close(); srv.shutdown(); return
+        if '--item6fail' in sys.argv:
+            await ride_fail(b, url); await b.close(); srv.shutdown(); return
+        if '--item6cert' in sys.argv:
+            await ride_cert(b, url); await b.close(); srv.shutdown(); return
+        if '--item6boardsmap' in sys.argv:
+            await ride_boards_map(b, url); await b.close(); srv.shutdown(); return
+        if '--item6' in sys.argv:
+            await item6(b, url); await b.close(); srv.shutdown(); return
         if '--item1b' in sys.argv:
             await item1b(b, url); await b.close(); srv.shutdown(); return
         if '--item1a' in sys.argv:
