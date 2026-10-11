@@ -1003,7 +1003,15 @@ async def night_debrief_log(b, url):
         await night_circuit(pg, F, past=40 + 30 * k)
     await pg.wait_for_timeout(800)
     d = await pg.evaluate(DEBRIEF)
+    vis = await pg.evaluate("""()=>{const sheet=document.querySelector('#gradeOv .sheet'),rl=document.querySelector('#gradeOv .rLines');
+      const log=document.querySelector('#gradeOv .gLog');if(!log)return {log:false};const r=log.getBoundingClientRect();
+      const rows=[...rl.children].map(e=>{const q=e.getBoundingClientRect(),cs=getComputedStyle(e);return [e.className,Math.round(q.top),Math.round(q.bottom),cs.opacity,cs.visibility,cs.display,cs.color,cs.zIndex]});
+      const btns=document.querySelector('#gradeOv .rBtns');const br=btns?btns.getBoundingClientRect():null;
+      return {log:true,sheetScroll:sheet.scrollHeight,sheetClient:sheet.clientHeight,cols:getComputedStyle(rl).gridTemplateColumns,
+        logTop:Math.round(r.top),logBottom:Math.round(r.bottom),logInView:r.top>=0&&r.bottom<=innerHeight,rows:rows,
+        btns:br&&[Math.round(br.top),Math.round(br.bottom)],sheetTop:sheet.getBoundingClientRect().top}}""")
     print(f'  night_debrief_log 844x390 on {d["on"]} letter {d["letter"]} gl {d["gl"]}')
+    print(f'  night_debrief_log Logbook row visibility: {vis}')
     await shot(pg, 'night_debrief_log_844x390.png')
     await pg.context.close()
 
