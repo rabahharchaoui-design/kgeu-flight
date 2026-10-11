@@ -1,6 +1,6 @@
 # Graphics session screenshots: one fixed set of scenes, iPhone landscape 844x390 at 2x, for a before/after
 # sheet of any build. Uses only hooks the pregraphics build already has, so it runs on both.
-#   .venv/bin/python tests/graphics_shots.py <root> <outdir>
+#   .venv/bin/python tests/graphics_shots.py <root> <outdir> [scene,scene,...]
 # Shots: home, the six reference and trainer aircraft in the chase view on the KGEU runway by day,
 # the Cessna on final at night, in the haboob and at sunset, the F-16 on the runway at sunset, the MQ-9A sensor ball in white hot, the map, and
 # the dogfight 3 s in (fixed seed). <outdir>/metrics.json: load time to splash gone, JS heap, page errors.
@@ -91,9 +91,41 @@ SCENES['shadow_valley'] = [f"if({K}.GFX)({K}.GFX.setTier('high'));", fly('cessna
 SCENES['clouds_monsoon'] = [fly('cessna', 'day', 'runway'), 600, f"if({K}.setClouds){K}.setClouds('monsoon');", air(-2000, -2000, 5000, 140, 82)]
 # the same at 5,000 ft heading north west under the scattered cumulus
 SCENES['clouds_scattered'] = [fly('cessna', 'day', 'runway'), 600, f"if({K}.setClouds){K}.setClouds('scattered');", air(2000, 2000, 5000, 320, 82)]
+# graphics item 7, the haboob as the signature visual: the aircraft put in the air with air(), the wall jumped to m metres
+# ahead of it (haboobJump; a negative m puts it inside), chase view unless said
+def hbj(m): return f"if({K}.haboobJump)({K}.haboobJump({m}));"
+# the Cessna at 2,000 ft heading south east 4 km from the wall, the late sun over the right shoulder (the lit face), seen
+# from 36 m behind it with a 46 degree lens so the wall fills the frame
+SCENES['haboob_wall'] = [fly('cessna', 'haboob', 'runway'), 600, air(3000, 3000, 3071, 150, 95), hbj(4000),
+    f"{K}.freeCam({{p:[0,7,36],t:[0,330,-4000],fov:46}});"]
+# 500 m from the face at 1,500 ft
+SCENES['haboob_face'] = [fly('cessna', 'haboob', 'runway'), 600, air(3000, 3000, 2571, 150, 95), hbj(500)]
+# 1 km inside at 1,500 ft: the dust streaks in the chase view, then in the cockpit
+SCENES['haboob_inside'] = [fly('cessna', 'haboob', 'runway'), 600, air(3000, 3000, 2571, 150, 95), hbj(-1000)]
+SCENES['haboob_inside_cockpit'] = SCENES['haboob_inside'] + [f"{K}.cycleCam();"]
+# inside heading west, the camera looking 20 degrees up at the sun (sun azimuth 268, elevation 21): the forward scatter
+SCENES['haboob_sun'] = [fly('cessna', 'haboob', 'runway'), 600, air(3000, 3000, 2571, 268, 95), hbj(-1000),
+    f"{K}.freeCam({{p:[0,2.5,12],t:[0,370,-1000],fov:62}});"]
+SETTLE_AT = {'explosion': 0, 'explosion_sunset': 0, 'explosion_smoke': 0, 'explosion_smoke_sunset': 0}
 # 3 s of sim in 0.1 s ticks (the headless loop runs ~3 fps, so real time would be about 1 s of flight)
 SCENES['dogfight'] = [f"{UNMAP}{K}.setTOD('day');{K}.DF.test.seed=1;{K}.DF.test.noBrief=true;{K}.dfStart();{CAM0}", 600,
     f"for(let i=0;i<30;i++){K}.stepFrame(0.1,false,true);{K}.stepFrame(0,true);"]
+
+# the C-130 drop mission by day, put at 1,000 ft AGL 1.5 km north east of the drop zone heading 245, the column left of
+# the nose and the sun (azimuth 147) off the left wing, so the smoke shows a lit and a shaded side
+SCENES['dz_smoke'] = [f"{UNMAP}{K}.setTOD('day');if({K}.setClouds){K}.setClouds('scattered');{K}.mission('drop');{CAM0}", 1500,
+    f"const K={K},D=K.DROPZ,s=K.state(),h=245*Math.PI/180,V=140/1.944,x=D.x+1260,z=D.z-820;s.pos.set(x,K.groundHeight(x,z)+305,z);"
+    "s.vel.set(Math.sin(h)*V,0,-Math.cos(h)*V);s.quat.setFromEuler(new THREE.Euler(0,-h,0,'YXZ'));s.w.set(0,0,0);"
+    "s.onGround=false;s.airTime=30;s.gearDown=false;s.gearPos=0;s.throttle=s.power=0.7;K.snapCam();"]
+# an F-16 crash on the KGEU runway, the wreck camera about 0.5 s into the explosion (stepped until fx().t is there) (SETTLE_AT: no settle, the shot at once);
+# last in the list, as nothing in the later scenes clears the burning wreck
+def boom(tod): return [fly('f16', tod, 'runway'), 1500, f"{K}.crashNow('Graphics shot.');for(let i=0;i<120&&!({K}.fx().active&&{K}.fx().t>=0.47);i++){K}.stepFrame(1/30,false,true);{K}.stepFrame(1/60);"
+    "document.getElementById('bigFlash').style.visibility='hidden';document.getElementById('toast').classList.remove('on');", 150]
+SCENES['explosion'] = boom('day')
+SCENES['explosion_sunset'] = boom('sunset')
+# not in the sheet: the same crash 6 s on by day and at sunset, for the smoke column's light
+CLOSE['explosion_smoke'] = boom('day')[:-1] + [f"for(let i=0;i<165;i++){K}.stepFrame(1/30,false,true);{K}.stepFrame(1/60);", 150]
+CLOSE['explosion_smoke_sunset'] = boom('sunset')[:-1] + [f"for(let i=0;i<165;i++){K}.stepFrame(1/30,false,true);{K}.stepFrame(1/60);", 150]
 
 # the mean and the largest abs difference (0..255) over the aircraft and its shadow (the middle of the frame, under
 # the HUD), and the share of pixels there that moved more than 24
@@ -109,7 +141,7 @@ async def setup(pg, name):
     for s in SCENES[name]:
         if isinstance(s, int): await pg.wait_for_timeout(s)
         else: await pg.evaluate("(js)=>{(new Function(js))();}", s)
-    await pg.wait_for_timeout(SETTLE)
+    await pg.wait_for_timeout(SETTLE_AT.get(name, SETTLE))
 
 async def main():
     root, out = os.path.abspath(sys.argv[1]), sys.argv[2]
@@ -119,7 +151,9 @@ async def main():
         b = await launch(p)
         ctx, pg = await open_page(b, serve(root))
         load = await pg.evaluate("()=>window.__gone==null?null:Math.round(window.__gone)")
+        only = sys.argv[3].split(',') if len(sys.argv) > 3 else None   # optional: a comma list of scene names
         for name in SCENES:
+            if only and name not in only: continue
             t = time.time()
             try:
                 await setup(pg, name)
