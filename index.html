@@ -3908,7 +3908,7 @@ const MAT=(function(){
     storeDark:new THREE.MeshStandardMaterial({color:0x5a5f64,metalness:0.4,roughness:0.5}),
     seeker:new THREE.MeshStandardMaterial({color:0x2b2f33,metalness:0.5,roughness:0.25}),
     turret:new THREE.MeshStandardMaterial({color:0x585d62,metalness:0.45,roughness:0.42}),
-    glassDark:new THREE.MeshStandardMaterial({color:0x101418,metalness:0.4,roughness:0.12}),
+    glassDark:new THREE.MeshPhysicalMaterial({color:0x101418,metalness:0.4,roughness:0.12,clearcoat:1,clearcoatRoughness:0.05}),
     ab:new THREE.MeshBasicMaterial({color:0xffb060,transparent:true,opacity:0.55,
       blending:THREE.AdditiveBlending,depthWrite:false}),
     prop:new THREE.MeshStandardMaterial({color:0x1d2024,metalness:0.4,roughness:0.55}),
@@ -6482,9 +6482,9 @@ return {buildF16HD:buildF16HD,buildMQ9HD:buildMQ9HD,buildC130HD:buildC130HD,buil
 // built in material (glows, light pools, strobes: a light stays the colour it was drawn), through the toneMapped getter.
 const PFS_SUN=1.75,PFS_SKY=1.0;
 // exposure by time of day (the ACES toe takes the darks down, the night needs more of it), and the showroom's
-const PFS_EXP={day:1.15,sunset:1.2,night:2.2,haboob:1.05,show:1.15};
+const PFS_EXP={day:1.15,sunset:1.3,night:2.2,haboob:1.05,show:1.15};
 // and the saturation put back after the curve (the haboob's orange light needs none)
-const PFS_SAT={day:1.3,sunset:1.15,night:1.3,haboob:0.92,show:1.3};
+const PFS_SAT={day:1.3,sunset:1.25,night:1.3,haboob:0.92,show:1.3};
 // pfsTone.x: that saturation, one plain object every built in material's uniform points at (UniformsUtils.clone copies
 // a plain object by reference), so pfsTone(id) sets it for all of them at once
 const PFS_TONE={x:PFS_SAT.day,y:0};
@@ -6581,33 +6581,113 @@ function rectObst(u,v,wu,wv,h,name){OBST.push({kind:'rect',u0:u-wu/2,u1:u+wu/2,v
 
 // ---------- sky ----------
 const sky=(function(){
-  const g=new THREE.SphereGeometry(80000,32,16),p=g.attributes.position,c=new Float32Array(p.count*3),top=new THREE.Color(0x3a78c0),col=new THREE.Color();
+  const g=new THREE.SphereGeometry(80000,64,32),p=g.attributes.position,c=new Float32Array(p.count*3),top=new THREE.Color(0x3a78c0),col=new THREE.Color();
   for(let i=0;i<p.count;i++){const t=clamp(p.getY(i)/80000,0,1);col.copy(HAZE).lerp(top,Math.pow(t,0.5));c.set([col.r,col.g,col.b],i*3);}
   g.setAttribute('color',new THREE.BufferAttribute(c,3));
   // toneMapped off: the dome stays the raw colours the (post encoding) fog fades the ground into, so the horizon meets
   const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide,fog:false,depthWrite:false,toneMapped:false}));m.renderOrder=-1;scene.add(m);return m;
 })();
+// the sun's disc (graphics item 4): a sprite on the dome (it follows the camera with it), blooms on Medium and High.
+// Shown only while it is inside the view, so the bloom passes are not run for a sun behind the camera (PFX_SRC).
+const SUND=(function(){
+  const t=tex(128,128,(x,w,h)=>{const gr=x.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2);
+    gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(0.11,'rgba(255,255,255,1)');gr.addColorStop(0.15,'rgba(255,255,255,0.55)');
+    gr.addColorStop(0.3,'rgba(255,255,255,0.16)');gr.addColorStop(0.6,'rgba(255,255,255,0.04)');gr.addColorStop(1,'rgba(255,255,255,0)');
+    x.fillStyle=gr;x.fillRect(0,0,w,h);});
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,color:0xfff6ea,transparent:true,depthWrite:false,fog:false,toneMapped:false}));
+  sp.renderOrder=0;sp.visible=false;sky.add(sp);pfxBloomTag(sp);
+  return {sp:sp,want:false,R:70000,cos:1,dir:new THREE.Vector3()};
+})();
+const _sdF=new THREE.Vector3();
+// per frame (after the camera is placed): the disc only while the sun is near the view
+function sunDiscUpdate(){
+  const S=SUND;if(!S.want){S.sp.visible=false;return;}
+  if(HB.sun&&HB.sun.visible){S.sp.visible=false;return;}
+  camera.getWorldDirection(_sdF);
+  const hv=Math.atan(Math.tan(camera.fov*Math.PI/360)*Math.sqrt(1+camera.aspect*camera.aspect))+S.ang;
+  S.sp.visible=_sdF.dot(S.dir)>Math.cos(Math.min(hv,Math.PI));
+}
 
 // ---------- time of day ----------
 // Three presets rather than a continuous clock: the point is to fly an approach
 // into a sunset or onto a lit runway, and three distinct looks do that without a
 // day/night cycle running under everything else.
+// Graphics item 4: each preset is an hour on 15 April at KGEU (doy 105); solarDir places the sun and skyModel turns its
+// elevation into the light, the haze and the dome, filling the same fields as before (haze, top, sun, sunI, sunPos,
+// hemiSky, hemiGnd, hemiI) so everything that reads them is unchanged. Night keeps the moon for its light direction.
 const TOD_SET={
-  day:   {id:'day',   name:'Day',    haze:0xdfe4e6, top:0x3a78c0, sun:0xfff0d8, sunI:1.00,
-          sunPos:[-0.55,0.75,0.37], hemiSky:0xdbe8ff, hemiGnd:0xa08060, hemiI:0.72,
+  day:   {id:'day',   name:'Day',    hour:11.5,
           fog:[5000,45000], night:false, lights:0.0, stars:0},
-  sunset:{id:'sunset',name:'Sunset', haze:0xe8a469, top:0x27407e, sun:0xffa452, sunI:0.92,
-          sunPos:[-0.95,0.13,0.28], hemiSky:0xffc796, hemiGnd:0x6a4632, hemiI:0.52,
+  sunset:{id:'sunset',name:'Sunset', hour:18+40/60,
           fog:[3000,38000], night:false, lights:0.55, stars:0.15},
-  night: {id:'night', name:'Night',  haze:0x0d1220, top:0x05070f, sun:0x9ab4e8, sunI:0.14,
-          sunPos:[0.42,0.52,-0.55], hemiSky:0x1d2740, hemiGnd:0x0e0c14, hemiI:0.26,
+  night: {id:'night', name:'Night',  hour:22, moonPos:[0.42,0.52,-0.55],
           fog:[2200,30000], night:true, lights:1.0, stars:1},
   // late afternoon with a haboob coming: these are the clear air values ahead of the
   // wall; hbUpdate pulls fog, haze, sun and wind toward the storm as you get into it
-  haboob:{id:'haboob',name:'Haboob', haze:0xd9b48a, top:0x6d84a2, sun:0xffc07a, sunI:0.85,
-          sunPos:[-0.8,0.3,0.4], hemiSky:0xf2d4ae, hemiGnd:0x7e5e44, hemiI:0.62,
+  haboob:{id:'haboob',name:'Haboob', hour:17.25, dust:0.8,
           fog:[5000,45000], night:false, lights:0.4, stars:0}
 };
+// The sun's direction in the world frame (+x east, +y up, +z south) from the standard declination (Cooper), equation of
+// time and hour angle formulas. Local standard time in hours; Arizona keeps MST (UTC-7) all year.
+function solarDir(hourLocal,dayOfYear,lat,lon,tzOffset){
+  const N=dayOfYear||105,R=Math.PI/180,phi=(lat===undefined?33.53:lat)*R,lo=lon===undefined?-112.30:lon,tz=tzOffset===undefined?-7:tzOffset;
+  const dec=23.44*R*Math.sin(2*Math.PI*(284+N)/365),B=2*Math.PI*(N-81)/364;
+  const eot=9.87*Math.sin(2*B)-7.53*Math.cos(B)-1.5*Math.sin(B);   // minutes
+  const H=15*R*(hourLocal+(4*(lo-15*tz)+eot)/60-12);
+  const e=-Math.cos(dec)*Math.sin(H),n=Math.sin(dec)*Math.cos(phi)-Math.cos(dec)*Math.cos(H)*Math.sin(phi),
+    u=Math.sin(dec)*Math.sin(phi)+Math.cos(dec)*Math.cos(H)*Math.cos(phi);
+  return new THREE.Vector3(e,u,-n).normalize();
+}
+// piecewise ramps over the sun's elevation in degrees: [[el,value],...] ascending, hex colours lerped in sRGB
+const _smA=new THREE.Color(),_smB=new THREE.Color();
+function smRamp(S,el,num){if(el<=S[0][0])return S[0][1];for(let i=1;i<S.length;i++)if(el<=S[i][0]){const f=(el-S[i-1][0])/(S[i][0]-S[i-1][0]);
+  return num?S[i-1][1]+(S[i][1]-S[i-1][1])*f:_smA.setHex(S[i-1][1]).lerp(_smB.setHex(S[i][1]),f).getHex();}return S[S.length-1][1];}
+const smN=(S,el)=>smRamp(S,el,true);
+function smHex(a,b,f){return _smA.setHex(a).lerp(_smB.setHex(b),f).getHex();}
+// the dusty late afternoon the haboob preset leans toward (dust 1 is it exactly)
+const SKY_DUST={haze:0xd9b48a,top:0x6d84a2,sun:0xffc07a,hemiSky:0xf2d4ae,hemiGnd:0x7e5e44,hS:0xe2b98c,hA:0xcfae90,glow:0xffd6a0,disc:0xffe2bc};
+// Everything the light and the sky take from the sun's elevation (degrees). Day: a white sun, a pale horizon and a deep
+// blue zenith. Toward the horizon the sun goes warm (0xffd9a0 around 15 degrees) then deep orange and weaker, the haze
+// peach to orange, the zenith blue-violet, the hemisphere sky cool and its ground warm (blue shadow sides, warm bounce).
+// Below -4 degrees: the night as it always was. hS / hA: the horizon band toward and away from the sun (the band goes
+// orange on the sun's side and magenta-purple opposite), glow: the warm light around the sun, anti: how much darker the
+// zenith gets away from it. dust (0..1) leans it all toward the haboob's dusty afternoon.
+function skyModel(el,dust){
+  if(el<-4)return {haze:0x0d1220,top:0x05070f,sun:0x9ab4e8,sunI:0.14,hemiSky:0x1d2740,hemiGnd:0x0e0c14,hemiI:0.26,
+    sky:{hS:0x0d1220,hA:0x0d1220,band:0,bw:0.1,glow:0x000000,gA:0,gB:0,anti:0},disc:0xffffff,discS:0,
+    env:{sun:0x3a4660,gnd:0x0a0b10}};
+  const sm=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
+  const o={
+    haze:smRamp([[0,0xe8945a],[3,0xeaa268],[8,0xe9be92],[15,0xe5d6c6],[35,0xdfe4e6]],el),
+    top:smRamp([[0,0x22357a],[3,0x283f82],[15,0x3463a8],[35,0x3a78c0]],el),
+    sun:smRamp([[0,0xff7a30],[1,0xff8a3c],[15,0xffd9a0],[40,0xfff0d8]],el),
+    sunI:(0.95+0.05*sm(0,40,el))*clamp((el+3)/5,0,1),
+    hemiSky:smRamp([[0,0xc8a4a4],[5,0xd6b0a6],[30,0xdbe8ff]],el),
+    hemiGnd:smRamp([[0,0x8c5230],[5,0x9a6038],[30,0xa08060]],el),
+    hemiI:smN([[0,0.58],[5,0.6],[30,0.72]],el),
+    sky:{hS:smRamp([[0,0xff7e3a],[3,0xff9a4c],[15,0xf2dcc2],[35,0xe8ecee]],el),
+         hA:smRamp([[0,0xa8709e],[3,0xbc84a4],[15,0xd6d4dc],[35,0xdfe4e6]],el),
+         band:smN([[0,0.9],[3,0.85],[15,0.35],[35,0.0]],el),bw:smN([[0,0.2],[3,0.17],[35,0.08]],el),
+         glow:smRamp([[0,0xffa048],[3,0xffb35a],[15,0xffe0b0],[35,0xfff4e4]],el),
+         gA:smN([[0,0.32],[3,0.3],[15,0.15],[35,0.05]],el),gB:smN([[0,0.22],[3,0.2],[35,0.2]],el),
+         anti:smN([[0,0.3],[3,0.28],[15,0.12],[35,0.0]],el)},
+    disc:smRamp([[0,0xfff0d0],[3,0xfff6e0],[35,0xffffff]],el),
+    discS:smN([[0,15000],[3,14000],[15,8000],[35,4200]],el),
+    env:{sun:0,gnd:0}};
+  const d=dust||0;
+  if(d>0){const D=SKY_DUST;for(const k of ['haze','top','sun','hemiSky','hemiGnd'])o[k]=smHex(o[k],D[k],d);
+    o.sky.hS=smHex(o.sky.hS,D.hS,d);o.sky.hA=smHex(o.sky.hA,D.hA,d);o.sky.glow=smHex(o.sky.glow,D.glow,d);o.disc=smHex(o.disc,D.disc,d);
+    o.sunI*=1-0.15*d;o.hemiI+=(0.62-o.hemiI)*d;o.sky.anti*=1-d;o.sky.gA*=1-0.5*d;}
+  o.env.sun=o.sun;o.env.gnd=o.hemiGnd;
+  return o;
+}
+// fill the presets from the model, once
+for(const k in TOD_SET){const T=TOD_SET[k],sd=solarDir(T.hour,T.doy||105),el=Math.asin(clamp(sd.y,-1,1))*180/Math.PI;
+  const M=skyModel(T.night?-90:el,T.dust);
+  T.sunEl=Math.round(el*10)/10;T.sunAz=Math.round(((Math.atan2(sd.x,-sd.z)*180/Math.PI)+360)%360*10)/10;
+  T.sunPos=T.night?T.moonPos:[sd.x,sd.y,sd.z];
+  T.haze=M.haze;T.top=M.top;T.sun=M.sun;T.sunI=M.sunI;T.hemiSky=M.hemiSky;T.hemiGnd=M.hemiGnd;T.hemiI=M.hemiI;
+  T.sky=M.sky;T.disc=M.disc;T.discS=T.night?0:M.discS;T.env=M.env;}
 let TOD=TOD_SET.day;
 let starField=null,cloudMat=null;
 // the cumulus puffs (7 squashed icosahedra a cluster, 2,900 to 3,470 m): seen from above inside the dogfight's
@@ -6617,12 +6697,30 @@ var CLOUD_MESH=null;
 // blue-grey at night so they never read as flat grey cutouts on the night sky
 const CLOUD_TOD={day:[0xffffff,0x6f7780],sunset:[0xffe2c8,0x5e4a48],night:[0x232a38,0x0d1119],haboob:[0xf0e2d0,0x6a5c50]};
 const _skyTop=new THREE.Color(),_skyCol=new THREE.Color(),HB_DUST=new THREE.Color(0xb8722e);
+const _skyHS=new THREE.Color(),_skyHA=new THREE.Color(),_skyG=new THREE.Color(),_skyB=new THREE.Color(),_skyS=new THREE.Vector3();
+// The dome's colour toward the unit direction (x,y,z), an analytic sky in the Preetham spirit: the haze at the horizon
+// (where the fog meets it) up to the zenith colour, the zenith darker away from the sun, a horizon band warm on the
+// sun's side and pink-violet opposite, and a wide plus a tight glow around the sun. top: the zenith (haboob lerped),
+// s: the sun's unit direction, P: TOD.sky, k: the haboob's dust (band and glow fade into it).
+function skyAt(x,y,z,top,s,P,k,out){
+  if(y<=0)return out.copy(HAZE);
+  const t=Math.min(y,1),cg=x*s.x+y*s.y+z*s.z,q=1-k;
+  out.copy(top);if(P.anti)out.multiplyScalar(1-P.anti*q*(1-cg)*0.5);
+  out.lerp(HAZE,1-Math.pow(t,0.5));
+  if(P.band>0){const hl=Math.hypot(x,z)||1,sl=Math.hypot(s.x,s.z)||1,a=(1+(x*s.x+z*s.z)/(hl*sl))*0.5;
+    const w=P.band*q*(t/(t+0.012))*Math.exp(-t/P.bw);
+    _skyB.copy(_skyHA).lerp(_skyHS,a*a);out.lerp(_skyB,Math.min(1,w));}
+  if(cg>0&&(P.gA>0||P.gB>0)){const c2=cg*cg,c4=c2*c2,c8=c4*c4,g=(P.gA*c4*cg*cg+P.gB*c8*c8*c8)*q;
+    out.r=Math.min(1,out.r+_skyG.r*g);out.g=Math.min(1,out.g+_skyG.g*g);out.b=Math.min(1,out.b+_skyG.b*g);}
+  return out;
+}
+function skyPrep(){const P=TOD.sky;_skyHS.setHex(P.hS);_skyHA.setHex(P.hA);_skyG.setHex(P.glow);_skyS.copy(sun.position).normalize();return P;}
 // k pulls the zenith toward the dust colour (the haboob): 0 is the plain preset
 function skyPaint(k){
-  const p=sky.geometry.attributes.position,c=sky.geometry.attributes.color;
+  const p=sky.geometry.attributes.position,c=sky.geometry.attributes.color,P=skyPrep();k=k||0;
   const top=_skyTop.setHex(TOD.top),col=_skyCol;if(k)top.lerp(HB_DUST,k);
-  for(let i=0;i<p.count;i++){const t=clamp(p.getY(i)/80000,0,1);
-    col.copy(HAZE).lerp(top,Math.pow(t,0.5));c.setXYZ(i,col.r,col.g,col.b);}
+  for(let i=0;i<p.count;i++){const x=p.getX(i)/80000,y=p.getY(i)/80000,z=p.getZ(i)/80000;
+    skyAt(x,y,z,top,_skyS,P,k,col);c.setXYZ(i,col.r,col.g,col.b);}
   c.needsUpdate=true;
 }
 // things built later (the world regions) that change with the time of day: called at the end of setTOD
@@ -6635,11 +6733,15 @@ function setTOD(id){
   HAZE.setHex(TOD.haze);
   scene.fog.color.copy(HAZE);scene.fog.near=TOD.fog[0];scene.fog.far=TOD.fog[1];
   scene.background=HAZE;
-  skyPaint();
   pfsTone(TOD.id);
   sun.color.setHex(TOD.sun);sun.intensity=TOD.sunI;
   sun.position.set(TOD.sunPos[0],TOD.sunPos[1],TOD.sunPos[2]);
   hemi.color.setHex(TOD.hemiSky);hemi.groundColor.setHex(TOD.hemiGnd);hemi.intensity=TOD.hemiI;
+  skyPaint();
+  // the sun's disc on the dome (never at night), its glow wider and warmer low down
+  {const S=SUND,sc=TOD.discS||0;S.want=sc>0;S.dir.copy(sun.position).normalize();S.sp.position.copy(S.dir).multiplyScalar(S.R);
+    S.sp.scale.setScalar(sc);S.sp.material.color.setHex(TOD.disc||0xffffff);S.ang=Math.atan(sc*0.5/S.R);if(!S.want)S.sp.visible=false;}
+  envApply();
   if(starField){starField.visible=TOD.stars>0;starField.material.opacity=TOD.stars;}
   AL_MAT.uniforms.uLights.value=TOD.lights;
   for(const L of AL_LAYERS)if(L.pts)L.pts.visible=TOD.lights>0;
@@ -7674,26 +7776,83 @@ if(REGION.az)(function(){
 
 // ---------- aircraft ----------
 // sky reflections for the HD airframes. Lambert ignores scene.environment, so the world looks the same.
-(function(){
-  const pm=new THREE.PMREMGenerator(renderer),es=new THREE.Scene();
-  const dg=new THREE.SphereGeometry(60,32,16),dp=dg.attributes.position,dc=new Float32Array(dp.count*3);
-  const top=new THREE.Color(0x3f6f9e),hor=new THREE.Color(0xb9c2c6),bot=new THREE.Color(0x6b5d4a),c=new THREE.Color();
-  for(let i=0;i<dp.count;i++){const h=dp.getY(i)/60;if(h>=0)c.copy(hor).lerp(top,Math.pow(h,0.6));else c.copy(hor).lerp(bot,Math.pow(-h,0.35));dc.set([c.r,c.g,c.b],i*3);}
-  dg.setAttribute('color',new THREE.BufferAttribute(dc,3));
-  es.add(new THREE.Mesh(dg,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide})));
-  const sn=new THREE.Mesh(new THREE.SphereGeometry(5,12,8),new THREE.MeshBasicMaterial({color:0xfff2dc}));sn.position.set(-30,40,20);es.add(sn);
-  scene.environment=pm.fromScene(es,0.04).texture;pm.dispose();
-})();
+// Graphics item 4: built from the live sky model (the dome's colours toward each direction, the ground below, the sun
+// as a small sphere), so the airframes reflect a warm sky at sunset and a dark one at night. A tiny scene through
+// PMREM once per setTOD (a few ms), never per frame. The day's is built the first time it is needed (Day, or the
+// showroom) and kept for good; any other is disposed when the next one replaces it. Boot builds exactly one.
+const ENV={day:null,rt:null,es:null,dg:null,sn:null};
+function envBuild(){
+  if(!ENV.es){const es=new THREE.Scene(),dg=new THREE.SphereGeometry(60,48,24);
+    dg.setAttribute('color',new THREE.BufferAttribute(new Float32Array(dg.attributes.position.count*3),3));
+    es.add(new THREE.Mesh(dg,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide})));
+    const sn=new THREE.Mesh(new THREE.SphereGeometry(5,12,8),new THREE.MeshBasicMaterial({color:0xfff2dc}));es.add(sn);
+    Object.assign(ENV,{es:es,dg:dg,sn:sn});}
+  const dp=ENV.dg.attributes.position,dc=ENV.dg.attributes.color,P=skyPrep(),top=_skyTop.setHex(TOD.top),c=_skyCol,
+    N=TOD.night,hor=N?new THREE.Color(0x4a5266):new THREE.Color().copy(HAZE).multiplyScalar(0.85),bot=N?new THREE.Color(0x24242a):new THREE.Color(TOD.env.gnd).multiplyScalar(0.67);
+  // night: a moonlit grey-blue sky rather than the near black dome, so the airframes still pick out against it
+  if(N)top.setHex(0x3a4660);
+  for(let i=0;i<dp.count;i++){const x=dp.getX(i)/60,y=dp.getY(i)/60,z=dp.getZ(i)/60;
+    if(y<0)c.copy(hor).lerp(bot,Math.pow(-y,0.35));else if(N)c.copy(hor).lerp(top,Math.pow(y,0.5));else skyAt(x,y,z,top,_skyS,P,0,c).multiplyScalar(0.85);
+    dc.setXYZ(i,c.r,c.g,c.b);}
+  dc.needsUpdate=true;
+  ENV.sn.material.color.setHex(TOD.night?0x8a96b4:TOD.env.sun);ENV.sn.position.copy(_skyS).multiplyScalar(50);
+  const pm=new THREE.PMREMGenerator(renderer),rt=pm.fromScene(ENV.es,0.04);pm.dispose();return rt;
+}
+// the day's environment, built on first use under the day's sun and haze (the live ones put back after)
+function envDay(){
+  if(ENV.day)return ENV.day.texture;
+  const T=TOD,sp=sun.position.clone(),hz=HAZE.clone();TOD=TOD_SET.day;sun.position.set(TOD.sunPos[0],TOD.sunPos[1],TOD.sunPos[2]);HAZE.setHex(TOD.haze);
+  ENV.day=envBuild();TOD=T;sun.position.copy(sp);HAZE.copy(hz);if(T.id!=='day')skyPrep();return ENV.day.texture;
+}
+function envApply(){
+  if(TOD.id==='day'){if(ENV.rt){ENV.rt.dispose();ENV.rt=null;}scene.environment=envDay();return;}
+  const rt=envBuild();if(ENV.rt)ENV.rt.dispose();ENV.rt=rt;scene.environment=rt.texture;
+}
 const HD=(function(){try{return makeHD();}catch(e){console.warn('HD airframes unavailable',e);return null;}})();
+// ---- graphics item 4: physically based materials per intent ----
+// One pass over an airframe's materials (once per material: userData.pbr), by what the part is rather than one flat
+// sheen. Paint by aircraft: alu, painted aluminium (F-16, C-130, A-10: light metallic, satin, the panel lines and rivet
+// rows of the skin canvas a little rougher, the paint itself a shade darker so the extra sky does not bleach it); gun, the drones' dark grey paint that takes the sky (not chrome); gloss,
+// white gloss paint (Cessna, Archer, the airliners); gel, the Pipistrel's composite gelcoat. Then for every aircraft:
+// glass (canopies and windows) under a clear coat, bare metal (gear legs, spinners, nozzles, pitots), tyres; anything
+// else keeps its colour and finish with the same sky reflection as the paint around it. Blades and blur discs unchanged.
+const PBR_KIND={f16:'alu',c130:'alu',a10:'alu',reaper:'gun',mq9b:'gun',cessna:'gloss',archer:'gloss',b737:'gloss',a320:'gloss',b747:'gloss',alpha:'gel'};
+const PBR_PAINT={alu:{m:0.15,r:0.6,e:1.0,k:0.8},gun:{m:0.45,r:0.42,e:0.8},gloss:{m:0.02,r:0.32,e:0.7},gel:{m:0.04,r:0.25,e:0.8}};
+let PBR_MATS=null;
+// the skin canvas as a roughness map: near white tile, darker panel lines and rivets; the darker, the rougher
+function pbrRough(sh){sh.fragmentShader=sh.fragmentShader.replace('#include <roughnessmap_fragment>',
+  'float roughnessFactor = roughness;\n#ifdef USE_ROUGHNESSMAP\n\tvec4 texelRoughness = texture2D( roughnessMap, vUv );\n'+
+  '\troughnessFactor *= 1.0 + clamp( 0.94 - texelRoughness.g, 0.0, 0.6 ) * 1.1;\n#endif');}
+function pbrTune(mt,kind,inProp){
+  if(!mt||!mt.isMeshStandardMaterial||mt.userData.pbr)return;mt.userData.pbr=1;
+  const H=HD&&HD.MAT;if(H&&!PBR_MATS){PBR_MATS=new Set();for(const k in H)if(H[k]&&H[k].isMaterial)PBR_MATS.add(H[k]);}
+  const P=PBR_PAINT[kind]||PBR_PAINT.alu,c=mt.color,lum=c?0.2126*c.r+0.7152*c.g+0.0722*c.b:1,shared=PBR_MATS&&PBR_MATS.has(mt);
+  if(H&&mt===H.gunmetal){mt.metalness=P.m;mt.roughness=P.r;mt.envMapIntensity=P.e;return;}
+  if(mt.emissive&&mt.emissive.r+mt.emissive.g+mt.emissive.b>0.05){mt.envMapIntensity=0.6;return;}   // beacons, lit lenses
+  if(mt.isMeshPhysicalMaterial||(H&&mt===H.glassDark)){mt.clearcoat=1;mt.clearcoatRoughness=0.05;mt.envMapIntensity=1.4;return;}
+  if(inProp&&mt.metalness<0.6){mt.envMapIntensity*=0.3;return;}                 // blades as they were
+  if(mt.transparent&&!mt.map){mt.envMapIntensity*=0.3;return;}
+  if(mt.transparent&&mt.metalness>=0.5){mt.envMapIntensity*=0.7;return;}        // the airliners' fan faces as they were
+  if(mt.metalness>=0.6){mt.metalness=Math.max(0.85,mt.metalness);mt.roughness=clamp(mt.roughness,0.25,0.35);mt.envMapIntensity=1.0;return;}
+  if(lum<0.1&&mt.roughness>=0.85){mt.roughness=0.9;mt.metalness=0;mt.envMapIntensity=0.5;return;}
+  const skin=mt.vertexColors||(mt.map&&!(H&&mt===H.nozzle));
+  if(skin||(!shared&&(kind==='gloss'||kind==='gel'))){
+    if(!mt.transparent)mt.metalness=P.m;mt.roughness=P.r;mt.envMapIntensity=P.e;
+    if(P.k&&!mt.transparent&&mt.color)mt.color.multiplyScalar(P.k);   // the grey was authored for the old flat sheen
+    if(kind==='alu'&&H&&!mt.transparent&&(mt.map===H.skinA||mt.map===H.skinB)){mt.roughnessMap=mt.map;mt.onBeforeCompile=pbrRough;mt.needsUpdate=true;}
+    return;}
+  mt.envMapIntensity=0.6;
+}
 // wrap an HD airframe in the interface the game expects: g, gear, prop + disc, ab, pylons, canopy
 function hdModel(which){
   if(!HD)return null;
   const gr=(TYPES[which]||TYPES.reaper).gear||1.5;
   let m;try{m=which==='f16'?HD.buildF16HD({gold:true,gear:gr}):which==='c130'?HD.buildC130HD({gear:gr}):which==='mq9b'?HD.buildMQ9BHD({gear:gr}):which==='cessna'?HD.buildC172HD({gear:gr}):which==='alpha'?HD.buildAlphaHD({gear:gr}):which==='archer'?HD.buildArcherHD({gear:gr}):which==='a10'?HD.buildA10HD({gear:gr}):which==='b737'?HD.buildB737HD({gear:gr}):which==='a320'?HD.buildA320HD({gear:gr}):which==='b747'?HD.buildB747HD({gear:gr}):HD.buildMQ9HD({gear:gr});}catch(e){console.warn(e);return null;}
   const out={g:m.g,gear:m.gear,canopy:m.canopy||null,pylons:m.pylons||null,hd:true};
-  // the world is lit by a hemisphere and a sun already: keep the sky reflection to a sheen
-  m.g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false;
-    const mt=o.material;if(mt&&mt.isMeshStandardMaterial&&!mt.userData.envSet){mt.userData.envSet=1;mt.envMapIntensity*=mt.metalness>0.5?0.7:0.3;}}});
+  // the propeller blades keep their old look (PBR_SKIP), a metal spinner on them still counts as bare metal
+  const inProp=new Set();for(const pr of [m.prop].concat(m.props||[]))if(pr)pr.traverse(o=>{if(o.isMesh)inProp.add(o.material);});
+  const kind=PBR_KIND[which]||'alu';
+  m.g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false;pbrTune(o.material,kind,inProp.has(o.material));}});
   if(m.ab)out.ab=m.ab;                                           // layered flame and nozzle petals, abUpdate drives them
   if(m.props){out.props=m.props;out.discs=m.discs;}              // four engines: the game spins each and fades in its disc
   if(m.prop){
@@ -12343,6 +12502,7 @@ function dfBuild(){
   const bg=new THREE.BufferGeometry();bg.setAttribute('position',new THREE.Float32BufferAttribute(P,3));bg.setAttribute('normal',new THREE.Float32BufferAttribute(N,3));
   bg.setAttribute('color',new THREE.Float32BufferAttribute(C,3));bg.setAttribute('uv',new THREE.Float32BufferAttribute(U,2));bg.computeBoundingSphere();
   DFM.body=bg;DFM.mat=new THREE.MeshStandardMaterial({map:HD?HD.MAT.skinA:null,vertexColors:true,metalness:0.16,roughness:0.56,envMapIntensity:0.3});
+  pbrTune(DFM.mat,'alu');if(can)pbrTune(can.material,'alu');
   DFM.can=can;DFM.tris=P.length/9;
   const B=(w,h,d,x,y,z,col)=>[tfcAt(new THREE.BoxGeometry(w,h,d),x,y,z),col];
   DFM.lod=tfcMerge([B(1.4,1.2,15,0,0,0,0x5b7591),B(9.5,0.12,4,0,-0.05,1.6,0x8a9aab),B(0.1,3,2.5,0,1.8,5.5,0x3e4e63)]);
@@ -16621,7 +16781,7 @@ const CARP={pos:0,idx:0,sync:()=>{document.querySelectorAll('#pAc .pick').forEac
 // carousel window with a scissor, so the paused flight stays visible around it ----
 const SHOW={on:false,items:{},t:0,scene:new THREE.Scene(),cam:new THREE.PerspectiveCamera(30,1,1,5000)};
 SHOW.scene.background=new THREE.Color(0xF6C177);
-SHOW.scene.fog=new THREE.Fog(0xF6C177,1e6,2e6);SHOW.scene.environment=scene.environment;
+SHOW.scene.fog=new THREE.Fog(0xF6C177,1e6,2e6);   // its environment: the day's (envDay), set when it first draws
 SHOW.scene.add(new THREE.HemisphereLight(0xfff4e2,0x8a5a3a,0.85));
 {const d=new THREE.DirectionalLight(0xffffff,0.95);d.position.set(-0.5,1,0.7);SHOW.scene.add(d);}
 function showItem(t){
@@ -16646,6 +16806,7 @@ function showRender(dt,c){
   // lift the model clear of the name strip under it
   const info=c.root.querySelector('.cinfo').getBoundingClientRect(),lift=info.height?(info.height*0.5)*k:0;
   const x=c.pos*D;cam.aspect=r.width/r.height;cam.position.set(x,dist*Math.sin(el)-lift,dist*Math.cos(el));cam.lookAt(x,-lift,0);cam.updateProjectionMatrix();
+  if(!SHOW.scene.environment)SHOW.scene.environment=envDay();   // before the scissor: a first build renders to its own targets
   renderer.setScissorTest(true);renderer.setScissor(r.left,H-r.bottom,r.width,r.height);renderer.setViewport(r.left,H-r.bottom,r.width,r.height);
   pfsTone('show');renderer.render(SHOW.scene,cam);pfsTone(TOD.id);
   renderer.setScissorTest(false);renderer.setViewport(0,0,innerWidth,H);
@@ -19213,7 +19374,7 @@ function tick(t,skipRender){
     sensorHudUpdate();}
   if(camBump>0){camBump=Math.max(0,camBump-dt*2.4);const k=camBump*camBump*1.3;
     camera.position.x+=(Math.random()-0.5)*k;camera.position.y+=(Math.random()-0.5)*k*1.5;camera.position.z+=(Math.random()-0.5)*k;}
-  camera.updateProjectionMatrix();sky.position.copy(camera.position);hbUpdate(paused?0:dt);farUpdate();
+  camera.updateProjectionMatrix();sky.position.copy(camera.position);hbUpdate(paused?0:dt);sunDiscUpdate();farUpdate();
   if(sensOn)tgtMarkUpdate(dt);else if(TM.shown)tgtMarkHide();
   dfHudUpdate();hogUI();fdTick();
   // PAPI
@@ -19267,7 +19428,7 @@ function tick(t,skipRender){
 // it switched off, so nothing is fetched and no request can fail in their console.
 var LB=null;
 LB=(function(){
-const APP_VER='2026-10-11-gfx3';          // keep version.json in step when shipping
+const APP_VER='2026-10-11-gfx4';          // keep version.json in step when shipping
   const ORIGINS=['https://rabahharchaoui-design.github.io','http://localhost:8765'];
   let over='';try{over=localStorage.getItem('kgeuLBUrl')||'';}catch(e){}
   const E={url:over||'https://pfs-scores.rabahharchaoui.workers.dev',enabled:!!over||ORIGINS.includes(location.origin),online:null,

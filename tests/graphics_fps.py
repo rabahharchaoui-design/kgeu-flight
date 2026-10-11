@@ -3,7 +3,7 @@
 # between the builds means anything. iPhone landscape, 2x. Only hooks the pregraphics build has.
 #   .venv/bin/python tests/graphics_fps.py <base_root> <new_root> [rounds]
 # Scenes: the home menu, the six aircraft in the chase view on the KGEU runway by day, the Cessna on final
-# at night and in the haboob, the MQ-9A sensor ball, the map, the dogfight 3 s in.
+# at night, in the haboob and at sunset, the MQ-9A sensor ball, the map, the dogfight 3 s in.
 # *_ms rows are wall time per held tick (sim + render, synced by a readback), as in aircraft_fps.py.
 import asyncio, json, os, sys
 from playwright.async_api import async_playwright
@@ -14,7 +14,8 @@ from graphics_shots import serve, launch, open_page, setup
 FLOOR = 0.90          # a scene may lose at most 10% against the base build
 ROWS = [('menu', 'home', False), ('f16_runway', 'f16', True), ('c130_runway', 'c130', True), ('mq9a_runway', 'mq9a', True),
         ('mq9b_runway', 'mq9b', True), ('cessna_runway', 'cessna', True), ('pipistrel_runway', 'pipistrel', True),
-        ('night_cessna_final', 'night', True), ('haboob_cessna_final', 'haboob', True), ('sensor_mq9a', 'sensor', True),
+        ('night_cessna_final', 'night', True), ('haboob_cessna_final', 'haboob', True), ('sunset_cessna_final', 'sunset', True),
+        ('sensor_mq9a', 'sensor', True),
         ('map_open', 'map', False), ('dogfight', 'dogfight', True)]
 
 async def run(b, url):

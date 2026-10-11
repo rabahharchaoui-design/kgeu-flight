@@ -2,7 +2,7 @@
 # sheet of any build. Uses only hooks the pregraphics build already has, so it runs on both.
 #   .venv/bin/python tests/graphics_shots.py <root> <outdir>
 # Shots: home, the six reference and trainer aircraft in the chase view on the KGEU runway by day,
-# the Cessna on final at night and in the haboob, the MQ-9A sensor ball in white hot, the map, and
+# the Cessna on final at night, in the haboob and at sunset, the F-16 on the runway at sunset, the MQ-9A sensor ball in white hot, the map, and
 # the dogfight 3 s in (fixed seed). <outdir>/metrics.json: load time to splash gone, JS heap, page errors.
 # tests/graphics_fps.py imports SCENES, setup() and the page helpers from here.
 import asyncio, functools, http.server, json, os, socketserver, sys, threading, time
@@ -56,6 +56,9 @@ SCENES = {'home': []}
 for n, t in AC: SCENES[n] = [fly(t, 'day', 'runway')]
 SCENES['night'] = [fly('cessna', 'night', 'final')]
 SCENES['haboob'] = [fly('cessna', 'haboob', 'final')]
+# graphics item 4: golden hour (the Cessna on final, the F-16 in the chase view on the runway)
+SCENES['sunset'] = [fly('cessna', 'sunset', 'final')]
+SCENES['golden_f16'] = [fly('f16', 'sunset', 'runway')]
 SCENES['sensor'] = [fly('reaper', 'day', 'final'), 1200, "document.getElementById('bSensor').click();", 400, f"{K}.setSensorMode('irw');"]
 SCENES['map'] = [fly('cessna', 'day', 'final'), 800, f"{K}.fmOpen();"]
 # 3 s of sim in 0.1 s ticks (the headless loop runs ~3 fps, so real time would be about 1 s of flight)
