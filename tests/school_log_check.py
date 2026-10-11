@@ -2,7 +2,10 @@
 # one entry; an F credits nothing but is an entry; totals keep counting past the 60 entry cap; (b) a real finish: slow
 # flight flown to the debrief credits 1.0 dual and the entry has the score; (c) the screen: Logbook in the school header,
 # the summary line, six rings with their captions, the disclaimer in view without scrolling at 844x390 and 568x320, the
-# endorsement row, the prior hours line, back to #sSchool, 44 px buttons, nothing off screen; (d) no page errors.
+# endorsement row, the prior hours line, back to #sSchool, 44 px buttons, nothing off screen; (d) no page errors;
+# (e) school2 item 7: pilotage, soloxc, night, hood, oral and ride entries: XC 3.0 of 3 (full), night 1.0 of 3, instrument
+# 1.0 of 3, the two endorsements in the order signed, the certificate block (date, examiner) only with kgeuCert, the notes
+# on the rows, "3 night" by the landings; (f) the debrief's Logbook row on a passed night lesson, none on a passed slow flight.
 # Run: .venv/bin/python tests/school_log_check.py
 import asyncio, json, sys
 from playwright.async_api import async_playwright
@@ -15,7 +18,8 @@ NOTE = 'Practice log. Not creditable toward FAA requirements.'
 # the screen: nothing off screen outside the entries list, 44 px buttons, the screen itself does not scroll, the disclaimer in view
 FIT = """()=>{const s=document.getElementById('sLog'),W=innerWidth,H=innerHeight,bad=[];
   if(s.scrollHeight>s.clientHeight+1)bad.push('scrolls');
-  s.querySelectorAll('*').forEach(e=>{if(e.closest('#logList'))return;const r=e.getBoundingClientRect();if(!r.width)return;
+  const rS=getComputedStyle(s.querySelector('.logR')).overflowY==='auto';   // item 7: under 340 px tall the right column scrolls
+  s.querySelectorAll('*').forEach(e=>{if(e.closest('#logList')||rS&&e.closest('.logR'))return;const r=e.getBoundingClientRect();if(!r.width)return;
     if(r.left<-0.5||r.top<-0.5||r.right>W+0.5||r.bottom>H+0.5)bad.push('off '+(e.id||e.className.baseVal||e.className||e.tagName));});
   document.querySelectorAll('#sLog button,#mBack').forEach(e=>{const r=e.getBoundingClientRect();if(r.width&&(r.width<43.5||r.height<43.5))bad.push('small '+(e.id||e.textContent));});
   const n=s.querySelector('.logNote'),r=n.getBoundingClientRect(),cs=getComputedStyle(n);
@@ -80,7 +84,7 @@ async def main():
         await finger(pg, '#schLog'); await pg.wait_for_timeout(800)
         r = await pg.evaluate(SCR)
         ok('(c) the rings: total 11.0, dual 10.5, solo 0.5', [x[0] for x in r['rings']] == ['11.0', '10.5', '0.5', '0.0', '0.0', '0.0'], r['rings'])
-        ok('(c) the endorsement row', r['end'] == ['Solo endorsement, signed by Dana Reyes, CFI, Oct 9, 2026'], r['end'])
+        ok('(c) the endorsement row', r['end'] == ['Solo · Dana Reyes, CFI · Oct 9, 2026'], r['end'])
         ok('(c) the prior hours line', r['prior'] == 'Prior hours (your entry): 35', r['prior'])
         ok('(c) entries newest first, the F with 0.0 h, the solo with its tags', len(r['rows']) == 22 and r['rows'][0][0] == 'First flight' and r['rows'][20] == ['Slow flight', ['0.0 h'], 'F']
            and r['rows'][21] == ['Stage check and first solo', ['0.5 dual', '0.5 solo', '3 landings'], 'A'], r['rows'][19:])
@@ -99,6 +103,52 @@ async def main():
         await finger(pg, '#mBack'); await pg.wait_for_timeout(400)
         ok('(c) back again returns to #sSchool', await pg.evaluate(f"()=>{K}.curScr()") == 'sSchool')
         ok('(d) no page errors (c)', not pg.errs, pg.errs[:3])
+        await pg.context.close()
+        # (e) school2 item 7: the Stage 3 and 4 blocks, the notes, the endorsements in order, the certificate block
+        pg = await page(b, url, vp={'width': 844, 'height': 390}, storage=BASE)
+        await pg.evaluate(f"""()=>{{const K={K};localStorage.setItem('kgeuEndorse',JSON.stringify({{xc:{{at:Date.UTC(2026,9,8,18),by:'Dana Reyes, CFI',lesson:'soloxc'}},solo:{{at:Date.UTC(2026,9,2,18),by:'Dana Reyes, CFI',lesson:'solo'}}}}));
+          K.logbookAdd('pilotage',{{letter:'B',score:84}});K.logbookAdd('soloxc',{{letter:'A',score:91}});K.logbookAdd('night',{{letter:'B',score:82}});
+          K.logbookAdd('hood',{{letter:'C',score:74}});K.logbookAdd('oral',{{letter:'C',score:80,right:12,of:15}});K.logbookAdd('ride',{{letter:'F',score:61}});K.openMenu('sSchool')}}""")
+        await pg.wait_for_timeout(300)
+        await finger(pg, '#schLog'); await pg.wait_for_timeout(800)
+        r = await pg.evaluate(SCR)
+        rg = {x[1]: x for x in r['rings']}
+        ok('(e) XC 3.0 of 3 and full after the two cross countries', rg['CROSS COUNTRY of 3'][0] == '3.0' and rg['CROSS COUNTRY of 3'][2], rg)
+        ok('(e) night 1.0 of 3, instrument 1.0 of 3, not full', rg['NIGHT of 3'][:3:2] == ['1.0', False] and rg['INSTRUMENT of 3'][:3:2] == ['1.0', False], rg)
+        ok('(e) the two endorsements in the order signed', r['end'] == ['Solo · Dana Reyes, CFI · Oct 2, 2026', 'Solo cross country · Dana Reyes, CFI · Oct 8, 2026'], r['end'])
+        rows = {x[0]: x[1] for x in r['rows']}
+        xc = rows.get('Pilotage and dead reckoning', [])
+        ok('(e) the cross country note after its hours', xc[:3] == ['1.5 dual', '1.5 XC', '2 landings'] and len(xc) == 4 and xc[3].startswith('KGEU-KPHX-KGEU, ') and xc[3].endswith(' nm'), xc)
+        ok('(e) the solo cross country note', rows.get('Solo cross country', [])[-1:] == [xc[3]], rows.get('Solo cross country'))
+        ok('(e) the night note', rows.get('Night flying') == ['1.0 dual', '1.0 night', '3 landings', '3 night landings'], rows.get('Night flying'))
+        ok('(e) the oral: 12 of 15 in place of hours; the ride: Notice of disapproval', rows.get('Oral exam') == ['12 of 15'] and rows.get('Mock checkride') == ['Notice of disapproval'], (rows.get('Oral exam'), rows.get('Mock checkride')))
+        nl = await pg.evaluate("()=>{const n=document.getElementById('logNldg');return [n.hidden,n.textContent,document.getElementById('logCert').hidden]}")
+        ok('(e) "3 night" by the landings; no certificate block without kgeuCert', nl == [False, '3 night', True], nl)
+        await pg.evaluate(f"""()=>{{const K={K};localStorage.setItem('kgeuCert',JSON.stringify({{at:Date.UTC(2026,9,9,18),cs:'N172KG',score:88,examiner:'Frank Delgado, DPE'}}));K.logbookAdd('ride',{{letter:'B',score:88}});K.nav('sSchool',true);K.nav('sLog')}}""")
+        await pg.wait_for_timeout(800)
+        c = await pg.evaluate("()=>{const c=document.getElementById('logCert'),e=document.getElementById('logEnd').getBoundingClientRect();return {hid:c.hidden,t:c.textContent,svg:!!c.querySelector('svg'),above:c.getBoundingClientRect().bottom<=e.top+0.5,ride:document.querySelector('#logList .lE .n span').textContent}}")
+        ok('(e) the certificate block with the date, the examiner and the score, above the endorsements', not c['hid'] and c['svg'] and c['above'] and all(t in c['t'] for t in ('Private Pilot Certificate', 'Airplane single engine land', 'Oct 9, 2026', 'Examiner: Frank Delgado, DPE', 'Checkride 88 of 100')), c)
+        ok('(e) the passed ride notes Pass', c['ride'].endswith('Pass'), c['ride'])
+        for W, H in ((844, 390), (568, 320)):
+            await pg.set_viewport_size({'width': W, 'height': H}); await pg.wait_for_timeout(400)
+            bad = await pg.evaluate(FIT)
+            ok(f'(e) {W}x{H}: with the certificate block nothing off screen, the disclaimer in view', not bad, bad)
+        ok('(d) no page errors (e)', not pg.errs, pg.errs[:3])
+        await pg.context.close()
+
+        # (f) the debrief's Logbook row: a passed night lesson has it, a passed slow flight does not
+        PASS = """(id)=>{const K=window.__kgeu;K.startLesson(id,true,{brief:false});const L=K.lessonDef(id);
+          L.tasks.forEach(t=>{if(t.kind==='hold')K.gHold(t.id,{get:()=>0,target:0,grace:0});else if(t.kind==='range')K.gRange(t.id,t.min!=null?t.min:0);else K.gEvent(t.id,true);});
+          for(let i=0;i<20;i++)K.gTick(0.1);K.gEnd();
+          const rows=[...document.querySelectorAll('#gradeOv .rLines .gl')].map(r=>r.className);const g=document.querySelector('#gradeOv .gLog');
+          return {letter:document.getElementById('gLetter').textContent,log:g?[g.querySelector('span').textContent,g.querySelector('b').textContent]:null,last:rows.indexOf('gl gLog')===rows.filter(c=>!/lbLine/.test(c)).length-1}}"""
+        pg = await page(b, url, vp={'width': 844, 'height': 390}, storage=dict(BASE, kgeuSchoolEasy='0'))
+        r = await pg.evaluate(PASS, 'night'); await pg.wait_for_timeout(200)
+        ok('(f) a passed night lesson: Logbook, +1.0 h night, 3 night landings, after the task rows', r['letter'] != 'F' and r['log'] == ['Logbook', '+1.0 h night, 3 night landings'] and r['last'], r)
+        await pg.evaluate("()=>document.getElementById('gFree').click()"); await pg.wait_for_timeout(300)
+        r = await pg.evaluate(PASS, 'slow'); await pg.wait_for_timeout(200)
+        ok('(f) a passed slow flight: no Logbook row', r['letter'] != 'F' and r['log'] is None, r)
+        ok('(d) no page errors (f)', not pg.errs, pg.errs[:3])
         await pg.context.close()
         await b.close()
     sys.exit(ok.done('school_log_check'))

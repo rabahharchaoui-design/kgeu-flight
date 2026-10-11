@@ -66,6 +66,17 @@
 # /tmp/ride_pass_storage.json), --item6boardsmap (needs --item6cert to have run first in this session; a page load +
 # two taps, ~15s). --item6 runs the whole group end to end (well over 110s: never call it directly in one foreground
 # Bash call).
+#
+# School2 item 7: the logbook (certificate block, endorsements in order signed, entry notes, "N night" by Landings,
+# the debrief's Logbook row). logbook_full_<WxH> (844x390, 568x320, 390x844): one page seeded exactly like
+# school_log_check.py's (e) block (pilotage, soloxc, night, hood, oral, ride entries with notes, kgeuCert set, the
+# solo + solo cross country endorsements), resized per shot; each shot prints the #logCert/#logEnd/#logList
+# scrollWidth-vs-clientWidth and the #mBack size. logbook_worst_<WxH> (844, 568): school_break_check.py's worst
+# case copied by value (60 entries, 999.9 h, 9,999 landings and night landings, the longest notes), same
+# measurement. night_debrief_log_844x390: the night lesson's clean three-stop run to the debrief's Logbook row
+# ("+1.0 h night, 3 night landings"). Split for the 110s cap: --item7full (~20s, no flight), --item7worst (~15s,
+# no flight), --item7night (~75s, the full night circuit flown three times, like --ndeb844). --item7 runs the
+# whole group end to end (well over 110s: never call it directly in one foreground Bash call).
 import asyncio, json, math, os, sys
 from playwright.async_api import async_playwright
 from harness import serve, launch, page, PLACED, finger
@@ -911,6 +922,97 @@ async def item6(b, url):
     await ride_cert(b, url)
     await ride_boards_map(b, url)
 
+# ---------------- item 7: the logbook (certificate block, endorsements in order, entry notes, "N night", debrief Logbook row) ----------------
+# logbook_full: the same seed as school_log_check.py's (e) block -- pilotage, soloxc, night, hood, oral, ride (F then a
+# passing B once kgeuCert is set): solo + solo cross country endorsements, the certificate block, XC full (3.0 of 3), "3 night".
+LOG7_SEED = f"""()=>{{const K={K};
+  localStorage.setItem('kgeuEndorse',JSON.stringify({{xc:{{at:Date.UTC(2026,9,8,18),by:'Dana Reyes, CFI',lesson:'soloxc'}},solo:{{at:Date.UTC(2026,9,2,18),by:'Dana Reyes, CFI',lesson:'solo'}}}}));
+  K.logbookAdd('pilotage',{{letter:'B',score:84}});K.logbookAdd('soloxc',{{letter:'A',score:91}});K.logbookAdd('night',{{letter:'B',score:82}});
+  K.logbookAdd('hood',{{letter:'C',score:74}});K.logbookAdd('oral',{{letter:'C',score:80,right:12,of:15}});K.logbookAdd('ride',{{letter:'F',score:61}});
+  localStorage.setItem('kgeuCert',JSON.stringify({{at:Date.UTC(2026,9,9,18),cs:'N172KG',score:88,examiner:'Frank Delgado, DPE'}}));
+  K.logbookAdd('ride',{{letter:'B',score:88}});}}"""
+
+# logbook_worst: the break check's worst case (school_break_check.py's SEEDED), copied by value so this file never
+# imports and re-runs that check's own asyncio.run(main()) -- 60 entries, 999.9 h, 9,999 landings and night landings,
+# the longest notes, both endorsements and the certificate block.
+LESSON_IDS7 = ['first', 'climbs', 'pattern', 'slow', 'stall', 'ground', 'landings', 'engine', 'solo',
+               'steep', 'short', 'soft', 'xwind', 'emerg', 'hood', 'pilotage', 'divert', 'night', 'soloxc', 'oral', 'ride']
+CS7 = 'WWWWWWWWWWWW'
+
+def mk_logbook7():
+    ents = []
+    for i in range(60):
+        lid = LESSON_IDS7[i % len(LESSON_IDS7)]
+        f = i % 11 == 0
+        ents.append({'id': lid, 'at': 1700000000000 - i * 86400000, 'score': 0 if f else 93, 'letter': 'F' if f else 'A',
+                     'dual': 0 if f else 5.5, 'solo': 0 if f else 2.3, 'xc': 0 if f else 4.1,
+                     'night': 0 if f else 3.2, 'inst': 0 if f else 2.7, 'ldg': 0 if f else 12, 'nldg': 0 if f else 12,
+                     'note': ['KGEU-KPHX-KGEU, 36 nm', '12 of 15', 'Notice of disapproval', '9999 night landings', 'Diverted to KGEU'][i % 5]})
+    return {'dual': 900.0, 'solo': 99.9, 'xc': 5, 'night': 5, 'inst': 5, 'ldg': 9999, 'nldg': 9999, 'entries': ents}
+
+WORST7 = dict(BASE, **{
+    'kgeuPlace': json.dumps({'level': 'cert', 'hours': 20000, 'at': 1700000000000}),
+    'kgeuSchool': json.dumps({f'cessna:{lid}': 'A' for lid in LESSON_IDS7}),
+    'kgeuLogbook': json.dumps(mk_logbook7()),
+    'kgeuEndorse': json.dumps({'solo': {'at': 1700000000000, 'by': 'Dana Reyes, CFI', 'lesson': 'solo'},
+                                'xc': {'at': 1700500000000, 'by': 'Dana Reyes, CFI', 'lesson': 'soloxc'}}),
+    'kgeuCert': json.dumps({'at': 1700000000000, 'cs': CS7, 'score': 100, 'examiner': 'Frank Delgado, DPE'}),
+    'kgeuLB': json.dumps({'cs': CS7, 'key': 'k' * 48, 'xp': 16000, 'creator': False, 'renamed': 0, 'renameAt': 0, 'created': 1}),
+})
+
+MEAS7 = """()=>{const ov=id=>{const e=document.getElementById(id);if(!e)return null;return [e.scrollWidth,e.clientWidth,e.scrollWidth>e.clientWidth+1]};
+  const b=document.getElementById('mBack').getBoundingClientRect();
+  return {cert:ov('logCert'),end:ov('logEnd'),list:ov('logList'),back:[Math.round(b.width),Math.round(b.height)]}}"""
+
+async def open_log(pg):
+    await pg.evaluate(f"()=>{K}.openMenu('sSchool')"); await pg.wait_for_timeout(300)
+    await finger(pg, '#schLog'); await pg.wait_for_timeout(800)
+
+async def logbook_full(b, url):
+    # logbook_full_<WxH> at 844x390, 568x320, 390x844, one page/seed, resized for each shot
+    pg = await page(b, url, vp={'width': 844, 'height': 390}, storage=ST)
+    await pg.evaluate(LOG7_SEED)
+    await open_log(pg)
+    await pg.wait_for_timeout(400)
+    for W, H in ((844, 390), (568, 320), (390, 844)):
+        await pg.set_viewport_size({'width': W, 'height': H}); await pg.wait_for_timeout(400)
+        m = await pg.evaluate(MEAS7)
+        print(f'  logbook_full {W}x{H} meas {m}')
+        await shot(pg, f'logbook_full_{W}x{H}.png')
+    await pg.context.close()
+
+async def logbook_worst(b, url):
+    # logbook_worst_<WxH> at 844 and 568: the break check's worst case
+    pg = await page(b, url, vp={'width': 844, 'height': 390}, storage=WORST7)
+    await open_log(pg)
+    for W, H in ((844, 390), (568, 320)):
+        await pg.set_viewport_size({'width': W, 'height': H}); await pg.wait_for_timeout(400)
+        m = await pg.evaluate(MEAS7)
+        print(f'  logbook_worst {W}x{H} meas {m}')
+        await shot(pg, f'logbook_worst_{W}x{H}.png')
+    await pg.context.close()
+
+async def night_debrief_log(b, url):
+    # night_debrief_log_844x390: the night lesson's clean run (three full stops), the debrief's Logbook row
+    pg = await page(b, url, vp={'width': 844, 'height': 390}, storage=ST)
+    F, shown, sub, sky0 = await night_start(pg)
+    await pg.evaluate(f"()=>{K}.tqAnswer('CALL')")
+    await pg.evaluate(NIGHT_WAIT_RB)
+    for k in range(3):
+        if k: await call(pg)
+        await night_circuit(pg, F, past=40 + 30 * k)
+    await pg.wait_for_timeout(800)
+    d = await pg.evaluate(DEBRIEF)
+    print(f'  night_debrief_log 844x390 on {d["on"]} letter {d["letter"]} gl {d["gl"]}')
+    await shot(pg, 'night_debrief_log_844x390.png')
+    await pg.context.close()
+
+async def item7(b, url):
+    # the whole item7 group, end to end; well over 110s, never call this one directly in a single foreground Bash call
+    await logbook_full(b, url)
+    await logbook_worst(b, url)
+    await night_debrief_log(b, url)
+
 async def main():
     srv, url = serve()
     async with async_playwright() as p:
@@ -999,6 +1101,14 @@ async def main():
             await ride_boards_map(b, url); await b.close(); srv.shutdown(); return
         if '--item6' in sys.argv:
             await item6(b, url); await b.close(); srv.shutdown(); return
+        if '--item7full' in sys.argv:
+            await logbook_full(b, url); await b.close(); srv.shutdown(); return
+        if '--item7worst' in sys.argv:
+            await logbook_worst(b, url); await b.close(); srv.shutdown(); return
+        if '--item7night' in sys.argv:
+            await night_debrief_log(b, url); await b.close(); srv.shutdown(); return
+        if '--item7' in sys.argv:
+            await item7(b, url); await b.close(); srv.shutdown(); return
         if '--item1b' in sys.argv:
             await item1b(b, url); await b.close(); srv.shutdown(); return
         if '--item1a' in sys.argv:
