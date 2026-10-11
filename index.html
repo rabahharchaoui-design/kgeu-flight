@@ -1638,11 +1638,13 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 #splash.gone{ display:none; }
 .spIcon{ width:clamp(88px,30vh,150px); height:clamp(88px,30vh,150px); border-radius:22%; box-shadow:0 10px 30px rgba(42,22,8,.28); }
 .spTitle{ font:800 clamp(26px,8vh,40px) var(--font); color:#2A1608; letter-spacing:.01em; }
-.spBar{ width:min(240px,50vw); height:4px; border-radius:2px; background:rgba(42,22,8,.16); overflow:hidden; }
+/* graphics item 8: a 2 px bar on the real boot stages (BOOT.bar), its room always kept (no layout shift), shown only if
+   the boot is still running after 1.5 s (#splash.slow) */
+.spBar{ width:min(240px,50vw); height:2px; border-radius:1px; background:rgba(42,22,8,.16); overflow:hidden; opacity:0; transition:opacity .25s ease; }
+#splash.slow .spBar{ opacity:1; }
 .spMsg{ font:600 13px var(--font); color:#6B3517; min-height:16px; }
-.spBar i{ display:block; height:100%; width:0; background:#A8592A; border-radius:2px; animation:spLoad 5s cubic-bezier(.1,.7,.2,1) forwards; }
-#splash.done .spBar i{ width:100% !important; animation:none; transition:width .2s; }
-@keyframes spLoad{ to{ width:88%; } }
+.spBar i{ display:block; height:100%; width:6%; background:#A8592A; border-radius:1px; transition:width .3s cubic-bezier(.23,1,.32,1); }
+#splash.done .spBar i{ width:100% !important; transition:width .2s; }
 @media (prefers-reduced-motion: reduce){ #splash{ transition:none; } }
 .credit{ display:inline-flex; align-items:center; gap:7px; min-height:44px; padding:0 6px; font:600 13px var(--font); color:#6B3517; text-decoration:none; -webkit-tap-highlight-color:transparent; }
 .credit .yt{ width:22px; height:auto; flex:none; }
@@ -1891,6 +1893,8 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   <div class="spMsg" id="spMsg"></div>
   <a class="credit spCredit" href="https://www.youtube.com/@OhRabah" target="_blank" rel="noopener"><svg class="yt" viewBox="0 0 28 20" aria-hidden="true"><path d="M27.4 3.1A3.5 3.5 0 0 0 24.9.6C22.7 0 14 0 14 0S5.3 0 3.1.6A3.5 3.5 0 0 0 .6 3.1C0 5.3 0 10 0 10s0 4.7.6 6.9a3.5 3.5 0 0 0 2.5 2.5C5.3 20 14 20 14 20s8.7 0 10.9-.6a3.5 3.5 0 0 0 2.5-2.5C28 14.7 28 10 28 10s0-4.7-.6-6.9Z" fill="#FF0000"/><path d="M11.2 14.3 18.4 10l-7.2-4.3v8.6Z" fill="#FFFFFF"/></svg><span>Made by @OhRabah</span></a>
 </div>
+<script>/* graphics item 8: the boot bar shows if the boot is still running at 1.5 s, three.js still loading included */
+setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList.contains('done'))s.classList.add('slow');},1500);</script>
 <canvas id="gl"></canvas>
 <div id="sensorFx"><div class="gr"></div><div class="vg"></div></div>
 <div id="hood" aria-hidden="true"></div>
@@ -3422,7 +3426,8 @@ var GFX={tier:'medium',auto:'medium',override:'auto',scale:1,bench:null,dyn:true
   postWant(){return GFX.on('bloom')||GFX.on('smaa');},
   setTier(t){if(!/^(auto|low|medium|high)$/.test(t))t='auto';GFX.override=t;GFX.tier=t==='auto'?GFX.auto:t;
     try{localStorage.setItem('kgeuTier',t);}catch(e){}
-    GFX.post=GFX.postWant();GFX.applyPR();GFX_HOOKS.forEach(f=>{try{f(GFX.tier);}catch(e){console.warn(e);}});if(GFX.ui)GFX.ui();},
+    GFX.applyTier();},
+  applyTier(){GFX.post=GFX.postWant();GFX.applyPR();GFX_HOOKS.forEach(f=>{try{f(GFX.tier);}catch(e){console.warn(e);}});if(GFX.ui)GFX.ui();},
   setScale(s){GFX.scale=s;GFX.applyPR();},
   // dynamic resolution: a state machine fed every flying frame with the ring buffer's average and 1% low (fps) and
   // the frame's dt (s). 3 s straight of 1% low under 55 steps the scale down (1, 0.85, 0.7 floor); 10 s straight of
@@ -3441,7 +3446,40 @@ var GFX={tier:'medium',auto:'medium',override:'auto',scale:1,bench:null,dyn:true
     if(S.lowT>=3&&k<GFX.STEPS.length-1){GFX.setScale(GFX.STEPS[k+1]);S.lowT=S.highT=0;S.cool=5;}
     else if(S.highT>=10&&k>0){GFX.setScale(GFX.STEPS[k-1]);S.lowT=S.highT=0;S.cool=5;}
     return GFX.scale;},
-  ui:null,HOOKS:GFX_HOOKS};
+  // graphics item 8, the battery guard. Safari has no thermal API; the signal we have is the dynamic scale sitting on its
+  // 0.7 floor while the 1% low is still under 50: 20 s of that straight in flight (frames over 250 ms count for nothing,
+  // nor the first 10 s after a start; a pause or the menu starts the count over) and the tier drops one step for this
+  // session only (never saved to kgeuTier, so the next cold launch is back on the detected tier), the scale goes back to
+  // 1.0 and one toast says so, once a session. Never below Low; on Low nothing happens. Fed by gfxDyn beside dynFeed.
+  thermS:{t:0,lowT:0,drops:0,toasts:0},
+  thermalReset(){const S=GFX.thermS;S.t=S.lowT=0;},
+  thermalFeed(avg,low1,dt){
+    const S=GFX.thermS;if(!(dt>0)||dt>0.25)return GFX.tier;
+    S.t+=dt;if(S.t<10)return GFX.tier;
+    if(GFX.scale<=GFX.STEPS[GFX.STEPS.length-1]+1e-6&&low1>0&&low1<50)S.lowT+=dt;else S.lowT=0;
+    if(S.lowT>=20&&GFX.tier!=='low'){
+      GFX.tier=TIERS[Math.max(0,tierRank(GFX.tier)-1)];S.drops++;S.lowT=0;S.t=0;
+      GFX.scale=1;GFX.dynReset(true);GFX.applyTier();
+      if(!S.toasts&&GFX.say){S.toasts=1;GFX.say('Graphics set to '+(GFX.tier==='low'?'Low':'Medium')+' to keep things smooth');}}
+    return GFX.tier;},
+  say:null,ui:null,HOOKS:GFX_HOOKS};
+// graphics item 8, payload: every texture this graphics pass added is drawn at run time on a canvas (the aircraft skins,
+// the road bake, the canopy dust streaks, the cloud, smoke and sun sprites) or is a render target, and the one new
+// downloaded asset is assets/world/az_dem.bin (1.16 MB of heights, not an image). There is no image file to ship as KTX2
+// (Basis) and no transcoder worth its 200 KB here, so none is used. Sizes are kept to what a 1266 x 585 backing store
+// shows: the road bake stays 2048 (31 m a texel over 64 km: the 1 px arterials vanish at 1024), with mipmaps and
+// anisotropy since the ground is always minified; the streaks and the post chain's targets never minify, so no mipmaps.
+// ---- boot stages (graphics item 8): when each was reached (ms from navigation), and the splash's progress bar. The bar
+// shows only if the boot is still running at 1.5 s (a fast device never sees it) and advances on the real stages:
+// three.js loaded, world built, aircraft built, DEM arrived (or skipped), shaders warm. BOOT.ft: the first frames' ms.
+const BOOT={t:{},ST:['three','world','aircraft','dem','warm'],slow:false,
+  mark(k){if(BOOT.t[k]==null)BOOT.t[k]=Math.round(performance.now());BOOT.bar();},
+  bar(){const sp=document.getElementById('splash');if(!sp)return;
+    if(!BOOT.slow&&(performance.now()>=1500||BOOT.force)&&!sp.classList.contains('done'))sp.classList.add('slow');
+    BOOT.slow=sp.classList.contains('slow');
+    const n=BOOT.ST.filter(k=>BOOT.t[k]!=null).length+(BOOT.t.warm==null?BOOT.sub||0:0),i=sp.querySelector('.spBar i');if(i)i.style.width=Math.round(8+n/BOOT.ST.length*84)+'%';}};
+try{BOOT.force=localStorage.getItem('kgeuBootBar')==='1';}catch(e){}
+BOOT.mark('three');setTimeout(()=>BOOT.bar(),Math.max(0,1500-performance.now()));
 try{const o=localStorage.getItem('kgeuTier');if(/^(auto|low|medium|high)$/.test(o))GFX.override=o;}catch(e){}
 if(navigator.webdriver)GFX.dyn=false;
 const fontsReady=(document.fonts&&document.fonts.load)?Promise.race([document.fonts.load('800 60px "Saira Condensed"'),new Promise(r=>setTimeout(r,1500))]):Promise.resolve();
@@ -6692,6 +6730,7 @@ float csmShadow( bool rcv ){
     if(typeof sh.fragmentShader==='string')sh.fragmentShader='#define PFS_AIR\n'+sh.fragmentShader;}
 }
 function init(){
+BOOT.t.init0=Math.round(performance.now());
 const glc=document.getElementById('gl');let glcH=0;const _euH=new THREE.Euler(0,0,0,'YXZ');   // canvas CSS height, kept by resize() (no layout read per frame); HUD heading scratch
 pfsColorSetup();pfsAirSetup();
 const renderer=new THREE.WebGLRenderer({canvas:glc,antialias:!isTouch,logarithmicDepthBuffer:true,powerPreference:'high-performance'});
@@ -6704,10 +6743,10 @@ try{const gl=renderer.getContext(),ext=gl.getExtension('WEBGL_debug_renderer_inf
 // 30 instanced spheres under 2 lights into a 512x512 target: 2 warm up frames, then up to 8 timed ones each closed by a
 // 1 px readPixels; 400 ms wall time at most. Mean ms a timed frame, or null if none finished or it could not run.
 function gfxBench(){
-  const t0=performance.now();let rt=null,geo=null,mat=null,ms=null;
+  const t0=performance.now();let rt=null,geo=null,mat=null,ms=null,im=null;
   try{
     rt=new THREE.WebGLRenderTarget(512,512);geo=new THREE.SphereGeometry(1,24,16);mat=new THREE.MeshStandardMaterial({color:0x8899aa,metalness:0.3,roughness:0.5});
-    const sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(50,1,0.1,100),im=new THREE.InstancedMesh(geo,mat,30),m=new THREE.Matrix4();
+    const sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(50,1,0.1,100),m=new THREE.Matrix4();im=new THREE.InstancedMesh(geo,mat,30);
     for(let i=0;i<30;i++){m.makeTranslation((i%6-2.5)*2.2,(Math.floor(i/6)-2)*2.2,-14);im.setMatrixAt(i,m);}
     sc.add(im);sc.add(new THREE.AmbientLight(0x404040,1));const dl=new THREE.DirectionalLight(0xffffff,1);dl.position.set(1,1,1);sc.add(dl);
     const px=new Uint8Array(4),prev=renderer.getRenderTarget();let sum=0,n=0;
@@ -6719,7 +6758,7 @@ function gfxBench(){
     renderer.setRenderTarget(prev);
     if(n)ms=Math.round(sum/n*100)/100;
   }catch(e){ms=null;}
-  try{if(rt)rt.dispose();if(geo)geo.dispose();if(mat)mat.dispose();}catch(e){}
+  try{if(rt)rt.dispose();if(geo)geo.dispose();if(mat)mat.dispose();if(im&&im.dispose)im.dispose();}catch(e){}   // graphics item 8: the instance buffer too
   return ms;
 }
 GFX.runBench=gfxBench;
@@ -7576,13 +7615,13 @@ function azdSet(buf){
 // fetched once at init (the service worker serves it from the cache); nothing waits on it: until it lands, or if it
 // never does, the ground is the procedural mountains(). Then the rings, the map's hillshade and the scrub follow it.
 function azdLoad(){
-  if(!REGION.az)return;
+  if(!REGION.az){BOOT.mark('dem');return;}
   const t0=performance.now();
   fetch('assets/world/az_dem.bin?v=1').then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer();}).then(b=>{
     const t1=performance.now();azdSet(b);AZD.ms=Math.round(performance.now()-t1);AZD.loadMs=Math.round(performance.now()-t0);
     tlReset();rebuildTerrain(camera.position.x,camera.position.z);
-    if(typeof mapDataReady==='function'&&MAPD.ready)mapDataReady();
-  }).catch(e=>{AZD.err=String(e);console.warn('az_dem',e);});
+    if(typeof mapDataReady==='function'&&MAPD.ready)mapDataReady();BOOT.mark('dem');
+  }).catch(e=>{AZD.err=String(e);console.warn('az_dem',e);BOOT.mark('dem');});
 }
 // bake the road network of assets/map/phx.bin into TROAD: freeways 3 px, a lighter grey, the arterials (trunk, primary,
 // secondary) 1 px; links and smaller roads left out. 2048 px over the 64 km square round KGEU (31 m a pixel).
@@ -8304,7 +8343,7 @@ if(REGION.az)(function(){
     b.position.set(21000+(hash(k,1)-0.5)*1600,hgt/2,7800+(hash(k,2)-0.5)*1300);scene.add(b);
     if(hgt>DT_TOP.h)Object.assign(DT_TOP,{x:b.position.x,z:b.position.z,h:hgt,w:wd,d:b.geometry.parameters.depth});}
 })();
-csmScan(CSM_N1);   // the stadium, the arena, Westgate, Luke's shelters and jets, Sky Harbor's terminals and tower, downtown
+csmScan(CSM_N1);BOOT.mark('world');   // the stadium, the arena, Westgate, Luke's shelters and jets, Sky Harbor's terminals and tower, downtown
 // palms, desert scrub, clouds
 (function(){
   const trunks=[],crowns=[],shr=[];
@@ -8499,7 +8538,9 @@ function envBuild(){
     dc.setXYZ(i,c.r,c.g,c.b);}
   dc.needsUpdate=true;
   ENV.sn.material.color.setHex(TOD.night?0x8a96b4:TOD.env.sun);ENV.sn.position.copy(_skyS).multiplyScalar(50);
-  const pm=new THREE.PMREMGenerator(renderer),rt=pm.fromScene(ENV.es,0.04);pm.dispose();return rt;
+  const pm=new THREE.PMREMGenerator(renderer),rt=pm.fromScene(ENV.es,0.04);pm.dispose();
+  // graphics item 8: the tiny sky scene's vertex buffers leave the GPU until the next setTOD (the arrays stay to repaint)
+  ENV.dg.dispose();ENV.sn.geometry.dispose();return rt;
 }
 // the day's environment, built on first use under the day's sun and haze (the live ones put back after)
 function envDay(){
@@ -9006,7 +9047,7 @@ function getModel(id){
   if(LB)try{LB.paintModel(m,id);}catch(e){}
   return m;
 }
-let plane=getModel('reaper');plane.g.visible=true;
+let plane=getModel('reaper');plane.g.visible=true;BOOT.mark('aircraft');
 function useModel(id){plane.g.visible=false;plane=getModel(id);plane.g.visible=true;}
 // ---- stance: the aircraft rests on its tyres ----
 // The physics holds the origin GEAR over the ground and pitches about it; a real aircraft
@@ -9041,14 +9082,14 @@ function stanceLift(m,q,gearPos,agl){
 // start(), the first event with a new aircraft built it on the tap and compiled its programs
 // on the first flying frame: the phone froze with the menu gone and nothing else painted yet.
 const WARM={i:0,done:false,seen:new WeakSet(),ms:[],t0:0,total:0},WARM_TEX=['map','normalMap','roughnessMap','metalnessMap','emissiveMap','alphaMap','aoMap','bumpMap','lightMap','specularMap'];
-function warmObj(root){
+function warmObj(root,noCompile){
   root.traverse(o=>{const ms=o.material?(Array.isArray(o.material)?o.material:[o.material]):[];
     for(const mt of ms)for(const k of WARM_TEX){const t=mt[k];
       if(!t||!t.isTexture||t.isCubeTexture||WARM.seen.has(t)||!t.image)continue;
       if(!(t.isDataTexture||t.image.nodeName||(typeof ImageBitmap!=='undefined'&&t.image instanceof ImageBitmap)))continue;
       WARM.seen.add(t);try{renderer.initTexture(t);}catch(e){}}});
-  try{renderer.compile(scene,camera);}catch(e){}
-  // one draw into a 4 px target, framed on it, uploads its vertex buffers too (same programs:
+  if(!noCompile)try{renderer.compile(scene,camera);}catch(e){}
+  // one draw into a 16 px target, framed on it, uploads its vertex buffers too (same programs:
   // ACES and sRGB output either way)
   try{const v=root.visible;root.visible=true;const s=new THREE.Box3().setFromObject(root).getBoundingSphere(new THREE.Sphere());
     WARM.cam.position.copy(s.center).add(_warmOff.set(0.6,0.5,0.62).multiplyScalar(Math.max(4,s.radius)*2.2));WARM.cam.lookAt(s.center);
@@ -9056,13 +9097,15 @@ function warmObj(root){
     renderer.setRenderTarget(WARM.rt);renderer.render(scene,WARM.cam);renderer.setRenderTarget(null);root.visible=v;}catch(e){renderer.setRenderTarget(null);}
 }
 // WARM.rt: the screen's (and the post chain's) output encoding, so the programs it compiles are the ones the frame uses
-WARM.rt=new THREE.WebGLRenderTarget(4,4);WARM.rt.texture.encoding=THREE.sRGBEncoding;WARM.cam=new THREE.PerspectiveCamera(50,1,0.5,400);const _warmOff=new THREE.Vector3();
+WARM.rt=new THREE.WebGLRenderTarget(16,16);WARM.rt.texture.encoding=THREE.sRGBEncoding;WARM.cam=new THREE.PerspectiveCamera(50,1,0.5,400);const _warmOff=new THREE.Vector3();
 const WARM_STEPS=['reaper','mq9b','f16','cessna','alpha','c130','archer','a10','b737','a320','b747'].map(id=>()=>warmObj(getModel(id).g))
   .concat([()=>{if(!DZ.built)dzBuild();warmObj(DZ.g);},()=>fxWarmLayer(),()=>fxWarmDebris(),()=>fxWarmDecals(),()=>{if(actx)boomBufs();}]);
 function warmTick(){
   if(WARM.done)return;
   // flying: wait. The steps belong to the menu and the pause sheet, never to a flying frame
   if(running&&!paused&&!menu.classList.contains('on')){setTimeout(warmTick,1500);return;}
+  // the splash's fade (graphics item 8): nothing that can wait on the GPU while its 480 ms timer runs
+  {const sp=$('splash');if(sp&&sp.classList.contains('done')&&!sp.classList.contains('gone')){setTimeout(warmTick,250);return;}}
   const t0=performance.now();if(!WARM.i)WARM.t0=t0;
   // steps run back to back inside a 60 ms budget (the far-cull models are ~4 ms each, an
   // aircraft 10 to 55), so each does not cost a whole frame's wait behind the menu
@@ -18500,7 +18543,7 @@ void main(){
 // per object, just before its draw: its own heat, texture and sprite flags into the override
 function irHook(){
   if(!IR.pass)return;
-  const u=IR_MAT.uniforms,d=this.userData,m=this.material;
+  const u=IR_MAT.uniforms,d=this.userData,m=Array.isArray(this.material)?this.material[0]:this.material;   // a multi material mesh: its first (graphics item 8)
   u.uHeat.value=d.irHeat;u.uVar.value=d.irVar;u.uSprite.value=this.isSprite?1:0;
   u.uAlpha.value=d.irSkip?0:this.isSprite?m.opacity:1;
   const map=!this.isSprite&&m&&m.map;
@@ -18757,6 +18800,105 @@ function dustFxUpdate(dt){
 }
 // a tier change: the canvas pixel ratio follows GFX.post (GFX.setTier already re-applied it); Low frees the targets
 GFX_HOOKS.push(()=>{if(!GFX.post)pfxFree();});
+// ---- graphics item 8: the shader precompile behind the splash ----
+// After the benchmark, from the 4th frame, as a queue (gfxPrecompile) that must drain before the splash is marked done
+// (the last boot stage, 'warm', on the bar; the 8 s fallback still takes the splash down, the queue then finishes behind
+// the menu): every program the first
+// flight can need on this tier compiled, and drawn once into a 16 px target (never the canvas), so no effect hitches the
+// first time it shows. The camera goes for the moment to where the first flight's chase view will be (the picked base and
+// start, the picked aircraft there, the terrain rings round it): renderer.compile, then one frame of the main scene with
+// the shadow cascades drawn (the depth program of the aircraft, the buildings and the terrain) and the haboob wall up
+// (built here; the full and the lite shaders), then the post chain (the bloom's depth prepass and layer, the blur, SMAA's
+// three passes and the composite with the streak sampler bound), one explosion (the FX layer's fireball and smoke, the
+// dry run of fxWarmLayer) and the DZ smoke, the IR pass and the carousel; the night lights (AL_MAT) are in the main
+// compile and frame. Headless (SwiftShader) a first draw of a new state is what stalls, not the link, hence the draws.
+// The menu's WARM steps still upload the other aircraft later. PRE.ms: each step's ms; localStorage kgeuNoPre=1 skips it.
+const PRE={done:false,skip:false,ms:{},total:0};
+try{PRE.skip=localStorage.getItem('kgeuNoPre')==='1';}catch(e){}
+// where the first flight's chase camera will be (createState's spawn points, without its wind draw)
+function prePose(){
+  const B=BASES[SPAWN_BASE]||BASES[BASE0];let x,z,y=GEAR,h=B.hdg;
+  if(SPAWN_POS==='ramp'){x=B.ramp[0]();z=B.ramp[1]();h=B.rampHdg;}
+  else if(SPAWN_POS==='final'||SPAWN_POS==='final1'){const D=SPAWN_POS==='final1'?1852:5556,P=B.fin(D);x=P[0];z=P[1];y=D*Math.tan(GS)+GEAR;}
+  else{x=B.runway[0]();z=B.runway[1]();}
+  return {x:x,y:y,z:z,h:h*Math.PI/180};
+}
+// the queue: one job a frame or more, at most ~40 ms of work a frame, so the splash and its bar keep moving. Every job
+// that draws puts the camera at the first flight's pose (preAt) and back before the frame's own menu draw.
+const PREQ={jobs:null,i:0,A:null,B:null,C:null,D:null,M:null,mv:false,mp:new V3(),mq:new Q4(),cp:new V3(),cq:new Q4(),cv:null};
+function preAt(f){
+  const Q=PREQ,r=renderer,prevT=r.getRenderTarget(),ac=r.autoClear,lm=camera.layers.mask,P=prePose(),fx=Math.sin(P.h),fz=-Math.cos(P.h);
+  Q.cp.copy(camera.position);Q.cq.copy(camera.quaternion);Q.M=null;Q.cv=null;
+  try{const M=getModel(savedType).g;Q.M=M;Q.mv=M.visible;Q.mp.copy(M.position);Q.mq.copy(M.quaternion);
+    M.visible=true;M.position.set(P.x,P.y,P.z);M.quaternion.setFromEuler(new THREE.Euler(0,-P.h,0,'YXZ'));M.updateMatrixWorld(true);}catch(e){Q.M=null;}
+  // the monsoon's cumulonimbus (Medium and High; the haboob's clouds) and the haboob wall, up for the draw
+  if(CLOUD_MESH&&CLOUDS.cb){Q.cv=CLOUD_MESH.visible;CLOUD_MESH.visible=true;CLOUDS.cb.visible=true;}
+  if(HB.g){HB.g.visible=true;HB.sun.visible=true;}
+  camera.position.set(P.x-fx*16,P.y+4.5,P.z-fz*16);camera.lookAt(P.x+fx*80,P.y+1,P.z+fz*80);camera.updateMatrixWorld();
+  rebuildTerrain(camera.position.x,camera.position.z);
+  try{f(Q.M);}
+  finally{r.setRenderTarget(prevT);r.autoClear=ac;camera.layers.mask=lm;if(HB.g){HB.g.visible=false;HB.sun.visible=false;}
+    if(Q.cv!==null){CLOUD_MESH.visible=Q.cv;CLOUDS.cb.visible=CLOUDS.preset==='monsoon';}
+    if(Q.M){Q.M.visible=Q.mv;Q.M.position.copy(Q.mp);Q.M.quaternion.copy(Q.mq);Q.M.updateMatrixWorld(true);}
+    camera.position.copy(Q.cp);camera.quaternion.copy(Q.cq);camera.updateMatrixWorld();rebuildTerrain(camera.position.x,camera.position.z);}
+}
+function preJobs(){
+  const Q=PREQ,r=renderer;Q.A=pfxRT(16,16,true);Q.B=pfxRT(16,16,false);Q.C=pfxRT(16,16,false);Q.D=pfxRT(16,16,false);
+  const A=Q.A,B=Q.B,C=Q.C,D=Q.D;
+  return [
+    ['build',()=>{hbBuild();if(CLOUD_MESH&&GFX.on('clouds')&&!CLOUDS.cb)cloudCB();if(!DZ.built)dzBuild();}],
+    ['compile',()=>preAt(()=>r.compile(scene,camera))],
+    ['frame',()=>preAt(M=>{
+      if(CSM.n){   // the maps drawn once round that camera (the shading ignores them: CSM_U.a.w stays 0)
+        _csmD.copy(sun.position).normalize();if(_csmD.y<0.2)_csmD.set(0.3,0.9,0.3).normalize();
+        const Ls=CSM.L;for(const l of Ls)l.length=0;
+        if(M){csmMark(M);Ls[0].push(M);Ls[1].push(M);}Ls[0].push(terrain);Ls[1].push(terrain);for(const o of CSM.stat)Ls[1].push(o);Ls[2].push(terrain);
+        for(let i=0;i<CSM.n;i++){const L=CSM.lights[i];csmFit(L,i,0,CSM.SPLIT[i],L.shadow.mapSize.x);L.shadow.needsUpdate=true;L.userData.sig=null;}}
+      try{r.setRenderTarget(A);r.autoClear=true;r.render(scene,camera);}
+      finally{if(CSM.n){csmIdle();for(const l of CSM.L)l.length=0;}}})],
+    ['post chain',()=>{if(!GFX.post)return;preAt(()=>{
+      const bg=scene.background,lm=camera.layers.mask;scene.background=null;r.setRenderTarget(A);r.clear(true,true,false);
+      try{camera.layers.set(PFX_OCC);scene.overrideMaterial=PFX_OCCM;r.render(scene,camera);scene.overrideMaterial=null;
+        camera.layers.set(PFX_BLOOM);FXQ_MAT.uniforms.uBloom.value=1;r.render(scene,camera);}
+      finally{FXQ_MAT.uniforms.uBloom.value=0;scene.overrideMaterial=null;camera.layers.mask=lm;scene.background=bg;}
+      r.autoClear=true;
+      const u=PFX_BLUR.uniforms;u.tSrc.value=A.texture;u.uDir.value.set(1/16,0);pfxPass(PFX_BLUR,B);
+      PFX_EDGE.uniforms.tDiffuse.value=A.texture;pfxPass(PFX_EDGE,B);
+      PFX_WGT.uniforms.tDiffuse.value=B.texture;pfxPass(PFX_WGT,C);
+      for(const m of [PFX_FIN,PFX_CMP]){const f=m.uniforms;if(f.tDiffuse)f.tDiffuse.value=C.texture;f.tColor.value=A.texture;f.tBloom.value=B.texture;f.uStr.value=PFX_STR;pfxPass(m,D);}
+      u.tSrc.value=null;PFX_EDGE.uniforms.tDiffuse.value=PFX_WGT.uniforms.tDiffuse.value=null;
+      for(const m of [PFX_FIN,PFX_CMP]){const f=m.uniforms;if(f.tDiffuse)f.tDiffuse.value=null;f.tColor.value=null;f.tBloom.value=PFX_BLACK;f.uStr.value=0;}});}],
+    ['explosion',()=>preAt(()=>fxWarmLayer(A))],
+    ['dz smoke',()=>{const sp=DZ.smoke[0];if(!sp)return;const v=sp.visible,o=sp.material.opacity;sp.visible=true;sp.material.opacity=0.5;
+      try{warmObj(sp,true);}finally{sp.visible=v;sp.material.opacity=o;}}],
+    // the IR pass, its tagging undone after (irTag gives every plain instanced mesh white instance colours and puts the
+    // points on layer 1 only; a normal program compiled while they are there would expect the colours of an instanced
+    // mesh built later without them), so it tags afresh when the sensor is first used
+    ['ir',()=>preAt(()=>{const ic=[],pm=[];scene.traverse(o=>{if(o.isInstancedMesh&&!o.instanceColor)ic.push(o);else if(o.isPoints)pm.push([o,o.layers.mask]);});
+      try{r.setRenderTarget(A);renderIR();}finally{for(const o of ic)o.instanceColor=null;for(const [o,m] of pm)o.layers.mask=m;irDirty=true;IR.pass=false;}})],
+    ['carousel',()=>{const p=showItem(savedType||'cessna'),cam=SHOW.cam,prevT=r.getRenderTarget();p.visible=true;p.position.set(0,0,0);p.scale.setScalar(40/p.userData.dim);
+      cam.aspect=1.6;cam.position.set(0,30,100);cam.lookAt(0,0,0);cam.updateProjectionMatrix();
+      if(!SHOW.scene.environment)SHOW.scene.environment=envDay();
+      try{r.setRenderTarget(A);r.render(SHOW.scene,cam);}finally{p.visible=false;r.setRenderTarget(prevT);}}]];
+}
+// one frame's share of the queue (tick, from the 4th frame); true once it has drained. BOOT.sub moves the bar through
+// the last stage as it goes.
+function gfxPrecompile(){
+  if(PRE.done)return true;
+  if(PRE.skip){PRE.done=true;BOOT.mark('warm');return true;}
+  const Q=PREQ,t0=performance.now();
+  if(!Q.jobs){Q.jobs=preJobs();Q.i=0;PRE.t0=t0;PRE.frames=0;}
+  PRE.frames++;
+  do{const j=Q.jobs[Q.i++],a=performance.now();
+    try{j[1]();}catch(e){console.warn('gfx precompile '+j[0],e);}
+    PRE.ms[j[0]]=+(performance.now()-a).toFixed(1);}
+  while(Q.i<Q.jobs.length&&performance.now()-t0<40);
+  BOOT.sub=Q.i/Q.jobs.length;BOOT.bar();
+  if(Q.i<Q.jobs.length)return false;
+  for(const k of ['A','B','C','D'])if(Q[k]){Q[k].dispose();Q[k]=null;}
+  Q.jobs=null;PRE.done=true;PRE.total=+Object.values(PRE.ms).reduce((x,y)=>x+y,0).toFixed(1);PRE.wall=Math.round(performance.now()-PRE.t0);
+  BOOT.mark('warm');return true;
+}
 // ---- day TV: grain and a faint 8 px block pattern, one small tile stepped every 80 ms ----
 const sensorFx=$('sensorFx'),sensorGr=sensorFx.firstChild;let sfxT=0;
 (function(){const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d'),id=x.createImageData(128,128),d=id.data;
@@ -18913,7 +19055,9 @@ function fxBallCanvas(){const c=document.createElement('canvas');c.width=c.heigh
     d[k]=R;d[k+1]=G;d[k+2]=B;d[k+3]=255*clamp((1-q)*5,0,1)*clamp(0.75+n*0.5,0,1);}
   x.putImageData(id,0,0);return c;}
 // smoke: soft wispy edge, lumpy inside, alpha carries the shape (colour comes from the record)
-function fxSmokeCanvas(){const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d'),N=fxNoise(7),id=x.createImageData(128,128),d=id.data;
+// built once (seeded, so the same pixels): the atlas copies it and the DZ smoke's texture keeps it (graphics item 8)
+let FX_SMOKE_C=null;
+function fxSmokeCanvas(){if(FX_SMOKE_C)return FX_SMOKE_C;const c=FX_SMOKE_C=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d'),N=fxNoise(7),id=x.createImageData(128,128),d=id.data;
   for(let y=0;y<128;y++)for(let X=0;X<128;X++){const dx=(X-64)/64,dy=(y-64)/64,r=Math.hypot(dx,dy),a=Math.atan2(dy,dx);
     const n=N.f(X/11,y/11),rr=0.72+0.28*N.f(Math.cos(a)*1.8+3,Math.sin(a)*1.8+3),q=r/rr,k=(y*128+X)*4;
     const v=200+55*n;d[k]=d[k+1]=d[k+2]=v;
@@ -19340,14 +19484,16 @@ function fxClear(){for(const o of FX){o.t=o.end;}fxUpdate(0);for(const m of FX_M
 // The layer is warmed with a dry run of a whole burst 50 km off (too far for the screen flash,
 // the bang or a kick): every update path runs once, the sort and the instance buffers upload,
 // so the first real one costs only itself.
-function fxWarmLayer(){
+function fxWarmLayer(rt){
   const cx=camera.position.x+50000,cz=camera.position.z,gy=groundHeight(cx,cz);
   try{explode(cx,gy,cz,{scale:2,secondary:1,debris:8,fireSec:5,smokeSec:5});fxMini(cx+30,gy,cz,0.8);
     for(let i=0;i<3;i++){fireUpdate(1/30);debrisUpdate(1/30);fxUpdate(1/30);wreckUpdate(1/30);fxPack();}
     warmObj(fxqMesh);
     // and one draw into the real framebuffer: a pipeline built for the 4 px target is not
-    // the one the screen uses, and the first real burst paid for that on its first frames
-    renderer.render(scene,camera);}
+    // the one the screen uses, and the first real burst paid for that on its first frames (the precompile behind the
+    // splash, gfxPrecompile, passes its 16 px target instead: never the canvas)
+    if(rt){const p=renderer.getRenderTarget();renderer.setRenderTarget(rt);renderer.render(scene,camera);renderer.setRenderTarget(p);}
+    else renderer.render(scene,camera);}
   finally{fxClear();fireClear();debrisClear();camBump=0;fxPack();}
 }
 function fxWarmDebris(){
@@ -20029,6 +20175,8 @@ const _ipPos=new V3(),_ipQ=new THREE.Quaternion(),_dPos=new V3(),_dQ=new THREE.Q
 const camQ=new THREE.Quaternion(),_cqT=new THREE.Quaternion();const CAM_K=5,CAM_LAG=1.0;
 let frameN=0,gearWarn=false,snapCamera=true,last=performance.now(),acc=0,hudT=0,mapT=0,loopHeld=false;const DT=1/120;
 const BOOT_T=performance.now();let splashSeen=false;
+// the 480 ms fade between 'done' and 'gone' (the 8 s fallback's too): the precompile queue holds off through it
+function splashFading(){const sp=$('splash');return !!sp&&sp.classList.contains('done')&&!sp.classList.contains('gone');}
 function splashDone(){const sp=$('splash');if(!sp||sp.classList.contains('done'))return;
   setTimeout(()=>{sp.classList.add('done');setTimeout(()=>{sp.classList.add('gone');fpsLoaded();},480);},Math.max(0,700-(performance.now()-BOOT_T)));}
 // frame rate (Settings > Developer): the main rAF's frame times in a 300 slot ring, always on (fpsStats works with the
@@ -20050,12 +20198,13 @@ function setFps(v){FPS.on=!!v;try{localStorage.setItem('kgeuFps',FPS.on?'1':'0')
 function gfxDyn(t,d){
   const S=GFX.dynS;
   if(!running||menu.classList.contains('on')){if(GFX.scale!==1)GFX.setScale(1);S.t0=null;return;}
-  if(S.t0!==RUN.t0){S.t0=RUN.t0;GFX.dynReset();}
+  if(S.t0!==RUN.t0){S.t0=RUN.t0;GFX.dynReset();GFX.thermalReset();}
   if(!GFX.dyn)return;
-  if(paused){S.lowT=S.highT=0;return;}
+  if(paused){S.lowT=S.highT=0;GFX.thermS.lowT=0;return;}
   if(!FPS.st||t-FPS.dynT>=250){FPS.dynT=t;FPS.st=fpsStats();}
-  GFX.dynFeed(FPS.st.avg,FPS.st.low1,d/1000);
+  GFX.dynFeed(FPS.st.avg,FPS.st.low1,d/1000);GFX.thermalFeed(FPS.st.avg,FPS.st.low1,d/1000);
 }
+GFX.say=m=>toast(m,3);
 function gfxTag(){return GFX.tier.charAt(0).toUpperCase()+' '+GFX.scale.toFixed(2)+' \u00b7 ';}
 function fpsFrame(t){
   let d=0;if(FPS.prev){d=t-FPS.prev;if(d>0&&d<1000){FPS.buf[FPS.i]=d;FPS.i=(FPS.i+1)%300;if(FPS.n<300)FPS.n++;}}
@@ -20063,10 +20212,20 @@ function fpsFrame(t){
   if(t-FPS.txtT>=250){FPS.txtT=t;const s=fpsStats();$('fpsPill').textContent=gfxTag()+Math.round(s.avg)+' fps \u00b7 1% '+Math.round(s.low1)+' \u00b7 '+s.ms.toFixed(1)+' ms';
     if(!FPS.logT)FPS.logT=t;else if(t-FPS.logT>=5000){FPS.logT=t;console.log('[fps] avg '+Math.round(s.avg)+' low1 '+Math.round(s.low1)+' ms '+s.ms.toFixed(1)+' scene '+fpsScene());}}}
 $('oFps').onclick=()=>setFps(!FPS.on);fpsUI();
+// graphics item 8: the first frames' times. BOOT.ft.boot: the first 12 from boot (the menu's), BOOT.ft.fly: a flight's
+// first 600 (restarted by each start); each [CPU ms of the tick, ms from this frame's start to the next one's] (the second
+// takes the GPU and the driver's shader work, which the CPU time cannot see). console.time on the very first menu frame
+// and on each first flight frame.
+BOOT.ft={boot:[],fly:[],run0:null,prev:null};
 function frame(t){
   requestAnimationFrame(frame);
   fpsFrame(t);
-  if(!loopHeld)tick(t);
+  const F=BOOT.ft;if(F.prev){F.prev[1]=+(t-F.prev[2]).toFixed(1);F.prev.length=2;F.prev=null;}
+  if(!loopHeld){const fl=running&&!paused&&F.run0!==RUN.t0,lb=!F.boot.length?'pfs first menu frame':fl?'pfs first flight frame':null;
+    if(fl){F.run0=RUN.t0;F.fly=[];}
+    if(!F.boot.length)BOOT.t.frame1=Math.round(performance.now());
+    if(lb)console.time(lb);const a=performance.now();tick(t);const ms=+(performance.now()-a).toFixed(1);if(lb)console.timeEnd(lb);
+    const e=[ms,null,t];if(F.boot.length<12){F.boot.push(e);F.prev=e;}if(running&&!paused&&F.fly.length<600){F.fly.push(e);F.prev=e;}}
 }
 function tick(t,skipRender){
   // a size change iOS sent no event for, and flight controls that could not be dealt yet (phone3 item 5)
@@ -20204,7 +20363,7 @@ function tick(t,skipRender){
   if(DF.live&&DF.wTxt&&running&&!s.crashed)w=DF.wTxt;   // the dogfight's HARD DECK and EJECT win
   if(w==='STALL')hapPattern('stall');   // its cooldown makes the repeating pulse
   setTxt(warnEl,w);warnEl.classList.toggle('on',!!w);
-  updateAudio();frameN++;if(frameN>=4&&!splashSeen&&WORLD.ready){splashSeen=true;splashDone();}   // a world region: once it is built
+  updateAudio();frameN++;if(frameN>=4&&WORLD.ready&&!PRE.done&&!splashFading()&&gfxPrecompile()&&!splashSeen){splashSeen=true;splashDone();}   // a world region: once it is built
   if(skipRender){}
   else if(SHOW.on){csmIdle();renderer.setClearColor(0xF6C177,1);renderer.clear();showRender(dt,CARM);}
   else{if((!menu.classList.contains('on')||frameN<40)&&!FM.on){   // the open map is opaque: no 3D frame under it
@@ -20221,7 +20380,7 @@ function tick(t,skipRender){
 // it switched off, so nothing is fetched and no request can fail in their console.
 var LB=null;
 LB=(function(){
-const APP_VER='2026-10-11-gfx7';          // keep version.json in step when shipping
+const APP_VER='2026-10-11-gfx8';          // keep version.json in step when shipping
   const ORIGINS=['https://rabahharchaoui-design.github.io','http://localhost:8765'];
   let over='';try{over=localStorage.getItem('kgeuLBUrl')||'';}catch(e){}
   const E={url:over||'https://pfs-scores.rabahharchaoui.workers.dev',enabled:!!over||ORIGINS.includes(location.origin),online:null,
@@ -20808,7 +20967,7 @@ const APP_VER='2026-10-11-gfx7';          // keep version.json in step when ship
     get P(){return E.P;}};
 })();
 
-window.__kgeu={PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),taskXp:taskXp,tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
+window.__kgeu={PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),taskXp:taskXp,tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
   task:()=>({on:TASK.on,id:TASK.id,stage:TASK.stage&&TASK.stage.id,si:TASK.si,brief:TASK.brief,done:TASK.done,res:TASK.res,ask:TASK.ask&&{shown:TASK.ask.shown,opts:TASK.ask.opts.map(o=>o.k),t:TASK.ask.t},d:TASK.d,log:TASK.log.slice(),seed:TASK.seed}),
   tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzBuild:()=>dzBuild(),dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
@@ -20932,6 +21091,7 @@ worldLoad();
 rebuildTerrain(st.pos.x,st.pos.z);azdLoad();
 requestAnimationFrame(frame);
 setTimeout(warmTick,900);
+BOOT.t.init=Math.round(performance.now());
 }
 })();
 </script>
