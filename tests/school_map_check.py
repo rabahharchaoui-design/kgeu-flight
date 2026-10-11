@@ -59,7 +59,7 @@ async def main():
         o = await pg.evaluate(OPEN)
         ok('(a) stages 1 and 2 open, 3 and 4 locked', o['s'] == ['s1', 's2'], o)
         nodes = await pg.evaluate("()=>[...document.querySelectorAll('#schMap .sNode')].map(n=>n.className.replace('sNode','').trim())")
-        ok('(a) the map: stage 1 selected, stages 3 and 4 soon', nodes[0] == 'sel' and nodes[1] == '' and nodes[2] == 'soon' and nodes[3] == 'soon', nodes)
+        ok('(a) the map: stage 1 selected, stages 3 and 4 locked (school2: their first lessons are real)', nodes[0] == 'sel' and nodes[1] == '' and nodes[2] == 'locked' and nodes[3] == 'locked', nodes)
         await fit_map(pg, '844x390')
 
         # (b) every level's open set

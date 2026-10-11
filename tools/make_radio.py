@@ -148,6 +148,13 @@ TOWER = {
     'n_4': 'four',  'n_5': 'five',  'n_6': 'six',    'n_7': 'seven',
     'n_8': 'eight', 'n_9': 'niner', 'n_10': 'one zero',
     'c_10': 'ten',  'c_11': 'eleven', 'c_12': 'twelve',
+    # school2 item 1: Phoenix Approach clears the pilotage lesson into the Class Bravo
+    'sq_4521':        'squawk four five two one,',
+    'cleared_bravo':  'cleared into the Class Bravo airspace,',
+    'maintain_35':    'maintain three thousand five hundred,',
+    # school2 item 2: Phoenix Approach answers the diversion lesson's request for vectors
+    'radar_contact':  'radar contact,',
+    'glendale_is':    'Glendale is at your'
 }
 
 # ---- pilot only ----
@@ -162,6 +169,11 @@ PILOT = {
     'rb_cleared_tg':   'Cleared touch and go runway one,',
     # school1 item 6: the landings lesson's readback of the option clearance
     'rb_cleared_option': 'Cleared for the option runway one,',
+    # school2 item 1: the pilotage lesson's Class Bravo request and readback (Phoenix Approach)
+    'req_bravo':       'ten miles west, three thousand five hundred, landing Sky Harbor, request Class Bravo clearance.',
+    'rb_bravo':        'cleared into the Class Bravo, three thousand five hundred, squawk four five two one,',
+    # school2 item 2: the diversion lesson's lost procedure (confess, ask for vectors)
+    'unsure':          'unsure of position west of Phoenix, four thousand five hundred, request vectors to Glendale.',
     'load_away':       'load away, one bundle.',
     'rifle':           'Rifle,',
     # C-130 jump calls on the intercom

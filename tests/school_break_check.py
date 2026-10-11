@@ -1,9 +1,10 @@
 # School1 break-ui pass: worst-case data into the Flight School screens, through the data boundary only: SCHOOL,
 # LES, G (gBegin/gHold/gRange/gEvent/gEnd), lesBrief*, setPlace, LOGB/logbookAdd, endorsements, startLesson and
 # localStorage (kgeuSchool, kgeuLogbook, kgeuPlace, kgeuEndorse, kgeuLB) -- never the DOM, never game code.
-# Fixture: a 12 letter callsign throughout; the stage map at 0 of 15 and 15 of 15 passed, every placement level,
-# hours 0/20000/empty, REFRESHER, the Standard and Easy chips, a summary of 999.9 h, 9,999 landings and 3
-# endorsements; the briefing on the lesson with SCHOOL's longest card body and the one with its longest quiz
+# Fixture: a 12 letter callsign throughout; the stage map at 0 of 21 and 21 of 21 passed, every placement level,
+# hours 0/20000/empty, REFRESHER, the Standard and Easy chips, a summary of 999.9 h, 9,999 landings and 2
+# endorsements (solo, solo cross country; school2 item 7 also seeds 9,999 night landings, a long note on every entry and
+# the certificate block); the briefing on the lesson with SCHOOL's longest card body and the one with its longest quiz
 # answer, both quiz outcomes, Skip shown (a replay); the debrief on Power off and power on stalls (its own seven
 # tasks, forced to worst-case long detail through gRange/gEvent/gEnd) and on the stage check and first solo (the
 # Endorsement row), both carrying the device board line, the EASY TOLERANCES tag and the callsign; the logbook at
@@ -54,7 +55,7 @@ async def shot(pg, name):
 
 BASE = {'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3', 'kgeuSchoolEasy': '0', 'kgeuTOD': 'day'}
 LESSON_IDS = ['first', 'climbs', 'pattern', 'slow', 'stall', 'ground', 'landings', 'engine', 'solo',
-              'steep', 'short', 'soft', 'xwind', 'emerg', 'hood']   # the 15 flyable lessons (school1 items 6-7)
+              'steep', 'short', 'soft', 'xwind', 'emerg', 'hood', 'pilotage', 'divert', 'night', 'soloxc', 'oral', 'ride']   # the 21 lessons that can be passed (school1 items 6-7, school2 items 1-6: the oral exam has no flight but counts)
 CS = 'WWWWWWWWWWWW'   # the server's longest callsign, all W (as the other break_check fixtures use)
 
 def mk_logbook():
@@ -64,16 +65,17 @@ def mk_logbook():
         f = i % 11 == 0
         ents.append({'id': lid, 'at': 1700000000000 - i * 86400000, 'score': 0 if f else 93, 'letter': 'F' if f else 'A',
                      'dual': 0 if f else 5.5, 'solo': 0 if f else 2.3, 'xc': 0 if f else 4.1,
-                     'night': 0 if f else 3.2, 'inst': 0 if f else 2.7, 'ldg': 0 if f else 12})
-    return {'dual': 900.0, 'solo': 99.9, 'xc': 5, 'night': 5, 'inst': 5, 'ldg': 9999, 'entries': ents}
+                     'night': 0 if f else 3.2, 'inst': 0 if f else 2.7, 'ldg': 0 if f else 12, 'nldg': 0 if f else 12,
+                     'note': ['KGEU-KPHX-KGEU, 36 nm', '12 of 15', 'Notice of disapproval', '9999 night landings', 'Diverted to KGEU'][i % 5]})
+    return {'dual': 900.0, 'solo': 99.9, 'xc': 5, 'night': 5, 'inst': 5, 'ldg': 9999, 'nldg': 9999, 'entries': ents}
 
 SEEDED = dict(BASE, **{
     'kgeuPlace': json.dumps({'level': 'cert', 'hours': 20000, 'at': 1700000000000}),
     'kgeuSchool': json.dumps({f'cessna:{lid}': 'A' for lid in LESSON_IDS}),
     'kgeuLogbook': json.dumps(mk_logbook()),
     'kgeuEndorse': json.dumps({'solo': {'at': 1700000000000, 'by': 'Dana Reyes, CFI', 'lesson': 'solo'},
-                                'instrument': {'at': 1700000000000, 'by': 'Dana Reyes, CFI', 'lesson': 'hood'},
-                                'checkride': {'at': 1700000000000, 'by': 'Dana Reyes, CFI', 'lesson': 'landings'}}),
+                                'xc': {'at': 1700500000000, 'by': 'Dana Reyes, CFI', 'lesson': 'soloxc'}}),
+    'kgeuCert': json.dumps({'at': 1700000000000, 'cs': CS, 'score': 100, 'examiner': 'Frank Delgado, DPE'}),
     'kgeuLB': json.dumps({'cs': CS, 'key': 'k' * 48, 'xp': 16000, 'creator': False, 'renamed': 0, 'renameAt': 0, 'created': 1}),
 })
 PRISTINE = dict(BASE, kgeuLB=SEEDED['kgeuLB'])
@@ -103,7 +105,7 @@ async def main():
     async with async_playwright() as p:
         b = await launch(p)
 
-        # ---------------- pristine: 0 of 15 passed, first-visit placement intake, empty logbook ----------------
+        # ---------------- pristine: 0 of 21 passed, first-visit placement intake, empty logbook ----------------
         pg = await page(b, url, vp={'width': W, 'height': H}, storage=PRISTINE)
         await pg.evaluate(f"()=>{K}.openMenu('sSchool')"); await pg.wait_for_timeout(130)
         await audit(pg, '#plOv', 'first visit, no placement, no Back')
@@ -121,10 +123,10 @@ async def main():
             await audit(pg, '#plOv', f'hours {hrs or "empty"}')
         await pg.fill('#plHrs', '')
         await finger(pg, '#plDay'); await pg.wait_for_timeout(130)   # closes the sheet (plDone), unlike setPlace alone
-        await audit(pg, '#sSchool', '0 of 15 passed, never flown')
+        await audit(pg, '#sSchool', '0 of 21 passed, never flown')
         prog = await pg.evaluate("()=>document.getElementById('schProg').textContent")
-        ok(f'{TAG} 0 of 15 passed', prog == '0 of 15 passed', prog)
-        await shot(pg, 'stagemap_0of15')
+        ok(f'{TAG} 0 of 21 passed', prog == '0 of 21 passed', prog)
+        await shot(pg, 'stagemap_0of16')
         await pg.evaluate("()=>document.getElementById('schLog').scrollIntoView()")
         await finger(pg, '#schLog'); await pg.wait_for_timeout(150)
         await audit(pg, '#sLog', '0 entries, no endorsements')
@@ -138,13 +140,13 @@ async def main():
         # ---------------- heavily seeded worst case ----------------
         pg = await page(b, url, vp={'width': W, 'height': H}, storage=SEEDED)
         await pg.evaluate(f"()=>{K}.openMenu('sSchool')"); await pg.wait_for_timeout(130)
-        await audit(pg, '#sSchool', '15 of 15 passed, REFRESHER, the 999.9 h summary')
+        await audit(pg, '#sSchool', '21 of 21 passed, REFRESHER, the 999.9 h summary')
         prog = await pg.evaluate("()=>document.getElementById('schProg').textContent")
         ref = await pg.evaluate("()=>!document.getElementById('schRef').hidden")
         summ = await pg.evaluate("()=>document.getElementById('schSum').textContent")
-        ok(f'{TAG} 15 of 15 passed, REFRESHER shown', prog == '15 of 15 passed' and ref, (prog, ref))
-        ok(f'{TAG} the summary: 999.9 h, 9999 landings, 3 endorsements', summ == '999.9 h logged, 9999 landings, 3 endorsements', summ)
-        await shot(pg, 'stagemap_15of15')
+        ok(f'{TAG} 21 of 21 passed, REFRESHER shown', prog == '21 of 21 passed' and ref, (prog, ref))
+        ok(f'{TAG} the summary: 999.9 h, 9999 landings, 2 endorsements', summ == '999.9 h logged, 9999 landings, 2 endorsements', summ)
+        await shot(pg, 'stagemap_16of16')
         await pg.evaluate(f"()=>{K}.ezSet(0,true)"); await pg.wait_for_timeout(150)
         await audit(pg, '#sSchool', 'Standard tolerances'); await shot(pg, 'stagemap_standard')
         await pg.evaluate(f"()=>{K}.ezSet(1,true)"); await pg.wait_for_timeout(150)
@@ -161,19 +163,26 @@ async def main():
         await shot(pg, 'placement_reopened')
         await pg.evaluate("()=>document.getElementById('plBack').click()"); await pg.wait_for_timeout(260)   # plClose's 180ms close animation
 
-        # the logbook: 60 entries, every ring full, 3 endorsements, 20,000 prior hours
+        # the logbook: 60 entries with notes, every ring full, 2 endorsements, the certificate, 9,999 night landings, 20,000 prior hours
         await pg.evaluate("()=>document.getElementById('schLog').scrollIntoView()")
         await finger(pg, '#schLog'); await pg.wait_for_timeout(180)
-        await audit(pg, '#sLog', '60 entries, every ring full, 3 endorsements, 20000 prior hours')
+        await audit(pg, '#sLog', '60 entries with notes, every ring full, 2 endorsements, the certificate, 9999 night, 20000 prior hours')
         rings = await pg.evaluate("()=>[...document.querySelectorAll('#logRings .lRing')].map(r=>r.classList.contains('full'))")
         full = len(rings) == 6 and all(rings)
         prior = await pg.evaluate("()=>document.getElementById('logPrior').textContent")
         n60 = await pg.evaluate("()=>document.querySelectorAll('#logList .lE').length")
         end3 = await pg.evaluate("()=>document.querySelectorAll('#logEnd p').length")
+        cert = await pg.evaluate("()=>{const c=document.getElementById('logCert');return !c.hidden&&c.textContent.includes('Frank Delgado')}")
+        nldg = await pg.evaluate("()=>document.getElementById('logNldg').textContent")
+        notes = await pg.evaluate("()=>document.querySelectorAll('#logList .lE i.nt').length")
+        ok(f'{TAG} the certificate block shows', cert)
+        ok(f'{TAG} 9999 night by the landings, a note on all 60 rows', nldg == '9999 night' and notes == 60, (nldg, notes))
+        rw = await pg.evaluate("()=>{const R=[...document.querySelectorAll('#logRings .lRing')].map(r=>Math.round(r.getBoundingClientRect().top));return [...new Set(R)].length}")
+        ok(f'{TAG} the rings in one row of six or two rows of three', rw in (1, 2), rw)
         ok(f'{TAG} every ring full', full, rings)
         ok(f'{TAG} prior hours reads 20,000', '20,000' in prior, prior)
         ok(f'{TAG} the entries list keeps 60', n60 == 60, n60)
-        ok(f'{TAG} 3 endorsements listed', end3 == 3, end3)
+        ok(f'{TAG} 2 endorsements listed', end3 == 2, end3)
         await shot(pg, 'logbook_full')
         await pg.evaluate(f"()=>{K}.nav('sSchool',true)"); await pg.wait_for_timeout(150)
 
