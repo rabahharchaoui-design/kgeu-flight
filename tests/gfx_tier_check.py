@@ -89,8 +89,10 @@ async def main():
         await pg.evaluate(f"()=>{{const K={K};K.pick('cessna');K.start('runway');}}"); await pg.wait_for_timeout(600)
         await pg.evaluate(f"()=>{{{K}.GFX.setScale(1);{K}.GFX.dynReset(true);}}")
         r = await feed(pg, 3.1, 50, 50)
-        pr = await pg.evaluate(f"()=>{K}.R3().renderer.getPixelRatio()")
-        ok('dyn: 1% low 50 for 3.1 s steps to 0.85 (pixel ratio 1.5 x 0.85)', r == 0.85 and abs(pr - 1.275) < 1e-6, [r, pr])
+        # graphics item 3: with the post chain on (medium) the canvas keeps 1.5 and the chain's scene target takes the scale
+        pr = await pg.evaluate(f"()=>[{K}.R3().renderer.getPixelRatio(),{K}.GFX.scenePR(),{K}.GFX.post]")
+        ok('dyn: 1% low 50 for 3.1 s steps to 0.85 (scene pixel ratio 1.5 x 0.85, canvas 1.5 under the post chain)',
+           r == 0.85 and abs(pr[1] - 1.275) < 1e-6 and abs(pr[0] - (1.5 if pr[2] else 1.275)) < 1e-6, [r, pr])
         r = await feed(pg, 3.1, 50, 50)
         ok('dyn: inside the 5 s cooldown nothing moves', r == 0.85, r)
         r = await feed(pg, 2.0, 50, 50)
