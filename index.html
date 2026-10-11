@@ -1563,9 +1563,19 @@ body.menuOn #tutArrow, body.pauseOn #tutArrow{ display:none !important; }
 #menu .srow .chips{ flex:1; min-width:0; }
 #menu .srow .chips > button{ flex:none; padding-left:10px; padding-right:10px; }
 .setGrid{ overflow:hidden; }
+/* graphics item 2: the Graphics row makes the left column six rows, one more than a 390 px tall phone holds, so the
+   grid scrolls inside itself (the footer and the tabs stay put) and the last row (Callsign) is a short swipe away */
+#sSet .setGrid{ overflow-x:hidden; overflow-y:auto; touch-action:pan-y; overscroll-behavior:contain; align-content:safe center; }
+@media (max-height:400px){ #sSet .setGrid{ align-content:start; } }
+#sSet .setGrid.more{ -webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 12px),transparent); mask-image:linear-gradient(to bottom,#000 calc(100% - 12px),transparent); }
 /* Settings > Developer: the frame rate pill, top right under the flight buttons, never takes a tap */
 #fpsPill{ position:fixed; top:calc(var(--padT) + 52px); right:var(--padR); z-index:60; display:none; pointer-events:none; font:700 11.5px/1 var(--font); letter-spacing:.04em; color:#e8f3e0; background:rgba(10,12,16,.62); border-radius:7px; padding:3px 7px; white-space:nowrap; font-variant-numeric:tabular-nums; }
 #fpsPill.on{ display:block; }
+/* Settings > Graphics: Auto (with the detected tier under it), Low, Medium, High; a segment like Mode's */
+.gfxSeg{ display:flex; gap:6px; align-items:center; }
+#menu .srow .gfxSeg > .chip{ flex:none; min-width:0; min-height:44px; padding:0 9px; display:flex; flex-direction:column; justify-content:center; line-height:1.05; }
+.gfxSeg .chip b{ font-size:14px; font-weight:800; }
+.gfxSeg .chip small{ font-size:10.5px; font-weight:700; opacity:.8; }
 /* small landscape (iPhone SE and the 568x320 web app): compact rows, no description text, one footer line */
 @media (max-height:400px){
   .setGrid{ gap:2px 12px; align-content:start; }
@@ -2059,6 +2069,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
     <div class="setGrid">
    <div class="setCol">
     <div class="srow"><span>Mode</span><div class="chips modeSeg" role="radiogroup" aria-label="Mode"><button class="pick chip sk" data-skill="rookie" role="radio"><b>Easy</b></button><button class="pick chip sk" data-skill="pilot" role="radio"><b>Hard</b></button><p class="modeDesc"></p></div></div>
+    <div class="srow"><span>Graphics</span><div class="chips gfxSeg" role="radiogroup" aria-label="Graphics quality"><button class="chip gt" data-tier="auto" role="radio"><b>Auto</b><small class="gtA">(Medium)</small></button><button class="chip gt" data-tier="low" role="radio"><b>Low</b></button><button class="chip gt" data-tier="medium" role="radio"><b>Medium</b></button><button class="chip gt" data-tier="high" role="radio"><b>High</b></button></div></div>
     <div class="srow"><span>Radio</span><div class="chips"><button class="tog" id="oRadio">Radio: On</button>
       <label class="sens"><input type="range" id="oRvol" min="0" max="10" step="1" value="7" aria-label="Radio volume"><b id="oRvolV">70%</b></label></div></div>
     <div class="srow"><span>Music</span><div class="chips"><button class="tog oMusic" id="oMusic">Music: On</button>
@@ -3335,6 +3346,78 @@ function autopilot(st,dt,ev){
 const coarse=window.matchMedia&&window.matchMedia('(pointer: coarse)').matches;
 const isTouch=coarse||(navigator.maxTouchPoints>0&&!(window.matchMedia&&window.matchMedia('(pointer: fine)').matches));
 if(isTouch) document.body.classList.add('touch');
+// ================= graphics quality tiers (graphics item 2) =================
+// GFX.tier picks how much the renderer does: 'low' | 'medium' | 'high'. GFX.auto is what tierFromSignals made of this
+// device, GFX.override the player's Settings > Graphics pick (localStorage kgeuTier, 'auto' follows GFX.auto). Later
+// effects register a minimum tier in GFX.FX (GFX.FX.bloom='medium') and ask GFX.on('bloom'); GFX_HOOKS re-apply them
+// when the tier changes. GFX.scale is the dynamic resolution factor (1, 0.85, 0.7) on top of the tier's pixel ratio.
+const TIERS=['low','medium','high'];
+function tierRank(t){const i=TIERS.indexOf(t);return i<0?1:i;}
+// the hidden first launch benchmark (gfxBench) is expected to take about this long a frame on a device of each tier;
+// more than twice that demotes one step (high to medium, medium to low), never below low and never a promotion.
+// 30 spheres of 24 segments (about 23k triangles, MeshStandardMaterial, 2 lights) at 512x512: an iPhone 12 does it
+// in about 1 to 2 ms, an iPhone 8 in about 4, a slow Android phone 10+
+const BENCH_MS={high:4,medium:6,low:10};
+// device signals to a tier, pure (table tested in tests/gfx_tier_check.py). In order:
+//  webdriver (Playwright) medium, so the baseline shots and the frame rate A/B never move;
+//  a software GPU (SwiftShader, llvmpipe) low;
+//  a desktop GPU (NVIDIA, GeForce, Radeon, RTX, Apple M, Intel Iris/Arc/UHD 7xx) high;
+//  Apple (iOS Safari only ever says "Apple GPU", so the screen in CSS points decides, h the longer side):
+//    an iPad (shorter side 744+, or iPad in the UA) high; h 852+ (14 Pro 393x852, 15/16 line, Plus and Pro Max
+//    428x926 to 440x956) high; h 812 to 851 (X, XS, 11 Pro, 12, 13, 14 at 844, minis at 812) medium;
+//    below 812 (SE, 8, 8 Plus at 667 and 736) low;
+//  Android: Adreno 650+ or 7xx, Mali-G71 to G79, Mali-G8xx/G9xx, Immortalis, Xclipse high; Adreno 5xx and 600 to 649,
+//    Mali-G57+ and Mali-G6x medium; anything else low (the Mali-G51/G52 of budget phones too, a step under G57);
+//  anything unknown medium. Then benchMs (BENCH_MS above) can demote one step.
+function tierFromSignals(s){
+  s=s||{};const gpu=String(s.gpu||''),ua=String(s.ua||'');
+  if(s.webdriver)return 'medium';
+  if(/SwiftShader|llvmpipe|Software/i.test(gpu))return 'low';
+  const L=Math.max(+s.w||0,+s.h||0),S=Math.min(+s.w||0,+s.h||0);
+  let t;
+  if(/NVIDIA|GeForce|Radeon|RTX|Apple M\d|Intel.*(Iris|Arc|UHD 7)/i.test(gpu))t='high';
+  else if(/Apple GPU/i.test(gpu)||/iPhone|iPad|iPod/.test(ua)){
+    if(/iPad/.test(ua)||S>=744)t='high';else if(L>=852)t='high';else if(L>=812)t='medium';else t='low';}
+  else if(/Adreno|Mali|Immortalis|Xclipse|PowerVR/i.test(gpu)||/Android/i.test(ua)){
+    if(/Adreno \(?(TM\) )?(6[5-9]\d|7\d\d)|Mali-G7[1-9]|Mali-G[89]\d|Immortalis|Xclipse/i.test(gpu))t='high';
+    else if(/Adreno \(?(TM\) )?(6[0-4]\d|5\d\d)|Mali-G5[7-9]|Mali-G6\d/i.test(gpu))t='medium';
+    else t='low';}
+  else t='medium';
+  const b=+s.benchMs;
+  if(b>0&&b>2*BENCH_MS[t])t=TIERS[Math.max(0,tierRank(t)-1)];
+  return t;
+}
+const GFX_HOOKS=[];   // fns(tier) the later effects push, run by GFX.setTier (like TOD_HOOKS)
+var GFX={tier:'medium',auto:'medium',override:'auto',scale:1,bench:null,dyn:true,FX:{},gpu:'',renderer:null,
+  rank(t){return tierRank(t||GFX.tier);},
+  on(name){const m=GFX.FX[name];return m==null||tierRank(GFX.tier)>=tierRank(m);},
+  // the tier's pixel ratio before the dynamic scale: medium is the pre tier value (1.5 on touch, 2 on desktop)
+  base(){const d=window.devicePixelRatio||1;return GFX.tier==='high'?Math.min(d,2):GFX.tier==='low'?Math.min(d,1):Math.min(d,isTouch?1.5:2);},
+  applyPR(){const r=GFX.renderer;if(!r)return;const pr=GFX.base()*GFX.scale;if(Math.abs(r.getPixelRatio()-pr)>1e-6)r.setPixelRatio(pr);},
+  setTier(t){if(!/^(auto|low|medium|high)$/.test(t))t='auto';GFX.override=t;GFX.tier=t==='auto'?GFX.auto:t;
+    try{localStorage.setItem('kgeuTier',t);}catch(e){}
+    GFX.applyPR();GFX_HOOKS.forEach(f=>{try{f(GFX.tier);}catch(e){console.warn(e);}});if(GFX.ui)GFX.ui();},
+  setScale(s){GFX.scale=s;GFX.applyPR();},
+  // dynamic resolution: a state machine fed every flying frame with the ring buffer's average and 1% low (fps) and
+  // the frame's dt (s). 3 s straight of 1% low under 55 steps the scale down (1, 0.85, 0.7 floor); 10 s straight of
+  // average 59+ and 1% low 57+ steps it back up; 5 s cooldown after a step; the first 3 s after a start and single
+  // frames over 250 ms (a tab switch) count for nothing. Returns the scale.
+  dynS:{t:0,lowT:0,highT:0,cool:0,t0:null},
+  STEPS:[1,0.85,0.7],
+  dynReset(warm){const S=GFX.dynS;S.t=warm?3:0;S.lowT=S.highT=S.cool=0;},
+  dynFeed(avg,low1,dt){
+    const S=GFX.dynS;if(!(dt>0)||dt>0.25)return GFX.scale;
+    S.t+=dt;if(S.t<3)return GFX.scale;
+    if(S.cool>0)S.cool=Math.max(0,S.cool-dt);
+    if(low1>0&&low1<55){S.lowT+=dt;S.highT=0;}else if(avg>=59&&low1>=57){S.highT+=dt;S.lowT=0;}else S.lowT=S.highT=0;
+    if(S.cool>0)return GFX.scale;
+    const i=GFX.STEPS.indexOf(GFX.scale),k=i<0?0:i;
+    if(S.lowT>=3&&k<GFX.STEPS.length-1){GFX.setScale(GFX.STEPS[k+1]);S.lowT=S.highT=0;S.cool=5;}
+    else if(S.highT>=10&&k>0){GFX.setScale(GFX.STEPS[k-1]);S.lowT=S.highT=0;S.cool=5;}
+    return GFX.scale;},
+  ui:null,HOOKS:GFX_HOOKS};
+try{const o=localStorage.getItem('kgeuTier');if(/^(auto|low|medium|high)$/.test(o))GFX.override=o;}catch(e){}
+if(navigator.webdriver)GFX.dyn=false;
 const fontsReady=(document.fonts&&document.fonts.load)?Promise.race([document.fonts.load('800 60px "Saira Condensed"'),new Promise(r=>setTimeout(r,1500))]):Promise.resolve();
 fontsReady.then(init,init);
 // the moment the splash is gone (fpsStats().loadMs)
@@ -6375,6 +6458,40 @@ function init(){
 const glc=document.getElementById('gl');let glcH=0;const _euH=new THREE.Euler(0,0,0,'YXZ');   // canvas CSS height, kept by resize() (no layout read per frame); HUD heading scratch
 const renderer=new THREE.WebGLRenderer({canvas:glc,antialias:!isTouch,logarithmicDepthBuffer:true,powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,isTouch?1.5:2));
+// graphics tier: the GPU string, the screen in CSS points, and on the first launch a short hidden benchmark (graphics item 2)
+GFX.renderer=renderer;
+try{const gl=renderer.getContext(),ext=gl.getExtension('WEBGL_debug_renderer_info');GFX.gpu=ext?String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)||''):'';}catch(e){GFX.gpu='';}
+// 30 instanced spheres under 2 lights into a 512x512 target: 2 warm up frames, then up to 8 timed ones each closed by a
+// 1 px readPixels; 400 ms wall time at most. Mean ms a timed frame, or null if none finished or it could not run.
+function gfxBench(){
+  const t0=performance.now();let rt=null,geo=null,mat=null,ms=null;
+  try{
+    rt=new THREE.WebGLRenderTarget(512,512);geo=new THREE.SphereGeometry(1,24,16);mat=new THREE.MeshStandardMaterial({color:0x8899aa,metalness:0.3,roughness:0.5});
+    const sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(50,1,0.1,100),im=new THREE.InstancedMesh(geo,mat,30),m=new THREE.Matrix4();
+    for(let i=0;i<30;i++){m.makeTranslation((i%6-2.5)*2.2,(Math.floor(i/6)-2)*2.2,-14);im.setMatrixAt(i,m);}
+    sc.add(im);sc.add(new THREE.AmbientLight(0x404040,1));const dl=new THREE.DirectionalLight(0xffffff,1);dl.position.set(1,1,1);sc.add(dl);
+    const px=new Uint8Array(4),prev=renderer.getRenderTarget();let sum=0,n=0;
+    renderer.setRenderTarget(rt);
+    for(let f=0;f<10;f++){
+      if(performance.now()-t0>400)break;
+      const a=performance.now();im.rotation.y=f*0.1;renderer.render(sc,cam);renderer.readRenderTargetPixels(rt,0,0,1,1,px);
+      if(f>=2){sum+=performance.now()-a;n++;}}
+    renderer.setRenderTarget(prev);
+    if(n)ms=Math.round(sum/n*100)/100;
+  }catch(e){ms=null;}
+  try{if(rt)rt.dispose();if(geo)geo.dispose();if(mat)mat.dispose();}catch(e){}
+  return ms;
+}
+GFX.runBench=gfxBench;
+{const sw=screen.width||innerWidth,sh=screen.height||innerHeight,ua=navigator.userAgent,W=Math.min(sw,sh),H=Math.max(sw,sh);
+  let b=null;try{b=JSON.parse(localStorage.getItem('kgeuBench')||'null');}catch(e){}
+  if(!navigator.webdriver&&(!b||b.ua!==ua||b.w!==W||b.h!==H)){
+    const ms=gfxBench();b={ms:ms,ua:ua,w:W,h:H,tier:tierFromSignals({gpu:GFX.gpu,w:W,h:H,dpr:window.devicePixelRatio||1,cores:navigator.hardwareConcurrency||0,ua:ua,benchMs:ms})};
+    try{localStorage.setItem('kgeuBench',JSON.stringify(b));}catch(e){}}
+  GFX.bench=b;
+  GFX.auto=tierFromSignals({gpu:GFX.gpu,w:W,h:H,dpr:window.devicePixelRatio||1,cores:navigator.hardwareConcurrency||0,ua:ua,
+    webdriver:!!navigator.webdriver,benchMs:b&&b.ms});
+  GFX.tier=GFX.override==='auto'?GFX.auto:GFX.override;GFX.applyPR();}
 const scene=new THREE.Scene();
 const HAZE=new THREE.Color(0xdfe4e6);
 scene.fog=new THREE.Fog(HAZE,5000,45000);
@@ -14508,6 +14625,14 @@ tapBtn($('tkPlay'),()=>{initAudio();tkOpen();musicPlayPause();tkPausedBy();});
 tapBtn($('tkNext'),()=>{initAudio();tkOpen();musicNext();});
 document.querySelectorAll('.oMvol').forEach(r=>r.addEventListener('input',e=>{initAudio();setMusicVol(+e.target.value/10);}));
 easyUI();stickUI();radioUI();soundUI();musicUI();
+// Settings > Graphics (graphics item 2): the Auto chip names the detected tier
+GFX.ui=()=>{const cap=t=>t.charAt(0).toUpperCase()+t.slice(1);
+  document.querySelectorAll('.gfxSeg .gt').forEach(b=>{const on=b.dataset.tier===GFX.override;b.classList.toggle('sel',on);b.setAttribute('aria-checked',String(on));
+    if(b.dataset.tier==='auto'){b.querySelector('.gtA').textContent='('+cap(GFX.auto)+')';b.setAttribute('aria-label','Auto ('+cap(GFX.auto)+')');}});};
+document.querySelectorAll('.gfxSeg .gt').forEach(b=>b.onclick=()=>GFX.setTier(b.dataset.tier));GFX.ui();
+// the Settings grid scrolls when it has more rows than room: fade its bottom edge while there is more below
+{const g=document.querySelector('#sSet .setGrid'),f=()=>g.classList.toggle('more',g.scrollTop+g.clientHeight<g.scrollHeight-2);
+  g.addEventListener('scroll',f,{passive:true});if(window.ResizeObserver)new ResizeObserver(f).observe(g);f();}
 // Add to Home Screen tip. iOS has no install prompt a page can trigger, so the
 // best we can do is say exactly where the button is, and only when it applies.
 (function(){
@@ -18736,7 +18861,7 @@ function splashDone(){const sp=$('splash');if(!sp||sp.classList.contains('done')
   setTimeout(()=>{sp.classList.add('done');setTimeout(()=>{sp.classList.add('gone');fpsLoaded();},480);},Math.max(0,700-(performance.now()-BOOT_T)));}
 // frame rate (Settings > Developer): the main rAF's frame times in a 300 slot ring, always on (fpsStats works with the
 // pill hidden); the pill text at most 4 times a second, a console line every 5 s while it shows
-var FPS={buf:new Float32Array(300),i:0,n:0,prev:0,on:false,txtT:0,logT:0};
+var FPS={buf:new Float32Array(300),i:0,n:0,prev:0,on:false,txtT:0,logT:0,dynT:0,st:null};
 try{FPS.on=localStorage.getItem('kgeuFps')==='1';}catch(e){}
 function fpsReset(){FPS.i=FPS.n=0;FPS.prev=0;}
 function fpsStats(){const b=FPS.buf,n=FPS.n;let sum=0,k=0;
@@ -18748,10 +18873,22 @@ function fpsStats(){const b=FPS.buf,n=FPS.n;let sum=0,k=0;
 function fpsScene(){return !running?'menu:'+curScr:paused?'paused':DF.on?'dogfight':sensorMode?'sensor':'flight';}
 function fpsUI(){const b=$('oFps');if(b){b.textContent='FPS counter: '+(FPS.on?'On':'Off');b.classList.toggle('on',FPS.on);}$('fpsPill').classList.toggle('on',FPS.on);}
 function setFps(v){FPS.on=!!v;try{localStorage.setItem('kgeuFps',FPS.on?'1':'0');}catch(e){}FPS.txtT=FPS.logT=0;fpsUI();}
+// dynamic resolution (graphics item 2): fed every frame while flying and not paused, with the ring's numbers refreshed
+// 4 times a second; the menu puts the scale back to 1, a new start() (RUN.t0) restarts the 3 s grace
+function gfxDyn(t,d){
+  const S=GFX.dynS;
+  if(!running||menu.classList.contains('on')){if(GFX.scale!==1)GFX.setScale(1);S.t0=null;return;}
+  if(S.t0!==RUN.t0){S.t0=RUN.t0;GFX.dynReset();}
+  if(!GFX.dyn)return;
+  if(paused){S.lowT=S.highT=0;return;}
+  if(!FPS.st||t-FPS.dynT>=250){FPS.dynT=t;FPS.st=fpsStats();}
+  GFX.dynFeed(FPS.st.avg,FPS.st.low1,d/1000);
+}
+function gfxTag(){return GFX.tier.charAt(0).toUpperCase()+' '+GFX.scale.toFixed(2)+' \u00b7 ';}
 function fpsFrame(t){
-  if(FPS.prev){const d=t-FPS.prev;if(d>0&&d<1000){FPS.buf[FPS.i]=d;FPS.i=(FPS.i+1)%300;if(FPS.n<300)FPS.n++;}}
-  FPS.prev=t;if(!FPS.on)return;
-  if(t-FPS.txtT>=250){FPS.txtT=t;const s=fpsStats();$('fpsPill').textContent=Math.round(s.avg)+' fps \u00b7 1% '+Math.round(s.low1)+' \u00b7 '+s.ms.toFixed(1)+' ms';
+  let d=0;if(FPS.prev){d=t-FPS.prev;if(d>0&&d<1000){FPS.buf[FPS.i]=d;FPS.i=(FPS.i+1)%300;if(FPS.n<300)FPS.n++;}}
+  FPS.prev=t;gfxDyn(t,d);if(!FPS.on)return;
+  if(t-FPS.txtT>=250){FPS.txtT=t;const s=fpsStats();$('fpsPill').textContent=gfxTag()+Math.round(s.avg)+' fps \u00b7 1% '+Math.round(s.low1)+' \u00b7 '+s.ms.toFixed(1)+' ms';
     if(!FPS.logT)FPS.logT=t;else if(t-FPS.logT>=5000){FPS.logT=t;console.log('[fps] avg '+Math.round(s.avg)+' low1 '+Math.round(s.low1)+' ms '+s.ms.toFixed(1)+' scene '+fpsScene());}}}
 $('oFps').onclick=()=>setFps(!FPS.on);fpsUI();
 function frame(t){
@@ -18912,7 +19049,7 @@ function tick(t,skipRender){
 // it switched off, so nothing is fetched and no request can fail in their console.
 var LB=null;
 LB=(function(){
-const APP_VER='2026-10-11-gfx1';          // keep version.json in step when shipping
+const APP_VER='2026-10-11-gfx2';          // keep version.json in step when shipping
   const ORIGINS=['https://rabahharchaoui-design.github.io','http://localhost:8765'];
   let over='';try{over=localStorage.getItem('kgeuLBUrl')||'';}catch(e){}
   const E={url:over||'https://pfs-scores.rabahharchaoui.workers.dev',enabled:!!over||ORIGINS.includes(location.origin),online:null,
@@ -19499,7 +19636,7 @@ const APP_VER='2026-10-11-gfx1';          // keep version.json in step when ship
     get P(){return E.P;}};
 })();
 
-window.__kgeu={fpsStats:fpsStats,fpsReset:fpsReset,TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),taskXp:taskXp,tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
+window.__kgeu={fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),taskXp:taskXp,tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
   task:()=>({on:TASK.on,id:TASK.id,stage:TASK.stage&&TASK.stage.id,si:TASK.si,brief:TASK.brief,done:TASK.done,res:TASK.res,ask:TASK.ask&&{shown:TASK.ask.shown,opts:TASK.ask.opts.map(o=>o.k),t:TASK.ask.t},d:TASK.d,log:TASK.log.slice(),seed:TASK.seed}),
   tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
