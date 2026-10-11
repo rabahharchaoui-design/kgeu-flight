@@ -46,7 +46,7 @@ async def open_page(b, url):
     return ctx, pg
 
 CAM0 = f"let k=0;while({K}.camMode()!==0&&k++<5){K}.cycleCam();"
-UNMAP = f"if(document.getElementById('mapOv').classList.contains('on')){K}.fmClose();"
+UNMAP = f"if({K}.freeCam)({K}.freeCam(null));if(document.getElementById('mapOv').classList.contains('on')){K}.fmClose();"
 def fly(t, tod, pos, base='kgeu'):
     return f"{UNMAP}{K}.setTOD('{tod}');{K}.pick('{t}');{K}.pickBase('{base}');{K}.start('{pos}');{CAM0}"
 AC = [('f16', 'f16'), ('c130', 'c130'), ('mq9a', 'reaper'), ('mq9b', 'mq9b'), ('cessna', 'cessna'), ('pipistrel', 'alpha')]
@@ -61,6 +61,21 @@ SCENES['sunset'] = [fly('cessna', 'sunset', 'final')]
 SCENES['golden_f16'] = [fly('f16', 'sunset', 'runway')]
 SCENES['sensor'] = [fly('reaper', 'day', 'final'), 1200, "document.getElementById('bSensor').click();", 400, f"{K}.setSensorMode('irw');"]
 SCENES['map'] = [fly('cessna', 'day', 'final'), 800, f"{K}.fmOpen();"]
+# graphics item 5, the real terrain: an aircraft put in the air (state() and snapCam(), so the base builds run it too) at
+# x, z (world metres), alt (ft MSL), heading (deg true), speed (kt), gear up
+def air(x, z, alt, hdg, kt):
+    return (f"const K={K},s=K.state(),h={hdg}*Math.PI/180,V={kt}/1.944;s.pos.set({x},({alt}-1071)/3.2808,{z});"
+            "s.vel.set(Math.sin(h)*V,0,-Math.cos(h)*V);s.quat.setFromEuler(new THREE.Euler(0,-h,0,'YXZ'));s.w.set(0,0,0);"
+            "s.onGround=false;s.airTime=30;s.gearDown=false;s.gearPos=0;s.throttle=s.power=0.8;K.snapCam();")
+# the F-16 at 6,000 ft 10 km west of KGEU looking west at the White Tanks, by day
+SCENES['terrain_west'] = [fly('f16', 'day', 'runway'), 600, air(-10000, -1000, 6000, 270, 330)]
+# the Cessna at 3,000 ft west of downtown, flying at it: South Mountain to the right and Camelback to the left, sunset
+SCENES['terrain_phx'] = [fly('cessna', 'sunset', 'runway'), 600, air(14000, 2000, 3000, 126, 100)]
+# the F-16 on the KGEU runway, the camera behind it looking west at the White Tanks over the airport (freeCam, world frame)
+SCENES['terrain_ramp'] = [fly('f16', 'day', 'runway'), 600,
+    f"{K}.freeCam({{w:true,p:[48,4.5,-1],t:[-24000,350,-6400],fov:38}});"]
+# not in the sheet: the White Tanks close up by day, for the rock colours
+CLOSE = {'wt_close': [fly('f16', 'day', 'runway'), 600, air(-16000, -3000, 4500, 260, 330)]}
 # 3 s of sim in 0.1 s ticks (the headless loop runs ~3 fps, so real time would be about 1 s of flight)
 SCENES['dogfight'] = [f"{UNMAP}{K}.setTOD('day');{K}.DF.test.seed=1;{K}.DF.test.noBrief=true;{K}.dfStart();{CAM0}", 600,
     f"for(let i=0;i<30;i++){K}.stepFrame(0.1,false,true);{K}.stepFrame(0,true);"]
