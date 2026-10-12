@@ -13,7 +13,7 @@ THREE = open(os.path.join(HERE, '..', 'node_modules/three/build/three.min.js')).
 K = 'window.__kgeu'
 SETTLE = 2500
 # no onboarding, tutorial, coach marks or school intake; the load moment is caught the same way on every build
-INIT = ("localStorage.setItem('kgeuOnboard','pilot');localStorage.setItem('kgeuTut','1');localStorage.setItem('kgeuCoach','3');"
+INIT = ("localStorage.setItem('kgeuOnboard','pilot');"+("localStorage.setItem('kgeuTier','"+os.environ['PFS_TIER']+"');" if os.environ.get('PFS_TIER') else '')+"localStorage.setItem('kgeuTut','1');localStorage.setItem('kgeuCoach','3');"
         "localStorage.setItem('kgeuPlace','{\"level\":\"ride\",\"hours\":null}');"
         "window.__gone=null;document.addEventListener('DOMContentLoaded',()=>{const s=document.getElementById('splash');if(!s)return;"
         "const o=new MutationObserver(()=>{if(s.classList.contains('gone')){window.__gone=performance.now();o.disconnect();}});"
