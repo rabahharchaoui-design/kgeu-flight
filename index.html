@@ -7144,7 +7144,7 @@ function setTOD(id){
 // player is in the dust (HB.d, 0..1) drives fog, haze, light, wind and turbulence.
 // The wall materials skip scene fog (it would wash the wall out at distance) and do
 // their own, which only closes in once you are in the dust.
-const HB={on:false,built:false,st:null,g:null,sun:null,U:null,mats:[],deep:null,fing:null,hd:false,surge:0,pd:1e9,C:new V3(),T:new V3(),Lat:new V3(),
+const HB={on:false,built:false,st:null,g:null,sun:null,U:null,mats:[],deep:null,fing:null,hd:false,med:false,surge:0,pd:1e9,C:new V3(),T:new V3(),Lat:new V3(),
   hdg:330,spd:18,W:24000,TAPER:3000,H:2000,R:150000,DEPTH:15000,kt0:8,ktPrev:5,
   dist:1e9,d:0,t:0,snap:false,called:false,t6:false,paintD:-1,dirty:false};
 const _hbV=new V3();
@@ -7163,11 +7163,16 @@ function hbStrip(n,off,h0,h1,jit,ov,out){
 }
 // the tier's look (GFX_HOOKS): HB_HD on the wall materials (HB_LITE as well on the lid, the sides, the backdrop, the back
 // layer, mostly seen through or over the front, and the low skirt and fingers: the light and the lobes without the two
-// extra taps and the relief; the full shader is the front layer and High's deep one),
+// extra taps and the relief; the full shader is the front layer and High's deep one; on Medium (HB_MED) the front reads
+// its fine octave and streaks from packed channels of the two coarse taps, graphics item 9),
 // the fingers on Medium and High, the deep layer on High
 function hbTier(){
-  if(!HB.built)return;const hd=GFX.on('haboob');
-  if(hd!==HB.hd){HB.hd=hd;for(const m of HB.mats){if(hd)m.defines.HB_HD='';else delete m.defines.HB_HD;if(m.userData.lite)m.defines.HB_LITE='';m.needsUpdate=true;}}
+  if(!HB.built)return;const hd=GFX.on('haboob'),med=hd&&!GFX.on('haboobDeep');
+  if(hd!==HB.hd||med!==HB.med){HB.hd=hd;HB.med=med;for(const m of HB.mats){if(hd)m.defines.HB_HD='';else delete m.defines.HB_HD;if(m.userData.lite)m.defines.HB_LITE='';
+    if(med&&!m.userData.lite)m.defines.HB_MED='';else delete m.defines.HB_MED;m.needsUpdate=true;}
+    // Medium: the noise unfiltered by anisotropy and from the nearest mip (the soft dust shows no difference; about 10 ms
+    // a frame headless with the wall filling the screen); Low and High keep the default filtering
+    const T=HB.U.uTex.value;T.anisotropy=med?1:MAXANI;T.minFilter=med?THREE.LinearMipmapNearestFilter:THREE.LinearMipmapLinearFilter;T.needsUpdate=true;}
   HB.fing.visible=hd;HB.deep.visible=GFX.on('haboobDeep');
 }
 GFX_HOOKS.push(hbTier);
@@ -7177,12 +7182,18 @@ function hbGeo(o){const g=new THREE.BufferGeometry();
 function hbBuild(){
   if(HB.built)return;HB.built=true;
   // tileable turbulence: soft light and dark puffs, each drawn wrapped around the edges
-  const nt=tex(256,256,(x,w,h)=>{x.fillStyle='#808080';x.fillRect(0,0,w,h);
-    for(let i=0;i<320;i++){const r=6+Math.pow(Math.random(),2)*60,cx=Math.random()*w,cy=Math.random()*h,a=0.08+Math.random()*0.16,c=Math.random()<0.55?'255,255,255':'0,0,0';
+  // graphics item 9: G holds a finer octave (smaller, denser puffs) and B the streaks stretched 14:1 along the face, so
+  // Medium's front reads its fine octave and its streaks from the two coarse taps (R as before for every tier)
+  const puffs=(x,w,h,N,r0,r1,sx)=>{x.setTransform(1,0,0,1,0,0);x.fillStyle='#808080';x.fillRect(0,0,w,h);
+    for(let i=0;i<N;i++){const r=r0+Math.pow(Math.random(),2)*r1,cx=Math.random()*w,cy=Math.random()*h,a=0.08+Math.random()*0.16,c=Math.random()<0.55?'255,255,255':'0,0,0',rx=r*sx;
       const gr=x.createRadialGradient(0,0,0,0,0,r);gr.addColorStop(0,'rgba('+c+','+a+')');gr.addColorStop(1,'rgba('+c+',0)');x.fillStyle=gr;
-      for(let ox=-1;ox<=1;ox++)for(let oy=-1;oy<=1;oy++){const px=cx+ox*w,py=cy+oy*h;if(px+r<0||px-r>w||py+r<0||py-r>h)continue;
-        x.setTransform(1,0,0,1,px,py);x.fillRect(-r,-r,2*r,2*r);}
-      x.setTransform(1,0,0,1,0,0);}},[1,1]);
+      for(let ox=-1;ox<=1;ox++)for(let oy=-1;oy<=1;oy++){const px=cx+ox*w,py=cy+oy*h;if(px+rx<0||px-rx>w||py+r<0||py-r>h)continue;
+        x.setTransform(sx,0,0,1,px,py);x.fillRect(-r,-r,2*r,2*r);}
+      x.setTransform(1,0,0,1,0,0);}};
+  const nt=tex(256,256,(x,w,h)=>{puffs(x,w,h,320,6,60,1);
+    const cv=(N,r0,r1,sx)=>{const c=document.createElement('canvas');c.width=w;c.height=h;const y=c.getContext('2d');puffs(y,w,h,N,r0,r1,sx);return y.getImageData(0,0,w,h).data;};
+    const G=cv(900,3,20,1),B=cv(260,3,14,14),im=x.getImageData(0,0,w,h),D=im.data;
+    for(let i=0;i<D.length;i+=4){D[i+1]=G[i];D[i+2]=B[i];}x.putImageData(im,0,0);},[1,1]);
   const U={uTex:{value:nt},uT:{value:0},uFN:{value:3e4},uFF:{value:1.2e5},uFogC:{value:HAZE.clone()},uVis:{value:1},
     uSunV:{value:new V3(0,1,0)},uSunC:{value:new THREE.Color(1,1,1)},uShC:{value:new THREE.Color(0.76,0.77,0.84)},uNr0:{value:15},uNr1:{value:120},uScat:{value:0.6}};HB.U=U;
   const vs=`#include <common>
@@ -7207,8 +7218,8 @@ varying vec2 vUv;varying vec3 vE;varying vec3 vMv;varying vec3 vL;
 void main(){
   #include <logdepthbuf_fragment>
   vec2 p=vUv*uSc+vec2(uPh*0.37,uPh*0.61);
-  float n1=texture2D(uTex,p+vec2(uT*0.004,-uT*0.011)*uSpd).r;
-  float n2=texture2D(uTex,p*2.3+vec2(-uT*0.009,-uT*0.019)*uSpd+0.37).r;
+  vec4 t1=texture2D(uTex,p+vec2(uT*0.004,-uT*0.011)*uSpd),t2=texture2D(uTex,p*2.3+vec2(-uT*0.009,-uT*0.019)*uSpd+0.37);
+  float n1=t1.r,n2=t2.r;
   float n=n1*0.6+n2*0.4,u=vE.x,v=vE.y,x=vUv.x;
   float ne=texture2D(uTex,vec2(x*0.35+uT*0.002*uSpd+uPh,0.5+uPh*0.3)).r,lw=vL.z,ph=vE.z+uPh;
 #ifdef HB_HD
@@ -7216,6 +7227,13 @@ void main(){
   float lv=length(vMv);
 #ifdef HB_LITE
   float sk=0.5,n3=n,nn=n;   // the layers mostly behind the front: the light and the shapes, not the two extra taps
+#elif defined(HB_MED)
+  // Medium's front (graphics item 9): no extra taps. The streaks are the B channel of the first tap; the fine octave is
+  // the G channels of both, cross faded by a weight that runs with time and the coarse noise so the crest still boils
+  float rl=smoothstep(0.35,0.8,v),sk=t1.b;
+  float bw=0.5+0.5*sin(uT*(0.5+0.9*rl)*uSpd+n1*9.0+n2*5.0+x*1.7);
+  float n3=clamp(0.5+(mix(t1.g,t2.g,bw)-0.5)*1.6,0.0,1.0);
+  float nf=0.32*(1.0-smoothstep(1500.0,6000.0,lv));float nn=n*(1.0-nf)+n3*nf;
 #else
   float sk=texture2D(uTex,vec2(p.x*0.09-uT*0.014*uSpd,p.y*1.3+uPh*0.5)).r;
   float rl=smoothstep(0.35,0.8,v);
@@ -8378,7 +8396,7 @@ csmScan(CSM_N1);BOOT.mark('world');   // the stadium, the arena, Westgate, Luke'
 // per vertex from the sun: bright sunlit tops, grey blue flat bases (each puff's underside pressed flat in the vertex
 // shader), orange tops at sunset; never a shadow caster. Monsoon adds six cumulonimbus 18 to 34 km south and east of the
 // field (CLOUDS.cb, one draw: 18 squashed icosahedra each, 1,440 triangles: a flat base, a leaning body of 10 overlapping
-// pieces +-25% in size, two side lumps, an overshooting top, an anvil of 4 offset tilted slabs spread north east; two
+// pieces +-25% in size, two side lumps, an overshooting top, an anvil of 4 offset canted slabs spread north east; two
 // of the six tower to 9 km), dark grey blue bases and bright tops, and the haze thickens and warms toward them (AIR.mon).
 // High (GFX.FX.cloudRim): a silver lining on the silhouettes facing the sun, per vertex. The pick per flight, from
 // setTOD (cloudsAuto): day 70% scattered and 30% clear, sunset scattered, haboob monsoon, night scattered (dim), from the
@@ -8431,7 +8449,7 @@ function cloudCB(){
       add(cx+lx*t+(h(j+20)-0.5)*W*0.55,y,cz+lz*t+(h(j+30)-0.5)*W*0.55,r,r*(0.7+0.2*h(j+40)),r*(0.85+0.3*h(j+45)),Y(y),h(j+50)*6,(h(j+55)-0.5)*0.4,(h(j+57)-0.5)*0.4);}
     for(let j=0;j<2;j++){const t=0.3+0.35*j+0.1*h(j+60),y=yb+(H-yb)*t,a=h(j+61)*6.283,r=W*(0.5+0.15*h(j+62));   // cauliflower lumps
       add(cx+lx*t+Math.cos(a)*W*0.75,y,cz+lz*t+Math.sin(a)*W*0.75,r,r*0.8,r,Y(y),a,0.2,-0.15);}
-    // the anvil: four flattened pieces of different sizes spread mostly downwind, each turned and tilted a little so its
+    // the anvil: four flattened pieces of different sizes spread mostly downwind, each turned and canted a little so its
     // outline is ragged, never one disc
     for(let j=0;j<4;j++){const a=-0.5+(j-1.5)*0.75+(h(j+70)-0.5)*0.5,d=W*(0.35+0.55*h(j+71)),sw=W*(1.0+0.7*h(j+72));
       add(cx+lx+Math.cos(a)*d+W*0.3,H-150-260*h(j+73),cz+lz-Math.sin(a)*d-W*0.2,sw,280+320*h(j+74),sw*(0.55+0.35*h(j+75)),1,h(j+76)*6.283,(h(j+77)-0.5)*0.12,(h(j+78)-0.5)*0.12);}
@@ -9099,13 +9117,18 @@ function warmObj(root,noCompile){
 // WARM.rt: the screen's (and the post chain's) output encoding, so the programs it compiles are the ones the frame uses
 WARM.rt=new THREE.WebGLRenderTarget(16,16);WARM.rt.texture.encoding=THREE.sRGBEncoding;WARM.cam=new THREE.PerspectiveCamera(50,1,0.5,400);const _warmOff=new THREE.Vector3();
 const WARM_STEPS=['reaper','mq9b','f16','cessna','alpha','c130','archer','a10','b737','a320','b747'].map(id=>()=>warmObj(getModel(id).g))
-  .concat([()=>{if(!DZ.built)dzBuild();warmObj(DZ.g);},()=>fxWarmLayer(),()=>fxWarmDebris(),()=>fxWarmDecals(),()=>{if(actx)boomBufs();}]);
+  // the burst: on Medium and High the precompile queue's 'explosion' job has already drawn it into a post chain target,
+  // the pipeline every flight frame uses there (the scene never draws straight to the canvas with post on), so the
+  // full size canvas draw here would only repeat it (3 s of the warm-up headless); Low and kgeuNoPre still draw it
+  .concat([()=>{if(!DZ.built)dzBuild();warmObj(DZ.g);},()=>{if(GFX.post&&PRE.done&&!PRE.skip&&PRE.ms.explosion!=null)return;fxWarmLayer();},()=>fxWarmDebris(),()=>fxWarmDecals(),()=>{if(actx)boomBufs();}]);
 function warmTick(){
   if(WARM.done)return;
   // flying: wait. The steps belong to the menu and the pause sheet, never to a flying frame
   if(running&&!paused&&!menu.classList.contains('on')){setTimeout(warmTick,1500);return;}
-  // the splash's fade (graphics item 8): nothing that can wait on the GPU while its 480 ms timer runs
-  {const sp=$('splash');if(sp&&sp.classList.contains('done')&&!sp.classList.contains('gone')){setTimeout(warmTick,250);return;}}
+  // the splash's fade (graphics item 8): nothing that can wait on the GPU while its 480 ms timer runs, nor in the up to
+  // 700 ms between the precompile queue draining (splashSeen) and the fade starting, so the fade's timer never queues
+  // behind a step's compile
+  {const sp=$('splash');if(sp&&!sp.classList.contains('gone')&&(sp.classList.contains('done')||splashSeen)){setTimeout(warmTick,250);return;}}
   const t0=performance.now();if(!WARM.i)WARM.t0=t0;
   // steps run back to back inside a 60 ms budget (the far-cull models are ~4 ms each, an
   // aircraft 10 to 55), so each does not cost a whole frame's wait behind the menu
@@ -20366,7 +20389,10 @@ function tick(t,skipRender){
   updateAudio();frameN++;if(frameN>=4&&WORLD.ready&&!PRE.done&&!splashFading()&&gfxPrecompile()&&!splashSeen){splashSeen=true;splashDone();}   // a world region: once it is built
   if(skipRender){}
   else if(SHOW.on){csmIdle();renderer.setClearColor(0xF6C177,1);renderer.clear();showRender(dt,CARM);}
-  else{if((!menu.classList.contains('on')||frameN<40)&&!FM.on){   // the open map is opaque: no 3D frame under it
+  // under the opaque menu the first 40 frames used to draw the world to compile its programs; the precompile queue
+  // (gfxPrecompile) now does that, so once it has drained the menu draws nothing (headless that was ~0.35 s a frame, and
+  // it pushed the menu's WARM steps past warm_console_check's window); kgeuNoPre keeps the old 40 frames
+  else{if((!menu.classList.contains('on')||(frameN<40&&(!PRE.done||PRE.skip)))&&!FM.on){   // the open map is opaque: no 3D frame under it
       rebuildTerrain(camera.position.x,camera.position.z);   // the LOD rings round the camera this frame looks from
       if(camMode===2&&SENSOR.mode!=='tv'&&!PHOTO.on&&!FREECAM){csmIdle();renderIR();}else{csmFrame();pfxRender();}}
     const po=pauseOv.classList.contains('on');document.body.classList.toggle('pauseOn',po);}
