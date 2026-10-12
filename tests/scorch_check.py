@@ -45,7 +45,7 @@ MEASURE = """(a)=>{const K=window.__kgeu,{scene,renderer,camera}=K.R3();
   scene.traverse(o=>{if(!o.visible||o===scene||o===sc)return;
     // fire, smoke, sparks and debris are one instanced quad layer and one instanced box mesh (item 15)
     if(o.isSprite||o.isPoints||o.isLine||o.isInstancedMesh||(o.geometry&&o.geometry.isInstancedBufferGeometry)){o.visible=false;hid.push(o);return;}
-    if(!o.isMesh||(o.geometry.parameters&&o.geometry.parameters.width>=60000))return;
+    if(!o.isMesh||o.userData.terrain||(o.geometry.parameters&&o.geometry.parameters.width>=60000))return;
     bx.setFromObject(o);if(bx.max.y>base+0.3){o.visible=false;hid.push(o);}});
   const gl=renderer.getContext(),W=gl.drawingBufferWidth,H=gl.drawingBufferHeight,v=new THREE.Vector3(),fov0=camera.fov,out=[];
   // samples on rings inside the disc, each with the point at the disc's edge the same way out,
@@ -54,7 +54,7 @@ MEASURE = """(a)=>{const K=window.__kgeu,{scene,renderer,camera}=K.R3();
     pts.push([x+c*q,K.terrainMeshH(x+c*q,z+s*q),z+s*q,x+c*0.96,K.terrainMeshH(x+c*0.96,z+s*0.96),z+s*0.96]);}
   // a sample the scorch does not darken counts as speckle only if nothing stands in front of
   // it (a runway light box, a sign): the first thing the ray meets must be the ground or the scorch
-  const rc=new THREE.Raycaster(),flat=o=>o===sc||(o.geometry.parameters&&o.geometry.parameters.width>=60000)||o.geometry.type==='PlaneGeometry';rc.camera=camera;
+  const rc=new THREE.Raycaster(),flat=o=>o===sc||o.userData.terrain||(o.geometry.parameters&&o.geometry.parameters.width>=60000)||o.geometry.type==='PlaneGeometry';rc.camera=camera;
   const lum=(b,i)=>0.3*b[i]+0.59*b[i+1]+0.11*b[i+2];
   for(let f=0;f<a.frames;f++){
     const az=a.az+f*0.004,d=a.dist*(1+0.003*f),el=a.el+0.002*Math.sin(f*1.7);
