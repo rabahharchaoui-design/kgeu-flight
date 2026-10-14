@@ -1596,6 +1596,10 @@ body.menuOn #tutArrow, body.pauseOn #tutArrow{ display:none !important; }
 #menu #a2hs .shr::before{ border-color:var(--rust); } #menu #a2hs .shr::after{ background:var(--rust); box-shadow:-3px 3.2px 0 -0.2px var(--rust), 3px 3.2px 0 -0.2px var(--rust); }
 .helpBody{ flex:1; min-height:0; display:flex; align-items:center; }
 #sCredits .helpBody{ align-items:stretch; width:100%; }
+#sStalls .helpBody{ align-items:stretch; width:100%; }
+#stallList li{ display:block; font-size:13px; font-variant-numeric:tabular-nums; min-height:0; line-height:1.35; }
+#stallList li.old{ opacity:.5; } #stallList li.lab{ font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--rust); margin-top:4px; }
+.stallFoot{ display:flex; gap:8px; justify-content:flex-end; flex:none; } .stallFoot button{ padding:0 18px; }
 .creditsList{ list-style:none; margin:0; padding:2px 2px 2px 0; width:100%; height:100%; overflow-y:auto; display:flex; flex-direction:column; gap:6px; }
 .creditsList li{ display:flex; align-items:baseline; gap:8px; font-size:15px; color:var(--brown); min-height:28px; }
 .creditsList b{ color:var(--night); font-weight:700; }
@@ -2087,6 +2091,7 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
     <div class="srow"><span>Sound</span><div class="chips"><button class="tog oSound" id="oSound">Sound: On</button><button class="tog oHap" id="oHap">Haptics: On</button></div></div>
     <div class="srow"><span>Help</span><div class="chips" id="helpRow"><button class="slink" id="bHelp" aria-label="Controls help"><span class="hL">Controls help</span><span class="hS">Controls</span><i class="chev" aria-hidden="true"></i></button><button id="bReplay" aria-label="Replay lesson 1"><span class="hL">Replay lesson 1</span><span class="hS">Lesson 1</span></button><button id="bPlace" aria-label="Retake placement"><span class="hL">Retake placement</span><span class="hS">Placement</span></button></div></div>
     <div class="srow"><span>About</span><div class="chips"><button class="slink" id="bCredits">Music credits<i class="chev" aria-hidden="true"></i></button><button class="tog" id="oFps" aria-label="Developer: FPS counter">FPS counter: Off</button></div></div>
+    <div class="srow"><span>Stutter log</span><div class="chips"><button class="slink" id="bStalls"><span id="bStallsT">No stalls yet</span><i class="chev" aria-hidden="true"></i></button></div></div>
    </div>
   </div>
   <div class="setFoot"><a class="credit" href="https://www.youtube.com/@OhRabah" target="_blank" rel="noopener"><svg class="yt" viewBox="0 0 28 20" aria-hidden="true"><path d="M27.4 3.1A3.5 3.5 0 0 0 24.9.6C22.7 0 14 0 14 0S5.3 0 3.1.6A3.5 3.5 0 0 0 .6 3.1C0 5.3 0 10 0 10s0 4.7.6 6.9a3.5 3.5 0 0 0 2.5 2.5C5.3 20 14 20 14 20s8.7 0 10.9-.6a3.5 3.5 0 0 0 2.5-2.5C28 14.7 28 10 28 10s0-4.7-.6-6.9Z" fill="#FF0000"/><path d="M11.2 14.3 18.4 10l-7.2-4.3v8.6Z" fill="#FFFFFF"/></svg><span>Made by @OhRabah</span></a>
@@ -2115,6 +2120,13 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
   <div class="helpBody">
    <ul class="creditsList" id="creditsList"></ul>
   </div>
+ </div>
+ <div class="scr" id="sStalls">
+  <header class="mh"><h2>Stutter log</h2></header>
+  <div class="helpBody">
+   <ul class="creditsList stallList" id="stallList"></ul>
+  </div>
+  <div class="stallFoot"><button id="bStallCopy">Copy</button><button id="bStallClr">Clear</button></div>
  </div>
  <div class="scr" id="sLb">
   <div class="lbBar">
@@ -3424,9 +3436,15 @@ var GFX={tier:'medium',auto:'medium',override:'auto',scale:1,bench:null,dyn:true
   // the pixel ratio the 3D scene is drawn at (the canvas's own one when the post chain is off)
   scenePR(){return GFX.base()*GFX.scale;},
   postWant(){return GFX.on('bloom')||GFX.on('smaa');},
-  setTier(t){if(!/^(auto|low|medium|high)$/.test(t))t='auto';GFX.override=t;GFX.tier=t==='auto'?GFX.auto:t;
+  // gfxfix item 3: a tier change recompiles every lit program (the cascade count), the haboob's defines, the clouds and
+  // the post chain, so it only ever runs in the menu (the chips, the battery guard's pendingTier at openMenu or start):
+  // applyTier, then the precompile queue and the menu's WARM steps again for the new tier (gfxRequeue), drained by the
+  // menu's frames or by start() before the flight. Setting the tier it already is changes nothing.
+  setTier(t){if(!/^(auto|low|medium|high)$/.test(t))t='auto';const was=GFX.tier;GFX.override=t;GFX.tier=t==='auto'?GFX.auto:t;
     try{localStorage.setItem('kgeuTier',t);}catch(e){}
-    GFX.applyTier();},
+    GFX.pendingTier=null;
+    if(GFX.tier===was){if(GFX.ui)GFX.ui();return;}
+    GFX.applyTier();if(GFX.requeue)GFX.requeue();},
   applyTier(){GFX.post=GFX.postWant();GFX.applyPR();GFX_HOOKS.forEach(f=>{try{f(GFX.tier);}catch(e){console.warn(e);}});if(GFX.ui)GFX.ui();},
   setScale(s){GFX.scale=s;GFX.applyPR();},
   // dynamic resolution: a state machine fed every flying frame with the ring buffer's average and 1% low (fps) and
@@ -3444,25 +3462,34 @@ var GFX={tier:'medium',auto:'medium',override:'auto',scale:1,bench:null,dyn:true
     if(S.cool>0)return GFX.scale;
     const i=GFX.STEPS.indexOf(GFX.scale),k=i<0?0:i;
     if(S.lowT>=3&&k<GFX.STEPS.length-1){GFX.setScale(GFX.STEPS[k+1]);S.lowT=S.highT=0;S.cool=5;}
-    else if(S.highT>=10&&k>0){GFX.setScale(GFX.STEPS[k-1]);S.lowT=S.highT=0;S.cool=5;}
+    else if(S.highT>=10&&k>0&&!GFX.thermS.on){GFX.setScale(GFX.STEPS[k-1]);S.lowT=S.highT=0;S.cool=5;}   // the battery guard holds the floor
     return GFX.scale;},
   // graphics item 8, the battery guard. Safari has no thermal API; the signal we have is the dynamic scale sitting on its
   // 0.7 floor while the 1% low is still under 50: 20 s of that straight in flight (frames over 250 ms count for nothing,
-  // nor the first 10 s after a start; a pause or the menu starts the count over) and the tier drops one step for this
-  // session only (never saved to kgeuTier, so the next cold launch is back on the detected tier), the scale goes back to
-  // 1.0 and one toast says so, once a session. Never below Low; on Low nothing happens. Fed by gfxDyn beside dynFeed.
-  thermS:{t:0,lowT:0,drops:0,toasts:0},
-  thermalReset(){const S=GFX.thermS;S.t=S.lowT=0;},
+  // nor the first 10 s after a start; a pause or the menu starts the count over). Gfxfix item 3: it never changes the
+  // tier in flight (that recompiles every program, seconds of freeze): thermS.on instead holds the scale on its 0.7 floor
+  // (dynFeed steps no higher), drops the cascaded shadows (csmFrame: no map drawn, the blob shadow back) and skips the
+  // bloom and SMAA passes (pfxRender: the plain composite PFX_CMP, compiled by the precompile queue), none of which
+  // compiles or allocates anything; pendingTier, one step down, is applied when the flight is over and the menu is up
+  // (openMenu, or start() if a restart skips the menu) for this session only (never saved to kgeuTier, so the next cold
+  // launch is back on the detected tier). One toast a session. Never below Low; on Low nothing happens. Fed by gfxDyn
+  // beside dynFeed; a new flight (thermalReset) clears thermS.on.
+  thermS:{t:0,lowT:0,drops:0,toasts:0,on:false},
+  pendingTier:null,
+  thermalReset(){const S=GFX.thermS;S.t=S.lowT=0;S.on=false;},
   thermalFeed(avg,low1,dt){
     const S=GFX.thermS;if(!(dt>0)||dt>0.25)return GFX.tier;
     S.t+=dt;if(S.t<10)return GFX.tier;
     if(GFX.scale<=GFX.STEPS[GFX.STEPS.length-1]+1e-6&&low1>0&&low1<50)S.lowT+=dt;else S.lowT=0;
     if(S.lowT>=20&&GFX.tier!=='low'){
-      GFX.tier=TIERS[Math.max(0,tierRank(GFX.tier)-1)];S.drops++;S.lowT=0;S.t=0;
-      GFX.scale=1;GFX.dynReset(true);GFX.applyTier();
-      if(!S.toasts&&GFX.say){S.toasts=1;GFX.say('Graphics set to '+(GFX.tier==='low'?'Low':'Medium')+' to keep things smooth');}}
+      const t=TIERS[Math.max(0,tierRank(GFX.tier)-1)];S.lowT=0;S.t=0;S.on=true;
+      if(GFX.pendingTier!==t){GFX.pendingTier=t;S.drops++;}
+      if(!S.toasts&&GFX.say){S.toasts=1;GFX.say('Graphics set to '+(t==='low'?'Low':'Medium')+' from the next flight to keep things smooth');}}
     return GFX.tier;},
-  say:null,ui:null,HOOKS:GFX_HOOKS};
+  // the battery guard's drop, in the menu (openMenu, start): the session tier one step down, its programs compiled again
+  pendingApply(){const t=GFX.pendingTier;if(!t)return false;GFX.pendingTier=null;GFX.thermS.on=false;
+    if(t===GFX.tier)return false;GFX.tier=t;GFX.scale=1;GFX.dynReset(true);GFX.applyTier();if(GFX.requeue)GFX.requeue();return true;},
+  say:null,ui:null,requeue:null,HOOKS:GFX_HOOKS};
 // graphics item 8, payload: every texture this graphics pass added is drawn at run time on a canvas (the aircraft skins,
 // the road bake, the canopy dust streaks, the cloud, smoke and sun sprites) or is a render target, and the one new
 // downloaded asset is assets/world/az_dem.bin (1.16 MB of heights, not an image). There is no image file to ship as KTX2
@@ -6575,10 +6602,12 @@ function pfsColorSetup(){
 // ================= atmosphere: cascaded sun shadows and desert air (graphics item 6) =================
 // Shared uniform values, plain objects so every material's clone of the ShaderLib uniforms points at the same one
 // (like PFS_TONE): CSM_U the cascade selection, AIR_U the haze model. Both are written by csmFrame and airSet.
-// CSM_U: per cascade i (x, y, z) the view depth weight clamp((z - a)*b) * clamp((c - z)*d): a ramp in over the
-// previous boundary's blend band and out over the next one, so two neighbours always sum to 1; a.w the shadow strength,
-// b.w the share of the sky light a shadow takes too (0.12 by day to 0.42 with the sun 5 degrees up or lower).
-const CSM_U={a:{x:0,y:0,z:0,w:0},b:{x:0,y:0,z:0,w:0},c:{x:-1,y:-1,z:-1,w:0},d:{x:0,y:0,z:0,w:0}};
+// CSM_U: per cascade i (x, y, z) the view depth weight clamp((c - z)*d) times its fade f (gfxfix item 4: the cascades
+// are nested, each from depth 0, so only the ramp out at its own split; csmShadow walks them near to far, a cascade
+// taking its weight of what the nearer ones left, so a fading near hands over to the mid without a seam); a.w the shadow
+// strength, b.w the share of the sky light a shadow takes too (0.12 by day to 0.42 with the sun 5 degrees up or lower).
+// a.xyz and b.xyz unused.
+const CSM_U={a:{x:0,y:0,z:0,w:0},b:{x:0,y:0,z:0,w:0},c:{x:-1,y:-1,z:-1,w:0},d:{x:0,y:0,z:0,w:0},f:{x:0,y:0,z:0,w:0}};
 // AIR_U.k: x the dry air (Rayleigh like) share of the ground level extinction, y 1/height falloff of the dust (1,500 m),
 // z 1/height falloff of the air (8,000 m), w the optical depth over scene.fog.far - near/2 at ground level (airSet:
 // day and sunset 1.4 with x 0.12, night 1.9 and haboob 2.3 with x 0.35); sun: x, z the sun's horizontal direction, y the weight of the sky tint in the in scatter; s, a: the sky tint
@@ -6601,7 +6630,7 @@ function pfsAirSetup(){
   const rep=(k,a,b)=>{if(C[k].indexOf(a)<0){console.warn('pfs air: no '+a.slice(0,40)+' in '+k);return;}C[k]=C[k].split(a).join(b);};
   C.shadowmap_pars_fragment+=`
 #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
-uniform vec4 csmA;uniform vec4 csmB;uniform vec4 csmC;uniform vec4 csmD;
+uniform vec4 csmA;uniform vec4 csmB;uniform vec4 csmC;uniform vec4 csmD;uniform vec4 csmF;
 float csmBil( sampler2D m, vec2 uv, float z, vec2 size ){
 	vec2 t = 1.0 / size, f = fract( uv * size + 0.5 ), c = uv - f * t;
 	return mix( mix( texture2DCompare( m, c, z ), texture2DCompare( m, c + vec2( t.x, 0.0 ), z ), f.x ),
@@ -6620,12 +6649,12 @@ float csmTap( sampler2D m, vec2 size, float bias, float radius, vec4 sc ){
 }
 float csmShadow( bool rcv ){
 	if ( ! rcv || csmA.w <= 0.0 ) return 1.0;
-	float z = 1.0 / gl_FragCoord.w, occ = 0.0, w = 0.0;
+	float z = 1.0 / gl_FragCoord.w, occ = 0.0, w = 0.0, rem = 1.0;
 	DirectionalLightShadow dls;
 	#pragma unroll_loop_start
 	for ( int i = 0; i < NUM_DIR_LIGHT_SHADOWS; i ++ ) {
-		w = clamp( ( z - csmA[ i ] ) * csmB[ i ], 0.0, 1.0 ) * clamp( ( csmC[ i ] - z ) * csmD[ i ], 0.0, 1.0 );
-		if ( w > 0.0 ) { dls = directionalLightShadows[ i ]; occ += w * ( 1.0 - csmTap( directionalShadowMap[ i ], dls.shadowMapSize, dls.shadowBias, dls.shadowRadius, vDirectionalShadowCoord[ i ] ) ); }
+		w = clamp( ( csmC[ i ] - z ) * csmD[ i ], 0.0, 1.0 ) * csmF[ i ];
+		if ( w > 0.0 ) { dls = directionalLightShadows[ i ]; occ += rem * w * ( 1.0 - csmTap( directionalShadowMap[ i ], dls.shadowMapSize, dls.shadowBias, dls.shadowRadius, vDirectionalShadowCoord[ i ] ) ); rem *= 1.0 - w; }
 	}
 	#pragma unroll_loop_end
 	return 1.0 - occ * csmA.w;
@@ -6724,7 +6753,7 @@ float csmShadow( bool rcv ){
 	gl_FragColor.rgb = mix( gl_FragColor.rgb, vAirC.rgb + 0.0 * fogColor, fogFactor );
 #endif`+E+C.fog_fragment+Z;
   for(const k in L){const sh=L[k];if(!sh)continue;
-    if(sh.uniforms)Object.assign(sh.uniforms,{csmA:{value:CSM_U.a},csmB:{value:CSM_U.b},csmC:{value:CSM_U.c},csmD:{value:CSM_U.d},
+    if(sh.uniforms)Object.assign(sh.uniforms,{csmA:{value:CSM_U.a},csmB:{value:CSM_U.b},csmC:{value:CSM_U.c},csmD:{value:CSM_U.d},csmF:{value:CSM_U.f},
       airK:{value:AIR_U.k},airSun:{value:AIR_U.sun},airS:{value:AIR_U.s},airA:{value:AIR_U.a},airT:{value:AIR_U.t},airM:{value:AIR_U.m},airMC:{value:AIR_U.mc}});
     if(typeof sh.vertexShader==='string')sh.vertexShader='#define PFS_AIR\n'+sh.vertexShader;
     if(typeof sh.fragmentShader==='string')sh.fragmentShader='#define PFS_AIR\n'+sh.fragmentShader;}
@@ -6781,21 +6810,30 @@ const sun=new THREE.DirectionalLight(0xfff0d8,1.0); sun.position.set(-0.55,0.75,
 // ---------- cascaded sun shadows (graphics item 6) ----------
 // GFX.FX.shadows (Medium): 2 cascades, a 1,024 map near and 512 for the ramp; GFX.FX.shadowFar (High): 3 at 1,024, the
 // third out to 12 km for the mountains at golden hour. Each cascade is a DirectionalLight that only casts (intensity 0,
-// skipped by the light loops, pfsAirSetup), giving the sun its shadow inside its own view depth range. csmFrame fits
-// each cascade's orthographic camera to the bounding sphere of its slice of the view frustum (a fixed size for a given
-// fov, in 9% steps, so it never breathes), centred on a whole shadow texel in the light's frame (so nothing standing
-// still swims), and asks for the maps to redraw. The shadow pass draws an explicit caster list per cascade
+// skipped by the light loops, pfsAirSetup), giving the sun its shadow from view depth 0 out to its own split: nested
+// layers, csmShadow walks them near to far, each taking what the nearer ones left (gfxfix item 4), so a cascade can fade
+// in and out (CSM.F) instead of popping. csmFrame fits each cascade's orthographic camera round the bounding sphere of
+// its slice of the view frustum with a radius fixed per cascade (CSM.R, csmRadii: the widest fov the game sets, never
+// changing in flight), centred on a whole shadow texel in the light's frame (so nothing standing still swims), and asks
+// for the maps to redraw. The shadow pass draws an explicit caster list per cascade
 // (renderer.shadowMap.render is wrapped below), never a walk of the scene to find them:
 //   near (0 to 120 m): the flown aircraft, a bandit or traffic within 250 m of the camera;
 //   mid (120 to 1,500 m): the aircraft, CSM.stat (buildings, towers, hangars, the stadium, billboards, the parked
 //     aircraft: csmStatic at build time), traffic and bandits within 2 km;
 //   far (1,500 to 12,000 m, High only): the terrain sectors (cast and receive, here only).
 // Redrawn: near and mid every frame, far every second frame. Off: at night (the moon casts none), under a sun lower
-// than a degree, in the IR view and the carousel (nothing asks for a map there); the haboob's dust fades them; near off
-// above 2,500 ft AGL (the camera's), mid above 8,000 ft, so on Medium nothing at all is drawn up there. Low: no lights,
+// than a degree, in the IR view and the carousel (nothing asks for a map there); the haboob's dust fades them. Near and mid
+// follow the camera's AGL smoothed over a second (CSM.aglS) with hysteresis (CSM.THR): near on below 2,500 ft, off above
+// 3,120; mid on below 8,000 ft, off above 10,000; each fades over a second, so on Medium nothing at all is drawn up there. Low: no lights,
 // no shadow map, no shadow code in any shader. The shadowed side keeps the hemisphere light, never black.
-const CSM={n:0,lights:[],L:[[],[],[]],stat:[],frame:0,act:0,prev:0,rc:-1,rt0:null,renders:0,recv:0,ai:[0,0,0],showScene:null,showL:[],skips:0,spin:null,spinOf:null,
-  SPLIT:[120,1500,12000],REACH:[250,2500,30000],BIAS:[0.04,0.5,10],NB:[0.03,0.4,12],
+const CSM={n:0,lights:[],L:[[],[],[]],stat:[],frame:0,act:0,prev:0,recvMs:0,renders:0,recv:0,builds:0,ai:[0,0,0],showScene:null,showL:[],skips:0,spin:null,spinOf:null,
+  SPLIT:[120,1500,12000],REACH:[250,2500,30000],BIAS:[0.04,0.5,10],NB:[0,0,0],
+  // gfxfix item 4: the normal bias in shadow texels of each cascade (NB = NBT x 2R/size, csmRadii). Near 0.09 (0.04 m:
+  // the gear's contact shadow on the ramp stays tight); mid 0.1 (1.0 m Medium, 0.5 m High: it holds only aircraft and
+  // buildings, never the terrain, and 1.5 texels, 15 m, lifted the ramp's lookup over a parked C-130 so its shadow was
+  // gone from 400 m); far 1.5 (59 m at 39 m texels: the terrain's own shadow, no acne on the White Tank slopes)
+  NBT:[0.09,0.1,1.5],R:[0,0,0],FR:[0,0,0],FOVMAX:70,F:[0,0,0],want:0,aglS:null,aglM:0,t0:-1,fadeN:0,
+  THR:{nearOn:762,nearOff:950,midOn:2438,midOff:3050},drawn:[0,0,0],pos:[[0,0,0],[0,0,0],[0,0,0]],
   root:{visible:true,layers:{test:()=>true},children:null}};
 const _csmD=new V3(),_csmF=new V3(),_csmC=new V3(),_csmX=new V3(),_csmY=new V3(),_csmUp=new V3(0,1,0),_csmOne=[null];
 {const SM=renderer.shadowMap,orig=SM.render;
@@ -6805,9 +6843,9 @@ const _csmD=new V3(),_csmF=new V3(),_csmC=new V3(),_csmX=new V3(),_csmY=new V3()
 function csmLit(m,opaque){if(Array.isArray(m))return m.some(x=>csmLit(x,opaque));
   return !!m&&(m.isMeshLambertMaterial||m.isMeshStandardMaterial||m.isMeshPhongMaterial)&&!(opaque&&m.transparent);}
 // the tier's cascades (GFX_HOOKS): Low removes every light and the shadow map itself
-function csmBuild(){
+function csmBuild(){CSM.builds++;   // STALL's 'csmBuild' tag
   for(const L of CSM.lights){scene.remove(L);scene.remove(L.target);if(L.shadow.map){L.shadow.map.dispose();L.shadow.map=null;}}
-  CSM.lights.length=0;CSM.n=0;CSM.act=CSM.prev=0;CSM_U.a.w=0;
+  CSM.lights.length=0;CSM.n=0;CSM.act=CSM.prev=0;CSM_U.a.w=0;CSM.aglS=null;   // the fades snap to the new set
   const on=GFX.on('shadows');renderer.shadowMap.enabled=on;
   if(!on)return;
   renderer.shadowMap.type=THREE.BasicShadowMap;   // the filtering is csmTap's own
@@ -6815,7 +6853,20 @@ function csmBuild(){
   for(let i=0;i<n;i++){const L=new THREE.DirectionalLight(0xffffff,0);L.castShadow=true;L.name='csm'+i;
     L.shadow.mapSize.set(sizes[i],sizes[i]);L.shadow.autoUpdate=false;L.shadow.needsUpdate=false;L.shadow.radius=1.5;
     L.userData.csmL=CSM.L[i];scene.add(L);scene.add(L.target);CSM.lights.push(L);}
-  CSM.n=n;csmShowSync();
+  CSM.n=n;csmRadii();csmShowSync();csmRecv();
+}
+// gfxfix item 4: each cascade's fixed radius, from the widest fov the game ever gives the main camera (CSM.FOVMAX: the
+// ramp view's 70; chase 62, cockpit 64, padlock 68, the drop views 66, photo 50, sensor 14 or less) and the current
+// aspect, so speed, zoom or a view change never resizes the texel grid in flight; csmBuild and resize(). The sphere
+// round the slice from depth 0 to f0: with q = tan^2(v) + tan^2(h) >= 1 (any landscape phone) the centre sits at f0
+// and r = f0 sqrt(q), so starting the mid at 0 instead of 110 m changes nothing (844x390 at 70 degrees: near 0..130 m
+// r 216, mid 0..1,500 (Medium, last) r 2,504 or 0..1,620 (High) r 2,704, far 0..12,000 r 20,030; the old fit at
+// 62 degrees, rounded up to 2^(1/8) steps: 197, 2,233 or 2,435, 17,867)
+function csmRadii(){
+  const tv=Math.tan(CSM.FOVMAX*Math.PI/360),th=tv*camera.aspect,q=tv*tv+th*th;
+  for(let i=0;i<CSM.n;i++){const f0=i===CSM.n-1?CSM.SPLIT[i]:CSM.SPLIT[i]*1.08,c=Math.min(f0,f0*(1+q)/2);
+    CSM.FR[i]=f0;CSM.R[i]=Math.sqrt((f0-c)*(f0-c)+f0*f0*q);
+    CSM.NB[i]=CSM.NBT[i]*2*CSM.R[i]/CSM.lights[i].shadow.mapSize.x;}
 }
 // the carousel's scene carries as many cascade lights, never drawn (no map, and csmIdle zeroes the strength before it
 // renders), only so its aircraft share the main scene's compiled programs: no second compile per model in the menu
@@ -6847,18 +6898,27 @@ function csmSigT(o,sp){if(o.isPoints||o.isSprite||o.isLine||(o.isMesh&&!o.castSh
 function csmSig(L,list,k){const p=L.position;let s=p.x*0.7+p.y*1.1+p.z*1.3+L.shadow.camera.right+list.length*17+k;
   for(let i=0;i<list.length;i++){const o=list[i];if(o===terrain)s+=TLS.gen*31;else if(!o.userData.csmS)s+=csmSigT(o,o===plane.g&&plane.propRig?CSM.spin:null);}
   return s;}
-// the receivers: every lit mesh but the clouds (userData.noRecv); one walk a flight, and when the scene gains an object
-function csmRecv(){CSM.rt0=RUN.t0;CSM.rc=scene.children.length;CSM.recv++;
-  scene.traverse(o=>{if(o.isMesh&&!o.userData.noRecv&&csmLit(o.material,false))o.receiveShadow=true;});}
+// the receivers: every lit mesh but the clouds (userData.noRecv). Gfxfix item 3: decided once per mesh as it enters the
+// world (Object3D.add below: a subtree joining anything under the scene, whether through scene.add or a group already
+// in it, as the strike range, the drop zone and the bandits do), never a scene walk in flight. The full walk is kept for
+// csmBuild (boot, a tier change) and start() (anything that changed its material since it was added); measured at
+// 0.2 to 0.4 ms headless at a flight's start (Arizona, 2,141 objects in the scene). receiveShadow is a uniform in r128,
+// never part of a program's key, so setting it compiles nothing.
+function csmRecvT(o){o.traverse(m=>{if(m.isMesh&&!m.userData.noRecv&&csmLit(m.material,false))m.receiveShadow=true;});}
+function csmRecv(){const t0=performance.now();CSM.recv++;csmRecvT(scene);CSM.recvMs=+(performance.now()-t0).toFixed(2);}
+{const add0=THREE.Object3D.prototype.add;
+ THREE.Object3D.prototype.add=function(o){const r=add0.apply(this,arguments);
+   if(arguments.length===1&&o&&o.isObject3D&&o.parent===this){for(let p=this;p;p=p.parent)if(p===scene){csmRecvT(o);break;}}
+   return r;};}
 function csmIdle(){CSM.act=0;CSM_U.a.w=0;for(const L of CSM.lights)L.shadow.needsUpdate=false;
   // the carousel's twins bind the cascades' own maps: the same sampler state, so no driver (SwiftShader) rebuilds a
   // pipeline for the menu
   for(let i=0;i<CSM.showL.length;i++){const T=CSM.showL[i],L=CSM.lights[i];if(L&&L.shadow.map&&T.shadow.map!==L.shadow.map){T.shadow.map=L.shadow.map;T.shadow.mapSize.copy(L.shadow.mapSize);}}}
-// cascade i's camera round the frustum slice n0..f0 (m), a size x size map
-function csmFit(L,i,n0,f0,size){
-  const tv=Math.tan(camera.fov*Math.PI/360),th=tv*camera.aspect,q=tv*tv+th*th;
-  let c=(f0+n0)*(1+q)/2,r;if(c>=f0){c=f0;r=f0*Math.sqrt(q);}else r=Math.sqrt((f0-c)*(f0-c)+f0*f0*q);
-  r=Math.pow(2,Math.ceil(Math.log2(r)*8)/8);
+// cascade i's camera round the frustum slice 0..CSM.FR[i] (m), radius CSM.R[i] (the centre from the current fov: the
+// sphere round it for this fov is never wider than R), a size x size map
+function csmFit(L,i){
+  const tv=Math.tan(camera.fov*Math.PI/360),th=tv*camera.aspect,q=tv*tv+th*th,f0=CSM.FR[i],r=CSM.R[i],size=L.shadow.mapSize.x;
+  const c=Math.min(f0,f0*(1+q)/2);
   camera.getWorldDirection(_csmF);_csmC.copy(camera.position).addScaledVector(_csmF,c);
   // the shadow camera's own lookAt basis (z toward the sun, x = up cross z), the centre on a whole texel of it
   const z=_csmD;_csmX.crossVectors(_csmUp,z).normalize();_csmY.crossVectors(z,_csmX);
@@ -6873,28 +6933,39 @@ const CSM_K='xyz';
 // traffic or a bandit: into the mid list within 2 km of the camera, the near one within 250 m
 function csmNear(g,cp){if(!g.visible)return;const e=g.matrixWorld.elements,dx=e[12]-cp.x,dy=e[13]-cp.y,dz=e[14]-cp.z,d=dx*dx+dy*dy+dz*dz;
   if(d<4e6){csmMark(g);CSM.L[1].push(g);if(d<62500)CSM.L[0].push(g);}}
-// every drawn frame of the world (not the IR view), after the camera is placed
-function csmFrame(){
-  const n=CSM.n,U=CSM_U;
+// every drawn frame of the world (not the IR view), after the camera is placed; dt the frame's real seconds (capped)
+function csmFrame(dt){
+  const n=CSM.n,U=CSM_U,T=CSM.THR,F=CSM.F;
   if(!n)return;
   csmIdle();CSM.frame++;
+  // gfxfix item 4: the camera's AGL smoothed over a second (snapped at a start and on a jump of over 400 m in a frame),
+  // near and mid wanted with hysteresis, each fading toward wanted at 1/s (snapped with the AGL)
+  const cp=camera.position,agl=cp.y-groundHeight(cp.x,cp.z),snap=CSM.aglS===null||CSM.t0!==RUN.t0||Math.abs(agl-CSM.aglM)>400;
+  dt=Math.max(0,dt||0);CSM.aglM=agl;CSM.t0=RUN.t0;
+  if(snap)CSM.aglS=agl;else CSM.aglS+=(agl-CSM.aglS)*(1-Math.exp(-dt));
+  const a=CSM.aglS;let want=CSM.want;
+  if(snap)want=(a<T.nearOn?1:0)|(a<T.midOn?2:0);
+  else{if(want&1){if(a>T.nearOff)want&=~1;}else if(a<T.nearOn)want|=1;
+    if(want&2){if(a>T.midOff)want&=~2;}else if(a<T.midOn)want|=2;}
+  if(n>2)want|=4;CSM.want=want;
+  for(let i=0;i<n;i++){const g=want&(1<<i)?1:0;F[i]=snap?g:g?Math.min(1,F[i]+dt):Math.max(0,F[i]-dt);}
+  if(F[0]>0&&F[0]<1)CSM.fadeN++;
   _csmD.copy(sun.position).normalize();
-  const k=TOD.night?0:clamp((_csmD.y-0.0175)/0.03,0,1)*(1-(HB.on?HB.d:0));
-  for(let i=0;i<3;i++){const c=CSM_K[i];U.a[c]=U.b[c]=U.d[c]=0;U.c[c]=-1;}
+  const k=TOD.night||GFX.thermS.on?0:clamp((_csmD.y-0.0175)/0.03,0,1)*(1-(HB.on?HB.d:0));   // thermS.on: the battery guard
+  for(let i=0;i<3;i++){const c=CSM_K[i];U.a[c]=U.b[c]=U.d[c]=U.f[c]=0;U.c[c]=-1;}
   if(k<=0.001){CSM.prev=0;return;}
-  if(RUN.t0!==CSM.rt0||scene.children.length!==CSM.rc)csmRecv();
-  const cp=camera.position,agl=cp.y-groundHeight(cp.x,cp.z);
-  let mask=0;if(agl<762)mask|=1;if(agl<2438)mask|=2;if(n>2)mask|=4;
-  // the active cascades share 0..12 km in order; a 16% blend band at each boundary, the last fades over its last 20%
-  let lo=0,na=0,j=0;const act=CSM.ai;for(let i=0;i<n;i++)if(mask&(1<<i))act[na++]=i;
-  for(;j<na;j++){
-    const i=act[j],c=CSM_K[i],hi=CSM.SPLIT[i],last=j===na-1,m0=0.08*lo,m1=0.08*hi;
-    if(j===0){U.a[c]=-1;U.b[c]=1e3;}else{U.a[c]=lo-m0;U.b[c]=1/(2*m0);}
-    if(last){U.c[c]=hi;U.d[c]=1/(0.2*hi);}else{U.c[c]=hi+m1;U.d[c]=1/(2*m1);}
-    const L=CSM.lights[i];csmFit(L,i,Math.max(0,U.a[c]),U.c[c],L.shadow.mapSize.x);
-    // far: every second frame, unless it has just come on
-    L.shadow.needsUpdate=i<2||!(CSM.prev&(1<<i))||(CSM.frame&1)===0;
-    lo=hi;}
+  let mask=0;for(let i=0;i<n;i++)if(F[i]>0)mask|=1<<i;
+  // nested: every active cascade from depth 0 to its split, a 16% band out at each split (the next one takes over
+  // inside csmShadow), the last fading over its last 20%
+  let na=0;const act=CSM.ai;for(let i=0;i<n;i++)if(mask&(1<<i))act[na++]=i;
+  for(let j=0;j<na;j++){
+    const i=act[j],c=CSM_K[i],hi=CSM.SPLIT[i];
+    if(i===n-1){U.c[c]=hi;U.d[c]=1/(0.2*hi);}else{U.c[c]=1.08*hi;U.d[c]=1/(0.16*hi);}
+    U.f[c]=F[i];
+    // far: every second frame, unless it has just come on; gfxfix item 4: a map not redrawn this frame keeps its light,
+    // target and camera where they were at its draw
+    const L=CSM.lights[i];L.shadow.needsUpdate=i<2||!(CSM.prev&(1<<i))||(CSM.frame&1)===0;
+    if(L.shadow.needsUpdate)csmFit(L,i);}
   U.a.w=k;U.b.w=0.12+0.3*(1-clamp((Math.asin(_csmD.y)*180/Math.PI-5)/25,0,1));CSM.act=mask;CSM.prev=mask;
   // the caster lists
   const Ln=CSM.L[0],Lm=CSM.L[1],Lf=CSM.L[2];Ln.length=Lm.length=Lf.length=0;
@@ -6906,7 +6977,8 @@ function csmFrame(){
   // a map drawn from the same light spot and the same caster poses is kept (statics never move: only their count)
   for(let j=0;j<na;j++){const i=act[j],L=CSM.lights[i];if(!L.shadow.needsUpdate)continue;
     const sg=csmSig(L,CSM.L[i],CSM.stat.length+mask*0.01);
-    if(L.shadow.map&&L.userData.sig===sg&&(CSM.prev2&(1<<i))){L.shadow.needsUpdate=false;CSM.skips++;}else L.userData.sig=sg;}
+    if(L.shadow.map&&L.userData.sig===sg&&(CSM.prev2&(1<<i))){L.shadow.needsUpdate=false;CSM.skips++;}
+    else{L.userData.sig=sg;CSM.drawn[i]=CSM.frame;const P=CSM.pos[i];P[0]=L.position.x;P[1]=L.position.y;P[2]=L.position.z;}}
   CSM.prev2=mask;
   // the old soft blob under the aircraft stands in only while the real shadow is off
   if(mask&3)shadow.visible=false;
@@ -7103,8 +7175,8 @@ function skyPaint(k){
   c.needsUpdate=true;
 }
 // things built later (the world regions) that change with the time of day: called at the end of setTOD
-const TOD_HOOKS=[];
-function setTOD(id){
+const TOD_HOOKS=[];var TOD_N=0;   // setTOD calls, STALL's 'tod' tag
+function setTOD(id){TOD_N++;
   // the dust storm is Arizona's: day in a world region, the saved Haboob kept for coming back
   const fb=id==='haboob'&&!REGION.az;if(fb)id='day';
   TOD=TOD_SET[id]||TOD_SET.day;
@@ -7146,7 +7218,7 @@ function setTOD(id){
 // their own, which only closes in once you are in the dust.
 const HB={on:false,built:false,st:null,g:null,sun:null,U:null,mats:[],deep:null,fing:null,hd:false,med:false,surge:0,pd:1e9,C:new V3(),T:new V3(),Lat:new V3(),
   hdg:330,spd:18,W:24000,TAPER:3000,H:2000,R:150000,DEPTH:15000,kt0:8,ktPrev:5,
-  dist:1e9,d:0,t:0,snap:false,called:false,t6:false,paintD:-1,dirty:false};
+  dist:1e9,d:0,t:0,snap:false,called:false,t6:false,paintD:-1,dirty:false,tierN:0};
 const _hbV=new V3();
 // n panels on the arc; heights fall off over the last HB.TAPER metres at each end
 function hbStrip(n,off,h0,h1,jit,ov,out){
@@ -7168,7 +7240,7 @@ function hbStrip(n,off,h0,h1,jit,ov,out){
 // the fingers on Medium and High, the deep layer on High
 function hbTier(){
   if(!HB.built)return;const hd=GFX.on('haboob'),med=hd&&!GFX.on('haboobDeep');
-  if(hd!==HB.hd||med!==HB.med){HB.hd=hd;HB.med=med;for(const m of HB.mats){if(hd)m.defines.HB_HD='';else delete m.defines.HB_HD;if(m.userData.lite)m.defines.HB_LITE='';
+  if(hd!==HB.hd||med!==HB.med){HB.tierN++;HB.hd=hd;HB.med=med;for(const m of HB.mats){if(hd)m.defines.HB_HD='';else delete m.defines.HB_HD;if(m.userData.lite)m.defines.HB_LITE='';
     if(med&&!m.userData.lite)m.defines.HB_MED='';else delete m.defines.HB_MED;m.needsUpdate=true;}
     // Medium: the noise unfiltered by anisotropy and from the nearest mip (the soft dust shows no difference; about 10 ms
     // a frame headless with the wall filling the screen); Low and High keep the default filtering
@@ -8409,7 +8481,7 @@ const CLOUDS={preset:'scattered',forced:null,vis:true,hd:null,cb:null,
 function cloudAttr(g,n,f){const a=new Float32Array(n);for(let i=0;i<n;i++)a[i]=f(i);g.setAttribute('aCl',new THREE.InstancedBufferAttribute(a,1));}
 if(CLOUD_MESH){cloudAttr(CLOUD_MESH.geometry,CLOUD_MESH.count,i=>0.45+0.2*hash(i,77));
   // three r128 culls an InstancedMesh by its one icosahedron at the origin: a sphere round the whole field of puffs
-  CLOUD_MESH.geometry.boundingSphere=new THREE.Sphere(new V3(APC.x,3150,APC.z),30000);CLOUD_MESH.userData.noRecv=true;}
+  CLOUD_MESH.geometry.boundingSphere=new THREE.Sphere(new V3(APC.x,3150,APC.z),30000);CLOUD_MESH.userData.noRecv=true;CLOUD_MESH.receiveShadow=false;}
 function cloudHD(){
   if(CLOUDS.hd)return CLOUDS.hd;
   const U=CLOUDS.U,m=new THREE.MeshLambertMaterial({color:0xffffff});
@@ -8540,8 +8612,8 @@ if(REGION.az)(function(){
 // as a small sphere), so the airframes reflect a warm sky at sunset and a dark one at night. A tiny scene through
 // PMREM once per setTOD (a few ms), never per frame. The day's is built the first time it is needed (Day, or the
 // showroom) and kept for good; any other is disposed when the next one replaces it. Boot builds exactly one.
-const ENV={day:null,rt:null,es:null,dg:null,sn:null};
-function envBuild(){
+const ENV={day:null,rt:null,es:null,dg:null,sn:null,pm:null,n:0};
+function envBuild(){ENV.n++;   // STALL's 'pmrem' tag
   if(!ENV.es){const es=new THREE.Scene(),dg=new THREE.SphereGeometry(60,48,24);
     dg.setAttribute('color',new THREE.BufferAttribute(new Float32Array(dg.attributes.position.count*3),3));
     es.add(new THREE.Mesh(dg,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide})));
@@ -8556,7 +8628,11 @@ function envBuild(){
     dc.setXYZ(i,c.r,c.g,c.b);}
   dc.needsUpdate=true;
   ENV.sn.material.color.setHex(TOD.night?0x8a96b4:TOD.env.sun);ENV.sn.position.copy(_skyS).multiplyScalar(50);
-  const pm=new THREE.PMREMGenerator(renderer),rt=pm.fromScene(ENV.es,0.04);pm.dispose();
+  // gfxfix item 3: one generator for the page's life. Disposing it after each build deleted its blur program, so the
+  // next setTOD compiled it again (a new program in flight); r128's fromScene allocates and frees its own ping pong
+  // target per call (_cleanup), so keeping it holds only the blur material
+  if(!ENV.pm)ENV.pm=new THREE.PMREMGenerator(renderer);
+  const rt=ENV.pm.fromScene(ENV.es,0.04);
   // graphics item 8: the tiny sky scene's vertex buffers leave the GPU until the next setTOD (the arrays stay to repaint)
   ENV.dg.dispose();ENV.sn.geometry.dispose();return rt;
 }
@@ -9120,7 +9196,9 @@ const WARM_STEPS=['reaper','mq9b','f16','cessna','alpha','c130','archer','a10','
   // the burst: on Medium and High the precompile queue's 'explosion' job has already drawn it into a post chain target,
   // the pipeline every flight frame uses there (the scene never draws straight to the canvas with post on), so the
   // full size canvas draw here would only repeat it (3 s of the warm-up headless); Low and kgeuNoPre still draw it
-  .concat([()=>{if(!DZ.built)dzBuild();warmObj(DZ.g);},()=>{if(GFX.post&&PRE.done&&!PRE.skip&&PRE.ms.explosion!=null)return;fxWarmLayer();},()=>fxWarmDebris(),()=>fxWarmDecals(),()=>{if(actx)boomBufs();}]);
+  // gfxfix item 3: the dogfight's bandit, missiles, tracers and flares (dfWarmBuild, the precompile queue's build job,
+  // whose compile job links their programs behind the splash) drawn once here without a compile, for the buffers
+  .concat([()=>{if(!DZ.built)dzBuild();warmObj(DZ.g);},()=>{dfWarmBuild();warmObj(DF.pool[0].g,true);},()=>{if(GFX.post&&PRE.done&&!PRE.skip&&PRE.ms.explosion!=null)return;fxWarmLayer();},()=>fxWarmDebris(),()=>fxWarmDecals(),()=>{if(actx)boomBufs();}]);
 function warmTick(){
   if(WARM.done)return;
   // flying: wait. The steps belong to the menu and the pause sheet, never to a flying frame
@@ -15428,6 +15506,9 @@ function start(mode,base){
   if(!baseOK(acType,base||SPAWN_BASE)){const hb=HOME(acType);if(!REGION.az){pickRegion('az',{resume:{mode:mode,base:hb,type:acType,tod:TOD.id}});return;}base=hb;SPAWN_BASE=hb;locSel();}
   if(FM.on)fmClose();
   initAudio();
+  // gfxfix item 3: the battery guard's drop if a restart skipped the menu, and the precompile queue drained before the
+  // first flight frame (it runs again after a tier change; normally the menu's frames have drained it already)
+  GFX.pendingApply();gfxDrain();
   if(ARC.prevTod){const p=ARC.prevTod;ARC.prevTod=null;setTOD(p);}
   setType(acType);useModel(acType);sizeShadow();vqReset();radioHush();radioFadeTok++;radioVolApply();chatT=9;atcT=0;TK.paused=false;
   const spawn=mode;if(mode==='final1')mode='final';RUNSTART={k:'free',mode:spawn,base:base||SPAWN_BASE,type:acType};
@@ -15446,6 +15527,7 @@ function start(mode,base){
   if(mode==='drop'||mode==='short')missStart(mode==='drop'?'drop':'short');
   if(mode==='drop')dzStart();
   hbSync(true);
+  csmRecv();   // the receivers once a flight, here at the tap rather than on its first frame
   if(LB){LB.reset();if(mode==='range'||mode==='drop'||mode==='short')LB.runStart(mode==='range'?(acType==='a10'?'arc:gunrun':'arc:strike'):mode==='drop'?'arc:drop':'mission:short');}
   layoutViewport();VP.ctl=layoutCtl(true);   // the controls are dealt on this frame, in Easy and in Hard
 }
@@ -15474,11 +15556,11 @@ function hudClear(){
   if(window.layoutCtl)layoutCtl();   // the LOOK pad and DROP button go with the mission
 }
 const pauseOv=$('pauseOv');
-function openMenu(scr){if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.forced=null;hudClear();pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
+function openMenu(scr){GFX.pendingApply();if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.forced=null;hudClear();pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
 // the pause button, P and a backgrounded app all land here; the sheet shows while paused
 function togglePause(){if(DF.brief||TASK.brief||LES.brief)return;   // the dogfight briefing holds the sim itself; FIGHT'S ON is the way on
-  if(RES.brief)resClose(RES.brief);paused=!paused;pauseOv.classList.toggle('on',paused);if(paused){radioFade(120);CARP.sync();PZ0={t:savedType,b:SPAWN_BASE,p:SPAWN_POS};PZ_LOC=null;locSel();pzApplyUI();requestAnimationFrame(locShow);if(window.stickReset)stickReset();musicUI();}}
-$('pResume').onclick=()=>{paused=false;pauseOv.classList.remove('on');initAudio();radioVolApply();};
+  if(RES.brief)resClose(RES.brief);if(paused)gfxDrain();paused=!paused;pauseOv.classList.toggle('on',paused);if(paused){radioFade(120);CARP.sync();PZ0={t:savedType,b:SPAWN_BASE,p:SPAWN_POS};PZ_LOC=null;locSel();pzApplyUI();requestAnimationFrame(locShow);if(window.stickReset)stickReset();musicUI();}}
+$('pResume').onclick=()=>{gfxDrain();paused=false;pauseOv.classList.remove('on');initAudio();radioVolApply();};
 // Restart and Apply are one button: it restarts this flight (same start, mission or range) until
 // an aircraft, base or start is changed on the sheet, then it reads Apply and flies the new picks.
 // Time of day needs neither, it changes the sky at once.
@@ -17471,11 +17553,11 @@ function showScr(id){
   curScr=id;document.body.classList.toggle('menuOn',menu.classList.contains('on'));document.querySelectorAll('#menu .scr').forEach(e=>e.classList.toggle('on',e.id===id));
   menu.classList.toggle('see3d',id==='sFly');SHOW.on=id==='sFly'&&menu.classList.contains('on');
   if(id==='sFly'){CARM.sync();sumUI();requestAnimationFrame(locShow);}
-  if(id==='sSchool'){schoolList();ezInit();if(!PLACE)plOpen();}else{plClose(true);orClose(true);}if(id==='sHome')startHereUI();if(id==='sArc')arcList();if(id==='sLog')logRender();
+  if(id==='sSchool'){schoolList();ezInit();if(!PLACE)plOpen();}else{plClose(true);orClose(true);}if(id==='sHome')startHereUI();if(id==='sArc')arcList();if(id==='sLog')logRender();if(id==='sSet')stallUI();
   if(LB){if(id==='sLb')LB.lbRender();else LB.sheet(false);if(id==='sSet'||id==='sFly'||id==='sHome')LB.ui();}
   tabsUI();
 }
-const TAB_OF={sHelp:'sSet',sCredits:'sSet',sLog:'sSchool'};
+const TAB_OF={sHelp:'sSet',sCredits:'sSet',sStalls:'sSet',sLog:'sSchool'};
 function tabsUI(){const t=TAB_OF[curScr]||curScr;menu.dataset.scr=curScr;
   document.querySelectorAll('#mTabs [data-go]').forEach(b=>{const on=b.dataset.go===t;b.classList.toggle('sel',on);b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1;});
   const bk=$('mBack');bk.hidden=!(fromPause||NAV.length);bk.classList.toggle('fl',fromPause&&!NAV.length);bk.setAttribute('aria-label',fromPause&&!NAV.length?'Back to the flight':'Back');}
@@ -17492,6 +17574,7 @@ document.querySelectorAll('#menu .back').forEach(b=>b.onclick=navBack);
 $('hFly').onclick=()=>tabGo('sFly');$('hSch').onclick=()=>tabGo('sSchool');$('hChal').onclick=()=>tabGo('sArc');
 $('hRec').onclick=()=>recOpen();$('bHelp').onclick=()=>nav('sHelp');
 $('bCredits').onclick=()=>{creditsRender();nav('sCredits');};
+$('bStalls').onclick=()=>{stallRender();nav('sStalls');};
 let creditsLoaded=false;
 function creditsRender(){
   const ul=document.getElementById('creditsList');if(!ul||creditsLoaded)return;
@@ -18630,8 +18713,8 @@ function renderIR(){
   scene.background=bg;sky.visible=skyV;
 }
 // ================= post processing: bloom and SMAA (graphics item 3) =================
-// Medium and High (GFX.FX.bloom, GFX.FX.smaa): the scene is drawn into PFX.rt (the canvas backing size times GFX.scale,
-// RGBA8 with depth, sRGB encoded exactly like the canvas, so every program is the one the canvas would use), the bloom
+// Medium and High (GFX.FX.bloom, GFX.FX.smaa): the scene is drawn into PFX.rt (the canvas backing size times GFX.scale:
+// since gfxfix item 3 the bottom left sub rectangle of a target allocated once at the full backing size, RGBA8 with depth, sRGB encoded exactly like the canvas, so every program is the one the canvas would use), the bloom
 // sources into PFX.b1 (High half, Medium quarter of that), two separable 9 tap blurs (5 bilinear taps each way, the
 // second twice as wide), then SMAA 1x (edges, blend weights) and one last full screen pass to the canvas that does the
 // neighbourhood blend, adds the bloom (a screen blend, PFX_STR) and upsamples a scaled down scene to the full backing
@@ -18644,15 +18727,20 @@ function renderIR(){
 const PFX={rt:null,ed:null,wt:null,b1:null,b2:null,w:0,h:0,bk:0,bloomed:false,frames:0};
 const PFX_STR=0.45;
 const _pfxV=new THREE.Vector2(),_pfxC=new THREE.Color(),_pfxFog=new THREE.Color();
-const PFX_VS='varying vec2 vUv;\nvoid main(){vUv=uv;gl_Position=vec4(position.xy,0.0,1.0);}';
+// gfxfix item 3: the chain's targets are allocated once at the full backing size and a dynamic scale step draws into a
+// sub rectangle of them (each target's viewport, pfxRender): uUvS takes a pass's quad uv to that rectangle of the full
+// size rt, ed and wt, uUvB to the bloom targets' one; vScr stays the screen's 0..1 (the dust streaks)
+const PFX_UVS={value:new THREE.Vector2(1,1)},PFX_UVB={value:new THREE.Vector2(1,1)};
+const PFX_VS='uniform vec2 uUvS;varying vec2 vUv;\nvoid main(){vUv=uv*uUvS;gl_Position=vec4(position.xy,0.0,1.0);}';
+const PFX_VS2='uniform vec2 uUvS,uUvB;varying vec2 vUv,vUvB,vScr;\nvoid main(){vScr=uv;vUv=uv*uUvS;vUvB=uv*uUvB;gl_Position=vec4(position.xy,0.0,1.0);}';
 const PFX_BLACK=new THREE.DataTexture(new Uint8Array([0,0,0,255]),1,1,THREE.RGBAFormat);PFX_BLACK.needsUpdate=true;
 function pfxMat(o){return new THREE.ShaderMaterial(Object.assign({vertexShader:PFX_VS,depthTest:false,depthWrite:false,toneMapped:false},o));}
-const PFX_BLUR=pfxMat({uniforms:{tSrc:{value:null},uDir:{value:new THREE.Vector2()}},fragmentShader:`uniform sampler2D tSrc;uniform vec2 uDir;varying vec2 vUv;
+const PFX_BLUR=pfxMat({uniforms:{tSrc:{value:null},uDir:{value:new THREE.Vector2()},uUvS:PFX_UVB},fragmentShader:`uniform sampler2D tSrc;uniform vec2 uDir;varying vec2 vUv;
 void main(){vec2 a=uDir*1.3846153846,b=uDir*3.2307692308;
   vec3 c=texture2D(tSrc,vUv).rgb*0.2270270270+(texture2D(tSrc,vUv+a).rgb+texture2D(tSrc,vUv-a).rgb)*0.3162162162+(texture2D(tSrc,vUv+b).rgb+texture2D(tSrc,vUv-b).rgb)*0.0702702703;
   gl_FragColor=vec4(c,1.0);}`});
 // the bloom goes on with a screen blend, so a lit runway edge does not clip to a white smear
-const PFX_ADD='vec3 pfxBl(vec3 c){vec3 b=texture2D(tBloom,vUv).rgb*uStr;return 1.0-(1.0-c)*(1.0-b);}\n';
+const PFX_ADD='varying vec2 vUvB,vScr;\nvec3 pfxBl(vec3 c){vec3 b=texture2D(tBloom,vUvB).rgb*uStr;return 1.0-(1.0-c)*(1.0-b);}\n';
 // graphics item 7: dust streaks on the canopy in the haboob (GFX.FX.dust, so Medium and High; Low keeps today's look).
 // DUSTFX.tex is a 512 canvas of fine streaks and grains, mapped in polar coordinates round the focus of expansion
 // (where the relative wind comes from on screen): angle across, log radius along, scrolled outward with the airspeed,
@@ -18673,20 +18761,20 @@ DUSTFX.tex=(()=>{const c=document.createElement('canvas');c.width=c.height=512;c
 const PFX_DUST=`uniform sampler2D tDust;uniform vec4 uDust,uDustF;uniform vec3 uDustC;
 vec3 pfxDust(vec3 c){
   if(uDust.x<=0.0)return c;
-  vec2 d=(vUv-uDustF.xy)*vec2(uDustF.z,1.0);float r=length(d);
+  vec2 d=(vScr-uDustF.xy)*vec2(uDustF.z,1.0);float r=length(d);
   vec4 s=texture2D(tDust,vec2(atan(d.y,d.x)*0.1591549*uDustF.w,log(r+0.03)*0.55-uDust.z));
   c=mix(c,uDustC*(0.78+0.5*s.r),s.a*uDust.x*smoothstep(0.04,0.4,r));
-  return mix(c,uDustC*0.4,uDust.y*smoothstep(0.32,0.9,length((vUv-0.5)*vec2(1.25,1.5))));
+  return mix(c,uDustC*0.4,uDust.y*smoothstep(0.32,0.9,length((vScr-0.5)*vec2(1.25,1.5))));
 }
 `;
 const PFX_DU=()=>({tDust:{value:DUSTFX.tex},uDust:{value:new THREE.Vector4()},uDustF:{value:new THREE.Vector4(0.5,0.5,1,5)},uDustC:{value:new THREE.Color()}});
-const PFX_CMP=pfxMat({uniforms:Object.assign({tColor:{value:null},tBloom:{value:PFX_BLACK},uStr:{value:0}},PFX_DU()),fragmentShader:`uniform sampler2D tColor,tBloom;uniform float uStr;varying vec2 vUv;
+const PFX_CMP=pfxMat({uniforms:Object.assign({tColor:{value:null},tBloom:{value:PFX_BLACK},uStr:{value:0},uUvS:PFX_UVS,uUvB:PFX_UVB},PFX_DU()),vertexShader:PFX_VS2,fragmentShader:`uniform sampler2D tColor,tBloom;uniform float uStr;varying vec2 vUv;
 ${PFX_ADD}${PFX_DUST}void main(){gl_FragColor=vec4(pfxDust(pfxBl(texture2D(tColor,vUv).rgb)),1.0);}`});
 // SMAA 1x medium with colour edge detection: three r128 examples/js SMAAShader and SMAAPass, compacted (WebGL port notes kept in the maths)
-const PFX_EDGE=pfxMat({defines:{SMAA_THRESHOLD:'0.1'},uniforms:{tDiffuse:{value:null},resolution:{value:new THREE.Vector2()}},
-  vertexShader:`uniform vec2 resolution;varying vec2 vUv;varying vec4 vOffset[3];
-void main(){vUv=uv;vOffset[0]=uv.xyxy+resolution.xyxy*vec4(-1.0,0.0,0.0,1.0);vOffset[1]=uv.xyxy+resolution.xyxy*vec4(1.0,0.0,0.0,-1.0);
-  vOffset[2]=uv.xyxy+resolution.xyxy*vec4(-2.0,0.0,0.0,2.0);gl_Position=vec4(position.xy,0.0,1.0);}`,
+const PFX_EDGE=pfxMat({defines:{SMAA_THRESHOLD:'0.1'},uniforms:{tDiffuse:{value:null},resolution:{value:new THREE.Vector2()},uUvS:PFX_UVS},
+  vertexShader:`uniform vec2 resolution,uUvS;varying vec2 vUv;varying vec4 vOffset[3];
+void main(){vec2 u=uv*uUvS;vUv=u;vOffset[0]=u.xyxy+resolution.xyxy*vec4(-1.0,0.0,0.0,1.0);vOffset[1]=u.xyxy+resolution.xyxy*vec4(1.0,0.0,0.0,-1.0);
+  vOffset[2]=u.xyxy+resolution.xyxy*vec4(-2.0,0.0,0.0,2.0);gl_Position=vec4(position.xy,0.0,1.0);}`,
   fragmentShader:`uniform sampler2D tDiffuse;varying vec2 vUv;varying vec4 vOffset[3];
 float md(vec3 a,vec3 b){vec3 t=abs(a-b);return max(max(t.r,t.g),t.b);}
 void main(){vec2 th=vec2(SMAA_THRESHOLD);vec4 d;vec3 C=texture2D(tDiffuse,vUv).rgb;
@@ -18697,10 +18785,10 @@ void main(){vec2 th=vec2(SMAA_THRESHOLD);vec4 d;vec3 C=texture2D(tDiffuse,vUv).r
   d.z=md(C,texture2D(tDiffuse,vOffset[2].xy).rgb);d.w=md(C,texture2D(tDiffuse,vOffset[2].zw).rgb);
   m=max(max(m,d.z),d.w);e*=step(0.5*m,d.xy);gl_FragColor=vec4(e,0.0,1.0);}`});
 const PFX_WGT=pfxMat({defines:{SMAA_MAX_SEARCH_STEPS:'8',SMAA_AREATEX_MAX_DISTANCE:'16',SMAA_AREATEX_PIXEL_SIZE:'( 1.0 / vec2( 160.0, 560.0 ) )',SMAA_AREATEX_SUBTEX_SIZE:'( 1.0 / 7.0 )'},
-  uniforms:{tDiffuse:{value:null},tArea:{value:null},tSearch:{value:null},resolution:{value:new THREE.Vector2()}},
-  vertexShader:`uniform vec2 resolution;varying vec2 vUv;varying vec4 vOffset[3];varying vec2 vPixcoord;
-void main(){vUv=uv;vPixcoord=uv/resolution;
-  vOffset[0]=uv.xyxy+resolution.xyxy*vec4(-0.25,0.125,1.25,0.125);vOffset[1]=uv.xyxy+resolution.xyxy*vec4(-0.125,0.25,-0.125,-1.25);
+  uniforms:{tDiffuse:{value:null},tArea:{value:null},tSearch:{value:null},resolution:{value:new THREE.Vector2()},uUvS:PFX_UVS},
+  vertexShader:`uniform vec2 resolution,uUvS;varying vec2 vUv;varying vec4 vOffset[3];varying vec2 vPixcoord;
+void main(){vec2 u=uv*uUvS;vUv=u;vPixcoord=u/resolution;
+  vOffset[0]=u.xyxy+resolution.xyxy*vec4(-0.25,0.125,1.25,0.125);vOffset[1]=u.xyxy+resolution.xyxy*vec4(-0.125,0.25,-0.125,-1.25);
   vOffset[2]=vec4(vOffset[0].xz,vOffset[1].yw)+vec4(-2.0,2.0,-2.0,2.0)*resolution.xxyy*float(SMAA_MAX_SEARCH_STEPS);
   gl_Position=vec4(position.xy,0.0,1.0);}`,
   fragmentShader:`#define SMAASampleLevelZeroOffset(tex,coord,offset) texture2D(tex,coord+float(offset)*resolution,0.0)
@@ -18732,9 +18820,9 @@ void main(){vec4 w=vec4(0.0);vec2 e=texture2D(tDiffuse,vUv).rg;
     c.y-=1.0*resolution.y;float e2=SMAASampleLevelZeroOffset(tDiffuse,c,ivec2(0,1)).g;w.ba=AR(sd,e1,e2,0.0);}
   gl_FragColor=w;}`});
 // the neighbourhood blend, with the bloom added and the upsample to the canvas in the same pass
-const PFX_FIN=pfxMat({uniforms:Object.assign({tDiffuse:{value:null},tColor:{value:null},tBloom:{value:PFX_BLACK},uStr:{value:0},resolution:{value:new THREE.Vector2()}},PFX_DU()),
-  vertexShader:`uniform vec2 resolution;varying vec2 vUv;varying vec4 vOffset[2];
-void main(){vUv=uv;vOffset[0]=uv.xyxy+resolution.xyxy*vec4(-1.0,0.0,0.0,1.0);vOffset[1]=uv.xyxy+resolution.xyxy*vec4(1.0,0.0,0.0,-1.0);gl_Position=vec4(position.xy,0.0,1.0);}`,
+const PFX_FIN=pfxMat({uniforms:Object.assign({tDiffuse:{value:null},tColor:{value:null},tBloom:{value:PFX_BLACK},uStr:{value:0},resolution:{value:new THREE.Vector2()},uUvS:PFX_UVS,uUvB:PFX_UVB},PFX_DU()),
+  vertexShader:`uniform vec2 resolution,uUvS,uUvB;varying vec2 vUv,vUvB,vScr;varying vec4 vOffset[2];
+void main(){vScr=uv;vUvB=uv*uUvB;vec2 u=uv*uUvS;vUv=u;vOffset[0]=u.xyxy+resolution.xyxy*vec4(-1.0,0.0,0.0,1.0);vOffset[1]=u.xyxy+resolution.xyxy*vec4(1.0,0.0,0.0,-1.0);gl_Position=vec4(position.xy,0.0,1.0);}`,
   fragmentShader:`uniform sampler2D tDiffuse,tColor,tBloom;uniform float uStr;uniform vec2 resolution;varying vec2 vUv;varying vec4 vOffset[2];
 ${PFX_ADD}${PFX_DUST}vec3 nb(){vec4 a;a.xz=texture2D(tDiffuse,vUv).xz;a.y=texture2D(tDiffuse,vOffset[1].zw).g;a.w=texture2D(tDiffuse,vOffset[1].xy).a;
   if(dot(a,vec4(1.0))<1e-5)return texture2D(tColor,vUv,0.0).rgb;
@@ -18754,6 +18842,7 @@ const PFX_OCCM=new THREE.MeshBasicMaterial({colorWrite:false});
 function pfxRT(w,h,depth){const t=new THREE.WebGLRenderTarget(w,h,{minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,format:THREE.RGBAFormat,depthBuffer:!!depth,stencilBuffer:false,generateMipmaps:false});
   t.texture.encoding=THREE.sRGBEncoding;return t;}
 function pfxFree(){for(const k of ['rt','ed','wt','b1','b2'])if(PFX[k]){PFX[k].dispose();PFX[k]=null;}PFX.w=PFX.h=0;}
+// the full backing size (scale 1): a dynamic scale step only moves the viewports (pfxRender), it allocates nothing
 function pfxSize(w,h,bk){
   pfxFree();PFX.w=w;PFX.h=h;PFX.bk=bk;
   PFX.rt=pfxRT(w,h,true);PFX.ed=pfxRT(w,h,false);PFX.wt=pfxRT(w,h,false);
@@ -18782,9 +18871,16 @@ function pfxRender(){
   const r=renderer;
   if(!GFX.post){if(PFX.rt)pfxFree();r.render(scene,camera);return;}
   r.getDrawingBufferSize(_pfxV);
-  const s=GFX.scale,w=Math.max(1,Math.round(_pfxV.x*s)),h=Math.max(1,Math.round(_pfxV.y*s)),bk=GFX.tier==='high'?2:4;
-  if(!PFX.rt||PFX.w!==w||PFX.h!==h||PFX.bk!==bk)pfxSize(w,h,bk);
-  const bloom=GFX.on('bloom')&&pfxSrcOn(),smaa=GFX.on('smaa'),ac=r.autoClear;
+  const s=GFX.scale,W=Math.max(1,Math.round(_pfxV.x)),H=Math.max(1,Math.round(_pfxV.y)),bk=GFX.tier==='high'?2:4;
+  if(!PFX.rt||PFX.w!==W||PFX.h!==H||PFX.bk!==bk)pfxSize(W,H,bk);
+  // the scaled frame: the bottom left w x h of the full size targets (and of the bloom's), the passes' uv scaled to it
+  const w=Math.max(1,Math.round(W*s)),h=Math.max(1,Math.round(H*s)),bw=PFX.b1.width,bh=PFX.b1.height,
+    sw=Math.min(bw,Math.max(1,Math.round(w/bk))),sh=Math.min(bh,Math.max(1,Math.round(h/bk)));
+  for(const t of [PFX.rt,PFX.ed,PFX.wt])t.viewport.set(0,0,w,h);
+  for(const t of [PFX.b1,PFX.b2])t.viewport.set(0,0,sw,sh);
+  PFX_UVS.value.set(w/W,h/H);PFX_UVB.value.set(sw/bw,sh/bh);PFX.sw=w;PFX.sh=h;
+  // the battery guard (GFX.thermS.on) drops the bloom and SMAA passes: the plain composite, compiled with the rest
+  const th=GFX.thermS.on,bloom=GFX.on('bloom')&&!th&&pfxSrcOn(),smaa=GFX.on('smaa')&&!th,ac=r.autoClear;
   r.getClearColor(_pfxC);const ca=r.getClearAlpha();
   GFX.rs=s;r.setRenderTarget(PFX.rt);r.render(scene,camera);
   r.autoClear=true;r.setClearColor(0x000000,0);
@@ -18836,7 +18932,7 @@ GFX_HOOKS.push(()=>{if(!GFX.post)pfxFree();});
 // dry run of fxWarmLayer) and the DZ smoke, the IR pass and the carousel; the night lights (AL_MAT) are in the main
 // compile and frame. Headless (SwiftShader) a first draw of a new state is what stalls, not the link, hence the draws.
 // The menu's WARM steps still upload the other aircraft later. PRE.ms: each step's ms; localStorage kgeuNoPre=1 skips it.
-const PRE={done:false,skip:false,ms:{},total:0};
+const PRE={done:false,skip:false,ms:{},total:0,syncMs:null},PRE_PX=new Uint8Array(4);
 try{PRE.skip=localStorage.getItem('kgeuNoPre')==='1';}catch(e){}
 // where the first flight's chase camera will be (createState's spawn points, without its wind draw)
 function prePose(){
@@ -18865,20 +18961,42 @@ function preAt(f){
     if(Q.M){Q.M.visible=Q.mv;Q.M.position.copy(Q.mp);Q.M.quaternion.copy(Q.mq);Q.M.updateMatrixWorld(true);}
     camera.position.copy(Q.cp);camera.quaternion.copy(Q.cq);camera.updateMatrixWorld();rebuildTerrain(camera.position.x,camera.position.z);}
 }
-function preJobs(){
-  const Q=PREQ,r=renderer;Q.A=pfxRT(16,16,true);Q.B=pfxRT(16,16,false);Q.C=pfxRT(16,16,false);Q.D=pfxRT(16,16,false);
-  const A=Q.A,B=Q.B,C=Q.C,D=Q.D;
-  return [
-    ['build',()=>{hbBuild();if(CLOUD_MESH&&GFX.on('clouds')&&!CLOUDS.cb)cloudCB();if(!DZ.built)dzBuild();}],
-    ['compile',()=>preAt(()=>r.compile(scene,camera))],
-    ['frame',()=>preAt(M=>{
+// gfxfix item 3: every shadow depth program a flight can need. r128 draws every caster with one shared MeshDepthMaterial
+// per morph, skinning and instancing variant (getDepthMaterial), its side from the caster's material, and none of the
+// caster's own maps; so the programs are morph (the HD F-16's control surfaces, the traffic F-16s) or not, times front,
+// back and double sided (no caster is skinned or instanced: csmMark and csmStatic skip instanced meshes). The takeoff
+// used to link the morph one on the first frame a traffic F-16 or our own came within 2 km. Six 1 m boxes, never in
+// the scene, listed in the near cascade for that one draw only (no frustum cull, so wherever the camera is).
+function preDepth(){
+  if(PREQ.dp)return PREQ.dp;const L=[],g=new THREE.BoxGeometry(1,1,1),gm=new THREE.BoxGeometry(1,1,1);
+  gm.morphAttributes.position=[gm.attributes.position.clone()];
+  for(const side of [THREE.FrontSide,THREE.BackSide,THREE.DoubleSide])for(const mo of [false,true]){
+    const m=new THREE.Mesh(mo?gm:g,new THREE.MeshLambertMaterial({side:side,morphTargets:mo}));m.castShadow=true;m.frustumCulled=false;
+    if(mo)m.updateMorphTargets();m.updateMatrixWorld(true);L.push(m);}
+  return PREQ.dp=L;
+}
+// the main scene drawn once round the first flight's camera into the 16 px target A, the shadow maps with every caster
+// variant (the 'frame' job, and the requeue's 'gpu sync')
+function preFrame(M,A){const r=renderer;
       if(CSM.n){   // the maps drawn once round that camera (the shading ignores them: CSM_U.a.w stays 0)
         _csmD.copy(sun.position).normalize();if(_csmD.y<0.2)_csmD.set(0.3,0.9,0.3).normalize();
         const Ls=CSM.L;for(const l of Ls)l.length=0;
         if(M){csmMark(M);Ls[0].push(M);Ls[1].push(M);}Ls[0].push(terrain);Ls[1].push(terrain);for(const o of CSM.stat)Ls[1].push(o);Ls[2].push(terrain);
-        for(let i=0;i<CSM.n;i++){const L=CSM.lights[i];csmFit(L,i,0,CSM.SPLIT[i],L.shadow.mapSize.x);L.shadow.needsUpdate=true;L.userData.sig=null;}}
+        for(const o of preDepth())Ls[0].push(o);
+        for(let i=0;i<CSM.n;i++){const L=CSM.lights[i];csmFit(L,i);L.shadow.needsUpdate=true;L.userData.sig=null;}}
       try{r.setRenderTarget(A);r.autoClear=true;r.render(scene,camera);}
-      finally{if(CSM.n){csmIdle();for(const l of CSM.L)l.length=0;}}})],
+      finally{if(CSM.n){csmIdle();for(const l of CSM.L)l.length=0;}}}
+// the dogfight's objects before any dogfight (about 8 ms): the bandit model and a first pooled bandit, the missiles,
+// tracers and flares (dfStart built them, and the flares' points program linked in flight); hidden, in the scene, so
+// the compile job (and any later whole scene compile) links their programs
+function dfWarmBuild(){dfBuild();dfWBuild();if(!DF.pool.length)dfBandit();}
+function preJobs(){
+  const Q=PREQ,r=renderer;Q.A=pfxRT(16,16,true);Q.B=pfxRT(16,16,false);Q.C=pfxRT(16,16,false);Q.D=pfxRT(16,16,false);
+  const A=Q.A,B=Q.B,C=Q.C,D=Q.D;
+  return [
+    ['build',()=>{hbBuild();if(CLOUD_MESH&&GFX.on('clouds')&&!CLOUDS.cb)cloudCB();if(!DZ.built)dzBuild();dfWarmBuild();}],
+    ['compile',()=>preAt(()=>r.compile(scene,camera))],
+    ['frame',()=>preAt(M=>preFrame(M,A))],
     ['post chain',()=>{if(!GFX.post)return;preAt(()=>{
       const bg=scene.background,lm=camera.layers.mask;scene.background=null;r.setRenderTarget(A);r.clear(true,true,false);
       try{camera.layers.set(PFX_OCC);scene.overrideMaterial=PFX_OCCM;r.render(scene,camera);scene.overrideMaterial=null;
@@ -18899,20 +19017,31 @@ function preJobs(){
     // mesh built later without them), so it tags afresh when the sensor is first used
     ['ir',()=>preAt(()=>{const ic=[],pm=[];scene.traverse(o=>{if(o.isInstancedMesh&&!o.instanceColor)ic.push(o);else if(o.isPoints)pm.push([o,o.layers.mask]);});
       try{r.setRenderTarget(A);renderIR();}finally{for(const o of ic)o.instanceColor=null;for(const [o,m] of pm)o.layers.mask=m;irDirty=true;IR.pass=false;}})],
-    ['carousel',()=>{const p=showItem(savedType||'cessna'),cam=SHOW.cam,prevT=r.getRenderTarget();p.visible=true;p.position.set(0,0,0);p.scale.setScalar(40/p.userData.dim);
+    ['carousel',()=>{if(PRE.car)return;PRE.car=true;const p=showItem(savedType||'cessna'),cam=SHOW.cam,prevT=r.getRenderTarget();p.visible=true;p.position.set(0,0,0);p.scale.setScalar(40/p.userData.dim);
       cam.aspect=1.6;cam.position.set(0,30,100);cam.lookAt(0,0,0);cam.updateProjectionMatrix();
       if(!SHOW.scene.environment)SHOW.scene.environment=envDay();
       try{r.setRenderTarget(A);r.render(SHOW.scene,cam);}finally{p.visible=false;r.setRenderTarget(prevT);}}]];
 }
 // one frame's share of the queue (tick, from the 4th frame); true once it has drained. BOOT.sub moves the bar through
-// the last stage as it goes.
+// the last stage as it goes. Gfxfix item 3: a tier change in the menu (GFX.setTier, GFX.pendingApply) runs it again
+// (gfxRequeue: every job is safe to repeat, the carousel's once only, BOOT.mark('warm') sets its time once); the tick
+// drains it on frames that are not flying, start() and the pause sheet's Resume drain what is left in one go (gfxDrain)
+// so a flight's first frame never compiles. __kgeu.boot().pre.done turns true again when it has drained.
 function gfxPrecompile(){
   if(PRE.done)return true;
   if(PRE.skip){PRE.done=true;BOOT.mark('warm');return true;}
   const Q=PREQ,t0=performance.now();
-  if(!Q.jobs){Q.jobs=preJobs();Q.i=0;PRE.t0=t0;PRE.frames=0;}
+  if(!Q.jobs){Q.jobs=preJobs();Q.i=0;PRE.t0=t0;PRE.frames=0;
+    // a requeued run (a tier change in the menu) ends on a GPU sync: the frame drawn once more and one pixel read back,
+    // so the driver finishes linking and building the new pipelines while the menu is still up, rather than on the
+    // first flight frame (the menu's own frames draw no 3D and never wait for it). PRE.syncMs: how long that took.
+    // Never at boot: the splash and the menu's first seconds absorb it there. It waits for the menu's WARM steps (run
+    // again with the queue, their draws are GPU work too), so it is the last thing the menu queues.
+    if(PRE.runs>1)Q.jobs.push(['gpu sync',()=>{const a=performance.now();
+      preAt(M=>{preFrame(M,Q.A);renderer.readRenderTargetPixels(Q.A,0,0,1,1,PRE_PX);});PRE.syncMs=Math.round(performance.now()-a);},()=>WARM.done]);}
   PRE.frames++;
-  do{const j=Q.jobs[Q.i++],a=performance.now();
+  do{if(Q.jobs[Q.i][2]&&!Q.jobs[Q.i][2]())break;   // a job that waits (the GPU sync, on the WARM steps)
+    const j=Q.jobs[Q.i++],a=performance.now();
     try{j[1]();}catch(e){console.warn('gfx precompile '+j[0],e);}
     PRE.ms[j[0]]=+(performance.now()-a).toFixed(1);}
   while(Q.i<Q.jobs.length&&performance.now()-t0<40);
@@ -18921,6 +19050,22 @@ function gfxPrecompile(){
   for(const k of ['A','B','C','D'])if(Q[k]){Q[k].dispose();Q[k]=null;}
   Q.jobs=null;PRE.done=true;PRE.total=+Object.values(PRE.ms).reduce((x,y)=>x+y,0).toFixed(1);PRE.wall=Math.round(performance.now()-PRE.t0);
   BOOT.mark('warm');return true;
+}
+// after a tier change (menu only): the queue and the menu's WARM steps once more for the new tier's programs
+function gfxRequeue(){
+  if(!BOOT.t.warm)return;   // still booting: the first run of the queue is on its way and sees the new tier
+  for(const k of ['A','B','C','D'])if(PREQ[k]){PREQ[k].dispose();PREQ[k]=null;}
+  PREQ.jobs=null;PREQ.i=0;PRE.done=false;PRE.runs=(PRE.runs||1)+1;
+  WARM.i=0;WARM.ms=[];const w=WARM.done;WARM.done=false;if(w)setTimeout(warmTick,60);
+}
+GFX.requeue=gfxRequeue;   // GFX lives outside init()
+// a flight about to start (or resume) with the queue not drained: the rest of it now, behind the menu still on screen
+function gfxDrain(){
+  if(PRE.done)return 0;const t0=performance.now();let n=0;
+  // the GPU sync waits on the WARM steps: the rest of them now as well
+  if(PRE.runs>1&&!WARM.done){while(WARM.i<WARM_STEPS.length){try{WARM_STEPS[WARM.i]();}catch(e){console.warn('wstep',e);}WARM.i++;}WARM.done=true;}
+  while(!PRE.done&&n++<64)gfxPrecompile();
+  PRE.drainMs=Math.round(performance.now()-t0);return PRE.drainMs;
 }
 // ---- day TV: grain and a faint 8 px block pattern, one small tile stepped every 80 ms ----
 const sensorFx=$('sensorFx'),sensorGr=sensorFx.firstChild;let sfxT=0;
@@ -19826,9 +19971,11 @@ function targetsTick(dt){
   for(const t of STRIKE.targets){if(!t.dead)continue;t.deadT=(t.deadT||0)+dt;
     t.mesh.userData.heat=0.95-0.45*clamp(t.deadT/60,0,1);}
 }
+// the scorched look, one material made at load rather than one per kill (gfxfix item 3)
+const KILL_MAT=lam(0x241f1a);
 function killTarget(t){
   t.dead=true;t.moving=false;t.mesh.userData.heat=0.95;irDirty=true;
-  const dark=lam(0x241f1a);
+  const dark=KILL_MAT;
   t.mesh.traverse(o=>{if(o.isMesh)o.material=dark;});
   t.mesh.rotation.z+=(Math.random()-0.5)*0.35;t.deadT=0;
 }
@@ -20187,7 +20334,7 @@ function sensorAP(){
   toast('AUTOPILOT ENGAGED',2);
 }
 // ---------- main loop ----------
-function resize(){const w=window.innerWidth,h=window.innerHeight;VP.w=w;VP.h=h;renderer.setSize(w,h,false);glcH=glc.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();sizeMap();fmSize();FM.prepT=0;if(FM.on){lblUI();fmDraw();}}
+function resize(){const w=window.innerWidth,h=window.innerHeight;VP.w=w;VP.h=h;renderer.setSize(w,h,false);glcH=glc.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();csmRadii();sizeMap();fmSize();FM.prepT=0;if(FM.on){lblUI();fmDraw();}}
 window.addEventListener('resize',()=>{resize();relayoutSoon();});window.__glReady=1;resize();
 const hudSens=$('sensorHud');let sensOn=false;const hIas=$('hIas'),hAlt=$('hAlt'),hWindT=$('hWindT'),hWindA=$('hWindA'),hAp=$('hAp'),bAuto=$('bAuto'),bAutoT=$('bAutoT'),warnEl=$('warn'),hVs=$('hVs'),hHdg=$('hHdg');
 const APN={to:'AUTO T/O',hold:'ALT HOLD',land:'AUTOLAND',orbit:'ORBIT'},APP={climb:'CLIMB',nav:'NAV',loc:'FINAL',orb:'DESCEND'};
@@ -20213,7 +20360,7 @@ function fpsStats(){const b=FPS.buf,n=FPS.n;let sum=0,k=0;
   const m=performance.memory;
   return {avg:sum>0?Math.round(k*10000/sum)/10:0,low1:p99>0?Math.round(10000/p99)/10:0,ms:k?Math.round(sum/k*10)/10:0,n:n,
     heapMB:m&&m.usedJSHeapSize?Math.round(m.usedJSHeapSize/104857.6)/10:null,loadMs:LOAD_MS};}
-function fpsScene(){return !running?'menu:'+curScr:paused?'paused':DF.on?'dogfight':sensorMode?'sensor':'flight';}
+function fpsScene(){return !running||menu.classList.contains('on')?'menu:'+curScr:paused?'paused':DF.on?'dogfight':sensorMode?'sensor':'flight';}
 function fpsUI(){const b=$('oFps');if(b){b.textContent='FPS counter: '+(FPS.on?'On':'Off');b.classList.toggle('on',FPS.on);}$('fpsPill').classList.toggle('on',FPS.on);}
 function setFps(v){FPS.on=!!v;try{localStorage.setItem('kgeuFps',FPS.on?'1':'0');}catch(e){}FPS.txtT=FPS.logT=0;fpsUI();}
 // dynamic resolution (graphics item 2): fed every frame while flying and not paused, with the ring's numbers refreshed
@@ -20235,6 +20382,102 @@ function fpsFrame(t){
   if(t-FPS.txtT>=250){FPS.txtT=t;const s=fpsStats();$('fpsPill').textContent=gfxTag()+Math.round(s.avg)+' fps \u00b7 1% '+Math.round(s.low1)+' \u00b7 '+s.ms.toFixed(1)+' ms';
     if(!FPS.logT)FPS.logT=t;else if(t-FPS.logT>=5000){FPS.logT=t;console.log('[fps] avg '+Math.round(s.avg)+' low1 '+Math.round(s.low1)+' ms '+s.ms.toFixed(1)+' scene '+fpsScene());}}}
 $('oFps').onclick=()=>setFps(!FPS.on);fpsUI();
+// gfxfix item 1: the stall logger, always on. A frame whose rAF gap passes STALL.thr is logged with what changed since
+// the previous frame's start (programs linked, uploads, shadows, the post chain, terrain, PMREM...) from cheap counters
+// read at the top of every frame. The gap covers the previous frame's tick and draw, so tick is that frame's CPU ms.
+// Skipped: before the splash is gone, a held loop (stepFrame) and the frame after it; the first frame back from a hidden
+// tab is logged with 'hidden' and left out of count and worst. Kept: the last 30 (localStorage kgeuStalls, written at
+// most every 2 s from a timer), Settings > Stutter log.
+var STALL={thr:250,log:[],prev:[],count:0,worst:0,marks:[],lastMarks:[],tags:[],tickMs:0,vis:false,held:true,saveT:0,
+  p:{prog:0,tex:0,geo:0,recv:0,bld:0,ch:0,pr:0,sc:0,tier:'',pw:0,ph:0,pbk:0,vw:0,vh:0,tls:0,env:0,tod:0,hbt:0,hb:false,warm:0,pre:0,fx:0,msl:0,trf:0,df:false,cr:false,pa:false,mn:false,heap:0}};
+try{const o=JSON.parse(localStorage.getItem('kgeuStalls')||'null');if(o&&Array.isArray(o.log))STALL.prev=o.log.concat(Array.isArray(o.prev)?o.prev:[]).slice(-30);}catch(e){}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)STALL.vis=true;});
+// gfxfix item 3: programs counted by r128's increasing WebGLProgram id, not the list's length (a compile and a dispose
+// in the same stretch net to zero there, as PMREM's blur did): max, the highest id seen; compiles, the ids above the
+// previous high water mark summed since load (every program ever linked, the ones since disposed too)
+const PROGHW={max:-1,compiles:0};
+function progScan(){const P=renderer.info.programs;if(!P)return 0;let m=PROGHW.max;
+  for(let i=0;i<P.length;i++)if(P[i].id>m)m=P[i].id;
+  const d=m-PROGHW.max;if(d>0){PROGHW.compiles+=d;PROGHW.max=m;}return d;}
+function stallProbe(t){
+  const S=STALL,P=S.p,ri=renderer.info,mm=performance.memory;
+  const prog=(progScan(),PROGHW.compiles),tex=ri.memory.textures,geo=ri.memory.geometries,ch=scene.children.length,pr=renderer.getPixelRatio();
+  let fx=0;for(let i=0;i<FX.length;i++)if(FX[i].on)fx++;
+  const msl=STRIKE.missiles.length+(DF.msl?DF.msl.length:0),mn=menu.classList.contains('on'),cr=!!(st&&st.crashed),heap=mm?mm.usedJSHeapSize||0:0,
+    warm=WARM.i,pre=PRE.frames|0,vis=S.vis,wasHeld=S.held;
+  const gap=FPS.prev?t-FPS.prev:0,tk=S.tickMs;
+  S.held=loopHeld;
+  if(vis&&!document.hidden)S.vis=false;
+  if(gap>S.thr&&LOAD_MS!=null&&!loopHeld&&!wasHeld){
+    const T=S.tags;T.length=0;
+    if(prog>P.prog)T.push('prog+'+(prog-P.prog));
+    if(tex>P.tex)T.push('tex+'+(tex-P.tex));
+    if(geo>P.geo)T.push('geo+'+(geo-P.geo));
+    if(CSM.recv>P.recv)T.push('csmRecv');
+    if(CSM.builds>P.bld)T.push('csmBuild');
+    if(ch!==P.ch)T.push('children'+(ch>P.ch?'+':'')+(ch-P.ch));
+    if(pr!==P.pr)T.push('pr');
+    if(GFX.scale!==P.sc)T.push('scale');
+    if(GFX.tier!==P.tier)T.push('tier');
+    if(PFX.w!==P.pw||PFX.h!==P.ph||PFX.bk!==P.pbk)T.push('rt');
+    if(VP.w!==P.vw||VP.h!==P.vh)T.push('resize');
+    if(TLS.n>P.tls)T.push('terrain '+Math.round(TLS.ms)+'ms');
+    if(ENV.n>P.env)T.push('pmrem');
+    if(TOD_N>P.tod)T.push('tod');
+    if(HB.tierN>P.hbt)T.push('hbTier');
+    if(HB.on!==P.hb)T.push('haboob');
+    if(warm>P.warm)T.push('wstep');   // a menu WARM step ran (never the word warm: warm_console_check)
+    if(pre>P.pre)T.push('pjob');   // a precompile queue job ran
+    if(fx>P.fx)T.push('fx+'+(fx-P.fx));
+    if(msl>P.msl)T.push('missile');
+    if(TRAFFIC.length>P.trf)T.push('traffic+'+(TRAFFIC.length-P.trf));
+    if(DF.on!==P.df)T.push('df');
+    if(cr&&!P.cr)T.push('crash');
+    if(paused!==P.pa)T.push('pause');
+    if(mn!==P.mn)T.push('menu');
+    if(heap&&P.heap-heap>8388608)T.push('gc?');
+    const g=Math.round(gap),tki=Math.round(tk);
+    if(g-tki>0.6*g)T.push('outside');
+    if(vis)T.push('hidden');
+    for(let i=0;i<S.marks.length;i++)T.push(S.marks[i]);
+    stallAdd(g,tki,t);
+  }
+  P.prog=prog;P.tex=tex;P.geo=geo;P.recv=CSM.recv;P.bld=CSM.builds;P.ch=ch;P.pr=pr;P.sc=GFX.scale;P.tier=GFX.tier;
+  P.pw=PFX.w;P.ph=PFX.h;P.pbk=PFX.bk;P.vw=VP.w;P.vh=VP.h;P.tls=TLS.n;P.env=ENV.n;P.tod=TOD_N;P.hbt=HB.tierN;P.hb=HB.on;
+  P.warm=warm;P.pre=pre;P.fx=fx;P.msl=msl;P.trf=TRAFFIC.length;P.df=DF.on;P.cr=cr;P.pa=paused;P.mn=mn;P.heap=heap;
+}
+function stallAdd(g,tki,t){
+  const S=STALL,hid=S.tags.indexOf('hidden')>=0;
+  const r={t:Math.round(t/100)/10,gap:g,tick:tki,scene:fpsScene(),tier:GFX.tier,scale:+GFX.scale.toFixed(2),tags:S.tags.slice(),marks:S.marks.slice()};
+  if(r.marks.length){S.lastMarks=r.marks;S.marks=[];}
+  S.log.push(r);if(S.log.length>30)S.log.shift();
+  if(!hid){S.count++;if(g>S.worst)S.worst=g;}
+  console.log('[stall] '+g+' ms tick '+tki+' ms '+r.scene+(r.tags.length?' '+r.tags.join(' '):''));
+  if(!S.saveT)S.saveT=setTimeout(stallSave,2000);
+}
+function stallSave(){STALL.saveT=0;
+  try{localStorage.setItem('kgeuStalls',JSON.stringify({v:stallVer(),log:STALL.log,prev:STALL.prev}));}catch(e){}
+  stallUI();if(curScr==='sStalls'&&menu.classList.contains('on'))stallRender();}
+// APP_VER lives inside the leaderboard module; its boot copies it onto __kgeu
+function stallVer(){return (window.__kgeu&&window.__kgeu.APP_VER)||'';}
+function stallMark(tag){STALL.marks.push(String(tag));}
+function stallClear(){const S=STALL;S.log.length=0;S.prev=[];S.count=0;S.worst=0;S.marks=[];S.lastMarks=[];
+  try{localStorage.removeItem('kgeuStalls');}catch(e){}stallUI();if(curScr==='sStalls')stallRender();}
+const _stN=n=>n.toLocaleString('en-US');
+function stallUI(){if(!STALL)return;const b=$('bStallsT');if(!b)return;const S=STALL;
+  b.textContent=S.count?S.count+(S.count===1?' stall':' stalls')+' · worst '+_stN(S.worst)+' ms':'No stalls yet';}
+function stallLine(r){return 't '+r.t.toFixed(1)+' s · '+_stN(r.gap)+' ms (tick '+r.tick+' ms) · '+r.scene+' · '+
+  String(r.tier||'').charAt(0).toUpperCase()+' '+(+r.scale||0).toFixed(2)+(r.tags&&r.tags.length?' · '+r.tags.join(' '):'');}
+function stallRender(){const ul=$('stallList');if(!ul)return;const S=STALL,esc=x=>x.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const cur=S.log.slice().reverse(),old=S.prev.slice().reverse().slice(0,Math.max(0,30-cur.length));
+  let h=cur.map(r=>'<li>'+esc(stallLine(r))+'</li>').join('');
+  if(!cur.length)h='<li>No stalls this session</li>';
+  if(old.length)h+='<li class="lab">Earlier sessions</li>'+old.map(r=>'<li class="old">'+esc(stallLine(r))+'</li>').join('');
+  ul.innerHTML=h;}
+$('bStallClr').onclick=()=>stallClear();
+$('bStallCopy').onclick=()=>{const j=JSON.stringify({v:stallVer(),thr:STALL.thr,count:STALL.count,worst:STALL.worst,log:STALL.log,prev:STALL.prev});
+  try{navigator.clipboard.writeText(j).then(()=>toast('Stutter log copied'),()=>toast('Copy failed'));}catch(e){toast('Copy failed');}};
+stallUI();
 // graphics item 8: the first frames' times. BOOT.ft.boot: the first 12 from boot (the menu's), BOOT.ft.fly: a flight's
 // first 600 (restarted by each start); each [CPU ms of the tick, ms from this frame's start to the next one's] (the second
 // takes the GPU and the driver's shader work, which the CPU time cannot see). console.time on the very first menu frame
@@ -20242,12 +20485,13 @@ $('oFps').onclick=()=>setFps(!FPS.on);fpsUI();
 BOOT.ft={boot:[],fly:[],run0:null,prev:null};
 function frame(t){
   requestAnimationFrame(frame);
+  stallProbe(t);   // before fpsFrame: it reads the gap from FPS.prev
   fpsFrame(t);
   const F=BOOT.ft;if(F.prev){F.prev[1]=+(t-F.prev[2]).toFixed(1);F.prev.length=2;F.prev=null;}
   if(!loopHeld){const fl=running&&!paused&&F.run0!==RUN.t0,lb=!F.boot.length?'pfs first menu frame':fl?'pfs first flight frame':null;
     if(fl){F.run0=RUN.t0;F.fly=[];}
     if(!F.boot.length)BOOT.t.frame1=Math.round(performance.now());
-    if(lb)console.time(lb);const a=performance.now();tick(t);const ms=+(performance.now()-a).toFixed(1);if(lb)console.timeEnd(lb);
+    if(lb)console.time(lb);const a=performance.now();tick(t);const ms=+(performance.now()-a).toFixed(1);if(lb)console.timeEnd(lb);STALL.tickMs=ms;
     const e=[ms,null,t];if(F.boot.length<12){F.boot.push(e);F.prev=e;}if(running&&!paused&&F.fly.length<600){F.fly.push(e);F.prev=e;}}
 }
 function tick(t,skipRender){
@@ -20386,7 +20630,8 @@ function tick(t,skipRender){
   if(DF.live&&DF.wTxt&&running&&!s.crashed)w=DF.wTxt;   // the dogfight's HARD DECK and EJECT win
   if(w==='STALL')hapPattern('stall');   // its cooldown makes the repeating pulse
   setTxt(warnEl,w);warnEl.classList.toggle('on',!!w);
-  updateAudio();frameN++;if(frameN>=4&&WORLD.ready&&!PRE.done&&!splashFading()&&gfxPrecompile()&&!splashSeen){splashSeen=true;splashDone();}   // a world region: once it is built
+  // a world region: once it is built. A rerun after a tier change (gfxRequeue) waits for a frame that is not flying
+  updateAudio();frameN++;if(frameN>=4&&WORLD.ready&&!PRE.done&&!splashFading()&&(!running||paused||menu.classList.contains('on'))&&gfxPrecompile()&&!splashSeen){splashSeen=true;splashDone();}
   if(skipRender){}
   else if(SHOW.on){csmIdle();renderer.setClearColor(0xF6C177,1);renderer.clear();showRender(dt,CARM);}
   // under the opaque menu the first 40 frames used to draw the world to compile its programs; the precompile queue
@@ -20394,7 +20639,7 @@ function tick(t,skipRender){
   // it pushed the menu's WARM steps past warm_console_check's window); kgeuNoPre keeps the old 40 frames
   else{if((!menu.classList.contains('on')||(frameN<40&&(!PRE.done||PRE.skip)))&&!FM.on){   // the open map is opaque: no 3D frame under it
       rebuildTerrain(camera.position.x,camera.position.z);   // the LOD rings round the camera this frame looks from
-      if(camMode===2&&SENSOR.mode!=='tv'&&!PHOTO.on&&!FREECAM){csmIdle();renderIR();}else{csmFrame();pfxRender();}}
+      if(camMode===2&&SENSOR.mode!=='tv'&&!PHOTO.on&&!FREECAM){csmIdle();renderIR();}else{csmFrame(Math.min(0.1,rdt));pfxRender();}}
     const po=pauseOv.classList.contains('on');document.body.classList.toggle('pauseOn',po);}
 }
 // test hook: headless UI checks need to reach a few internals
@@ -20406,7 +20651,7 @@ function tick(t,skipRender){
 // it switched off, so nothing is fetched and no request can fail in their console.
 var LB=null;
 LB=(function(){
-const APP_VER='2026-10-12-graphics';          // keep version.json in step when shipping
+const APP_VER='2026-10-14-gfxfix';          // keep version.json in step when shipping
   const ORIGINS=['https://rabahharchaoui-design.github.io','http://localhost:8765'];
   let over='';try{over=localStorage.getItem('kgeuLBUrl')||'';}catch(e){}
   const E={url:over||'https://pfs-scores.rabahharchaoui.workers.dev',enabled:!!over||ORIGINS.includes(location.origin),online:null,
@@ -20993,7 +21238,7 @@ const APP_VER='2026-10-12-graphics';          // keep version.json in step when 
     get P(){return E.P;}};
 })();
 
-window.__kgeu={PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),taskXp:taskXp,tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
+window.__kgeu={stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>p.cacheKey),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),taskXp:taskXp,tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
   task:()=>({on:TASK.on,id:TASK.id,stage:TASK.stage&&TASK.stage.id,si:TASK.si,brief:TASK.brief,done:TASK.done,res:TASK.res,ask:TASK.ask&&{shown:TASK.ask.shown,opts:TASK.ask.opts.map(o=>o.k),t:TASK.ask.t},d:TASK.d,log:TASK.log.slice(),seed:TASK.seed}),
   tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzBuild:()=>dzBuild(),dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
@@ -21018,10 +21263,12 @@ window.__kgeu={PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,b
   clouds:()=>({preset:CLOUDS.preset,forced:CLOUDS.forced,visible:!!(CLOUD_MESH&&CLOUD_MESH.visible),hd:!!(CLOUD_MESH&&CLOUD_MESH.material===CLOUDS.hd),
     cb:!!(CLOUDS.cb&&CLOUDS.cb.visible),cbTris:CLOUDS.tris||0,cbN:CLOUDS.cb?CLOUDS.cb.count:0,puffs:CLOUD_MESH?CLOUD_MESH.count:0,pick:(t,k)=>cloudsPick(t,k)}),
   cloudsPick:cloudsPick,
-  csm:()=>({n:CSM.n,lights:CSM.lights.length,inScene:CSM.lights.filter(l=>l.parent===scene).length,enabled:renderer.shadowMap.enabled,
+  csm:()=>({n:CSM.n,recvMs:CSM.recvMs,lights:CSM.lights.length,inScene:CSM.lights.filter(l=>l.parent===scene).length,enabled:renderer.shadowMap.enabled,
     sizes:CSM.lights.map(l=>l.shadow.mapSize.x),act:CSM.act,renders:CSM.renders,skips:CSM.skips,recv:CSM.recv,strength:CSM_U.a.w,stat:CSM.stat.length,
     lists:CSM.L.map(l=>l.length),dirLights:scene.children.filter(o=>o.isDirectionalLight).length,
-    r:CSM.lights.map(l=>l.shadow.camera.right),split:[CSM_U.a,CSM_U.c].map(o=>[o.x,o.y,o.z])}),
+    r:CSM.lights.map(l=>l.shadow.camera.right),split:[CSM_U.a,CSM_U.c].map(o=>[o.x,o.y,o.z]),
+    aglS:CSM.aglS,F:CSM.F.slice(0,CSM.n),R:CSM.R.slice(0,CSM.n),NB:CSM.NB.slice(0,CSM.n),thr:Object.assign({},CSM.THR),fadeN:CSM.fadeN,
+    cascades:CSM.lights.map((l,i)=>({drawn:CSM.drawn[i],pos:CSM.pos[i].slice(),lpos:[l.position.x,l.position.y,l.position.z]}))}),
   AIR:()=>({k:AIR_U.k,sun:AIR_U.sun,s:AIR_U.s,a:AIR_U.a,t:AIR_U.t,m:AIR_U.m,mon:AIR.mon,r0:AIR.r0}),
   setTOD:setTOD,isNight:isNight,TOD:()=>TOD,
   haboob:()=>({on:HB.on,dist:HB.on?HB.dist:null,d:HB.d,windKt:st.windKt,gustAmp:st.gustAmp,fogNear:scene.fog.near,called:HB.called,
