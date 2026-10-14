@@ -128,39 +128,56 @@ async def main():
         r = await feed(pg, 3.2, 50, 50)
         ok('dyn: after the grace, 3 s of low frames step down', r == 0.85, r)
         # graphics item 8, the battery guard: 20 s straight at the 0.7 floor with the 1% low under 50 (not in the first 10 s
-        # of a flight) drops one tier for the session, the scale back to 1, one toast a session; kgeuTier never written
+        # of a flight). Gfxfix item 3: in flight it never changes the tier (no recompile): the scale held at 0.7, the
+        # cascades and the bloom and SMAA passes off (thermS.on), GFX.pendingTier one step down and one toast a session;
+        # the menu (openMenu) applies the pending tier for the session, kgeuTier never written
         TF = """([n,avg,low,dt])=>{const G=window.__kgeu.GFX;let s;for(let i=0;i<n;i++)s=G.thermalFeed(avg,low,dt);return s;}"""
         async def tfeed(secs, low, dt=1/60):
             return await pg.evaluate(TF, [int(round(secs / dt)), 30, low, dt])
+        ST = f"()=>({{tier:{K}.GFX.tier,pending:{K}.GFX.pendingTier,on:{K}.GFX.thermS.on,scale:{K}.GFX.scale,ov:{K}.GFX.override,ls:localStorage.getItem('kgeuTier'),toasts:{K}.GFX.thermS.toasts,drops:{K}.GFX.thermS.drops,txt:document.getElementById('toast').textContent,pr:{K}.R3().renderer.getPixelRatio(),csm:{K}.csm().n,act:{K}.csm().act,bloomed:{K}.PFX().bloomed,pre:{K}.boot().pre.done}})"
         ls0 = await pg.evaluate("()=>localStorage.getItem('kgeuTier')")
         await pg.evaluate(f"()=>{{const G={K}.GFX;G.setScale(0.7);G.thermalReset();document.getElementById('toast').classList.remove('on');document.getElementById('toast').textContent='';}}")
         r = await tfeed(9.9, 40)
         ok('thermal: the first 10 s of a flight count for nothing', r == 'medium' and await pg.evaluate(f"()=>{K}.GFX.thermS.lowT") == 0, r)
         r = await tfeed(19.9, 40)
-        ok('thermal: 19.9 s at 0.7 under 50, still Medium', r == 'medium', r)
+        ok('thermal: 19.9 s at 0.7 under 50, still Medium', r == 'medium' and not await pg.evaluate(f"()=>{K}.GFX.thermS.on"), r)
         r = await tfeed(0.3, 40, dt=0.3)
         ok('thermal: a 300 ms frame is ignored', r == 'medium', r)
+        p0 = await pg.evaluate(f"()=>{K}.progN().compiles")
         r = await tfeed(0.2, 40)
-        s = await pg.evaluate(f"()=>({{tier:{K}.GFX.tier,scale:{K}.GFX.scale,ov:{K}.GFX.override,ls:localStorage.getItem('kgeuTier'),toasts:{K}.GFX.thermS.toasts,drops:{K}.GFX.thermS.drops,txt:document.getElementById('toast').textContent,pr:{K}.R3().renderer.getPixelRatio(),csm:{K}.csm().n}})")
-        ok('thermal: 20 s at 0.7 under 50 drops Medium to Low, scale 1.0, Low applied (pixel ratio 1, no cascades), one toast',
-           r == 'low' and s['tier'] == 'low' and s['scale'] == 1 and s['toasts'] == 1 and s['drops'] == 1 and s['txt'] == 'Graphics set to Low to keep things smooth' and s['pr'] == 1 and s['csm'] == 0, s)
+        await pg.wait_for_timeout(900)
+        s = await pg.evaluate(ST)
+        p1 = await pg.evaluate(f"()=>{K}.progN().compiles")
+        ok('thermal: 20 s at 0.7 under 50 in flight: still Medium (pixel ratio 1.5, 2 cascades), the scale held at 0.7, pendingTier Low, one toast',
+           r == 'medium' and s['tier'] == 'medium' and s['pending'] == 'low' and s['on'] and s['scale'] == 0.7 and s['pr'] == 1.5 and s['csm'] == 2
+           and s['toasts'] == 1 and s['drops'] == 1 and s['txt'] == 'Graphics set to Low from the next flight to keep things smooth', s)
+        ok('thermal: in flight the cascades draw nothing, no bloom, no program compiled', s['act'] == 0 and s['bloomed'] is False and p1 == p0, [s['act'], s['bloomed'], p0, p1])
+        r = await feed(pg, 10.5, 60, 58)
+        ok('thermal: the dynamic scale stays on its 0.7 floor', r == 0.7, r)
         ok('thermal: the saved kgeuTier and the Settings pick untouched', s['ls'] == ls0 and s['ov'] == 'auto', [ls0, s])
+        await pg.evaluate(f"()=>{K}.openMenu()"); await pg.wait_for_timeout(300)
+        s = await pg.evaluate(ST)
+        ok('thermal: the menu applies it: Low for the session (pixel ratio 1, no cascades), the warm-up queued again', s['tier'] == 'low' and s['pending'] is None and not s['on'] and s['pr'] == 1 and s['csm'] == 0 and s['ls'] == ls0 and s['ov'] == 'auto', s)
+        await pg.wait_for_function(f"()=>{K}.boot().pre.done", timeout=60000, polling=200)
+        ok('thermal: the precompile queue drains again in the menu', True)
+        await pg.evaluate(f"()=>{{const K={K};K.pick('cessna');K.start('runway');}}"); await pg.wait_for_timeout(600)
         await pg.evaluate(f"()=>{{const G={K}.GFX;G.setScale(0.7);G.thermalReset();}}")
         r = await tfeed(40, 30)
-        ok('thermal: on Low nothing happens', r == 'low' and await pg.evaluate(f"()=>{K}.GFX.thermS.drops") == 1, r)
-        # a second episode (the session tier put back to Medium by hand): drops again, no second toast
+        ok('thermal: on Low nothing happens', r == 'low' and await pg.evaluate(f"()=>{K}.GFX.thermS.drops") == 1 and await pg.evaluate(f"()=>{K}.GFX.pendingTier") is None, r)
+        # a second episode (the session tier put back to Medium by hand): pending again, no second toast
         await pg.evaluate(f"()=>{{const G={K}.GFX;G.tier='medium';G.applyTier();G.setScale(0.7);G.thermalReset();document.getElementById('toast').classList.remove('on');document.getElementById('toast').textContent='';}}")
         r = await tfeed(10, 55)
         r = await tfeed(25, 55)
-        ok('thermal: a 1% low of 55 at 0.7 is not a thermal episode', r == 'medium', r)
+        ok('thermal: a 1% low of 55 at 0.7 is not a thermal episode', r == 'medium' and await pg.evaluate(f"()=>{K}.GFX.pendingTier") is None, r)
         await pg.evaluate(f"()=>{{{K}.GFX.setScale(0.85);}}")
         r = await tfeed(25, 30)
-        ok('thermal: under 50 at 0.85 (not the floor) is not one either', r == 'medium', r)
+        ok('thermal: under 50 at 0.85 (not the floor) is not one either', r == 'medium' and await pg.evaluate(f"()=>{K}.GFX.pendingTier") is None, r)
         await pg.evaluate(f"()=>{{{K}.GFX.setScale(0.7);}}")
         r = await tfeed(20.1, 30)
-        s = await pg.evaluate(f"()=>({{toasts:{K}.GFX.thermS.toasts,drops:{K}.GFX.thermS.drops,txt:document.getElementById('toast').textContent,ls:localStorage.getItem('kgeuTier')}})")
-        ok('thermal: a second episode drops again without a second toast', r == 'low' and s['drops'] == 2 and s['toasts'] == 1 and s['txt'] == '' and s['ls'] == ls0, s)
+        s = await pg.evaluate(ST)
+        ok('thermal: a second episode sets Low pending again without a second toast', r == 'medium' and s['pending'] == 'low' and s['drops'] == 2 and s['toasts'] == 1 and s['txt'] == '' and s['ls'] == ls0, s)
         await pg.evaluate(f"()=>{K}.GFX.setTier('auto')")
+        ok('a Settings pick clears the pending drop', await pg.evaluate(f"()=>{K}.GFX.pendingTier") is None)
         # the menu puts it back to 1
         await pg.evaluate(f"()=>{{{K}.openMenu();}}"); await pg.wait_for_timeout(300)
         s = await pg.evaluate(f"()=>[{K}.GFX.scale,{K}.R3().renderer.getPixelRatio()]")

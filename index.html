@@ -3436,9 +3436,15 @@ var GFX={tier:'medium',auto:'medium',override:'auto',scale:1,bench:null,dyn:true
   // the pixel ratio the 3D scene is drawn at (the canvas's own one when the post chain is off)
   scenePR(){return GFX.base()*GFX.scale;},
   postWant(){return GFX.on('bloom')||GFX.on('smaa');},
-  setTier(t){if(!/^(auto|low|medium|high)$/.test(t))t='auto';GFX.override=t;GFX.tier=t==='auto'?GFX.auto:t;
+  // gfxfix item 3: a tier change recompiles every lit program (the cascade count), the haboob's defines, the clouds and
+  // the post chain, so it only ever runs in the menu (the chips, the battery guard's pendingTier at openMenu or start):
+  // applyTier, then the precompile queue and the menu's WARM steps again for the new tier (gfxRequeue), drained by the
+  // menu's frames or by start() before the flight. Setting the tier it already is changes nothing.
+  setTier(t){if(!/^(auto|low|medium|high)$/.test(t))t='auto';const was=GFX.tier;GFX.override=t;GFX.tier=t==='auto'?GFX.auto:t;
     try{localStorage.setItem('kgeuTier',t);}catch(e){}
-    GFX.applyTier();},
+    GFX.pendingTier=null;
+    if(GFX.tier===was){if(GFX.ui)GFX.ui();return;}
+    GFX.applyTier();if(GFX.requeue)GFX.requeue();},
   applyTier(){GFX.post=GFX.postWant();GFX.applyPR();GFX_HOOKS.forEach(f=>{try{f(GFX.tier);}catch(e){console.warn(e);}});if(GFX.ui)GFX.ui();},
   setScale(s){GFX.scale=s;GFX.applyPR();},
   // dynamic resolution: a state machine fed every flying frame with the ring buffer's average and 1% low (fps) and
@@ -3456,25 +3462,34 @@ var GFX={tier:'medium',auto:'medium',override:'auto',scale:1,bench:null,dyn:true
     if(S.cool>0)return GFX.scale;
     const i=GFX.STEPS.indexOf(GFX.scale),k=i<0?0:i;
     if(S.lowT>=3&&k<GFX.STEPS.length-1){GFX.setScale(GFX.STEPS[k+1]);S.lowT=S.highT=0;S.cool=5;}
-    else if(S.highT>=10&&k>0){GFX.setScale(GFX.STEPS[k-1]);S.lowT=S.highT=0;S.cool=5;}
+    else if(S.highT>=10&&k>0&&!GFX.thermS.on){GFX.setScale(GFX.STEPS[k-1]);S.lowT=S.highT=0;S.cool=5;}   // the battery guard holds the floor
     return GFX.scale;},
   // graphics item 8, the battery guard. Safari has no thermal API; the signal we have is the dynamic scale sitting on its
   // 0.7 floor while the 1% low is still under 50: 20 s of that straight in flight (frames over 250 ms count for nothing,
-  // nor the first 10 s after a start; a pause or the menu starts the count over) and the tier drops one step for this
-  // session only (never saved to kgeuTier, so the next cold launch is back on the detected tier), the scale goes back to
-  // 1.0 and one toast says so, once a session. Never below Low; on Low nothing happens. Fed by gfxDyn beside dynFeed.
-  thermS:{t:0,lowT:0,drops:0,toasts:0},
-  thermalReset(){const S=GFX.thermS;S.t=S.lowT=0;},
+  // nor the first 10 s after a start; a pause or the menu starts the count over). Gfxfix item 3: it never changes the
+  // tier in flight (that recompiles every program, seconds of freeze): thermS.on instead holds the scale on its 0.7 floor
+  // (dynFeed steps no higher), drops the cascaded shadows (csmFrame: no map drawn, the blob shadow back) and skips the
+  // bloom and SMAA passes (pfxRender: the plain composite PFX_CMP, compiled by the precompile queue), none of which
+  // compiles or allocates anything; pendingTier, one step down, is applied when the flight is over and the menu is up
+  // (openMenu, or start() if a restart skips the menu) for this session only (never saved to kgeuTier, so the next cold
+  // launch is back on the detected tier). One toast a session. Never below Low; on Low nothing happens. Fed by gfxDyn
+  // beside dynFeed; a new flight (thermalReset) clears thermS.on.
+  thermS:{t:0,lowT:0,drops:0,toasts:0,on:false},
+  pendingTier:null,
+  thermalReset(){const S=GFX.thermS;S.t=S.lowT=0;S.on=false;},
   thermalFeed(avg,low1,dt){
     const S=GFX.thermS;if(!(dt>0)||dt>0.25)return GFX.tier;
     S.t+=dt;if(S.t<10)return GFX.tier;
     if(GFX.scale<=GFX.STEPS[GFX.STEPS.length-1]+1e-6&&low1>0&&low1<50)S.lowT+=dt;else S.lowT=0;
     if(S.lowT>=20&&GFX.tier!=='low'){
-      GFX.tier=TIERS[Math.max(0,tierRank(GFX.tier)-1)];S.drops++;S.lowT=0;S.t=0;
-      GFX.scale=1;GFX.dynReset(true);GFX.applyTier();
-      if(!S.toasts&&GFX.say){S.toasts=1;GFX.say('Graphics set to '+(GFX.tier==='low'?'Low':'Medium')+' to keep things smooth');}}
+      const t=TIERS[Math.max(0,tierRank(GFX.tier)-1)];S.lowT=0;S.t=0;S.on=true;
+      if(GFX.pendingTier!==t){GFX.pendingTier=t;S.drops++;}
+      if(!S.toasts&&GFX.say){S.toasts=1;GFX.say('Graphics set to '+(t==='low'?'Low':'Medium')+' from the next flight to keep things smooth');}}
     return GFX.tier;},
-  say:null,ui:null,HOOKS:GFX_HOOKS};
+  // the battery guard's drop, in the menu (openMenu, start): the session tier one step down, its programs compiled again
+  pendingApply(){const t=GFX.pendingTier;if(!t)return false;GFX.pendingTier=null;GFX.thermS.on=false;
+    if(t===GFX.tier)return false;GFX.tier=t;GFX.scale=1;GFX.dynReset(true);GFX.applyTier();if(GFX.requeue)GFX.requeue();return true;},
+  say:null,ui:null,requeue:null,HOOKS:GFX_HOOKS};
 // graphics item 8, payload: every texture this graphics pass added is drawn at run time on a canvas (the aircraft skins,
 // the road bake, the canopy dust streaks, the cloud, smoke and sun sprites) or is a render target, and the one new
 // downloaded asset is assets/world/az_dem.bin (1.16 MB of heights, not an image). There is no image file to ship as KTX2
@@ -6806,7 +6821,7 @@ const sun=new THREE.DirectionalLight(0xfff0d8,1.0); sun.position.set(-0.55,0.75,
 // than a degree, in the IR view and the carousel (nothing asks for a map there); the haboob's dust fades them; near off
 // above 2,500 ft AGL (the camera's), mid above 8,000 ft, so on Medium nothing at all is drawn up there. Low: no lights,
 // no shadow map, no shadow code in any shader. The shadowed side keeps the hemisphere light, never black.
-const CSM={n:0,lights:[],L:[[],[],[]],stat:[],frame:0,act:0,prev:0,rc:-1,rt0:null,renders:0,recv:0,builds:0,ai:[0,0,0],showScene:null,showL:[],skips:0,spin:null,spinOf:null,
+const CSM={n:0,lights:[],L:[[],[],[]],stat:[],frame:0,act:0,prev:0,recvMs:0,renders:0,recv:0,builds:0,ai:[0,0,0],showScene:null,showL:[],skips:0,spin:null,spinOf:null,
   SPLIT:[120,1500,12000],REACH:[250,2500,30000],BIAS:[0.04,0.5,10],NB:[0.03,0.4,12],
   root:{visible:true,layers:{test:()=>true},children:null}};
 const _csmD=new V3(),_csmF=new V3(),_csmC=new V3(),_csmX=new V3(),_csmY=new V3(),_csmUp=new V3(0,1,0),_csmOne=[null];
@@ -6827,7 +6842,7 @@ function csmBuild(){CSM.builds++;   // STALL's 'csmBuild' tag
   for(let i=0;i<n;i++){const L=new THREE.DirectionalLight(0xffffff,0);L.castShadow=true;L.name='csm'+i;
     L.shadow.mapSize.set(sizes[i],sizes[i]);L.shadow.autoUpdate=false;L.shadow.needsUpdate=false;L.shadow.radius=1.5;
     L.userData.csmL=CSM.L[i];scene.add(L);scene.add(L.target);CSM.lights.push(L);}
-  CSM.n=n;csmShowSync();
+  CSM.n=n;csmShowSync();csmRecv();
 }
 // the carousel's scene carries as many cascade lights, never drawn (no map, and csmIdle zeroes the strength before it
 // renders), only so its aircraft share the main scene's compiled programs: no second compile per model in the menu
@@ -6859,9 +6874,18 @@ function csmSigT(o,sp){if(o.isPoints||o.isSprite||o.isLine||(o.isMesh&&!o.castSh
 function csmSig(L,list,k){const p=L.position;let s=p.x*0.7+p.y*1.1+p.z*1.3+L.shadow.camera.right+list.length*17+k;
   for(let i=0;i<list.length;i++){const o=list[i];if(o===terrain)s+=TLS.gen*31;else if(!o.userData.csmS)s+=csmSigT(o,o===plane.g&&plane.propRig?CSM.spin:null);}
   return s;}
-// the receivers: every lit mesh but the clouds (userData.noRecv); one walk a flight, and when the scene gains an object
-function csmRecv(){CSM.rt0=RUN.t0;CSM.rc=scene.children.length;CSM.recv++;
-  scene.traverse(o=>{if(o.isMesh&&!o.userData.noRecv&&csmLit(o.material,false))o.receiveShadow=true;});}
+// the receivers: every lit mesh but the clouds (userData.noRecv). Gfxfix item 3: decided once per mesh as it enters the
+// world (Object3D.add below: a subtree joining anything under the scene, whether through scene.add or a group already
+// in it, as the strike range, the drop zone and the bandits do), never a scene walk in flight. The full walk is kept for
+// csmBuild (boot, a tier change) and start() (anything that changed its material since it was added); measured at
+// 0.2 to 0.4 ms headless at a flight's start (Arizona, 2,141 objects in the scene). receiveShadow is a uniform in r128,
+// never part of a program's key, so setting it compiles nothing.
+function csmRecvT(o){o.traverse(m=>{if(m.isMesh&&!m.userData.noRecv&&csmLit(m.material,false))m.receiveShadow=true;});}
+function csmRecv(){const t0=performance.now();CSM.recv++;csmRecvT(scene);CSM.recvMs=+(performance.now()-t0).toFixed(2);}
+{const add0=THREE.Object3D.prototype.add;
+ THREE.Object3D.prototype.add=function(o){const r=add0.apply(this,arguments);
+   if(arguments.length===1&&o&&o.isObject3D&&o.parent===this){for(let p=this;p;p=p.parent)if(p===scene){csmRecvT(o);break;}}
+   return r;};}
 function csmIdle(){CSM.act=0;CSM_U.a.w=0;for(const L of CSM.lights)L.shadow.needsUpdate=false;
   // the carousel's twins bind the cascades' own maps: the same sampler state, so no driver (SwiftShader) rebuilds a
   // pipeline for the menu
@@ -6891,10 +6915,9 @@ function csmFrame(){
   if(!n)return;
   csmIdle();CSM.frame++;
   _csmD.copy(sun.position).normalize();
-  const k=TOD.night?0:clamp((_csmD.y-0.0175)/0.03,0,1)*(1-(HB.on?HB.d:0));
+  const k=TOD.night||GFX.thermS.on?0:clamp((_csmD.y-0.0175)/0.03,0,1)*(1-(HB.on?HB.d:0));   // thermS.on: the battery guard
   for(let i=0;i<3;i++){const c=CSM_K[i];U.a[c]=U.b[c]=U.d[c]=0;U.c[c]=-1;}
   if(k<=0.001){CSM.prev=0;return;}
-  if(RUN.t0!==CSM.rt0||scene.children.length!==CSM.rc)csmRecv();
   const cp=camera.position,agl=cp.y-groundHeight(cp.x,cp.z);
   let mask=0;if(agl<762)mask|=1;if(agl<2438)mask|=2;if(n>2)mask|=4;
   // the active cascades share 0..12 km in order; a 16% blend band at each boundary, the last fades over its last 20%
@@ -8421,7 +8444,7 @@ const CLOUDS={preset:'scattered',forced:null,vis:true,hd:null,cb:null,
 function cloudAttr(g,n,f){const a=new Float32Array(n);for(let i=0;i<n;i++)a[i]=f(i);g.setAttribute('aCl',new THREE.InstancedBufferAttribute(a,1));}
 if(CLOUD_MESH){cloudAttr(CLOUD_MESH.geometry,CLOUD_MESH.count,i=>0.45+0.2*hash(i,77));
   // three r128 culls an InstancedMesh by its one icosahedron at the origin: a sphere round the whole field of puffs
-  CLOUD_MESH.geometry.boundingSphere=new THREE.Sphere(new V3(APC.x,3150,APC.z),30000);CLOUD_MESH.userData.noRecv=true;}
+  CLOUD_MESH.geometry.boundingSphere=new THREE.Sphere(new V3(APC.x,3150,APC.z),30000);CLOUD_MESH.userData.noRecv=true;CLOUD_MESH.receiveShadow=false;}
 function cloudHD(){
   if(CLOUDS.hd)return CLOUDS.hd;
   const U=CLOUDS.U,m=new THREE.MeshLambertMaterial({color:0xffffff});
@@ -8552,7 +8575,7 @@ if(REGION.az)(function(){
 // as a small sphere), so the airframes reflect a warm sky at sunset and a dark one at night. A tiny scene through
 // PMREM once per setTOD (a few ms), never per frame. The day's is built the first time it is needed (Day, or the
 // showroom) and kept for good; any other is disposed when the next one replaces it. Boot builds exactly one.
-const ENV={day:null,rt:null,es:null,dg:null,sn:null,n:0};
+const ENV={day:null,rt:null,es:null,dg:null,sn:null,pm:null,n:0};
 function envBuild(){ENV.n++;   // STALL's 'pmrem' tag
   if(!ENV.es){const es=new THREE.Scene(),dg=new THREE.SphereGeometry(60,48,24);
     dg.setAttribute('color',new THREE.BufferAttribute(new Float32Array(dg.attributes.position.count*3),3));
@@ -8568,7 +8591,11 @@ function envBuild(){ENV.n++;   // STALL's 'pmrem' tag
     dc.setXYZ(i,c.r,c.g,c.b);}
   dc.needsUpdate=true;
   ENV.sn.material.color.setHex(TOD.night?0x8a96b4:TOD.env.sun);ENV.sn.position.copy(_skyS).multiplyScalar(50);
-  const pm=new THREE.PMREMGenerator(renderer),rt=pm.fromScene(ENV.es,0.04);pm.dispose();
+  // gfxfix item 3: one generator for the page's life. Disposing it after each build deleted its blur program, so the
+  // next setTOD compiled it again (a new program in flight); r128's fromScene allocates and frees its own ping pong
+  // target per call (_cleanup), so keeping it holds only the blur material
+  if(!ENV.pm)ENV.pm=new THREE.PMREMGenerator(renderer);
+  const rt=ENV.pm.fromScene(ENV.es,0.04);
   // graphics item 8: the tiny sky scene's vertex buffers leave the GPU until the next setTOD (the arrays stay to repaint)
   ENV.dg.dispose();ENV.sn.geometry.dispose();return rt;
 }
@@ -9132,7 +9159,10 @@ const WARM_STEPS=['reaper','mq9b','f16','cessna','alpha','c130','archer','a10','
   // the burst: on Medium and High the precompile queue's 'explosion' job has already drawn it into a post chain target,
   // the pipeline every flight frame uses there (the scene never draws straight to the canvas with post on), so the
   // full size canvas draw here would only repeat it (3 s of the warm-up headless); Low and kgeuNoPre still draw it
-  .concat([()=>{if(!DZ.built)dzBuild();warmObj(DZ.g);},()=>{if(GFX.post&&PRE.done&&!PRE.skip&&PRE.ms.explosion!=null)return;fxWarmLayer();},()=>fxWarmDebris(),()=>fxWarmDecals(),()=>{if(actx)boomBufs();}]);
+  // gfxfix item 3: the dogfight's bandit (a first one in the pool), missiles, tracers and flares were built at the first
+  // dfStart and the flares' points program linked in flight: built here, every material compiled (warmObj's compile
+  // walks the whole scene, hidden objects too) and the bandit drawn once
+  .concat([()=>{if(!DZ.built)dzBuild();warmObj(DZ.g);},()=>{dfBuild();dfWBuild();warmObj((DF.pool[0]||dfBandit()).g);},()=>{if(GFX.post&&PRE.done&&!PRE.skip&&PRE.ms.explosion!=null)return;fxWarmLayer();},()=>fxWarmDebris(),()=>fxWarmDecals(),()=>{if(actx)boomBufs();}]);
 function warmTick(){
   if(WARM.done)return;
   // flying: wait. The steps belong to the menu and the pause sheet, never to a flying frame
@@ -15440,6 +15470,9 @@ function start(mode,base){
   if(!baseOK(acType,base||SPAWN_BASE)){const hb=HOME(acType);if(!REGION.az){pickRegion('az',{resume:{mode:mode,base:hb,type:acType,tod:TOD.id}});return;}base=hb;SPAWN_BASE=hb;locSel();}
   if(FM.on)fmClose();
   initAudio();
+  // gfxfix item 3: the battery guard's drop if a restart skipped the menu, and the precompile queue drained before the
+  // first flight frame (it runs again after a tier change; normally the menu's frames have drained it already)
+  GFX.pendingApply();gfxDrain();
   if(ARC.prevTod){const p=ARC.prevTod;ARC.prevTod=null;setTOD(p);}
   setType(acType);useModel(acType);sizeShadow();vqReset();radioHush();radioFadeTok++;radioVolApply();chatT=9;atcT=0;TK.paused=false;
   const spawn=mode;if(mode==='final1')mode='final';RUNSTART={k:'free',mode:spawn,base:base||SPAWN_BASE,type:acType};
@@ -15458,6 +15491,7 @@ function start(mode,base){
   if(mode==='drop'||mode==='short')missStart(mode==='drop'?'drop':'short');
   if(mode==='drop')dzStart();
   hbSync(true);
+  csmRecv();   // the receivers once a flight, here at the tap rather than on its first frame
   if(LB){LB.reset();if(mode==='range'||mode==='drop'||mode==='short')LB.runStart(mode==='range'?(acType==='a10'?'arc:gunrun':'arc:strike'):mode==='drop'?'arc:drop':'mission:short');}
   layoutViewport();VP.ctl=layoutCtl(true);   // the controls are dealt on this frame, in Easy and in Hard
 }
@@ -15486,11 +15520,11 @@ function hudClear(){
   if(window.layoutCtl)layoutCtl();   // the LOOK pad and DROP button go with the mission
 }
 const pauseOv=$('pauseOv');
-function openMenu(scr){if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.forced=null;hudClear();pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
+function openMenu(scr){GFX.pendingApply();if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.forced=null;hudClear();pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
 // the pause button, P and a backgrounded app all land here; the sheet shows while paused
 function togglePause(){if(DF.brief||TASK.brief||LES.brief)return;   // the dogfight briefing holds the sim itself; FIGHT'S ON is the way on
-  if(RES.brief)resClose(RES.brief);paused=!paused;pauseOv.classList.toggle('on',paused);if(paused){radioFade(120);CARP.sync();PZ0={t:savedType,b:SPAWN_BASE,p:SPAWN_POS};PZ_LOC=null;locSel();pzApplyUI();requestAnimationFrame(locShow);if(window.stickReset)stickReset();musicUI();}}
-$('pResume').onclick=()=>{paused=false;pauseOv.classList.remove('on');initAudio();radioVolApply();};
+  if(RES.brief)resClose(RES.brief);if(paused)gfxDrain();paused=!paused;pauseOv.classList.toggle('on',paused);if(paused){radioFade(120);CARP.sync();PZ0={t:savedType,b:SPAWN_BASE,p:SPAWN_POS};PZ_LOC=null;locSel();pzApplyUI();requestAnimationFrame(locShow);if(window.stickReset)stickReset();musicUI();}}
+$('pResume').onclick=()=>{gfxDrain();paused=false;pauseOv.classList.remove('on');initAudio();radioVolApply();};
 // Restart and Apply are one button: it restarts this flight (same start, mission or range) until
 // an aircraft, base or start is changed on the sheet, then it reads Apply and flies the new picks.
 // Time of day needs neither, it changes the sky at once.
@@ -18643,8 +18677,8 @@ function renderIR(){
   scene.background=bg;sky.visible=skyV;
 }
 // ================= post processing: bloom and SMAA (graphics item 3) =================
-// Medium and High (GFX.FX.bloom, GFX.FX.smaa): the scene is drawn into PFX.rt (the canvas backing size times GFX.scale,
-// RGBA8 with depth, sRGB encoded exactly like the canvas, so every program is the one the canvas would use), the bloom
+// Medium and High (GFX.FX.bloom, GFX.FX.smaa): the scene is drawn into PFX.rt (the canvas backing size times GFX.scale:
+// since gfxfix item 3 the bottom left sub rectangle of a target allocated once at the full backing size, RGBA8 with depth, sRGB encoded exactly like the canvas, so every program is the one the canvas would use), the bloom
 // sources into PFX.b1 (High half, Medium quarter of that), two separable 9 tap blurs (5 bilinear taps each way, the
 // second twice as wide), then SMAA 1x (edges, blend weights) and one last full screen pass to the canvas that does the
 // neighbourhood blend, adds the bloom (a screen blend, PFX_STR) and upsamples a scaled down scene to the full backing
@@ -18657,15 +18691,20 @@ function renderIR(){
 const PFX={rt:null,ed:null,wt:null,b1:null,b2:null,w:0,h:0,bk:0,bloomed:false,frames:0};
 const PFX_STR=0.45;
 const _pfxV=new THREE.Vector2(),_pfxC=new THREE.Color(),_pfxFog=new THREE.Color();
-const PFX_VS='varying vec2 vUv;\nvoid main(){vUv=uv;gl_Position=vec4(position.xy,0.0,1.0);}';
+// gfxfix item 3: the chain's targets are allocated once at the full backing size and a dynamic scale step draws into a
+// sub rectangle of them (each target's viewport, pfxRender): uUvS takes a pass's quad uv to that rectangle of the full
+// size rt, ed and wt, uUvB to the bloom targets' one; vScr stays the screen's 0..1 (the dust streaks)
+const PFX_UVS={value:new THREE.Vector2(1,1)},PFX_UVB={value:new THREE.Vector2(1,1)};
+const PFX_VS='uniform vec2 uUvS;varying vec2 vUv;\nvoid main(){vUv=uv*uUvS;gl_Position=vec4(position.xy,0.0,1.0);}';
+const PFX_VS2='uniform vec2 uUvS,uUvB;varying vec2 vUv,vUvB,vScr;\nvoid main(){vScr=uv;vUv=uv*uUvS;vUvB=uv*uUvB;gl_Position=vec4(position.xy,0.0,1.0);}';
 const PFX_BLACK=new THREE.DataTexture(new Uint8Array([0,0,0,255]),1,1,THREE.RGBAFormat);PFX_BLACK.needsUpdate=true;
 function pfxMat(o){return new THREE.ShaderMaterial(Object.assign({vertexShader:PFX_VS,depthTest:false,depthWrite:false,toneMapped:false},o));}
-const PFX_BLUR=pfxMat({uniforms:{tSrc:{value:null},uDir:{value:new THREE.Vector2()}},fragmentShader:`uniform sampler2D tSrc;uniform vec2 uDir;varying vec2 vUv;
+const PFX_BLUR=pfxMat({uniforms:{tSrc:{value:null},uDir:{value:new THREE.Vector2()},uUvS:PFX_UVB},fragmentShader:`uniform sampler2D tSrc;uniform vec2 uDir;varying vec2 vUv;
 void main(){vec2 a=uDir*1.3846153846,b=uDir*3.2307692308;
   vec3 c=texture2D(tSrc,vUv).rgb*0.2270270270+(texture2D(tSrc,vUv+a).rgb+texture2D(tSrc,vUv-a).rgb)*0.3162162162+(texture2D(tSrc,vUv+b).rgb+texture2D(tSrc,vUv-b).rgb)*0.0702702703;
   gl_FragColor=vec4(c,1.0);}`});
 // the bloom goes on with a screen blend, so a lit runway edge does not clip to a white smear
-const PFX_ADD='vec3 pfxBl(vec3 c){vec3 b=texture2D(tBloom,vUv).rgb*uStr;return 1.0-(1.0-c)*(1.0-b);}\n';
+const PFX_ADD='varying vec2 vUvB,vScr;\nvec3 pfxBl(vec3 c){vec3 b=texture2D(tBloom,vUvB).rgb*uStr;return 1.0-(1.0-c)*(1.0-b);}\n';
 // graphics item 7: dust streaks on the canopy in the haboob (GFX.FX.dust, so Medium and High; Low keeps today's look).
 // DUSTFX.tex is a 512 canvas of fine streaks and grains, mapped in polar coordinates round the focus of expansion
 // (where the relative wind comes from on screen): angle across, log radius along, scrolled outward with the airspeed,
@@ -18686,20 +18725,20 @@ DUSTFX.tex=(()=>{const c=document.createElement('canvas');c.width=c.height=512;c
 const PFX_DUST=`uniform sampler2D tDust;uniform vec4 uDust,uDustF;uniform vec3 uDustC;
 vec3 pfxDust(vec3 c){
   if(uDust.x<=0.0)return c;
-  vec2 d=(vUv-uDustF.xy)*vec2(uDustF.z,1.0);float r=length(d);
+  vec2 d=(vScr-uDustF.xy)*vec2(uDustF.z,1.0);float r=length(d);
   vec4 s=texture2D(tDust,vec2(atan(d.y,d.x)*0.1591549*uDustF.w,log(r+0.03)*0.55-uDust.z));
   c=mix(c,uDustC*(0.78+0.5*s.r),s.a*uDust.x*smoothstep(0.04,0.4,r));
-  return mix(c,uDustC*0.4,uDust.y*smoothstep(0.32,0.9,length((vUv-0.5)*vec2(1.25,1.5))));
+  return mix(c,uDustC*0.4,uDust.y*smoothstep(0.32,0.9,length((vScr-0.5)*vec2(1.25,1.5))));
 }
 `;
 const PFX_DU=()=>({tDust:{value:DUSTFX.tex},uDust:{value:new THREE.Vector4()},uDustF:{value:new THREE.Vector4(0.5,0.5,1,5)},uDustC:{value:new THREE.Color()}});
-const PFX_CMP=pfxMat({uniforms:Object.assign({tColor:{value:null},tBloom:{value:PFX_BLACK},uStr:{value:0}},PFX_DU()),fragmentShader:`uniform sampler2D tColor,tBloom;uniform float uStr;varying vec2 vUv;
+const PFX_CMP=pfxMat({uniforms:Object.assign({tColor:{value:null},tBloom:{value:PFX_BLACK},uStr:{value:0},uUvS:PFX_UVS,uUvB:PFX_UVB},PFX_DU()),vertexShader:PFX_VS2,fragmentShader:`uniform sampler2D tColor,tBloom;uniform float uStr;varying vec2 vUv;
 ${PFX_ADD}${PFX_DUST}void main(){gl_FragColor=vec4(pfxDust(pfxBl(texture2D(tColor,vUv).rgb)),1.0);}`});
 // SMAA 1x medium with colour edge detection: three r128 examples/js SMAAShader and SMAAPass, compacted (WebGL port notes kept in the maths)
-const PFX_EDGE=pfxMat({defines:{SMAA_THRESHOLD:'0.1'},uniforms:{tDiffuse:{value:null},resolution:{value:new THREE.Vector2()}},
-  vertexShader:`uniform vec2 resolution;varying vec2 vUv;varying vec4 vOffset[3];
-void main(){vUv=uv;vOffset[0]=uv.xyxy+resolution.xyxy*vec4(-1.0,0.0,0.0,1.0);vOffset[1]=uv.xyxy+resolution.xyxy*vec4(1.0,0.0,0.0,-1.0);
-  vOffset[2]=uv.xyxy+resolution.xyxy*vec4(-2.0,0.0,0.0,2.0);gl_Position=vec4(position.xy,0.0,1.0);}`,
+const PFX_EDGE=pfxMat({defines:{SMAA_THRESHOLD:'0.1'},uniforms:{tDiffuse:{value:null},resolution:{value:new THREE.Vector2()},uUvS:PFX_UVS},
+  vertexShader:`uniform vec2 resolution,uUvS;varying vec2 vUv;varying vec4 vOffset[3];
+void main(){vec2 u=uv*uUvS;vUv=u;vOffset[0]=u.xyxy+resolution.xyxy*vec4(-1.0,0.0,0.0,1.0);vOffset[1]=u.xyxy+resolution.xyxy*vec4(1.0,0.0,0.0,-1.0);
+  vOffset[2]=u.xyxy+resolution.xyxy*vec4(-2.0,0.0,0.0,2.0);gl_Position=vec4(position.xy,0.0,1.0);}`,
   fragmentShader:`uniform sampler2D tDiffuse;varying vec2 vUv;varying vec4 vOffset[3];
 float md(vec3 a,vec3 b){vec3 t=abs(a-b);return max(max(t.r,t.g),t.b);}
 void main(){vec2 th=vec2(SMAA_THRESHOLD);vec4 d;vec3 C=texture2D(tDiffuse,vUv).rgb;
@@ -18710,10 +18749,10 @@ void main(){vec2 th=vec2(SMAA_THRESHOLD);vec4 d;vec3 C=texture2D(tDiffuse,vUv).r
   d.z=md(C,texture2D(tDiffuse,vOffset[2].xy).rgb);d.w=md(C,texture2D(tDiffuse,vOffset[2].zw).rgb);
   m=max(max(m,d.z),d.w);e*=step(0.5*m,d.xy);gl_FragColor=vec4(e,0.0,1.0);}`});
 const PFX_WGT=pfxMat({defines:{SMAA_MAX_SEARCH_STEPS:'8',SMAA_AREATEX_MAX_DISTANCE:'16',SMAA_AREATEX_PIXEL_SIZE:'( 1.0 / vec2( 160.0, 560.0 ) )',SMAA_AREATEX_SUBTEX_SIZE:'( 1.0 / 7.0 )'},
-  uniforms:{tDiffuse:{value:null},tArea:{value:null},tSearch:{value:null},resolution:{value:new THREE.Vector2()}},
-  vertexShader:`uniform vec2 resolution;varying vec2 vUv;varying vec4 vOffset[3];varying vec2 vPixcoord;
-void main(){vUv=uv;vPixcoord=uv/resolution;
-  vOffset[0]=uv.xyxy+resolution.xyxy*vec4(-0.25,0.125,1.25,0.125);vOffset[1]=uv.xyxy+resolution.xyxy*vec4(-0.125,0.25,-0.125,-1.25);
+  uniforms:{tDiffuse:{value:null},tArea:{value:null},tSearch:{value:null},resolution:{value:new THREE.Vector2()},uUvS:PFX_UVS},
+  vertexShader:`uniform vec2 resolution,uUvS;varying vec2 vUv;varying vec4 vOffset[3];varying vec2 vPixcoord;
+void main(){vec2 u=uv*uUvS;vUv=u;vPixcoord=u/resolution;
+  vOffset[0]=u.xyxy+resolution.xyxy*vec4(-0.25,0.125,1.25,0.125);vOffset[1]=u.xyxy+resolution.xyxy*vec4(-0.125,0.25,-0.125,-1.25);
   vOffset[2]=vec4(vOffset[0].xz,vOffset[1].yw)+vec4(-2.0,2.0,-2.0,2.0)*resolution.xxyy*float(SMAA_MAX_SEARCH_STEPS);
   gl_Position=vec4(position.xy,0.0,1.0);}`,
   fragmentShader:`#define SMAASampleLevelZeroOffset(tex,coord,offset) texture2D(tex,coord+float(offset)*resolution,0.0)
@@ -18745,9 +18784,9 @@ void main(){vec4 w=vec4(0.0);vec2 e=texture2D(tDiffuse,vUv).rg;
     c.y-=1.0*resolution.y;float e2=SMAASampleLevelZeroOffset(tDiffuse,c,ivec2(0,1)).g;w.ba=AR(sd,e1,e2,0.0);}
   gl_FragColor=w;}`});
 // the neighbourhood blend, with the bloom added and the upsample to the canvas in the same pass
-const PFX_FIN=pfxMat({uniforms:Object.assign({tDiffuse:{value:null},tColor:{value:null},tBloom:{value:PFX_BLACK},uStr:{value:0},resolution:{value:new THREE.Vector2()}},PFX_DU()),
-  vertexShader:`uniform vec2 resolution;varying vec2 vUv;varying vec4 vOffset[2];
-void main(){vUv=uv;vOffset[0]=uv.xyxy+resolution.xyxy*vec4(-1.0,0.0,0.0,1.0);vOffset[1]=uv.xyxy+resolution.xyxy*vec4(1.0,0.0,0.0,-1.0);gl_Position=vec4(position.xy,0.0,1.0);}`,
+const PFX_FIN=pfxMat({uniforms:Object.assign({tDiffuse:{value:null},tColor:{value:null},tBloom:{value:PFX_BLACK},uStr:{value:0},resolution:{value:new THREE.Vector2()},uUvS:PFX_UVS,uUvB:PFX_UVB},PFX_DU()),
+  vertexShader:`uniform vec2 resolution,uUvS,uUvB;varying vec2 vUv,vUvB,vScr;varying vec4 vOffset[2];
+void main(){vScr=uv;vUvB=uv*uUvB;vec2 u=uv*uUvS;vUv=u;vOffset[0]=u.xyxy+resolution.xyxy*vec4(-1.0,0.0,0.0,1.0);vOffset[1]=u.xyxy+resolution.xyxy*vec4(1.0,0.0,0.0,-1.0);gl_Position=vec4(position.xy,0.0,1.0);}`,
   fragmentShader:`uniform sampler2D tDiffuse,tColor,tBloom;uniform float uStr;uniform vec2 resolution;varying vec2 vUv;varying vec4 vOffset[2];
 ${PFX_ADD}${PFX_DUST}vec3 nb(){vec4 a;a.xz=texture2D(tDiffuse,vUv).xz;a.y=texture2D(tDiffuse,vOffset[1].zw).g;a.w=texture2D(tDiffuse,vOffset[1].xy).a;
   if(dot(a,vec4(1.0))<1e-5)return texture2D(tColor,vUv,0.0).rgb;
@@ -18767,6 +18806,7 @@ const PFX_OCCM=new THREE.MeshBasicMaterial({colorWrite:false});
 function pfxRT(w,h,depth){const t=new THREE.WebGLRenderTarget(w,h,{minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,format:THREE.RGBAFormat,depthBuffer:!!depth,stencilBuffer:false,generateMipmaps:false});
   t.texture.encoding=THREE.sRGBEncoding;return t;}
 function pfxFree(){for(const k of ['rt','ed','wt','b1','b2'])if(PFX[k]){PFX[k].dispose();PFX[k]=null;}PFX.w=PFX.h=0;}
+// the full backing size (scale 1): a dynamic scale step only moves the viewports (pfxRender), it allocates nothing
 function pfxSize(w,h,bk){
   pfxFree();PFX.w=w;PFX.h=h;PFX.bk=bk;
   PFX.rt=pfxRT(w,h,true);PFX.ed=pfxRT(w,h,false);PFX.wt=pfxRT(w,h,false);
@@ -18795,9 +18835,16 @@ function pfxRender(){
   const r=renderer;
   if(!GFX.post){if(PFX.rt)pfxFree();r.render(scene,camera);return;}
   r.getDrawingBufferSize(_pfxV);
-  const s=GFX.scale,w=Math.max(1,Math.round(_pfxV.x*s)),h=Math.max(1,Math.round(_pfxV.y*s)),bk=GFX.tier==='high'?2:4;
-  if(!PFX.rt||PFX.w!==w||PFX.h!==h||PFX.bk!==bk)pfxSize(w,h,bk);
-  const bloom=GFX.on('bloom')&&pfxSrcOn(),smaa=GFX.on('smaa'),ac=r.autoClear;
+  const s=GFX.scale,W=Math.max(1,Math.round(_pfxV.x)),H=Math.max(1,Math.round(_pfxV.y)),bk=GFX.tier==='high'?2:4;
+  if(!PFX.rt||PFX.w!==W||PFX.h!==H||PFX.bk!==bk)pfxSize(W,H,bk);
+  // the scaled frame: the bottom left w x h of the full size targets (and of the bloom's), the passes' uv scaled to it
+  const w=Math.max(1,Math.round(W*s)),h=Math.max(1,Math.round(H*s)),bw=PFX.b1.width,bh=PFX.b1.height,
+    sw=Math.min(bw,Math.max(1,Math.round(w/bk))),sh=Math.min(bh,Math.max(1,Math.round(h/bk)));
+  for(const t of [PFX.rt,PFX.ed,PFX.wt])t.viewport.set(0,0,w,h);
+  for(const t of [PFX.b1,PFX.b2])t.viewport.set(0,0,sw,sh);
+  PFX_UVS.value.set(w/W,h/H);PFX_UVB.value.set(sw/bw,sh/bh);PFX.sw=w;PFX.sh=h;
+  // the battery guard (GFX.thermS.on) drops the bloom and SMAA passes: the plain composite, compiled with the rest
+  const th=GFX.thermS.on,bloom=GFX.on('bloom')&&!th&&pfxSrcOn(),smaa=GFX.on('smaa')&&!th,ac=r.autoClear;
   r.getClearColor(_pfxC);const ca=r.getClearAlpha();
   GFX.rs=s;r.setRenderTarget(PFX.rt);r.render(scene,camera);
   r.autoClear=true;r.setClearColor(0x000000,0);
@@ -18849,7 +18896,7 @@ GFX_HOOKS.push(()=>{if(!GFX.post)pfxFree();});
 // dry run of fxWarmLayer) and the DZ smoke, the IR pass and the carousel; the night lights (AL_MAT) are in the main
 // compile and frame. Headless (SwiftShader) a first draw of a new state is what stalls, not the link, hence the draws.
 // The menu's WARM steps still upload the other aircraft later. PRE.ms: each step's ms; localStorage kgeuNoPre=1 skips it.
-const PRE={done:false,skip:false,ms:{},total:0};
+const PRE={done:false,skip:false,ms:{},total:0,syncMs:null},PRE_PX=new Uint8Array(4);
 try{PRE.skip=localStorage.getItem('kgeuNoPre')==='1';}catch(e){}
 // where the first flight's chase camera will be (createState's spawn points, without its wind draw)
 function prePose(){
@@ -18878,20 +18925,38 @@ function preAt(f){
     if(Q.M){Q.M.visible=Q.mv;Q.M.position.copy(Q.mp);Q.M.quaternion.copy(Q.mq);Q.M.updateMatrixWorld(true);}
     camera.position.copy(Q.cp);camera.quaternion.copy(Q.cq);camera.updateMatrixWorld();rebuildTerrain(camera.position.x,camera.position.z);}
 }
+// gfxfix item 3: every shadow depth program a flight can need. r128 draws every caster with one shared MeshDepthMaterial
+// per morph, skinning and instancing variant (getDepthMaterial), its side from the caster's material, and none of the
+// caster's own maps; so the programs are morph (the HD F-16's control surfaces, the traffic F-16s) or not, times front,
+// back and double sided (no caster is skinned or instanced: csmMark and csmStatic skip instanced meshes). The takeoff
+// used to link the morph one on the first frame a traffic F-16 or our own came within 2 km. Six 1 m boxes, never in
+// the scene, listed in the near cascade for that one draw only (no frustum cull, so wherever the camera is).
+function preDepth(){
+  if(PREQ.dp)return PREQ.dp;const L=[],g=new THREE.BoxGeometry(1,1,1),gm=new THREE.BoxGeometry(1,1,1);
+  gm.morphAttributes.position=[gm.attributes.position.clone()];
+  for(const side of [THREE.FrontSide,THREE.BackSide,THREE.DoubleSide])for(const mo of [false,true]){
+    const m=new THREE.Mesh(mo?gm:g,new THREE.MeshLambertMaterial({side:side,morphTargets:mo}));m.castShadow=true;m.frustumCulled=false;
+    if(mo)m.updateMorphTargets();m.updateMatrixWorld(true);L.push(m);}
+  return PREQ.dp=L;
+}
+// the main scene drawn once round the first flight's camera into the 16 px target A, the shadow maps with every caster
+// variant (the 'frame' job, and the requeue's 'gpu sync')
+function preFrame(M,A){const r=renderer;
+      if(CSM.n){   // the maps drawn once round that camera (the shading ignores them: CSM_U.a.w stays 0)
+        _csmD.copy(sun.position).normalize();if(_csmD.y<0.2)_csmD.set(0.3,0.9,0.3).normalize();
+        const Ls=CSM.L;for(const l of Ls)l.length=0;
+        if(M){csmMark(M);Ls[0].push(M);Ls[1].push(M);}Ls[0].push(terrain);Ls[1].push(terrain);for(const o of CSM.stat)Ls[1].push(o);Ls[2].push(terrain);
+        for(const o of preDepth())Ls[0].push(o);
+        for(let i=0;i<CSM.n;i++){const L=CSM.lights[i];csmFit(L,i,0,CSM.SPLIT[i],L.shadow.mapSize.x);L.shadow.needsUpdate=true;L.userData.sig=null;}}
+      try{r.setRenderTarget(A);r.autoClear=true;r.render(scene,camera);}
+      finally{if(CSM.n){csmIdle();for(const l of CSM.L)l.length=0;}}}
 function preJobs(){
   const Q=PREQ,r=renderer;Q.A=pfxRT(16,16,true);Q.B=pfxRT(16,16,false);Q.C=pfxRT(16,16,false);Q.D=pfxRT(16,16,false);
   const A=Q.A,B=Q.B,C=Q.C,D=Q.D;
   return [
     ['build',()=>{hbBuild();if(CLOUD_MESH&&GFX.on('clouds')&&!CLOUDS.cb)cloudCB();if(!DZ.built)dzBuild();}],
     ['compile',()=>preAt(()=>r.compile(scene,camera))],
-    ['frame',()=>preAt(M=>{
-      if(CSM.n){   // the maps drawn once round that camera (the shading ignores them: CSM_U.a.w stays 0)
-        _csmD.copy(sun.position).normalize();if(_csmD.y<0.2)_csmD.set(0.3,0.9,0.3).normalize();
-        const Ls=CSM.L;for(const l of Ls)l.length=0;
-        if(M){csmMark(M);Ls[0].push(M);Ls[1].push(M);}Ls[0].push(terrain);Ls[1].push(terrain);for(const o of CSM.stat)Ls[1].push(o);Ls[2].push(terrain);
-        for(let i=0;i<CSM.n;i++){const L=CSM.lights[i];csmFit(L,i,0,CSM.SPLIT[i],L.shadow.mapSize.x);L.shadow.needsUpdate=true;L.userData.sig=null;}}
-      try{r.setRenderTarget(A);r.autoClear=true;r.render(scene,camera);}
-      finally{if(CSM.n){csmIdle();for(const l of CSM.L)l.length=0;}}})],
+    ['frame',()=>preAt(M=>preFrame(M,A))],
     ['post chain',()=>{if(!GFX.post)return;preAt(()=>{
       const bg=scene.background,lm=camera.layers.mask;scene.background=null;r.setRenderTarget(A);r.clear(true,true,false);
       try{camera.layers.set(PFX_OCC);scene.overrideMaterial=PFX_OCCM;r.render(scene,camera);scene.overrideMaterial=null;
@@ -18912,20 +18977,31 @@ function preJobs(){
     // mesh built later without them), so it tags afresh when the sensor is first used
     ['ir',()=>preAt(()=>{const ic=[],pm=[];scene.traverse(o=>{if(o.isInstancedMesh&&!o.instanceColor)ic.push(o);else if(o.isPoints)pm.push([o,o.layers.mask]);});
       try{r.setRenderTarget(A);renderIR();}finally{for(const o of ic)o.instanceColor=null;for(const [o,m] of pm)o.layers.mask=m;irDirty=true;IR.pass=false;}})],
-    ['carousel',()=>{const p=showItem(savedType||'cessna'),cam=SHOW.cam,prevT=r.getRenderTarget();p.visible=true;p.position.set(0,0,0);p.scale.setScalar(40/p.userData.dim);
+    ['carousel',()=>{if(PRE.car)return;PRE.car=true;const p=showItem(savedType||'cessna'),cam=SHOW.cam,prevT=r.getRenderTarget();p.visible=true;p.position.set(0,0,0);p.scale.setScalar(40/p.userData.dim);
       cam.aspect=1.6;cam.position.set(0,30,100);cam.lookAt(0,0,0);cam.updateProjectionMatrix();
       if(!SHOW.scene.environment)SHOW.scene.environment=envDay();
       try{r.setRenderTarget(A);r.render(SHOW.scene,cam);}finally{p.visible=false;r.setRenderTarget(prevT);}}]];
 }
 // one frame's share of the queue (tick, from the 4th frame); true once it has drained. BOOT.sub moves the bar through
-// the last stage as it goes.
+// the last stage as it goes. Gfxfix item 3: a tier change in the menu (GFX.setTier, GFX.pendingApply) runs it again
+// (gfxRequeue: every job is safe to repeat, the carousel's once only, BOOT.mark('warm') sets its time once); the tick
+// drains it on frames that are not flying, start() and the pause sheet's Resume drain what is left in one go (gfxDrain)
+// so a flight's first frame never compiles. __kgeu.boot().pre.done turns true again when it has drained.
 function gfxPrecompile(){
   if(PRE.done)return true;
   if(PRE.skip){PRE.done=true;BOOT.mark('warm');return true;}
   const Q=PREQ,t0=performance.now();
-  if(!Q.jobs){Q.jobs=preJobs();Q.i=0;PRE.t0=t0;PRE.frames=0;}
+  if(!Q.jobs){Q.jobs=preJobs();Q.i=0;PRE.t0=t0;PRE.frames=0;
+    // a requeued run (a tier change in the menu) ends on a GPU sync: the frame drawn once more and one pixel read back,
+    // so the driver finishes linking and building the new pipelines while the menu is still up, rather than on the
+    // first flight frame (the menu's own frames draw no 3D and never wait for it). PRE.syncMs: how long that took.
+    // Never at boot: the splash and the menu's first seconds absorb it there. It waits for the menu's WARM steps (run
+    // again with the queue, their draws are GPU work too), so it is the last thing the menu queues.
+    if(PRE.runs>1)Q.jobs.push(['gpu sync',()=>{const a=performance.now();
+      preAt(M=>{preFrame(M,Q.A);renderer.readRenderTargetPixels(Q.A,0,0,1,1,PRE_PX);});PRE.syncMs=Math.round(performance.now()-a);},()=>WARM.done]);}
   PRE.frames++;
-  do{const j=Q.jobs[Q.i++],a=performance.now();
+  do{if(Q.jobs[Q.i][2]&&!Q.jobs[Q.i][2]())break;   // a job that waits (the GPU sync, on the WARM steps)
+    const j=Q.jobs[Q.i++],a=performance.now();
     try{j[1]();}catch(e){console.warn('gfx precompile '+j[0],e);}
     PRE.ms[j[0]]=+(performance.now()-a).toFixed(1);}
   while(Q.i<Q.jobs.length&&performance.now()-t0<40);
@@ -18934,6 +19010,22 @@ function gfxPrecompile(){
   for(const k of ['A','B','C','D'])if(Q[k]){Q[k].dispose();Q[k]=null;}
   Q.jobs=null;PRE.done=true;PRE.total=+Object.values(PRE.ms).reduce((x,y)=>x+y,0).toFixed(1);PRE.wall=Math.round(performance.now()-PRE.t0);
   BOOT.mark('warm');return true;
+}
+// after a tier change (menu only): the queue and the menu's WARM steps once more for the new tier's programs
+function gfxRequeue(){
+  if(!BOOT.t.warm)return;   // still booting: the first run of the queue is on its way and sees the new tier
+  for(const k of ['A','B','C','D'])if(PREQ[k]){PREQ[k].dispose();PREQ[k]=null;}
+  PREQ.jobs=null;PREQ.i=0;PRE.done=false;PRE.runs=(PRE.runs||1)+1;
+  WARM.i=0;WARM.ms=[];const w=WARM.done;WARM.done=false;if(w)setTimeout(warmTick,60);
+}
+GFX.requeue=gfxRequeue;   // GFX lives outside init()
+// a flight about to start (or resume) with the queue not drained: the rest of it now, behind the menu still on screen
+function gfxDrain(){
+  if(PRE.done)return 0;const t0=performance.now();let n=0;
+  // the GPU sync waits on the WARM steps: the rest of them now as well
+  if(PRE.runs>1&&!WARM.done){while(WARM.i<WARM_STEPS.length){try{WARM_STEPS[WARM.i]();}catch(e){console.warn('wstep',e);}WARM.i++;}WARM.done=true;}
+  while(!PRE.done&&n++<64)gfxPrecompile();
+  PRE.drainMs=Math.round(performance.now()-t0);return PRE.drainMs;
 }
 // ---- day TV: grain and a faint 8 px block pattern, one small tile stepped every 80 ms ----
 const sensorFx=$('sensorFx'),sensorGr=sensorFx.firstChild;let sfxT=0;
@@ -19839,9 +19931,11 @@ function targetsTick(dt){
   for(const t of STRIKE.targets){if(!t.dead)continue;t.deadT=(t.deadT||0)+dt;
     t.mesh.userData.heat=0.95-0.45*clamp(t.deadT/60,0,1);}
 }
+// the scorched look, one material made at load rather than one per kill (gfxfix item 3)
+const KILL_MAT=lam(0x241f1a);
 function killTarget(t){
   t.dead=true;t.moving=false;t.mesh.userData.heat=0.95;irDirty=true;
-  const dark=lam(0x241f1a);
+  const dark=KILL_MAT;
   t.mesh.traverse(o=>{if(o.isMesh)o.material=dark;});
   t.mesh.rotation.z+=(Math.random()-0.5)*0.35;t.deadT=0;
 }
@@ -20226,7 +20320,7 @@ function fpsStats(){const b=FPS.buf,n=FPS.n;let sum=0,k=0;
   const m=performance.memory;
   return {avg:sum>0?Math.round(k*10000/sum)/10:0,low1:p99>0?Math.round(10000/p99)/10:0,ms:k?Math.round(sum/k*10)/10:0,n:n,
     heapMB:m&&m.usedJSHeapSize?Math.round(m.usedJSHeapSize/104857.6)/10:null,loadMs:LOAD_MS};}
-function fpsScene(){return !running?'menu:'+curScr:paused?'paused':DF.on?'dogfight':sensorMode?'sensor':'flight';}
+function fpsScene(){return !running||menu.classList.contains('on')?'menu:'+curScr:paused?'paused':DF.on?'dogfight':sensorMode?'sensor':'flight';}
 function fpsUI(){const b=$('oFps');if(b){b.textContent='FPS counter: '+(FPS.on?'On':'Off');b.classList.toggle('on',FPS.on);}$('fpsPill').classList.toggle('on',FPS.on);}
 function setFps(v){FPS.on=!!v;try{localStorage.setItem('kgeuFps',FPS.on?'1':'0');}catch(e){}FPS.txtT=FPS.logT=0;fpsUI();}
 // dynamic resolution (graphics item 2): fed every frame while flying and not paused, with the ring's numbers refreshed
@@ -20258,9 +20352,16 @@ var STALL={thr:250,log:[],prev:[],count:0,worst:0,marks:[],lastMarks:[],tags:[],
   p:{prog:0,tex:0,geo:0,recv:0,bld:0,ch:0,pr:0,sc:0,tier:'',pw:0,ph:0,pbk:0,vw:0,vh:0,tls:0,env:0,tod:0,hbt:0,hb:false,warm:0,pre:0,fx:0,msl:0,trf:0,df:false,cr:false,pa:false,mn:false,heap:0}};
 try{const o=JSON.parse(localStorage.getItem('kgeuStalls')||'null');if(o&&Array.isArray(o.log))STALL.prev=o.log.concat(Array.isArray(o.prev)?o.prev:[]).slice(-30);}catch(e){}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)STALL.vis=true;});
+// gfxfix item 3: programs counted by r128's increasing WebGLProgram id, not the list's length (a compile and a dispose
+// in the same stretch net to zero there, as PMREM's blur did): max, the highest id seen; compiles, the ids above the
+// previous high water mark summed since load (every program ever linked, the ones since disposed too)
+const PROGHW={max:-1,compiles:0};
+function progScan(){const P=renderer.info.programs;if(!P)return 0;let m=PROGHW.max;
+  for(let i=0;i<P.length;i++)if(P[i].id>m)m=P[i].id;
+  const d=m-PROGHW.max;if(d>0){PROGHW.compiles+=d;PROGHW.max=m;}return d;}
 function stallProbe(t){
   const S=STALL,P=S.p,ri=renderer.info,mm=performance.memory;
-  const prog=ri.programs?ri.programs.length:0,tex=ri.memory.textures,geo=ri.memory.geometries,ch=scene.children.length,pr=renderer.getPixelRatio();
+  const prog=(progScan(),PROGHW.compiles),tex=ri.memory.textures,geo=ri.memory.geometries,ch=scene.children.length,pr=renderer.getPixelRatio();
   let fx=0;for(let i=0;i<FX.length;i++)if(FX[i].on)fx++;
   const msl=STRIKE.missiles.length+(DF.msl?DF.msl.length:0),mn=menu.classList.contains('on'),cr=!!(st&&st.crashed),heap=mm?mm.usedJSHeapSize||0:0,
     warm=WARM.i,pre=PRE.frames|0,vis=S.vis,wasHeld=S.held;
@@ -20285,8 +20386,8 @@ function stallProbe(t){
     if(TOD_N>P.tod)T.push('tod');
     if(HB.tierN>P.hbt)T.push('hbTier');
     if(HB.on!==P.hb)T.push('haboob');
-    if(warm>P.warm)T.push('warm');
-    if(pre>P.pre)T.push('pre');
+    if(warm>P.warm)T.push('wstep');   // a menu WARM step ran (never the word warm: warm_console_check)
+    if(pre>P.pre)T.push('pjob');   // a precompile queue job ran
     if(fx>P.fx)T.push('fx+'+(fx-P.fx));
     if(msl>P.msl)T.push('missile');
     if(TRAFFIC.length>P.trf)T.push('traffic+'+(TRAFFIC.length-P.trf));
@@ -20489,7 +20590,8 @@ function tick(t,skipRender){
   if(DF.live&&DF.wTxt&&running&&!s.crashed)w=DF.wTxt;   // the dogfight's HARD DECK and EJECT win
   if(w==='STALL')hapPattern('stall');   // its cooldown makes the repeating pulse
   setTxt(warnEl,w);warnEl.classList.toggle('on',!!w);
-  updateAudio();frameN++;if(frameN>=4&&WORLD.ready&&!PRE.done&&!splashFading()&&gfxPrecompile()&&!splashSeen){splashSeen=true;splashDone();}   // a world region: once it is built
+  // a world region: once it is built. A rerun after a tier change (gfxRequeue) waits for a frame that is not flying
+  updateAudio();frameN++;if(frameN>=4&&WORLD.ready&&!PRE.done&&!splashFading()&&(!running||paused||menu.classList.contains('on'))&&gfxPrecompile()&&!splashSeen){splashSeen=true;splashDone();}
   if(skipRender){}
   else if(SHOW.on){csmIdle();renderer.setClearColor(0xF6C177,1);renderer.clear();showRender(dt,CARM);}
   // under the opaque menu the first 40 frames used to draw the world to compile its programs; the precompile queue
@@ -21096,7 +21198,7 @@ const APP_VER='2026-10-12-graphics';          // keep version.json in step when 
     get P(){return E.P;}};
 })();
 
-window.__kgeu={stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,progN:()=>renderer.info.programs.length,progList:()=>renderer.info.programs.map(p=>p.cacheKey),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),taskXp:taskXp,tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
+window.__kgeu={stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>p.cacheKey),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),taskXp:taskXp,tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
   task:()=>({on:TASK.on,id:TASK.id,stage:TASK.stage&&TASK.stage.id,si:TASK.si,brief:TASK.brief,done:TASK.done,res:TASK.res,ask:TASK.ask&&{shown:TASK.ask.shown,opts:TASK.ask.opts.map(o=>o.k),t:TASK.ask.t},d:TASK.d,log:TASK.log.slice(),seed:TASK.seed}),
   tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzBuild:()=>dzBuild(),dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
@@ -21121,7 +21223,7 @@ window.__kgeu={stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,lo
   clouds:()=>({preset:CLOUDS.preset,forced:CLOUDS.forced,visible:!!(CLOUD_MESH&&CLOUD_MESH.visible),hd:!!(CLOUD_MESH&&CLOUD_MESH.material===CLOUDS.hd),
     cb:!!(CLOUDS.cb&&CLOUDS.cb.visible),cbTris:CLOUDS.tris||0,cbN:CLOUDS.cb?CLOUDS.cb.count:0,puffs:CLOUD_MESH?CLOUD_MESH.count:0,pick:(t,k)=>cloudsPick(t,k)}),
   cloudsPick:cloudsPick,
-  csm:()=>({n:CSM.n,lights:CSM.lights.length,inScene:CSM.lights.filter(l=>l.parent===scene).length,enabled:renderer.shadowMap.enabled,
+  csm:()=>({n:CSM.n,recvMs:CSM.recvMs,lights:CSM.lights.length,inScene:CSM.lights.filter(l=>l.parent===scene).length,enabled:renderer.shadowMap.enabled,
     sizes:CSM.lights.map(l=>l.shadow.mapSize.x),act:CSM.act,renders:CSM.renders,skips:CSM.skips,recv:CSM.recv,strength:CSM_U.a.w,stat:CSM.stat.length,
     lists:CSM.L.map(l=>l.length),dirLights:scene.children.filter(o=>o.isDirectionalLight).length,
     r:CSM.lights.map(l=>l.shadow.camera.right),split:[CSM_U.a,CSM_U.c].map(o=>[o.x,o.y,o.z])}),
