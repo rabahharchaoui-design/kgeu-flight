@@ -9196,10 +9196,9 @@ const WARM_STEPS=['reaper','mq9b','f16','cessna','alpha','c130','archer','a10','
   // the burst: on Medium and High the precompile queue's 'explosion' job has already drawn it into a post chain target,
   // the pipeline every flight frame uses there (the scene never draws straight to the canvas with post on), so the
   // full size canvas draw here would only repeat it (3 s of the warm-up headless); Low and kgeuNoPre still draw it
-  // gfxfix item 3: the dogfight's bandit (a first one in the pool), missiles, tracers and flares were built at the first
-  // dfStart and the flares' points program linked in flight: built here, every material compiled (warmObj's compile
-  // walks the whole scene, hidden objects too) and the bandit drawn once
-  .concat([()=>{if(!DZ.built)dzBuild();warmObj(DZ.g);},()=>{dfBuild();dfWBuild();warmObj((DF.pool[0]||dfBandit()).g);},()=>{if(GFX.post&&PRE.done&&!PRE.skip&&PRE.ms.explosion!=null)return;fxWarmLayer();},()=>fxWarmDebris(),()=>fxWarmDecals(),()=>{if(actx)boomBufs();}]);
+  // gfxfix item 3: the dogfight's bandit, missiles, tracers and flares (dfWarmBuild, the precompile queue's build job,
+  // whose compile job links their programs behind the splash) drawn once here without a compile, for the buffers
+  .concat([()=>{if(!DZ.built)dzBuild();warmObj(DZ.g);},()=>{dfWarmBuild();warmObj(DF.pool[0].g,true);},()=>{if(GFX.post&&PRE.done&&!PRE.skip&&PRE.ms.explosion!=null)return;fxWarmLayer();},()=>fxWarmDebris(),()=>fxWarmDecals(),()=>{if(actx)boomBufs();}]);
 function warmTick(){
   if(WARM.done)return;
   // flying: wait. The steps belong to the menu and the pause sheet, never to a flying frame
@@ -18987,11 +18986,15 @@ function preFrame(M,A){const r=renderer;
         for(let i=0;i<CSM.n;i++){const L=CSM.lights[i];csmFit(L,i);L.shadow.needsUpdate=true;L.userData.sig=null;}}
       try{r.setRenderTarget(A);r.autoClear=true;r.render(scene,camera);}
       finally{if(CSM.n){csmIdle();for(const l of CSM.L)l.length=0;}}}
+// the dogfight's objects before any dogfight (about 8 ms): the bandit model and a first pooled bandit, the missiles,
+// tracers and flares (dfStart built them, and the flares' points program linked in flight); hidden, in the scene, so
+// the compile job (and any later whole scene compile) links their programs
+function dfWarmBuild(){dfBuild();dfWBuild();if(!DF.pool.length)dfBandit();}
 function preJobs(){
   const Q=PREQ,r=renderer;Q.A=pfxRT(16,16,true);Q.B=pfxRT(16,16,false);Q.C=pfxRT(16,16,false);Q.D=pfxRT(16,16,false);
   const A=Q.A,B=Q.B,C=Q.C,D=Q.D;
   return [
-    ['build',()=>{hbBuild();if(CLOUD_MESH&&GFX.on('clouds')&&!CLOUDS.cb)cloudCB();if(!DZ.built)dzBuild();}],
+    ['build',()=>{hbBuild();if(CLOUD_MESH&&GFX.on('clouds')&&!CLOUDS.cb)cloudCB();if(!DZ.built)dzBuild();dfWarmBuild();}],
     ['compile',()=>preAt(()=>r.compile(scene,camera))],
     ['frame',()=>preAt(M=>preFrame(M,A))],
     ['post chain',()=>{if(!GFX.post)return;preAt(()=>{
