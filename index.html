@@ -6602,10 +6602,12 @@ function pfsColorSetup(){
 // ================= atmosphere: cascaded sun shadows and desert air (graphics item 6) =================
 // Shared uniform values, plain objects so every material's clone of the ShaderLib uniforms points at the same one
 // (like PFS_TONE): CSM_U the cascade selection, AIR_U the haze model. Both are written by csmFrame and airSet.
-// CSM_U: per cascade i (x, y, z) the view depth weight clamp((z - a)*b) * clamp((c - z)*d): a ramp in over the
-// previous boundary's blend band and out over the next one, so two neighbours always sum to 1; a.w the shadow strength,
-// b.w the share of the sky light a shadow takes too (0.12 by day to 0.42 with the sun 5 degrees up or lower).
-const CSM_U={a:{x:0,y:0,z:0,w:0},b:{x:0,y:0,z:0,w:0},c:{x:-1,y:-1,z:-1,w:0},d:{x:0,y:0,z:0,w:0}};
+// CSM_U: per cascade i (x, y, z) the view depth weight clamp((c - z)*d) times its fade f (gfxfix item 4: the cascades
+// are nested, each from depth 0, so only the ramp out at its own split; csmShadow walks them near to far, a cascade
+// taking its weight of what the nearer ones left, so a fading near hands over to the mid without a seam); a.w the shadow
+// strength, b.w the share of the sky light a shadow takes too (0.12 by day to 0.42 with the sun 5 degrees up or lower).
+// a.xyz and b.xyz unused.
+const CSM_U={a:{x:0,y:0,z:0,w:0},b:{x:0,y:0,z:0,w:0},c:{x:-1,y:-1,z:-1,w:0},d:{x:0,y:0,z:0,w:0},f:{x:0,y:0,z:0,w:0}};
 // AIR_U.k: x the dry air (Rayleigh like) share of the ground level extinction, y 1/height falloff of the dust (1,500 m),
 // z 1/height falloff of the air (8,000 m), w the optical depth over scene.fog.far - near/2 at ground level (airSet:
 // day and sunset 1.4 with x 0.12, night 1.9 and haboob 2.3 with x 0.35); sun: x, z the sun's horizontal direction, y the weight of the sky tint in the in scatter; s, a: the sky tint
@@ -6628,7 +6630,7 @@ function pfsAirSetup(){
   const rep=(k,a,b)=>{if(C[k].indexOf(a)<0){console.warn('pfs air: no '+a.slice(0,40)+' in '+k);return;}C[k]=C[k].split(a).join(b);};
   C.shadowmap_pars_fragment+=`
 #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
-uniform vec4 csmA;uniform vec4 csmB;uniform vec4 csmC;uniform vec4 csmD;
+uniform vec4 csmA;uniform vec4 csmB;uniform vec4 csmC;uniform vec4 csmD;uniform vec4 csmF;
 float csmBil( sampler2D m, vec2 uv, float z, vec2 size ){
 	vec2 t = 1.0 / size, f = fract( uv * size + 0.5 ), c = uv - f * t;
 	return mix( mix( texture2DCompare( m, c, z ), texture2DCompare( m, c + vec2( t.x, 0.0 ), z ), f.x ),
@@ -6647,12 +6649,12 @@ float csmTap( sampler2D m, vec2 size, float bias, float radius, vec4 sc ){
 }
 float csmShadow( bool rcv ){
 	if ( ! rcv || csmA.w <= 0.0 ) return 1.0;
-	float z = 1.0 / gl_FragCoord.w, occ = 0.0, w = 0.0;
+	float z = 1.0 / gl_FragCoord.w, occ = 0.0, w = 0.0, rem = 1.0;
 	DirectionalLightShadow dls;
 	#pragma unroll_loop_start
 	for ( int i = 0; i < NUM_DIR_LIGHT_SHADOWS; i ++ ) {
-		w = clamp( ( z - csmA[ i ] ) * csmB[ i ], 0.0, 1.0 ) * clamp( ( csmC[ i ] - z ) * csmD[ i ], 0.0, 1.0 );
-		if ( w > 0.0 ) { dls = directionalLightShadows[ i ]; occ += w * ( 1.0 - csmTap( directionalShadowMap[ i ], dls.shadowMapSize, dls.shadowBias, dls.shadowRadius, vDirectionalShadowCoord[ i ] ) ); }
+		w = clamp( ( csmC[ i ] - z ) * csmD[ i ], 0.0, 1.0 ) * csmF[ i ];
+		if ( w > 0.0 ) { dls = directionalLightShadows[ i ]; occ += rem * w * ( 1.0 - csmTap( directionalShadowMap[ i ], dls.shadowMapSize, dls.shadowBias, dls.shadowRadius, vDirectionalShadowCoord[ i ] ) ); rem *= 1.0 - w; }
 	}
 	#pragma unroll_loop_end
 	return 1.0 - occ * csmA.w;
@@ -6751,7 +6753,7 @@ float csmShadow( bool rcv ){
 	gl_FragColor.rgb = mix( gl_FragColor.rgb, vAirC.rgb + 0.0 * fogColor, fogFactor );
 #endif`+E+C.fog_fragment+Z;
   for(const k in L){const sh=L[k];if(!sh)continue;
-    if(sh.uniforms)Object.assign(sh.uniforms,{csmA:{value:CSM_U.a},csmB:{value:CSM_U.b},csmC:{value:CSM_U.c},csmD:{value:CSM_U.d},
+    if(sh.uniforms)Object.assign(sh.uniforms,{csmA:{value:CSM_U.a},csmB:{value:CSM_U.b},csmC:{value:CSM_U.c},csmD:{value:CSM_U.d},csmF:{value:CSM_U.f},
       airK:{value:AIR_U.k},airSun:{value:AIR_U.sun},airS:{value:AIR_U.s},airA:{value:AIR_U.a},airT:{value:AIR_U.t},airM:{value:AIR_U.m},airMC:{value:AIR_U.mc}});
     if(typeof sh.vertexShader==='string')sh.vertexShader='#define PFS_AIR\n'+sh.vertexShader;
     if(typeof sh.fragmentShader==='string')sh.fragmentShader='#define PFS_AIR\n'+sh.fragmentShader;}
@@ -6808,21 +6810,30 @@ const sun=new THREE.DirectionalLight(0xfff0d8,1.0); sun.position.set(-0.55,0.75,
 // ---------- cascaded sun shadows (graphics item 6) ----------
 // GFX.FX.shadows (Medium): 2 cascades, a 1,024 map near and 512 for the ramp; GFX.FX.shadowFar (High): 3 at 1,024, the
 // third out to 12 km for the mountains at golden hour. Each cascade is a DirectionalLight that only casts (intensity 0,
-// skipped by the light loops, pfsAirSetup), giving the sun its shadow inside its own view depth range. csmFrame fits
-// each cascade's orthographic camera to the bounding sphere of its slice of the view frustum (a fixed size for a given
-// fov, in 9% steps, so it never breathes), centred on a whole shadow texel in the light's frame (so nothing standing
-// still swims), and asks for the maps to redraw. The shadow pass draws an explicit caster list per cascade
+// skipped by the light loops, pfsAirSetup), giving the sun its shadow from view depth 0 out to its own split: nested
+// layers, csmShadow walks them near to far, each taking what the nearer ones left (gfxfix item 4), so a cascade can fade
+// in and out (CSM.F) instead of popping. csmFrame fits each cascade's orthographic camera round the bounding sphere of
+// its slice of the view frustum with a radius fixed per cascade (CSM.R, csmRadii: the widest fov the game sets, never
+// changing in flight), centred on a whole shadow texel in the light's frame (so nothing standing still swims), and asks
+// for the maps to redraw. The shadow pass draws an explicit caster list per cascade
 // (renderer.shadowMap.render is wrapped below), never a walk of the scene to find them:
 //   near (0 to 120 m): the flown aircraft, a bandit or traffic within 250 m of the camera;
 //   mid (120 to 1,500 m): the aircraft, CSM.stat (buildings, towers, hangars, the stadium, billboards, the parked
 //     aircraft: csmStatic at build time), traffic and bandits within 2 km;
 //   far (1,500 to 12,000 m, High only): the terrain sectors (cast and receive, here only).
 // Redrawn: near and mid every frame, far every second frame. Off: at night (the moon casts none), under a sun lower
-// than a degree, in the IR view and the carousel (nothing asks for a map there); the haboob's dust fades them; near off
-// above 2,500 ft AGL (the camera's), mid above 8,000 ft, so on Medium nothing at all is drawn up there. Low: no lights,
+// than a degree, in the IR view and the carousel (nothing asks for a map there); the haboob's dust fades them. Near and mid
+// follow the camera's AGL smoothed over a second (CSM.aglS) with hysteresis (CSM.THR): near on below 2,500 ft, off above
+// 3,120; mid on below 8,000 ft, off above 10,000; each fades over a second, so on Medium nothing at all is drawn up there. Low: no lights,
 // no shadow map, no shadow code in any shader. The shadowed side keeps the hemisphere light, never black.
 const CSM={n:0,lights:[],L:[[],[],[]],stat:[],frame:0,act:0,prev:0,recvMs:0,renders:0,recv:0,builds:0,ai:[0,0,0],showScene:null,showL:[],skips:0,spin:null,spinOf:null,
-  SPLIT:[120,1500,12000],REACH:[250,2500,30000],BIAS:[0.04,0.5,10],NB:[0.03,0.4,12],
+  SPLIT:[120,1500,12000],REACH:[250,2500,30000],BIAS:[0.04,0.5,10],NB:[0,0,0],
+  // gfxfix item 4: the normal bias in shadow texels of each cascade (NB = NBT x 2R/size, csmRadii). Near 0.09 (0.04 m:
+  // the gear's contact shadow on the ramp stays tight); mid 0.1 (1.0 m Medium, 0.5 m High: it holds only aircraft and
+  // buildings, never the terrain, and 1.5 texels, 15 m, lifted the ramp's lookup over a parked C-130 so its shadow was
+  // gone from 400 m); far 1.5 (59 m at 39 m texels: the terrain's own shadow, no acne on the White Tank slopes)
+  NBT:[0.09,0.1,1.5],R:[0,0,0],FR:[0,0,0],FOVMAX:70,F:[0,0,0],want:0,aglS:null,aglM:0,t0:-1,fadeN:0,
+  THR:{nearOn:762,nearOff:950,midOn:2438,midOff:3050},drawn:[0,0,0],pos:[[0,0,0],[0,0,0],[0,0,0]],
   root:{visible:true,layers:{test:()=>true},children:null}};
 const _csmD=new V3(),_csmF=new V3(),_csmC=new V3(),_csmX=new V3(),_csmY=new V3(),_csmUp=new V3(0,1,0),_csmOne=[null];
 {const SM=renderer.shadowMap,orig=SM.render;
@@ -6834,7 +6845,7 @@ function csmLit(m,opaque){if(Array.isArray(m))return m.some(x=>csmLit(x,opaque))
 // the tier's cascades (GFX_HOOKS): Low removes every light and the shadow map itself
 function csmBuild(){CSM.builds++;   // STALL's 'csmBuild' tag
   for(const L of CSM.lights){scene.remove(L);scene.remove(L.target);if(L.shadow.map){L.shadow.map.dispose();L.shadow.map=null;}}
-  CSM.lights.length=0;CSM.n=0;CSM.act=CSM.prev=0;CSM_U.a.w=0;
+  CSM.lights.length=0;CSM.n=0;CSM.act=CSM.prev=0;CSM_U.a.w=0;CSM.aglS=null;   // the fades snap to the new set
   const on=GFX.on('shadows');renderer.shadowMap.enabled=on;
   if(!on)return;
   renderer.shadowMap.type=THREE.BasicShadowMap;   // the filtering is csmTap's own
@@ -6842,7 +6853,20 @@ function csmBuild(){CSM.builds++;   // STALL's 'csmBuild' tag
   for(let i=0;i<n;i++){const L=new THREE.DirectionalLight(0xffffff,0);L.castShadow=true;L.name='csm'+i;
     L.shadow.mapSize.set(sizes[i],sizes[i]);L.shadow.autoUpdate=false;L.shadow.needsUpdate=false;L.shadow.radius=1.5;
     L.userData.csmL=CSM.L[i];scene.add(L);scene.add(L.target);CSM.lights.push(L);}
-  CSM.n=n;csmShowSync();csmRecv();
+  CSM.n=n;csmRadii();csmShowSync();csmRecv();
+}
+// gfxfix item 4: each cascade's fixed radius, from the widest fov the game ever gives the main camera (CSM.FOVMAX: the
+// ramp view's 70; chase 62, cockpit 64, padlock 68, the drop views 66, photo 50, sensor 14 or less) and the current
+// aspect, so speed, zoom or a view change never resizes the texel grid in flight; csmBuild and resize(). The sphere
+// round the slice from depth 0 to f0: with q = tan^2(v) + tan^2(h) >= 1 (any landscape phone) the centre sits at f0
+// and r = f0 sqrt(q), so starting the mid at 0 instead of 110 m changes nothing (844x390 at 70 degrees: near 0..130 m
+// r 216, mid 0..1,500 (Medium, last) r 2,504 or 0..1,620 (High) r 2,704, far 0..12,000 r 20,030; the old fit at
+// 62 degrees, rounded up to 2^(1/8) steps: 197, 2,233 or 2,435, 17,867)
+function csmRadii(){
+  const tv=Math.tan(CSM.FOVMAX*Math.PI/360),th=tv*camera.aspect,q=tv*tv+th*th;
+  for(let i=0;i<CSM.n;i++){const f0=i===CSM.n-1?CSM.SPLIT[i]:CSM.SPLIT[i]*1.08,c=Math.min(f0,f0*(1+q)/2);
+    CSM.FR[i]=f0;CSM.R[i]=Math.sqrt((f0-c)*(f0-c)+f0*f0*q);
+    CSM.NB[i]=CSM.NBT[i]*2*CSM.R[i]/CSM.lights[i].shadow.mapSize.x;}
 }
 // the carousel's scene carries as many cascade lights, never drawn (no map, and csmIdle zeroes the strength before it
 // renders), only so its aircraft share the main scene's compiled programs: no second compile per model in the menu
@@ -6890,11 +6914,11 @@ function csmIdle(){CSM.act=0;CSM_U.a.w=0;for(const L of CSM.lights)L.shadow.need
   // the carousel's twins bind the cascades' own maps: the same sampler state, so no driver (SwiftShader) rebuilds a
   // pipeline for the menu
   for(let i=0;i<CSM.showL.length;i++){const T=CSM.showL[i],L=CSM.lights[i];if(L&&L.shadow.map&&T.shadow.map!==L.shadow.map){T.shadow.map=L.shadow.map;T.shadow.mapSize.copy(L.shadow.mapSize);}}}
-// cascade i's camera round the frustum slice n0..f0 (m), a size x size map
-function csmFit(L,i,n0,f0,size){
-  const tv=Math.tan(camera.fov*Math.PI/360),th=tv*camera.aspect,q=tv*tv+th*th;
-  let c=(f0+n0)*(1+q)/2,r;if(c>=f0){c=f0;r=f0*Math.sqrt(q);}else r=Math.sqrt((f0-c)*(f0-c)+f0*f0*q);
-  r=Math.pow(2,Math.ceil(Math.log2(r)*8)/8);
+// cascade i's camera round the frustum slice 0..CSM.FR[i] (m), radius CSM.R[i] (the centre from the current fov: the
+// sphere round it for this fov is never wider than R), a size x size map
+function csmFit(L,i){
+  const tv=Math.tan(camera.fov*Math.PI/360),th=tv*camera.aspect,q=tv*tv+th*th,f0=CSM.FR[i],r=CSM.R[i],size=L.shadow.mapSize.x;
+  const c=Math.min(f0,f0*(1+q)/2);
   camera.getWorldDirection(_csmF);_csmC.copy(camera.position).addScaledVector(_csmF,c);
   // the shadow camera's own lookAt basis (z toward the sun, x = up cross z), the centre on a whole texel of it
   const z=_csmD;_csmX.crossVectors(_csmUp,z).normalize();_csmY.crossVectors(z,_csmX);
@@ -6909,27 +6933,39 @@ const CSM_K='xyz';
 // traffic or a bandit: into the mid list within 2 km of the camera, the near one within 250 m
 function csmNear(g,cp){if(!g.visible)return;const e=g.matrixWorld.elements,dx=e[12]-cp.x,dy=e[13]-cp.y,dz=e[14]-cp.z,d=dx*dx+dy*dy+dz*dz;
   if(d<4e6){csmMark(g);CSM.L[1].push(g);if(d<62500)CSM.L[0].push(g);}}
-// every drawn frame of the world (not the IR view), after the camera is placed
-function csmFrame(){
-  const n=CSM.n,U=CSM_U;
+// every drawn frame of the world (not the IR view), after the camera is placed; dt the frame's real seconds (capped)
+function csmFrame(dt){
+  const n=CSM.n,U=CSM_U,T=CSM.THR,F=CSM.F;
   if(!n)return;
   csmIdle();CSM.frame++;
+  // gfxfix item 4: the camera's AGL smoothed over a second (snapped at a start and on a jump of over 400 m in a frame),
+  // near and mid wanted with hysteresis, each fading toward wanted at 1/s (snapped with the AGL)
+  const cp=camera.position,agl=cp.y-groundHeight(cp.x,cp.z),snap=CSM.aglS===null||CSM.t0!==RUN.t0||Math.abs(agl-CSM.aglM)>400;
+  dt=Math.max(0,dt||0);CSM.aglM=agl;CSM.t0=RUN.t0;
+  if(snap)CSM.aglS=agl;else CSM.aglS+=(agl-CSM.aglS)*(1-Math.exp(-dt));
+  const a=CSM.aglS;let want=CSM.want;
+  if(snap)want=(a<T.nearOn?1:0)|(a<T.midOn?2:0);
+  else{if(want&1){if(a>T.nearOff)want&=~1;}else if(a<T.nearOn)want|=1;
+    if(want&2){if(a>T.midOff)want&=~2;}else if(a<T.midOn)want|=2;}
+  if(n>2)want|=4;CSM.want=want;
+  for(let i=0;i<n;i++){const g=want&(1<<i)?1:0;F[i]=snap?g:g?Math.min(1,F[i]+dt):Math.max(0,F[i]-dt);}
+  if(F[0]>0&&F[0]<1)CSM.fadeN++;
   _csmD.copy(sun.position).normalize();
   const k=TOD.night||GFX.thermS.on?0:clamp((_csmD.y-0.0175)/0.03,0,1)*(1-(HB.on?HB.d:0));   // thermS.on: the battery guard
-  for(let i=0;i<3;i++){const c=CSM_K[i];U.a[c]=U.b[c]=U.d[c]=0;U.c[c]=-1;}
+  for(let i=0;i<3;i++){const c=CSM_K[i];U.a[c]=U.b[c]=U.d[c]=U.f[c]=0;U.c[c]=-1;}
   if(k<=0.001){CSM.prev=0;return;}
-  const cp=camera.position,agl=cp.y-groundHeight(cp.x,cp.z);
-  let mask=0;if(agl<762)mask|=1;if(agl<2438)mask|=2;if(n>2)mask|=4;
-  // the active cascades share 0..12 km in order; a 16% blend band at each boundary, the last fades over its last 20%
-  let lo=0,na=0,j=0;const act=CSM.ai;for(let i=0;i<n;i++)if(mask&(1<<i))act[na++]=i;
-  for(;j<na;j++){
-    const i=act[j],c=CSM_K[i],hi=CSM.SPLIT[i],last=j===na-1,m0=0.08*lo,m1=0.08*hi;
-    if(j===0){U.a[c]=-1;U.b[c]=1e3;}else{U.a[c]=lo-m0;U.b[c]=1/(2*m0);}
-    if(last){U.c[c]=hi;U.d[c]=1/(0.2*hi);}else{U.c[c]=hi+m1;U.d[c]=1/(2*m1);}
-    const L=CSM.lights[i];csmFit(L,i,Math.max(0,U.a[c]),U.c[c],L.shadow.mapSize.x);
-    // far: every second frame, unless it has just come on
-    L.shadow.needsUpdate=i<2||!(CSM.prev&(1<<i))||(CSM.frame&1)===0;
-    lo=hi;}
+  let mask=0;for(let i=0;i<n;i++)if(F[i]>0)mask|=1<<i;
+  // nested: every active cascade from depth 0 to its split, a 16% band out at each split (the next one takes over
+  // inside csmShadow), the last fading over its last 20%
+  let na=0;const act=CSM.ai;for(let i=0;i<n;i++)if(mask&(1<<i))act[na++]=i;
+  for(let j=0;j<na;j++){
+    const i=act[j],c=CSM_K[i],hi=CSM.SPLIT[i];
+    if(i===n-1){U.c[c]=hi;U.d[c]=1/(0.2*hi);}else{U.c[c]=1.08*hi;U.d[c]=1/(0.16*hi);}
+    U.f[c]=F[i];
+    // far: every second frame, unless it has just come on; gfxfix item 4: a map not redrawn this frame keeps its light,
+    // target and camera where they were at its draw
+    const L=CSM.lights[i];L.shadow.needsUpdate=i<2||!(CSM.prev&(1<<i))||(CSM.frame&1)===0;
+    if(L.shadow.needsUpdate)csmFit(L,i);}
   U.a.w=k;U.b.w=0.12+0.3*(1-clamp((Math.asin(_csmD.y)*180/Math.PI-5)/25,0,1));CSM.act=mask;CSM.prev=mask;
   // the caster lists
   const Ln=CSM.L[0],Lm=CSM.L[1],Lf=CSM.L[2];Ln.length=Lm.length=Lf.length=0;
@@ -6941,7 +6977,8 @@ function csmFrame(){
   // a map drawn from the same light spot and the same caster poses is kept (statics never move: only their count)
   for(let j=0;j<na;j++){const i=act[j],L=CSM.lights[i];if(!L.shadow.needsUpdate)continue;
     const sg=csmSig(L,CSM.L[i],CSM.stat.length+mask*0.01);
-    if(L.shadow.map&&L.userData.sig===sg&&(CSM.prev2&(1<<i))){L.shadow.needsUpdate=false;CSM.skips++;}else L.userData.sig=sg;}
+    if(L.shadow.map&&L.userData.sig===sg&&(CSM.prev2&(1<<i))){L.shadow.needsUpdate=false;CSM.skips++;}
+    else{L.userData.sig=sg;CSM.drawn[i]=CSM.frame;const P=CSM.pos[i];P[0]=L.position.x;P[1]=L.position.y;P[2]=L.position.z;}}
   CSM.prev2=mask;
   // the old soft blob under the aircraft stands in only while the real shadow is off
   if(mask&3)shadow.visible=false;
@@ -18947,7 +18984,7 @@ function preFrame(M,A){const r=renderer;
         const Ls=CSM.L;for(const l of Ls)l.length=0;
         if(M){csmMark(M);Ls[0].push(M);Ls[1].push(M);}Ls[0].push(terrain);Ls[1].push(terrain);for(const o of CSM.stat)Ls[1].push(o);Ls[2].push(terrain);
         for(const o of preDepth())Ls[0].push(o);
-        for(let i=0;i<CSM.n;i++){const L=CSM.lights[i];csmFit(L,i,0,CSM.SPLIT[i],L.shadow.mapSize.x);L.shadow.needsUpdate=true;L.userData.sig=null;}}
+        for(let i=0;i<CSM.n;i++){const L=CSM.lights[i];csmFit(L,i);L.shadow.needsUpdate=true;L.userData.sig=null;}}
       try{r.setRenderTarget(A);r.autoClear=true;r.render(scene,camera);}
       finally{if(CSM.n){csmIdle();for(const l of CSM.L)l.length=0;}}}
 function preJobs(){
@@ -20294,7 +20331,7 @@ function sensorAP(){
   toast('AUTOPILOT ENGAGED',2);
 }
 // ---------- main loop ----------
-function resize(){const w=window.innerWidth,h=window.innerHeight;VP.w=w;VP.h=h;renderer.setSize(w,h,false);glcH=glc.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();sizeMap();fmSize();FM.prepT=0;if(FM.on){lblUI();fmDraw();}}
+function resize(){const w=window.innerWidth,h=window.innerHeight;VP.w=w;VP.h=h;renderer.setSize(w,h,false);glcH=glc.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();csmRadii();sizeMap();fmSize();FM.prepT=0;if(FM.on){lblUI();fmDraw();}}
 window.addEventListener('resize',()=>{resize();relayoutSoon();});window.__glReady=1;resize();
 const hudSens=$('sensorHud');let sensOn=false;const hIas=$('hIas'),hAlt=$('hAlt'),hWindT=$('hWindT'),hWindA=$('hWindA'),hAp=$('hAp'),bAuto=$('bAuto'),bAutoT=$('bAutoT'),warnEl=$('warn'),hVs=$('hVs'),hHdg=$('hHdg');
 const APN={to:'AUTO T/O',hold:'ALT HOLD',land:'AUTOLAND',orbit:'ORBIT'},APP={climb:'CLIMB',nav:'NAV',loc:'FINAL',orb:'DESCEND'};
@@ -20599,7 +20636,7 @@ function tick(t,skipRender){
   // it pushed the menu's WARM steps past warm_console_check's window); kgeuNoPre keeps the old 40 frames
   else{if((!menu.classList.contains('on')||(frameN<40&&(!PRE.done||PRE.skip)))&&!FM.on){   // the open map is opaque: no 3D frame under it
       rebuildTerrain(camera.position.x,camera.position.z);   // the LOD rings round the camera this frame looks from
-      if(camMode===2&&SENSOR.mode!=='tv'&&!PHOTO.on&&!FREECAM){csmIdle();renderIR();}else{csmFrame();pfxRender();}}
+      if(camMode===2&&SENSOR.mode!=='tv'&&!PHOTO.on&&!FREECAM){csmIdle();renderIR();}else{csmFrame(Math.min(0.1,rdt));pfxRender();}}
     const po=pauseOv.classList.contains('on');document.body.classList.toggle('pauseOn',po);}
 }
 // test hook: headless UI checks need to reach a few internals
@@ -21226,7 +21263,9 @@ window.__kgeu={stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,lo
   csm:()=>({n:CSM.n,recvMs:CSM.recvMs,lights:CSM.lights.length,inScene:CSM.lights.filter(l=>l.parent===scene).length,enabled:renderer.shadowMap.enabled,
     sizes:CSM.lights.map(l=>l.shadow.mapSize.x),act:CSM.act,renders:CSM.renders,skips:CSM.skips,recv:CSM.recv,strength:CSM_U.a.w,stat:CSM.stat.length,
     lists:CSM.L.map(l=>l.length),dirLights:scene.children.filter(o=>o.isDirectionalLight).length,
-    r:CSM.lights.map(l=>l.shadow.camera.right),split:[CSM_U.a,CSM_U.c].map(o=>[o.x,o.y,o.z])}),
+    r:CSM.lights.map(l=>l.shadow.camera.right),split:[CSM_U.a,CSM_U.c].map(o=>[o.x,o.y,o.z]),
+    aglS:CSM.aglS,F:CSM.F.slice(0,CSM.n),R:CSM.R.slice(0,CSM.n),NB:CSM.NB.slice(0,CSM.n),thr:Object.assign({},CSM.THR),fadeN:CSM.fadeN,
+    cascades:CSM.lights.map((l,i)=>({drawn:CSM.drawn[i],pos:CSM.pos[i].slice(),lpos:[l.position.x,l.position.y,l.position.z]}))}),
   AIR:()=>({k:AIR_U.k,sun:AIR_U.sun,s:AIR_U.s,a:AIR_U.a,t:AIR_U.t,m:AIR_U.m,mon:AIR.mon,r0:AIR.r0}),
   setTOD:setTOD,isNight:isNight,TOD:()=>TOD,
   haboob:()=>({on:HB.on,dist:HB.on?HB.dist:null,d:HB.d,windKt:st.windKt,gustAmp:st.gustAmp,fogNear:scene.fog.near,called:HB.called,

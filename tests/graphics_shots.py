@@ -87,6 +87,15 @@ SCENES['shadow_golden'] = [fly('c130', 'sunset', 'ramp'), 600, f"{K}.freeCam({{p
 # High forced (main() puts Auto back after every shot): the Cessna at 4,000 ft at sunset east of the White Tanks
 # heading west south west at them, the range's shadows reaching out across the valley toward it
 SCENES['shadow_valley'] = [f"if({K}.GFX)({K}.GFX.setTier('high'));", fly('cessna', 'sunset', 'runway'), 600, air(-15000, -9000, 4000, 241, 82)]
+# Gfxfix: the F-16 150 m AGL on the east slope of the White Tanks, looking west (chase view), scattered clouds by
+# day. Point found by sampling groundHeight west from x=-12000, z=-5000 until it first rises above 250 m (same
+# approach as tests/shadow_pop_check.py sequence C): x=-20400, z=-5000, groundHeight=253.16 m.
+RIDGE_X, RIDGE_Z, RIDGE_GH = -20400, -5000, 253.1561028798422
+RIDGE_ALT_FT = 1071 + (RIDGE_GH + 150) * 3.2808
+SCENES['shadow_ridge_day'] = [fly('f16', 'day', 'runway'), 600, air(RIDGE_X, RIDGE_Z, RIDGE_ALT_FT, 270, 250)]
+SCENES['shadow_ridge_sunset'] = [fly('f16', 'sunset', 'runway'), 600, air(RIDGE_X, RIDGE_Z, RIDGE_ALT_FT, 270, 250)]
+# High forced (main() puts Auto back after every shot), otherwise the same as shadow_ridge_day
+SCENES['shadow_ridge_high'] = [f"if({K}.GFX)({K}.GFX.setTier('high'));", fly('f16', 'day', 'runway'), 600, air(RIDGE_X, RIDGE_Z, RIDGE_ALT_FT, 270, 250)]
 # the Cessna at 5,000 ft by day heading south east out of KGEU: the monsoon builds ahead
 SCENES['clouds_monsoon'] = [fly('cessna', 'day', 'runway'), 600, f"if({K}.setClouds){K}.setClouds('monsoon');", air(-2000, -2000, 5000, 140, 82)]
 # the same at 5,000 ft heading north west under the scattered cumulus
