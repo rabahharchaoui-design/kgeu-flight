@@ -1596,6 +1596,10 @@ body.menuOn #tutArrow, body.pauseOn #tutArrow{ display:none !important; }
 #menu #a2hs .shr::before{ border-color:var(--rust); } #menu #a2hs .shr::after{ background:var(--rust); box-shadow:-3px 3.2px 0 -0.2px var(--rust), 3px 3.2px 0 -0.2px var(--rust); }
 .helpBody{ flex:1; min-height:0; display:flex; align-items:center; }
 #sCredits .helpBody{ align-items:stretch; width:100%; }
+#sStalls .helpBody{ align-items:stretch; width:100%; }
+#stallList li{ display:block; font-size:13px; font-variant-numeric:tabular-nums; min-height:0; line-height:1.35; }
+#stallList li.old{ opacity:.5; } #stallList li.lab{ font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--rust); margin-top:4px; }
+.stallFoot{ display:flex; gap:8px; justify-content:flex-end; flex:none; } .stallFoot button{ padding:0 18px; }
 .creditsList{ list-style:none; margin:0; padding:2px 2px 2px 0; width:100%; height:100%; overflow-y:auto; display:flex; flex-direction:column; gap:6px; }
 .creditsList li{ display:flex; align-items:baseline; gap:8px; font-size:15px; color:var(--brown); min-height:28px; }
 .creditsList b{ color:var(--night); font-weight:700; }
@@ -2087,6 +2091,7 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
     <div class="srow"><span>Sound</span><div class="chips"><button class="tog oSound" id="oSound">Sound: On</button><button class="tog oHap" id="oHap">Haptics: On</button></div></div>
     <div class="srow"><span>Help</span><div class="chips" id="helpRow"><button class="slink" id="bHelp" aria-label="Controls help"><span class="hL">Controls help</span><span class="hS">Controls</span><i class="chev" aria-hidden="true"></i></button><button id="bReplay" aria-label="Replay lesson 1"><span class="hL">Replay lesson 1</span><span class="hS">Lesson 1</span></button><button id="bPlace" aria-label="Retake placement"><span class="hL">Retake placement</span><span class="hS">Placement</span></button></div></div>
     <div class="srow"><span>About</span><div class="chips"><button class="slink" id="bCredits">Music credits<i class="chev" aria-hidden="true"></i></button><button class="tog" id="oFps" aria-label="Developer: FPS counter">FPS counter: Off</button></div></div>
+    <div class="srow"><span>Stutter log</span><div class="chips"><button class="slink" id="bStalls"><span id="bStallsT">No stalls yet</span><i class="chev" aria-hidden="true"></i></button></div></div>
    </div>
   </div>
   <div class="setFoot"><a class="credit" href="https://www.youtube.com/@OhRabah" target="_blank" rel="noopener"><svg class="yt" viewBox="0 0 28 20" aria-hidden="true"><path d="M27.4 3.1A3.5 3.5 0 0 0 24.9.6C22.7 0 14 0 14 0S5.3 0 3.1.6A3.5 3.5 0 0 0 .6 3.1C0 5.3 0 10 0 10s0 4.7.6 6.9a3.5 3.5 0 0 0 2.5 2.5C5.3 20 14 20 14 20s8.7 0 10.9-.6a3.5 3.5 0 0 0 2.5-2.5C28 14.7 28 10 28 10s0-4.7-.6-6.9Z" fill="#FF0000"/><path d="M11.2 14.3 18.4 10l-7.2-4.3v8.6Z" fill="#FFFFFF"/></svg><span>Made by @OhRabah</span></a>
@@ -2115,6 +2120,13 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
   <div class="helpBody">
    <ul class="creditsList" id="creditsList"></ul>
   </div>
+ </div>
+ <div class="scr" id="sStalls">
+  <header class="mh"><h2>Stutter log</h2></header>
+  <div class="helpBody">
+   <ul class="creditsList stallList" id="stallList"></ul>
+  </div>
+  <div class="stallFoot"><button id="bStallCopy">Copy</button><button id="bStallClr">Clear</button></div>
  </div>
  <div class="scr" id="sLb">
   <div class="lbBar">
@@ -6794,7 +6806,7 @@ const sun=new THREE.DirectionalLight(0xfff0d8,1.0); sun.position.set(-0.55,0.75,
 // than a degree, in the IR view and the carousel (nothing asks for a map there); the haboob's dust fades them; near off
 // above 2,500 ft AGL (the camera's), mid above 8,000 ft, so on Medium nothing at all is drawn up there. Low: no lights,
 // no shadow map, no shadow code in any shader. The shadowed side keeps the hemisphere light, never black.
-const CSM={n:0,lights:[],L:[[],[],[]],stat:[],frame:0,act:0,prev:0,rc:-1,rt0:null,renders:0,recv:0,ai:[0,0,0],showScene:null,showL:[],skips:0,spin:null,spinOf:null,
+const CSM={n:0,lights:[],L:[[],[],[]],stat:[],frame:0,act:0,prev:0,rc:-1,rt0:null,renders:0,recv:0,builds:0,ai:[0,0,0],showScene:null,showL:[],skips:0,spin:null,spinOf:null,
   SPLIT:[120,1500,12000],REACH:[250,2500,30000],BIAS:[0.04,0.5,10],NB:[0.03,0.4,12],
   root:{visible:true,layers:{test:()=>true},children:null}};
 const _csmD=new V3(),_csmF=new V3(),_csmC=new V3(),_csmX=new V3(),_csmY=new V3(),_csmUp=new V3(0,1,0),_csmOne=[null];
@@ -6805,7 +6817,7 @@ const _csmD=new V3(),_csmF=new V3(),_csmC=new V3(),_csmX=new V3(),_csmY=new V3()
 function csmLit(m,opaque){if(Array.isArray(m))return m.some(x=>csmLit(x,opaque));
   return !!m&&(m.isMeshLambertMaterial||m.isMeshStandardMaterial||m.isMeshPhongMaterial)&&!(opaque&&m.transparent);}
 // the tier's cascades (GFX_HOOKS): Low removes every light and the shadow map itself
-function csmBuild(){
+function csmBuild(){CSM.builds++;   // STALL's 'csmBuild' tag
   for(const L of CSM.lights){scene.remove(L);scene.remove(L.target);if(L.shadow.map){L.shadow.map.dispose();L.shadow.map=null;}}
   CSM.lights.length=0;CSM.n=0;CSM.act=CSM.prev=0;CSM_U.a.w=0;
   const on=GFX.on('shadows');renderer.shadowMap.enabled=on;
@@ -7103,8 +7115,8 @@ function skyPaint(k){
   c.needsUpdate=true;
 }
 // things built later (the world regions) that change with the time of day: called at the end of setTOD
-const TOD_HOOKS=[];
-function setTOD(id){
+const TOD_HOOKS=[];var TOD_N=0;   // setTOD calls, STALL's 'tod' tag
+function setTOD(id){TOD_N++;
   // the dust storm is Arizona's: day in a world region, the saved Haboob kept for coming back
   const fb=id==='haboob'&&!REGION.az;if(fb)id='day';
   TOD=TOD_SET[id]||TOD_SET.day;
@@ -7146,7 +7158,7 @@ function setTOD(id){
 // their own, which only closes in once you are in the dust.
 const HB={on:false,built:false,st:null,g:null,sun:null,U:null,mats:[],deep:null,fing:null,hd:false,med:false,surge:0,pd:1e9,C:new V3(),T:new V3(),Lat:new V3(),
   hdg:330,spd:18,W:24000,TAPER:3000,H:2000,R:150000,DEPTH:15000,kt0:8,ktPrev:5,
-  dist:1e9,d:0,t:0,snap:false,called:false,t6:false,paintD:-1,dirty:false};
+  dist:1e9,d:0,t:0,snap:false,called:false,t6:false,paintD:-1,dirty:false,tierN:0};
 const _hbV=new V3();
 // n panels on the arc; heights fall off over the last HB.TAPER metres at each end
 function hbStrip(n,off,h0,h1,jit,ov,out){
@@ -7168,7 +7180,7 @@ function hbStrip(n,off,h0,h1,jit,ov,out){
 // the fingers on Medium and High, the deep layer on High
 function hbTier(){
   if(!HB.built)return;const hd=GFX.on('haboob'),med=hd&&!GFX.on('haboobDeep');
-  if(hd!==HB.hd||med!==HB.med){HB.hd=hd;HB.med=med;for(const m of HB.mats){if(hd)m.defines.HB_HD='';else delete m.defines.HB_HD;if(m.userData.lite)m.defines.HB_LITE='';
+  if(hd!==HB.hd||med!==HB.med){HB.tierN++;HB.hd=hd;HB.med=med;for(const m of HB.mats){if(hd)m.defines.HB_HD='';else delete m.defines.HB_HD;if(m.userData.lite)m.defines.HB_LITE='';
     if(med&&!m.userData.lite)m.defines.HB_MED='';else delete m.defines.HB_MED;m.needsUpdate=true;}
     // Medium: the noise unfiltered by anisotropy and from the nearest mip (the soft dust shows no difference; about 10 ms
     // a frame headless with the wall filling the screen); Low and High keep the default filtering
@@ -8540,8 +8552,8 @@ if(REGION.az)(function(){
 // as a small sphere), so the airframes reflect a warm sky at sunset and a dark one at night. A tiny scene through
 // PMREM once per setTOD (a few ms), never per frame. The day's is built the first time it is needed (Day, or the
 // showroom) and kept for good; any other is disposed when the next one replaces it. Boot builds exactly one.
-const ENV={day:null,rt:null,es:null,dg:null,sn:null};
-function envBuild(){
+const ENV={day:null,rt:null,es:null,dg:null,sn:null,n:0};
+function envBuild(){ENV.n++;   // STALL's 'pmrem' tag
   if(!ENV.es){const es=new THREE.Scene(),dg=new THREE.SphereGeometry(60,48,24);
     dg.setAttribute('color',new THREE.BufferAttribute(new Float32Array(dg.attributes.position.count*3),3));
     es.add(new THREE.Mesh(dg,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide})));
@@ -17471,11 +17483,11 @@ function showScr(id){
   curScr=id;document.body.classList.toggle('menuOn',menu.classList.contains('on'));document.querySelectorAll('#menu .scr').forEach(e=>e.classList.toggle('on',e.id===id));
   menu.classList.toggle('see3d',id==='sFly');SHOW.on=id==='sFly'&&menu.classList.contains('on');
   if(id==='sFly'){CARM.sync();sumUI();requestAnimationFrame(locShow);}
-  if(id==='sSchool'){schoolList();ezInit();if(!PLACE)plOpen();}else{plClose(true);orClose(true);}if(id==='sHome')startHereUI();if(id==='sArc')arcList();if(id==='sLog')logRender();
+  if(id==='sSchool'){schoolList();ezInit();if(!PLACE)plOpen();}else{plClose(true);orClose(true);}if(id==='sHome')startHereUI();if(id==='sArc')arcList();if(id==='sLog')logRender();if(id==='sSet')stallUI();
   if(LB){if(id==='sLb')LB.lbRender();else LB.sheet(false);if(id==='sSet'||id==='sFly'||id==='sHome')LB.ui();}
   tabsUI();
 }
-const TAB_OF={sHelp:'sSet',sCredits:'sSet',sLog:'sSchool'};
+const TAB_OF={sHelp:'sSet',sCredits:'sSet',sStalls:'sSet',sLog:'sSchool'};
 function tabsUI(){const t=TAB_OF[curScr]||curScr;menu.dataset.scr=curScr;
   document.querySelectorAll('#mTabs [data-go]').forEach(b=>{const on=b.dataset.go===t;b.classList.toggle('sel',on);b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1;});
   const bk=$('mBack');bk.hidden=!(fromPause||NAV.length);bk.classList.toggle('fl',fromPause&&!NAV.length);bk.setAttribute('aria-label',fromPause&&!NAV.length?'Back to the flight':'Back');}
@@ -17492,6 +17504,7 @@ document.querySelectorAll('#menu .back').forEach(b=>b.onclick=navBack);
 $('hFly').onclick=()=>tabGo('sFly');$('hSch').onclick=()=>tabGo('sSchool');$('hChal').onclick=()=>tabGo('sArc');
 $('hRec').onclick=()=>recOpen();$('bHelp').onclick=()=>nav('sHelp');
 $('bCredits').onclick=()=>{creditsRender();nav('sCredits');};
+$('bStalls').onclick=()=>{stallRender();nav('sStalls');};
 let creditsLoaded=false;
 function creditsRender(){
   const ul=document.getElementById('creditsList');if(!ul||creditsLoaded)return;
@@ -20235,6 +20248,95 @@ function fpsFrame(t){
   if(t-FPS.txtT>=250){FPS.txtT=t;const s=fpsStats();$('fpsPill').textContent=gfxTag()+Math.round(s.avg)+' fps \u00b7 1% '+Math.round(s.low1)+' \u00b7 '+s.ms.toFixed(1)+' ms';
     if(!FPS.logT)FPS.logT=t;else if(t-FPS.logT>=5000){FPS.logT=t;console.log('[fps] avg '+Math.round(s.avg)+' low1 '+Math.round(s.low1)+' ms '+s.ms.toFixed(1)+' scene '+fpsScene());}}}
 $('oFps').onclick=()=>setFps(!FPS.on);fpsUI();
+// gfxfix item 1: the stall logger, always on. A frame whose rAF gap passes STALL.thr is logged with what changed since
+// the previous frame's start (programs linked, uploads, shadows, the post chain, terrain, PMREM...) from cheap counters
+// read at the top of every frame. The gap covers the previous frame's tick and draw, so tick is that frame's CPU ms.
+// Skipped: before the splash is gone, a held loop (stepFrame) and the frame after it; the first frame back from a hidden
+// tab is logged with 'hidden' and left out of count and worst. Kept: the last 30 (localStorage kgeuStalls, written at
+// most every 2 s from a timer), Settings > Stutter log.
+var STALL={thr:250,log:[],prev:[],count:0,worst:0,marks:[],lastMarks:[],tags:[],tickMs:0,vis:false,held:true,saveT:0,
+  p:{prog:0,tex:0,geo:0,recv:0,bld:0,ch:0,pr:0,sc:0,tier:'',pw:0,ph:0,pbk:0,vw:0,vh:0,tls:0,env:0,tod:0,hbt:0,hb:false,warm:0,pre:0,fx:0,msl:0,trf:0,df:false,cr:false,pa:false,mn:false,heap:0}};
+try{const o=JSON.parse(localStorage.getItem('kgeuStalls')||'null');if(o&&Array.isArray(o.log))STALL.prev=o.log.concat(Array.isArray(o.prev)?o.prev:[]).slice(-30);}catch(e){}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)STALL.vis=true;});
+function stallProbe(t){
+  const S=STALL,P=S.p,ri=renderer.info,mm=performance.memory;
+  const prog=ri.programs?ri.programs.length:0,tex=ri.memory.textures,geo=ri.memory.geometries,ch=scene.children.length,pr=renderer.getPixelRatio();
+  let fx=0;for(let i=0;i<FX.length;i++)if(FX[i].on)fx++;
+  const msl=STRIKE.missiles.length+(DF.msl?DF.msl.length:0),mn=menu.classList.contains('on'),cr=!!(st&&st.crashed),heap=mm?mm.usedJSHeapSize||0:0,
+    warm=WARM.i,pre=PRE.frames|0,vis=S.vis,wasHeld=S.held;
+  const gap=FPS.prev?t-FPS.prev:0,tk=S.tickMs;
+  S.held=loopHeld;
+  if(vis&&!document.hidden)S.vis=false;
+  if(gap>S.thr&&LOAD_MS!=null&&!loopHeld&&!wasHeld){
+    const T=S.tags;T.length=0;
+    if(prog>P.prog)T.push('prog+'+(prog-P.prog));
+    if(tex>P.tex)T.push('tex+'+(tex-P.tex));
+    if(geo>P.geo)T.push('geo+'+(geo-P.geo));
+    if(CSM.recv>P.recv)T.push('csmRecv');
+    if(CSM.builds>P.bld)T.push('csmBuild');
+    if(ch!==P.ch)T.push('children'+(ch>P.ch?'+':'')+(ch-P.ch));
+    if(pr!==P.pr)T.push('pr');
+    if(GFX.scale!==P.sc)T.push('scale');
+    if(GFX.tier!==P.tier)T.push('tier');
+    if(PFX.w!==P.pw||PFX.h!==P.ph||PFX.bk!==P.pbk)T.push('rt');
+    if(VP.w!==P.vw||VP.h!==P.vh)T.push('resize');
+    if(TLS.n>P.tls)T.push('terrain '+Math.round(TLS.ms)+'ms');
+    if(ENV.n>P.env)T.push('pmrem');
+    if(TOD_N>P.tod)T.push('tod');
+    if(HB.tierN>P.hbt)T.push('hbTier');
+    if(HB.on!==P.hb)T.push('haboob');
+    if(warm>P.warm)T.push('warm');
+    if(pre>P.pre)T.push('pre');
+    if(fx>P.fx)T.push('fx+'+(fx-P.fx));
+    if(msl>P.msl)T.push('missile');
+    if(TRAFFIC.length>P.trf)T.push('traffic+'+(TRAFFIC.length-P.trf));
+    if(DF.on!==P.df)T.push('df');
+    if(cr&&!P.cr)T.push('crash');
+    if(paused!==P.pa)T.push('pause');
+    if(mn!==P.mn)T.push('menu');
+    if(heap&&P.heap-heap>8388608)T.push('gc?');
+    const g=Math.round(gap),tki=Math.round(tk);
+    if(g-tki>0.6*g)T.push('outside');
+    if(vis)T.push('hidden');
+    for(let i=0;i<S.marks.length;i++)T.push(S.marks[i]);
+    stallAdd(g,tki,t);
+  }
+  P.prog=prog;P.tex=tex;P.geo=geo;P.recv=CSM.recv;P.bld=CSM.builds;P.ch=ch;P.pr=pr;P.sc=GFX.scale;P.tier=GFX.tier;
+  P.pw=PFX.w;P.ph=PFX.h;P.pbk=PFX.bk;P.vw=VP.w;P.vh=VP.h;P.tls=TLS.n;P.env=ENV.n;P.tod=TOD_N;P.hbt=HB.tierN;P.hb=HB.on;
+  P.warm=warm;P.pre=pre;P.fx=fx;P.msl=msl;P.trf=TRAFFIC.length;P.df=DF.on;P.cr=cr;P.pa=paused;P.mn=mn;P.heap=heap;
+}
+function stallAdd(g,tki,t){
+  const S=STALL,hid=S.tags.indexOf('hidden')>=0;
+  const r={t:Math.round(t/100)/10,gap:g,tick:tki,scene:fpsScene(),tier:GFX.tier,scale:+GFX.scale.toFixed(2),tags:S.tags.slice(),marks:S.marks.slice()};
+  if(r.marks.length){S.lastMarks=r.marks;S.marks=[];}
+  S.log.push(r);if(S.log.length>30)S.log.shift();
+  if(!hid){S.count++;if(g>S.worst)S.worst=g;}
+  console.log('[stall] '+g+' ms tick '+tki+' ms '+r.scene+(r.tags.length?' '+r.tags.join(' '):''));
+  if(!S.saveT)S.saveT=setTimeout(stallSave,2000);
+}
+function stallSave(){STALL.saveT=0;
+  try{localStorage.setItem('kgeuStalls',JSON.stringify({v:stallVer(),log:STALL.log,prev:STALL.prev}));}catch(e){}
+  stallUI();if(curScr==='sStalls'&&menu.classList.contains('on'))stallRender();}
+// APP_VER lives inside the leaderboard module; its boot copies it onto __kgeu
+function stallVer(){return (window.__kgeu&&window.__kgeu.APP_VER)||'';}
+function stallMark(tag){STALL.marks.push(String(tag));}
+function stallClear(){const S=STALL;S.log.length=0;S.prev=[];S.count=0;S.worst=0;S.marks=[];S.lastMarks=[];
+  try{localStorage.removeItem('kgeuStalls');}catch(e){}stallUI();if(curScr==='sStalls')stallRender();}
+const _stN=n=>n.toLocaleString('en-US');
+function stallUI(){if(!STALL)return;const b=$('bStallsT');if(!b)return;const S=STALL;
+  b.textContent=S.count?S.count+(S.count===1?' stall':' stalls')+' · worst '+_stN(S.worst)+' ms':'No stalls yet';}
+function stallLine(r){return 't '+r.t.toFixed(1)+' s · '+_stN(r.gap)+' ms (tick '+r.tick+' ms) · '+r.scene+' · '+
+  String(r.tier||'').charAt(0).toUpperCase()+' '+(+r.scale||0).toFixed(2)+(r.tags&&r.tags.length?' · '+r.tags.join(' '):'');}
+function stallRender(){const ul=$('stallList');if(!ul)return;const S=STALL,esc=x=>x.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const cur=S.log.slice().reverse(),old=S.prev.slice().reverse().slice(0,Math.max(0,30-cur.length));
+  let h=cur.map(r=>'<li>'+esc(stallLine(r))+'</li>').join('');
+  if(!cur.length)h='<li>No stalls this session</li>';
+  if(old.length)h+='<li class="lab">Earlier sessions</li>'+old.map(r=>'<li class="old">'+esc(stallLine(r))+'</li>').join('');
+  ul.innerHTML=h;}
+$('bStallClr').onclick=()=>stallClear();
+$('bStallCopy').onclick=()=>{const j=JSON.stringify({v:stallVer(),thr:STALL.thr,count:STALL.count,worst:STALL.worst,log:STALL.log,prev:STALL.prev});
+  try{navigator.clipboard.writeText(j).then(()=>toast('Stutter log copied'),()=>toast('Copy failed'));}catch(e){toast('Copy failed');}};
+stallUI();
 // graphics item 8: the first frames' times. BOOT.ft.boot: the first 12 from boot (the menu's), BOOT.ft.fly: a flight's
 // first 600 (restarted by each start); each [CPU ms of the tick, ms from this frame's start to the next one's] (the second
 // takes the GPU and the driver's shader work, which the CPU time cannot see). console.time on the very first menu frame
@@ -20242,12 +20344,13 @@ $('oFps').onclick=()=>setFps(!FPS.on);fpsUI();
 BOOT.ft={boot:[],fly:[],run0:null,prev:null};
 function frame(t){
   requestAnimationFrame(frame);
+  stallProbe(t);   // before fpsFrame: it reads the gap from FPS.prev
   fpsFrame(t);
   const F=BOOT.ft;if(F.prev){F.prev[1]=+(t-F.prev[2]).toFixed(1);F.prev.length=2;F.prev=null;}
   if(!loopHeld){const fl=running&&!paused&&F.run0!==RUN.t0,lb=!F.boot.length?'pfs first menu frame':fl?'pfs first flight frame':null;
     if(fl){F.run0=RUN.t0;F.fly=[];}
     if(!F.boot.length)BOOT.t.frame1=Math.round(performance.now());
-    if(lb)console.time(lb);const a=performance.now();tick(t);const ms=+(performance.now()-a).toFixed(1);if(lb)console.timeEnd(lb);
+    if(lb)console.time(lb);const a=performance.now();tick(t);const ms=+(performance.now()-a).toFixed(1);if(lb)console.timeEnd(lb);STALL.tickMs=ms;
     const e=[ms,null,t];if(F.boot.length<12){F.boot.push(e);F.prev=e;}if(running&&!paused&&F.fly.length<600){F.fly.push(e);F.prev=e;}}
 }
 function tick(t,skipRender){
@@ -20993,7 +21096,7 @@ const APP_VER='2026-10-12-graphics';          // keep version.json in step when 
     get P(){return E.P;}};
 })();
 
-window.__kgeu={PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),taskXp:taskXp,tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
+window.__kgeu={stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,progN:()=>renderer.info.programs.length,progList:()=>renderer.info.programs.map(p=>p.cacheKey),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),taskXp:taskXp,tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
   task:()=>({on:TASK.on,id:TASK.id,stage:TASK.stage&&TASK.stage.id,si:TASK.si,brief:TASK.brief,done:TASK.done,res:TASK.res,ask:TASK.ask&&{shown:TASK.ask.shown,opts:TASK.ask.opts.map(o=>o.k),t:TASK.ask.t},d:TASK.d,log:TASK.log.slice(),seed:TASK.seed}),
   tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzBuild:()=>dzBuild(),dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
