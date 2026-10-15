@@ -1598,7 +1598,7 @@ body.menuOn #tutArrow, body.pauseOn #tutArrow{ display:none !important; }
 .helpBody{ flex:1; min-height:0; display:flex; align-items:center; }
 #sCredits .helpBody{ align-items:stretch; width:100%; }
 #sStalls .helpBody{ align-items:stretch; width:100%; }
-#stallList li{ display:block; font-size:13px; font-variant-numeric:tabular-nums; min-height:0; line-height:1.35; }
+#stallList li{ display:block; font-size:13px; font-variant-numeric:tabular-nums; min-height:0; flex-shrink:0; line-height:1.35; }
 #stallList li.old{ opacity:.5; } #stallList li.lab{ font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--rust); margin-top:4px; }
 .stallFoot{ display:flex; gap:8px; justify-content:flex-end; flex:none; } .stallFoot button{ padding:0 18px; }
 /* bugs1 item 7: My tickets. Rows of 44 px or more that only show (no press feedback); the text one line with an ellipsis */
@@ -2235,6 +2235,7 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
  <div class="scr" id="sStalls">
   <header class="mh"><h2>Stutter log</h2></header>
   <p class="tkNote stallSum" id="bStallsT">No stalls yet</p>
+  <p class="tkNote" id="bStallSkip" hidden></p>
   <div class="helpBody">
    <ul class="creditsList stallList" id="stallList"></ul>
   </div>
@@ -20520,13 +20521,20 @@ $('oFps').onclick=()=>setFps(!FPS.on);fpsUI();
 // gfxfix item 1: the stall logger, always on. A frame whose rAF gap passes STALL.thr is logged with what changed since
 // the previous frame's start (programs linked, uploads, shadows, the post chain, terrain, PMREM...) from cheap counters
 // read at the top of every frame. The gap covers the previous frame's tick and draw, so tick is that frame's CPU ms.
-// Skipped: before the splash is gone, a held loop (stepFrame) and the frame after it; the first frame back from a hidden
-// tab is logged with 'hidden' and left out of count and worst. Kept: the last 30 (localStorage kgeuStalls, written at
-// most every 2 s from a timer), Settings > Stutter log.
-var STALL={thr:250,log:[],prev:[],count:0,worst:0,marks:[],lastMarks:[],tags:[],tickMs:0,vis:false,held:true,saveT:0,
+// Skipped: before the splash is gone, a held loop (stepFrame) and the frame after it. Fix2 item 1: a gap that is not a
+// freeze is never logged, only counted in STALL.skip: hidden (the page hidden now or at any point in the gap, or the
+// first frame back), idle (an 'outside' gap, the main thread not busy in the frame callback, while not flying: the
+// menu up or no flight running, the phone idle or iOS throttling rAF) and paused (paused at the gap's start and still
+// paused; a gap that starts paused and ends running is logged with 'resume'). Kept: the last 30 real stalls
+// (localStorage kgeuStalls with the skip counters, written at most every 2 s from a timer), Settings > Stutter log.
+var STALL={thr:250,log:[],prev:[],count:0,worst:0,marks:[],lastMarks:[],tags:[],tickMs:0,vis:false,held:true,saveT:0,spin:0,
+  skip:{hidden:0,paused:0,idle:0,worst:0},skipPrev:{hidden:0,paused:0,idle:0,worst:0},
   p:{prog:0,tex:0,geo:0,recv:0,bld:0,ch:0,pr:0,sc:0,tier:'',pw:0,ph:0,pbk:0,vw:0,vh:0,tls:0,env:0,tod:0,hbt:0,hb:false,warm:0,pre:0,fx:0,msl:0,trf:0,df:false,cr:false,pa:false,mn:false,heap:0}};
-try{const o=JSON.parse(localStorage.getItem('kgeuStalls')||'null');if(o&&Array.isArray(o.log))STALL.prev=o.log.concat(Array.isArray(o.prev)?o.prev:[]).slice(-30);}catch(e){}
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)STALL.vis=true;});
+try{const o=JSON.parse(localStorage.getItem('kgeuStalls')||'null');if(o&&Array.isArray(o.log))STALL.prev=o.log.concat(Array.isArray(o.prev)?o.prev:[]).filter(r=>!(r.tags&&r.tags.indexOf('hidden')>=0)).slice(-30);
+  const k=o&&o.skip,q=STALL.skipPrev;if(k)for(const n in q)q[n]=n==='worst'?Math.max(q[n],+k[n]||0):q[n]+(+k[n]||0);}catch(e){}
+// the skip counters this session plus the earlier sessions' (what is saved and shown)
+function stallSkip(){const a=STALL.skip,b=STALL.skipPrev;return {hidden:a.hidden+b.hidden,paused:a.paused+b.paused,idle:a.idle+b.idle,worst:Math.max(a.worst,b.worst)};}
+document.addEventListener('visibilitychange',()=>{STALL.vis=true;});   // hidden at some point in this gap (cleared once visible)
 // gfxfix item 3: programs counted by r128's increasing WebGLProgram id, not the list's length (a compile and a dispose
 // in the same stretch net to zero there, as PMREM's blur did): max, the highest id seen; compiles, the ids above the
 // previous high water mark summed since load (every program ever linked, the ones since disposed too)
@@ -20571,37 +20579,44 @@ function stallProbe(t){
     if(paused!==P.pa)T.push('pause');
     if(mn!==P.mn)T.push('menu');
     if(heap&&P.heap-heap>8388608)T.push('gc?');
-    const g=Math.round(gap),tki=Math.round(tk);
-    if(g-tki>0.6*g)T.push('outside');
-    if(vis)T.push('hidden');
-    for(let i=0;i<S.marks.length;i++)T.push(S.marks[i]);
-    stallAdd(g,tki,t);
+    const g=Math.round(gap),tki=Math.round(tk),out=g-tki>0.6*g;
+    if(out)T.push('outside');
+    // fix2 item 1: not a freeze, counted apart and never logged
+    const why=vis||document.hidden?'hidden':out&&(!running||mn)?'idle':P.pa&&paused?'paused':null;
+    if(why){S.skip[why]++;if(g>S.skip.worst)S.skip.worst=g;S.marks=[];if(!S.saveT)S.saveT=setTimeout(stallSave,2000);}
+    else{if(P.pa&&!paused)T.push('resume');
+      for(let i=0;i<S.marks.length;i++)T.push(S.marks[i]);
+      stallAdd(g,tki,t);}
   }
   P.prog=prog;P.tex=tex;P.geo=geo;P.recv=CSM.recv;P.bld=CSM.builds;P.ch=ch;P.pr=pr;P.sc=GFX.scale;P.tier=GFX.tier;
   P.pw=PFX.w;P.ph=PFX.h;P.pbk=PFX.bk;P.vw=VP.w;P.vh=VP.h;P.tls=TLS.n;P.env=ENV.n;P.tod=TOD_N;P.hbt=HB.tierN;P.hb=HB.on;
   P.warm=warm;P.pre=pre;P.fx=fx;P.msl=msl;P.trf=TRAFFIC.length;P.df=DF.on;P.cr=cr;P.pa=paused;P.mn=mn;P.heap=heap;
 }
 function stallAdd(g,tki,t){
-  const S=STALL,hid=S.tags.indexOf('hidden')>=0;
+  const S=STALL;
   const r={t:Math.round(t/100)/10,gap:g,tick:tki,scene:fpsScene(),tier:GFX.tier,scale:+GFX.scale.toFixed(2),tags:S.tags.slice(),marks:S.marks.slice()};
   if(r.marks.length){S.lastMarks=r.marks;S.marks=[];}
   S.log.push(r);if(S.log.length>30)S.log.shift();
-  if(!hid){S.count++;if(g>S.worst)S.worst=g;}
+  S.count++;if(g>S.worst)S.worst=g;
   console.log('[stall] '+g+' ms tick '+tki+' ms '+r.scene+(r.tags.length?' '+r.tags.join(' '):''));
   if(!S.saveT)S.saveT=setTimeout(stallSave,2000);
-  if(g>3000&&!hid&&BUG&&BUG.onStall)BUG.onStall(r);   // bugs1 item 6: a long stall in flight may ask for a report
+  if(g>3000&&BUG&&BUG.onStall)BUG.onStall(r);   // bugs1 item 6: a long stall in flight may ask for a report
 }
 function stallSave(){STALL.saveT=0;
-  try{localStorage.setItem('kgeuStalls',JSON.stringify({v:stallVer(),log:STALL.log,prev:STALL.prev}));}catch(e){}
+  try{localStorage.setItem('kgeuStalls',JSON.stringify({v:stallVer(),log:STALL.log,prev:STALL.prev,skip:stallSkip()}));}catch(e){}
   stallUI();if(curScr==='sStalls'&&menu.classList.contains('on'))stallRender();}
 // APP_VER lives inside the leaderboard module; its boot copies it onto __kgeu
 function stallVer(){return (window.__kgeu&&window.__kgeu.APP_VER)||'';}
 function stallMark(tag){STALL.marks.push(String(tag));}
 function stallClear(){const S=STALL;S.log.length=0;S.prev=[];S.count=0;S.worst=0;S.marks=[];S.lastMarks=[];
+  S.skip={hidden:0,paused:0,idle:0,worst:0};S.skipPrev={hidden:0,paused:0,idle:0,worst:0};
   try{localStorage.removeItem('kgeuStalls');}catch(e){}stallUI();if(curScr==='sStalls')stallRender();}
 const _stN=n=>n.toLocaleString('en-US');
 function stallUI(){if(!STALL)return;const b=$('bStallsT');if(!b)return;const S=STALL;
-  b.textContent=S.count?S.count+(S.count===1?' stall':' stalls')+' · worst '+_stN(S.worst)+' ms':'No stalls yet';}
+  b.textContent=S.count?S.count+(S.count===1?' stall':' stalls')+' · worst '+_stN(S.worst)+' ms':'No stalls yet';
+  const e=$('bStallSkip');if(!e)return;const k=stallSkip(),n=k.hidden+k.paused+k.idle;e.hidden=!n;
+  e.textContent=n?'Skipped '+_stN(n)+(n===1?' gap':' gaps')+' while hidden, paused or idle (longest '+(k.worst<1000?_stN(k.worst)+' ms':_stN(Math.round(k.worst/1000))+' s')+')':'';}
+function stallJSON(){return JSON.stringify({v:stallVer(),thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:stallSkip(),log:STALL.log,prev:STALL.prev});}
 function stallLine(r){return 't '+r.t.toFixed(1)+' s · '+_stN(r.gap)+' ms (tick '+r.tick+' ms) · '+r.scene+' · '+
   String(r.tier||'').charAt(0).toUpperCase()+' '+(+r.scale||0).toFixed(2)+(r.tags&&r.tags.length?' · '+r.tags.join(' '):'');}
 function stallRender(){const ul=$('stallList');if(!ul)return;const S=STALL,esc=x=>x.replace(/&/g,'&amp;').replace(/</g,'&lt;');
@@ -20611,7 +20626,7 @@ function stallRender(){const ul=$('stallList');if(!ul)return;const S=STALL,esc=x
   if(old.length)h+='<li class="lab">Earlier sessions</li>'+old.map(r=>'<li class="old">'+esc(stallLine(r))+'</li>').join('');
   ul.innerHTML=h;}
 $('bStallClr').onclick=()=>stallClear();
-$('bStallCopy').onclick=()=>{const j=JSON.stringify({v:stallVer(),thr:STALL.thr,count:STALL.count,worst:STALL.worst,log:STALL.log,prev:STALL.prev});
+$('bStallCopy').onclick=()=>{const j=stallJSON();
   try{navigator.clipboard.writeText(j).then(()=>toast('Stutter log copied'),()=>toast('Copy failed'));}catch(e){toast('Copy failed');}};
 stallUI();
 // graphics item 8: the first frames' times. BOOT.ft.boot: the first 12 from boot (the menu's), BOOT.ft.fly: a flight's
@@ -20627,7 +20642,7 @@ function frame(t){
   if(!loopHeld){const fl=running&&!paused&&F.run0!==RUN.t0,lb=!F.boot.length?'pfs first menu frame':fl?'pfs first flight frame':null;
     if(fl){F.run0=RUN.t0;F.fly=[];}
     if(!F.boot.length)BOOT.t.frame1=Math.round(performance.now());
-    if(lb)console.time(lb);const a=performance.now();tick(t);const ms=+(performance.now()-a).toFixed(1);if(lb)console.timeEnd(lb);STALL.tickMs=ms;
+    if(lb)console.time(lb);const a=performance.now();if(STALL.spin){const e=a+STALL.spin;STALL.spin=0;while(performance.now()<e);}tick(t);const ms=+(performance.now()-a).toFixed(1);if(lb)console.timeEnd(lb);STALL.tickMs=ms;
     const e=[ms,null,t];if(F.boot.length<12){F.boot.push(e);F.prev=e;}if(running&&!paused&&F.fly.length<600){F.fly.push(e);F.prev=e;}}
 }
 function tick(t,skipRender){
@@ -21413,7 +21428,7 @@ const APP_VER='2026-10-15-bugs1';          // keep version.json in step when shi
     get P(){return E.P;}};
 })();
 
-window.__kgeu={stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>p.cacheKey),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
+window.__kgeu={stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>p.cacheKey),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
   task:()=>({on:TASK.on,id:TASK.id,stage:TASK.stage&&TASK.stage.id,si:TASK.si,brief:TASK.brief,done:TASK.done,res:TASK.res,ask:TASK.ask&&{shown:TASK.ask.shown,opts:TASK.ask.opts.map(o=>o.k),t:TASK.ask.t},d:TASK.d,log:TASK.log.slice(),seed:TASK.seed}),
   tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzBuild:()=>dzBuild(),dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
