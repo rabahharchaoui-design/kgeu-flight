@@ -47,6 +47,8 @@
   --padT:max(var(--saT),8px);
   --padL:max(var(--saL),10px);
   --padR:max(var(--saR),10px);
+  /* fix2: the same inset both sides (a notch or a cutout on one side only), for screens centred on the screen */
+  --padX:max(var(--padL),var(--padR));
   --padB:max(var(--saB),10px);
   --tap:48px;
   box-sizing:border-box;
@@ -1173,10 +1175,16 @@ label.sens b{ color:var(--ink); min-width:74px; }
 /* ui1: the tab bar. Six sections in one segmented row at the top of every menu screen; the selected tab is the dark
    pill (no slide: it is tapped tens of times a session). Icons drop out below 700 px wide, "Flight" below 760. */
 #menu{ --tabH:50px; }
-#menu .scr{ padding-top:calc(var(--padT) + var(--tabH) + 8px); }
-.mtabs{ position:absolute; z-index:2; top:var(--padT); left:var(--padL); right:var(--padR); height:var(--tabH); display:flex; align-items:center; gap:8px; pointer-events:none; }
-.mtabs > *{ pointer-events:auto; }
-.mtRow{ display:flex; gap:2px; padding:3px; border-radius:15px; background:rgba(42,22,8,.1); flex:none; min-width:0; max-width:100%; overflow-x:auto; scrollbar-width:none; touch-action:pan-x; }
+#menu .scr{ padding-top:calc(var(--padT) + var(--tabH) + 8px); padding-left:var(--padX); padding-right:var(--padX); }
+/* fix2: the row sits centred on the screen. The bar has the same inset both sides (--padX) and two equal flex:1 spacers
+   round the row: .mtL (holding the back button, never narrower than it) and .mtX (the Fly chips, min 0). With room the
+   spacers match and the row is centred; tight, .mtL keeps the back button clear and the row moves right just enough;
+   tighter still the row shrinks and scrolls, starting at the inset. */
+.mtabs{ position:absolute; z-index:2; top:var(--padT); left:var(--padX); right:var(--padX); height:var(--tabH); display:flex; align-items:center; gap:0; pointer-events:none; }
+.mtabs > *, .mtL > *{ pointer-events:auto; }
+.mtL{ flex:1 1 0; display:flex; align-items:center; pointer-events:none !important; }
+.mtL > .mBack{ margin-right:8px; }
+.mtRow{ display:flex; gap:2px; padding:3px; border-radius:15px; background:rgba(42,22,8,.1); flex:0 1 auto; min-width:0; max-width:100%; overflow-x:auto; scrollbar-width:none; touch-action:pan-x; }
 .mtRow::-webkit-scrollbar{ display:none; }
 #menu .mtRow button{ flex:none; display:flex; align-items:center; justify-content:center; gap:6px; min-height:44px; min-width:48px; padding:0 13px; border-radius:12px; background:transparent; color:var(--night);
   font-size:16px; font-weight:800; letter-spacing:.02em; white-space:nowrap; transition:transform 120ms cubic-bezier(.23,1,.32,1); -webkit-user-select:none; user-select:none; }
@@ -1189,7 +1197,8 @@ label.sens b{ color:var(--ink); min-width:74px; }
 #menu .mBack.fl{ width:auto; padding:0 14px 0 8px; gap:4px; display:flex; align-items:center; background:var(--rust); color:#fff4e0; }
 #menu .mBack.fl span{ display:inline; font-size:16px; font-weight:800; letter-spacing:.04em; }
 #menu .mBack[hidden]{ display:none; }
-.mtX{ flex:1; min-width:0; display:flex; align-items:center; justify-content:flex-end; gap:10px; overflow:hidden; }
+.mtX{ flex:1 1 0; min-width:0; display:flex; align-items:center; justify-content:flex-end; gap:10px; overflow:hidden; }
+.mtX > :first-child{ margin-left:8px; }
 #menu .mtX > *{ display:none; }
 #menu[data-scr=sFly] #flyCs{ display:inline-flex; }
 #menu #sumLine{ display:none; max-width:none; min-width:0; flex:0 1 auto; }
@@ -1197,7 +1206,7 @@ label.sens b{ color:var(--ink); min-width:74px; }
 @media (max-width:1000px){ #menu[data-scr=sFly] #sumLine{ display:none; } #flyCs i{ display:none; } }
 #menu .mtRow button i.sm{ display:none; }
 @media (max-width:759px){ #menu .mtRow button i.lg{ display:none; } #menu .mtRow button i.sm{ display:inline; } }
-@media (max-width:699px){ #menu .mtRow button svg{ display:none; } #menu .mtRow button{ padding:0 11px; font-size:15px; } .mtX{ display:none; } }
+@media (max-width:699px){ #menu .mtRow button svg{ display:none; } #menu .mtRow button{ padding:0 11px; font-size:15px; } .mtX{ visibility:hidden; } }
 @media (max-width:580px){ #menu .mtRow button{ padding:0 9px; } }
 @media (max-width:420px){ .mtRow{ gap:0; } #menu .mtRow button{ padding:0 7px; font-size:14px; min-width:44px; } }
 @media (prefers-reduced-motion:reduce){ #menu .mtRow button{ transition:none; } }
@@ -1308,7 +1317,7 @@ label.sens b{ color:var(--ink); min-width:74px; }
 .chip.slot{ border-style:dashed !important; background:transparent !important; opacity:.35; }
 #sumLine{ font-weight:700; color:var(--brown); font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:55%; }
 /* the pause sheet: actions on the left, change flight on the right */
-#pauseOv{ background:transparent; }
+#pauseOv{ background:transparent; padding-left:var(--padX); padding-right:var(--padX); }   /* fix2: centred on the screen with a notch on one side */
 /* ---------- the pause sheet: a top bar (RESUME, Restart / Apply, MAIN MENU on its own at the far right),
    then two panels. Left: where to go, the quick tiles, the music. Right: the flight picks (mode, Action
    Shot, Settings; aircraft; base and time; the starts). 12 px gaps, 44 px targets, fits 568x320 and
@@ -1370,7 +1379,7 @@ label.sens b{ color:var(--ink); min-width:74px; }
 #pauseOv .frows .chip b{ font-size:clamp(10px,1.7vw,15px); }
 #pauseOv .frow:not(.starts) .grp.g2{ flex:2.2 1 0; } #pauseOv .frow:not(.starts) .grp.g4{ flex:3.8 1 0; }
 /* 568 wide: the chips inside one group sit 8 px apart (one segmented control); everything else keeps 12 */
-@media (max-width:620px) and (orientation:landscape){ #pauseOv{ padding-left:8px; padding-right:8px; } #pauseOv .frows .chip b, .acRow .chip b{ letter-spacing:-.01em; } .acRow, #pauseOv .grp, #pauseOv .gchips, .pzQ{ gap:8px; } .pzBody{ gap:10px; } .pzL{ flex:0 0 218px; } .pzL,.pzR{ padding:8px; } #pauseOv .qs i .lg{ display:none; } #pauseOv .pzQ .qs i .sm{ display:inline; } }
+@media (max-width:620px) and (orientation:landscape){ #pauseOv{ padding-left:max(var(--saL),var(--saR),8px); padding-right:max(var(--saL),var(--saR),8px); } #pauseOv .frows .chip b, .acRow .chip b{ letter-spacing:-.01em; } .acRow, #pauseOv .grp, #pauseOv .gchips, .pzQ{ gap:8px; } .pzBody{ gap:10px; } .pzL{ flex:0 0 218px; } .pzL,.pzR{ padding:8px; } #pauseOv .qs i .lg{ display:none; } #pauseOv .pzQ .qs i .sm{ display:inline; } }
 #pauseOv .qs i .sm{ display:none; }
 /* cards: missions, school, arcade. Sized to their content, two or three to a row. */
 .cards{ flex:1; min-height:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(min(196px,30vw),1fr)); grid-auto-rows:min-content; align-content:center; gap:8px; }
@@ -2125,7 +2134,7 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
 <div id="rotate"><div>Turn your phone sideways</div><div style="font-size:16px;font-weight:500;color:var(--soft)">Landscape gives you the stick, throttle, and a wider view.</div><button id="rotOk">Play in portrait anyway</button></div>
 <div class="overlay on" id="menu">
  <nav class="mtabs" id="mTabs" aria-label="Menu">
-  <button class="back mBack" id="mBack" aria-label="Back" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg><span>Flight</span></button>
+  <div class="mtL"><button class="back mBack" id="mBack" aria-label="Back" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg><span>Flight</span></button></div>
   <div class="mtRow" role="tablist">
    <button role="tab" data-go="sHome" id="tHome"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7v9h-5.5v-6h-6v6H3.5z"/></svg><span>Home</span></button>
    <button role="tab" data-go="sFly" id="tFly"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 15.5v-2l-7.5-4.6V4a1.5 1.5 0 0 0-3 0v4.9L3 13.5v2l7.5-2.3V18l-2 1.4V21l3.5-1 3.5 1v-1.6L13.5 18v-4.8z"/></svg><span>Fly</span></button>
@@ -17737,10 +17746,16 @@ function showScr(id){
 const TAB_OF={sHelp:'sSet',sCredits:'sSet',sStalls:'sSet',sTickets:'sSet',sLog:'sSchool'};
 function tabsUI(){const t=TAB_OF[curScr]||curScr;menu.dataset.scr=curScr;
   document.querySelectorAll('#mTabs [data-go]').forEach(b=>{const on=b.dataset.go===t;b.classList.toggle('sel',on);b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1;});
-  const bk=$('mBack');bk.hidden=!(fromPause||NAV.length);bk.classList.toggle('fl',fromPause&&!NAV.length);bk.setAttribute('aria-label',fromPause&&!NAV.length?'Back to the flight':'Back');}
+  const bk=$('mBack');bk.hidden=!(fromPause||NAV.length);bk.classList.toggle('fl',fromPause&&!NAV.length);bk.setAttribute('aria-label',fromPause&&!NAV.length?'Back to the flight':'Back');
+  tabSee();}
+// fix2: a row too wide for the screen scrolls; keep the selected tab in view (by hand: scrollIntoView would scroll the menu too)
+function tabSee(){const r=document.querySelector('#mTabs .mtRow'),b=r&&r.querySelector('.sel');if(!b||r.scrollWidth<=r.clientWidth+1)return;
+  const R=r.getBoundingClientRect(),B=b.getBoundingClientRect();
+  if(B.left<R.left+3)r.scrollLeft-=R.left+3-B.left;else if(B.right>R.right-3)r.scrollLeft+=B.right-(R.right-3);}
 // a tab: the top of that section (the stack goes, the way back to a paused flight stays)
 function tabGo(id){if(curScr===id&&!NAV.length)return;NAV.length=0;showScr(id);}
 document.querySelectorAll('#mTabs [data-go]').forEach(b=>b.addEventListener('click',()=>tabGo(b.dataset.go)));
+addEventListener('resize',()=>requestAnimationFrame(tabSee));   // a rotation can make the row scroll
 function nav(id,reset){if(reset){NAV.length=0;fromPause=false;}else if(curScr!==id)NAV.push(curScr);showScr(id);}
 function navBack(){
   if(fromPause&&!NAV.length){fromPause=false;menuClose();pauseOv.classList.add('on');CARP.sync();return;}
