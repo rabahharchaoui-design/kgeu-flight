@@ -2684,6 +2684,10 @@ function isPaved(x,z){
   if(Math.abs(Z[0])<=LZ.len/2+10&&Math.abs(Z[1])<=LZ.wid/2+4) return true;
   const S=shUV(x,z);
   for(const r of SH_RWY) if(Math.abs(S[0])<=r.len/2&&Math.abs(S[1]-r.v)<=23) return true;
+  // fix2 item 6: Sky Harbor's drawn pavement: the terminal apron, the two parallel taxiways and the apron's link to 7L
+  if(S[0]>=-380&&S[0]<=-120&&S[1]>=-240&&S[1]<=460) return true;
+  if(Math.abs(S[0])<=1500&&(Math.abs(S[1]+150)<=12||Math.abs(S[1]-165)<=12)) return true;
+  if(Math.abs(S[0]+250)<=13&&S[1]>=-280&&S[1]<=-235) return true;
   return false;
 }
 const OBST=[];
@@ -2723,7 +2727,9 @@ const BASES=!REGION.az?{[REGION.id]:{id:REGION.id,name:REGION.base,rwy:REGION.ma
   // planes2: Sky Harbor for the airliners. Runway 7L is 11,489 ft; the frame is shX/shZ (u along 092, v right)
   phx:{id:'phx',name:'Sky Harbor',rwy:'7L',hdg:92,twr:'Phoenix Tower 120.9',gnd:'Phoenix Ground 132.55',twrClip:'phoenix_tower',gndClip:'phoenix_ground',rwyClip:'rwy_07l',
         runway:[()=>shX(-1739,-300),()=>shZ(-1739,-300)],
-        ramp:[()=>shX(-130,95),()=>shZ(-130,95)],rampHdg:2,
+        // fix2 item 6: the gate row of the terminal apron (u -380..-120), east of the airliners' stands (u -420..-228): a 747's
+        // wingtips 14 m clear of the next stand and 35 m of the Terminal 4 concourse, facing north across 7R to 7L
+        ramp:[()=>shX(-165,95),()=>shZ(-165,95)],rampHdg:2,
         fin:d=>[shX(-1451-d,-300),shZ(-1451-d,-300)]}
 };
 // the longest runway of a base, metres: the long runway rule for the airliners (TYPES.minRwy)
@@ -8566,6 +8572,8 @@ if(REGION.az)(function(){
     }
     // the apron by the airliner stands, where the Pocket Air ramp start is (planes2)
     {const g=new THREE.PlaneGeometry(700,260);g.rotateX(-Math.PI/2);const m=new THREE.Mesh(g,pale);m.position.set(shX(-250,110),0.045,shZ(-250,110));m.rotation.y=-SKY_HARBOR.h;scene.add(m);}
+    // fix2 item 6: the apron (u -380..-120, v -240..460) to 7L across the gap north of it, so a ramp start can reach 7L (isPaved)
+    {const g=new THREE.PlaneGeometry(46,26);g.rotateX(-Math.PI/2);const m=new THREE.Mesh(g,pale);m.position.set(shX(-250,-257),0.05,shZ(-250,-257));m.rotation.y=-SKY_HARBOR.h;scene.add(m);}
     // Terminals 3 and 4 with their concourses, between the inner runways
     for(const [u0,v0,L,W] of [[-620,150,300,90],[120,150,420,100]]){
       const t=new THREE.Mesh(new THREE.BoxGeometry(L,26,W),roof);
@@ -19131,6 +19139,24 @@ function prePose(){
   else{x=B.runway[0]();z=B.runway[1]();}
   return {x:x,y:y,z:z,h:h*Math.PI/180};
 }
+// fix2 item 6: where the flight started and what is under it (tests/spawn_check.py): paved at the position and 8 m
+// behind and ahead along the heading (both wheel sets), the heading in degrees true
+function spawnInfo(){const q=st.quat,f=new V3(0,0,-1).applyQuaternion(q),h=Math.atan2(f.x,-f.z),fx=Math.sin(h),fz=-Math.cos(h),x=st.pos.x,z=st.pos.z;
+  return {base:st.base,pos:SPAWN_POS,spawn:st.spawn||st.mode,x:x,z:z,y:st.pos.y,hdgDeg:((h*180/Math.PI)%360+360)%360,
+    paved:[isPaved(x-8*fx,z-8*fz),isPaved(x,z),isPaved(x+8*fx,z+8*fz)],agl:Math.max(0,st.pos.y-GEAR-groundHeight(x,z)),gh:groundHeight(x,z),crashed:st.crashed,why:st.crashReason,onGround:st.onGround,
+    spd:Math.hypot(st.vel.x,st.vel.z),type:st.type,clear:spawnClear(x,z,fx,fz)};}
+// the room round the aircraft: the least distance from its wing and fuselage lines to an obstacle (OBST) and to a traffic
+// stand (TFC park spots, an airliner of 36 m span parked there), metres
+function spawnClear(x,z,fx,fz){let o=1e9,t=1e9;
+  for(let i=-10;i<=10;i++){const a=i/10,px=x-fz*a*AC.span/2,pz=z+fx*a*AC.span/2,qx=x+fx*a*AC.len/2,qz=z+fz*a*AC.len/2;
+    for(const [X,Z] of [[px,pz],[qx,qz]]){
+      for(const b of OBST){let d;
+        if(b.kind==='rect'){if(!REGION.az)continue;const u=toU(X,Z),v=toV(X,Z);d=Math.hypot(Math.max(b.u0-u,0,u-b.u1),Math.max(b.v0-v,0,v-b.v1));}
+        else if(b.kind==='poly')d=pipXZ(b.P,X,Z)?0:polyEdgeD(b.P,X,Z);
+        else d=Math.max(0,Math.hypot(X-b.x,Z-b.z)-b.r);
+        if(d<o)o=d;}
+      for(const P of TFC.plans)if(P.park)for(const sp of P.park.spots){const d=Math.max(0,Math.hypot(X-sp[0],Z-sp[1])-18);if(d<t)t=d;}}}
+  return {obst:o,stand:t};}
 // the queue: one job a frame or more, at most ~40 ms of work a frame, so the splash and its bar keep moving. Every job
 // that draws puts the camera at the first flight's pose (preAt) and back before the frame's own menu draw.
 const PREQ={jobs:null,i:0,A:null,B:null,C:null,D:null,M:null,mv:false,mp:new V3(),mq:new Q4(),cp:new V3(),cq:new Q4(),cv:null};
@@ -21624,7 +21650,7 @@ window.__kgeu={gfxHold:n=>{GFX.holdF=n|0;},pfx:()=>{const L=PFX.last||{};return 
   // step the mission clock without waiting on rAF: the pallet takes 50 s to come down
   missTick:(n,dt)=>{for(let i=0;i<n;i++)missUpdate(dt);},
   STRIKE:STRIKE,SENSOR:SENSOR,RANGE:RANGE,groundHeight:groundHeight,secAt:secAt,CAR:CAR,
-  isPaved:isPaved,riverX:riverX,FWY_X:FWY_X,I10_Z:I10_Z,APC:APC,LUKE:LUKE,
+  isPaved:isPaved,spawnInfo:spawnInfo,riverX:riverX,FWY_X:FWY_X,I10_Z:I10_Z,APC:APC,LUKE:LUKE,
   smokeCount:()=>smoke.filter(p=>p.life>0).length,smokeMax:SMOKE_MAX,
   camMode:()=>camMode,sensorMode:()=>sensorMode,
   dropCam:()=>{const p=MISS.pallet;return {mode:DCAM.mode==='chase'&&(DCAM.drag||DCAM.yaw||DCAM.pitch)?'look':DCAM.mode,
