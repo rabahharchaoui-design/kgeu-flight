@@ -1312,6 +1312,19 @@ label.sens b{ color:var(--ink); min-width:74px; }
 .pz{ display:flex; flex-direction:column; gap:12px; width:100%; height:100%; max-width:980px; max-height:600px; }
 .pzTop{ display:flex; gap:12px; align-items:stretch; flex:none; }
 #pauseOv #pResume{ flex:2 1 0; min-width:0; min-height:48px; font-size:clamp(18px,2.6vw,24px); font-weight:900; letter-spacing:.08em; background:var(--rust); color:#fff4e0; border:none; border-radius:14px; box-shadow:0 4px 0 var(--brown); }
+/* fix2 item 3: a tier change applying while a flight is paused, under the Resume label and in Settings > Graphics */
+.gfxBusy{ display:inline-flex; align-items:center; gap:6px; height:20px; padding:0 9px; border-radius:10px; background:rgba(26,16,9,.62); border:1px solid rgba(255,255,255,.12);
+  color:#f3dcb4; font-size:12px; font-weight:700; letter-spacing:.02em; line-height:1; text-transform:none; white-space:nowrap; pointer-events:none; flex:none; }
+.gfxBusy[hidden]{ display:none; }
+.gfxBusy::before{ content:''; width:8px; height:8px; flex:none; border-radius:50%; border:2px solid rgba(246,193,119,.3); border-top-color:#f6c177; animation:gbSpin .8s linear infinite; }
+@keyframes gbSpin{ to{ transform:rotate(360deg); } }
+@media (prefers-reduced-motion: reduce){ .gfxBusy::before{ animation-duration:2.4s; } }
+/* the pill sits on the Resume button's lower edge (a sibling, so the button's label stays RESUME); taps go through it */
+.pzRw{ flex:2 1 0; min-width:0; position:relative; display:flex; }
+.pzRw > #pResume{ flex:1 1 auto; width:100%; }
+#pauseOv #pResume.busy{ line-height:1; padding-top:0; padding-bottom:25px; font-size:clamp(16px,2.2vw,22px); }
+.pzRw > .gfxBusy{ position:absolute; left:50%; bottom:3px; transform:translateX(-50%); max-width:calc(100% - 12px); overflow:hidden; }
+#sSet .gfxSeg .gfxBusy{ margin-left:2px; }
 #pauseOv #pResume:active{ transform:translateY(2px); box-shadow:0 2px 0 var(--brown); }
 #pauseOv #pApply{ flex:1 1 0; min-width:0; min-height:48px; font-size:clamp(15px,2.2vw,19px) !important; font-weight:800; letter-spacing:.04em; background:rgba(26,16,9,.9) !important; color:var(--sand) !important; border:2px solid rgba(246,193,119,.3); box-shadow:none; border-radius:14px; }
 #pauseOv .menuB2{ flex:0 0 auto; margin-left:auto; min-width:120px; min-height:48px; padding:0 14px; font-size:13px; font-weight:800; letter-spacing:.08em; background:rgba(26,16,9,.72); color:#e8cfa5; border:1.5px solid rgba(246,193,119,.35); border-radius:14px; }
@@ -2188,7 +2201,7 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
     <div class="setGrid">
    <div class="setCol">
     <div class="srow"><span>Mode</span><div class="chips modeSeg" role="radiogroup" aria-label="Mode"><button class="pick chip sk" data-skill="rookie" role="radio"><b>Easy</b></button><button class="pick chip sk" data-skill="pilot" role="radio"><b>Hard</b></button><p class="modeDesc"></p></div></div>
-    <div class="srow"><span>Graphics</span><div class="chips gfxSeg" role="radiogroup" aria-label="Graphics quality"><button class="chip gt" data-tier="auto" role="radio"><b>Auto</b><small class="gtA">(Medium)</small></button><button class="chip gt" data-tier="low" role="radio"><b>Low</b></button><button class="chip gt" data-tier="medium" role="radio"><b>Medium</b></button><button class="chip gt" data-tier="high" role="radio"><b>High</b></button></div></div>
+    <div class="srow"><span>Graphics</span><div class="chips gfxSeg" role="radiogroup" aria-label="Graphics quality"><button class="chip gt" data-tier="auto" role="radio"><b>Auto</b><small class="gtA">(Medium)</small></button><button class="chip gt" data-tier="low" role="radio"><b>Low</b></button><button class="chip gt" data-tier="medium" role="radio"><b>Medium</b></button><button class="chip gt" data-tier="high" role="radio"><b>High</b></button><span class="gfxBusy" id="gfxBusyS" role="status" hidden>Applying graphics…</span></div></div>
     <div class="srow"><span>Radio</span><div class="chips"><button class="tog" id="oRadio">Radio: On</button>
       <label class="sens"><input type="range" id="oRvol" min="0" max="10" step="1" value="7" aria-label="Radio volume"><b id="oRvolV">70%</b></label></div></div>
     <div class="srow"><span>Music</span><div class="chips"><button class="tog oMusic" id="oMusic">Music: On</button>
@@ -2304,7 +2317,7 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
 <div class="overlay" id="storyOv"><div class="sheet"><p class="reg" id="storyH"></p><p class="sub" id="storyT"></p><div class="row"><button class="primary" id="storyX">Close</button></div></div></div>
 <div class="overlay" id="pauseOv" role="dialog" aria-label="Paused"><div class="pz">
   <div class="pzTop">
-   <button class="primary" id="pResume">RESUME</button>
+   <div class="pzRw"><button class="primary" id="pResume">RESUME</button><span class="gfxBusy" id="gfxBusy" role="status" hidden><span class="gbT">Applying graphics…</span></span></div>
    <button class="go apply" id="pApply">Restart</button>
    <button class="menuB2" id="pMenu" aria-label="Main menu">MAIN MENU</button>
   </div>
@@ -3625,7 +3638,7 @@ var GFX={tier:'medium',auto:'medium',override:'auto',scale:1,bench:null,dyn:true
   // the battery guard's drop, in the menu (openMenu, start): the session tier one step down, its programs compiled again
   pendingApply(){const t=GFX.pendingTier;if(!t)return false;GFX.pendingTier=null;GFX.thermS.on=false;
     if(t===GFX.tier)return false;GFX.tier=t;GFX.scale=1;GFX.dynReset(true);GFX.applyTier();if(GFX.requeue)GFX.requeue();return true;},
-  say:null,ui:null,requeue:null,HOOKS:GFX_HOOKS};
+  say:null,ui:null,requeue:null,HOOKS:GFX_HOOKS,busy:false,resumeWait:false,doneF:0,holdF:0};
 // graphics item 8, payload: every texture this graphics pass added is drawn at run time on a canvas (the aircraft skins,
 // the road bake, the canopy dust streaks, the cloud, smoke and sun sprites) or is a render target, and the one new
 // downloaded asset is assets/world/az_dem.bin (1.16 MB of heights, not an image). There is no image file to ship as KTX2
@@ -9339,6 +9352,7 @@ function warmTick(){
   if(WARM.done)return;
   // flying: wait. The steps belong to the menu and the pause sheet, never to a flying frame
   if(running&&!paused&&!menu.classList.contains('on')){setTimeout(warmTick,1500);return;}
+  if(GFX.busy&&running&&!st.crashed){setTimeout(warmTick,500);return;}   // fix2 item 3: applying in a paused flight, the tick runs them (warmRun)
   // the splash's fade (graphics item 8): nothing that can wait on the GPU while its 480 ms timer runs, nor in the up to
   // 700 ms between the precompile queue draining (splashSeen) and the fade starting, so the fade's timer never queues
   // behind a step's compile
@@ -15712,8 +15726,8 @@ function bugFresh(){if(!running)return null;
   try{if(camMode===2&&SENSOR.mode!=='tv'&&!PHOTO.on&&!FREECAM)renderIR();else pfxRender();}catch(e){return null;}
   return bugGrab();}
 function togglePause(){if(DF.brief||TASK.brief||LES.brief)return;   // the dogfight briefing holds the sim itself; FIGHT'S ON is the way on
-  if(RES.brief)resClose(RES.brief);if(paused)gfxDrain();paused=!paused;pauseOv.classList.toggle('on',paused);if(paused){BUG.want=running?1:0;radioFade(120);CARP.sync();PZ0={t:savedType,b:SPAWN_BASE,p:SPAWN_POS};PZ_LOC=null;locSel();pzApplyUI();requestAnimationFrame(locShow);if(window.stickReset)stickReset();musicUI();}}
-$('pResume').onclick=()=>{gfxDrain();paused=false;pauseOv.classList.remove('on');initAudio();radioVolApply();};
+  if(RES.brief)resClose(RES.brief);if(paused){pzResume();return;}paused=true;pauseOv.classList.add('on');{BUG.want=running?1:0;radioFade(120);CARP.sync();PZ0={t:savedType,b:SPAWN_BASE,p:SPAWN_POS};PZ_LOC=null;locSel();pzApplyUI();requestAnimationFrame(locShow);if(window.stickReset)stickReset();musicUI();}}
+$('pResume').onclick=()=>pzResume();   // fix2 item 3: waits while a tier change applies
 // Restart and Apply are one button: it restarts this flight (same start, mission or range) until
 // an aircraft, base or start is changed on the sheet, then it reads Apply and flies the new picks.
 // Time of day needs neither, it changes the sky at once.
@@ -19178,7 +19192,7 @@ function preJobs(){
 // (gfxRequeue: every job is safe to repeat, the carousel's once only, BOOT.mark('warm') sets its time once); the tick
 // drains it on frames that are not flying, start() and the pause sheet's Resume drain what is left in one go (gfxDrain)
 // so a flight's first frame never compiles. __kgeu.boot().pre.done turns true again when it has drained.
-function gfxPrecompile(){
+function gfxPrecompile(budget){
   if(PRE.done)return true;
   if(PRE.skip){PRE.done=true;BOOT.mark('warm');return true;}
   const Q=PREQ,t0=performance.now();
@@ -19195,7 +19209,7 @@ function gfxPrecompile(){
     const j=Q.jobs[Q.i++],a=performance.now();
     try{j[1]();}catch(e){console.warn('gfx precompile '+j[0],e);}
     PRE.ms[j[0]]=+(performance.now()-a).toFixed(1);}
-  while(Q.i<Q.jobs.length&&performance.now()-t0<40);
+  while(Q.i<Q.jobs.length&&performance.now()-t0<(budget||40));
   BOOT.sub=Q.i/Q.jobs.length;BOOT.bar();
   if(Q.i<Q.jobs.length)return false;
   for(const k of ['A','B','C','D'])if(Q[k]){Q[k].dispose();Q[k]=null;}
@@ -19208,6 +19222,7 @@ function gfxRequeue(){
   for(const k of ['A','B','C','D'])if(PREQ[k]){PREQ[k].dispose();PREQ[k]=null;}
   PREQ.jobs=null;PREQ.i=0;PRE.done=false;PRE.runs=(PRE.runs||1)+1;
   WARM.i=0;WARM.ms=[];const w=WARM.done;WARM.done=false;if(w)setTimeout(warmTick,60);
+  GFX.busy=true;GFX.doneF=0;   // fix2 item 3: applying graphics (gfxApplying) until both have drained
 }
 GFX.requeue=gfxRequeue;   // GFX lives outside init()
 // a flight about to start (or resume) with the queue not drained: the rest of it now, behind the menu still on screen
@@ -19216,8 +19231,37 @@ function gfxDrain(){
   // the GPU sync waits on the WARM steps: the rest of them now as well
   if(PRE.runs>1&&!WARM.done){while(WARM.i<WARM_STEPS.length){try{WARM_STEPS[WARM.i]();}catch(e){console.warn('wstep',e);}WARM.i++;}WARM.done=true;}
   while(!PRE.done&&n++<64)gfxPrecompile();
-  PRE.drainMs=Math.round(performance.now()-t0);return PRE.drainMs;
+  PRE.drainMs=Math.round(performance.now()-t0);if(PRE.done&&WARM.done)GFX.busy=false;return PRE.drainMs;
 }
+// fix2 item 3: a tier change (the Settings chips, or the battery guard's pendingApply at openMenu) during a paused
+// flight. gfxDrain inside the Resume tap ran the whole requeued queue and the WARM steps in that one task (6 s on the
+// owner's iPhone, the relink landing on the resumed flight), so while the flight is paused and they have not drained
+// the game is applying graphics: the tick drains them at up to 80 ms a frame (no flight frame is drawn), #gfxBusy
+// shows under the Resume label and in Settings > Graphics, and a resume (the Resume button, the pause toggle) waits
+// for them (GFX.resumeWait) and then resumes by itself, two frames after the last job so the GPU sync's frame is not
+// the resumed flight's first gap. start() still drains in one go behind the menu.
+function gfxApplying(){return GFX.busy&&running&&!st.crashed;}
+function gfxBusyUI(){const ap=gfxApplying(),w=ap&&GFX.resumeWait,g=$('gfxBusy'),b=$('pResume'),gs=$('gfxBusyS');
+  if(g.hidden===!ap&&b.classList.contains('busy')===ap&&g.dataset.w===String(w))return;
+  g.hidden=!ap;b.classList.toggle('busy',ap);g.dataset.w=String(w);gs.hidden=!ap;
+  g.firstChild.textContent=w?'Applying graphics\u2026 resuming':'Applying graphics\u2026';}
+// the pause sheet's way back to the flight (Resume, the pause toggle); true if it resumed now
+function pzResume(){
+  if(gfxApplying()){GFX.resumeWait=true;gfxBusyUI();return false;}   // taps while applying are idempotent
+  GFX.resumeWait=false;gfxDrain();paused=false;pauseOv.classList.remove('on');initAudio();radioVolApply();gfxBusyUI();return true;}
+// each frame (tick): the wait, then the resume the player asked for; the pause sheet still up and no menu over it
+function gfxBusyTick(){
+  if(GFX.busy&&PRE.done&&WARM.done){GFX.busy=false;GFX.doneF=0;}
+  if(!GFX.busy&&GFX.doneF<9)GFX.doneF++;
+  if(GFX.resumeWait){
+    if(!running||st.crashed||!paused||menu.classList.contains('on')||!pauseOv.classList.contains('on'))GFX.resumeWait=false;
+    else if(!GFX.busy&&GFX.doneF>=2)pzResume();}
+  gfxBusyUI();}
+// the WARM steps, from the tick while applying (warmTick's timers stand aside): steps back to back inside the budget
+function warmRun(budget){const t0=performance.now();if(!WARM.i)WARM.t0=t0;
+  while(WARM.i<WARM_STEPS.length&&performance.now()-t0<budget){const a=performance.now();try{WARM_STEPS[WARM.i]();}catch(e){console.warn('warm',e);}WARM.ms.push(+(performance.now()-a).toFixed(1));WARM.i++;}
+  if(WARM.i>=WARM_STEPS.length&&!WARM.done){WARM.done=true;WARM.total=performance.now()-WARM.t0;}
+  return performance.now()-t0;}
 // ---- day TV: grain and a faint 8 px block pattern, one small tile stepped every 80 ms ----
 const sensorFx=$('sensorFx'),sensorGr=sensorFx.firstChild;let sfxT=0;
 (function(){const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d'),id=x.createImageData(128,128),d=id.data;
@@ -20797,7 +20841,11 @@ function tick(t,skipRender){
   if(w==='STALL')hapPattern('stall');   // its cooldown makes the repeating pulse
   setTxt(warnEl,w);warnEl.classList.toggle('on',!!w);
   // a world region: once it is built. A rerun after a tier change (gfxRequeue) waits for a frame that is not flying
-  updateAudio();frameN++;if(frameN>=4&&WORLD.ready&&!PRE.done&&!splashFading()&&(!running||paused||menu.classList.contains('on'))&&gfxPrecompile()&&!splashSeen){splashSeen=true;splashDone();}
+  // fix2 item 3: applying graphics in a paused flight, 80 ms a frame for the WARM steps and the queue together
+  updateAudio();frameN++;gfxBusyTick();
+  const notFly=!running||paused||menu.classList.contains('on'),apl=notFly&&gfxApplying();
+  let pb=40;const hold=apl&&GFX.holdF>0;if(hold)GFX.holdF--;else if(apl){pb=80;if(!WARM.done)pb=Math.max(8,80-warmRun(40));}
+  if(frameN>=4&&WORLD.ready&&!PRE.done&&!splashFading()&&notFly&&!hold&&gfxPrecompile(pb)&&!splashSeen){splashSeen=true;splashDone();}
   if(skipRender){}
   else if(SHOW.on){csmIdle();renderer.setClearColor(0xF6C177,1);renderer.clear();showRender(dt,CARM);}
   // under the opaque menu the first 40 frames used to draw the world to compile its programs; the precompile queue
@@ -21443,7 +21491,7 @@ const APP_VER='2026-10-15-bugs1';          // keep version.json in step when shi
     get P(){return E.P;}};
 })();
 
-window.__kgeu={stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>({id:p.id,name:p.name,cacheKey:p.cacheKey,usedTimes:p.usedTimes})),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
+window.__kgeu={gfxHold:n=>{GFX.holdF=n|0;},gfxBusy:()=>({applying:gfxApplying(),resumeWait:GFX.resumeWait,preDone:PRE.done,warmDone:WARM.done,busy:GFX.busy}),stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>({id:p.id,name:p.name,cacheKey:p.cacheKey,usedTimes:p.usedTimes})),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
   task:()=>({on:TASK.on,id:TASK.id,stage:TASK.stage&&TASK.stage.id,si:TASK.si,brief:TASK.brief,done:TASK.done,res:TASK.res,ask:TASK.ask&&{shown:TASK.ask.shown,opts:TASK.ask.opts.map(o=>o.k),t:TASK.ask.t},d:TASK.d,log:TASK.log.slice(),seed:TASK.seed}),
   tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzBuild:()=>dzBuild(),dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
