@@ -64,7 +64,7 @@ ALLOW = {
     'sensor|LOCK with nothing under the crosshair': 'no target under the crosshair: lock has nothing to lock onto',
     'dogfight|FOX with empty racks': 'no missiles left on the rack: FOX has nothing to fire',
     'sSet|#bTickets opens sTickets': 'offline harness: tixOpen() requires LB.E.enabled and returns early '
-        'by design (also covered by the setFoot footer overlap below -- see #bBug/#bStalls, not allowed there)',
+        'by design',
 }
 # hud:<drone>|#bLock "LOCK" and hud:<drone>|#bFire "FIRE" are allowed no-ops too: free flight has no
 # locked target under the crosshair, so there is nothing to lock onto or fire at (same reasoning as
@@ -72,10 +72,10 @@ ALLOW = {
 for _t in DRONES:
     ALLOW[f'hud:{_t}|#bLock "LOCK"'] = 'no target under the crosshair in free flight: nothing to lock onto'
     ALLOW[f'hud:{_t}|#bFire "FIRE"'] = 'nothing locked in free flight: nothing to fire at'
-# NOT in ALLOW, by design: #bBug and #bStalls in Settings sit under the .setFoot footer (credits /
-# OSM attribution / Add to Home Screen tip) at 844x390 landscape -- a real touch at the button's own
-# centre lands on the footer instead (confirmed with elementsFromPoint), so bugOpen()/stallRender()
-# never run. This is a real finding, not a deliberate no-op.
+# NOT in ALLOW, by design: #bBug and #bStalls in Settings. They used to sit under the .setFoot footer
+# at 844x390 (the Bugs row was clipped below the rows' scroll box, a real touch landed on the footer);
+# fixed in fix2 item 7 (the footer scrolls under the last row, pointer-events:none), proven by
+# tests/settings_tap_check.py at five sizes. A WRONG here again is a real regression.
 
 # ---------------- generic helpers ----------------
 
@@ -92,7 +92,7 @@ SNAP_JS = f"""()=>{{const K={K};const ov={{}};document.querySelectorAll('.overla
   try{{df=K.DF?{{on:K.DF.on,wave:K.DF.wave,n:K.DF.bandits&&K.DF.bandits.length,fox:K.DF.ammo&&K.DF.ammo.fox,gun:K.DF.ammo&&K.DF.ammo.gun,flr:K.DF.ammo&&K.DF.ammo.flares}}:null;}}catch(e){{}}
   try{{task=K.task?(()=>{{const t=K.task();return t&&{{on:t.on,stage:t.stage,brief:t.brief,ask:t.ask&&t.ask.shown,done:t.done,res:!!t.res}};}})():null;}}catch(e){{}}
   try{{les=K.LES?{{on:K.LES.on,ph:K.LES.ph,brief:!!(K.lesBrief&&K.lesBrief.on)}}:null;}}catch(e){{}}
-  const txt={{}};['bGearT','bModeT','bZoomT','flapInd','toast','atc','missT','bFoxN','bGunN','bFlrN','bBrkN','bAutoT'].forEach(id=>{{const e=document.getElementById(id);txt[id]=e?e.textContent:null;}});
+  const txt={{}};['sideToast','bGearT','bModeT','bZoomT','flapInd','toast','atc','missT','bFoxN','bGunN','bFlrN','bBrkN','bAutoT'].forEach(id=>{{const e=document.getElementById(id);txt[id]=e?e.textContent:null;}});
   return {{ov,scr,curScr,running,paused,st,cam,sm,sens,df,task,les,txt,mut:window.__mut||0,bodyCls:document.body.className}};}}"""
 
 INSTALL_OBS = "()=>{if(window.__obsInstalled)return;window.__obsInstalled=1;window.__mut=0;const o=new MutationObserver(ms=>{window.__mut+=ms.length;});o.observe(document.body,{childList:true,attributes:true,subtree:true,characterData:true});}"
@@ -203,8 +203,11 @@ async def check_tap(pg, table, screen, handle, expect_fn=None, restore_scr=None,
         status = 'OK'
         observed += f' (allowed: {ALLOW[key]})'
     table.add(screen, label, 'observable effect' if not expect_fn else 'see table', observed, status)
-    # restore: if we wandered off the screen under test or kicked off a flight, go back
-    if restore_scr and (after['curScr'] != restore_scr or after['running']):
+    # restore: if we wandered off the screen under test or kicked off a flight, go back. Only a flight
+    # this tap started counts: once an earlier tap (Settings > Replay lesson 1) has left one running
+    # behind the menu, "running" alone sent every later tap through the restore, whose #bugX tap
+    # closed the bug sheet after its first chip (the "zero size" chips were the audit's own doing)
+    if restore_scr and (after['curScr'] != restore_scr or (after['running'] and not before['running'])):
         try:
             await pg.evaluate(f"()=>{{try{{{K}.taskStop&&{K}.taskStop();}}catch(e){{}}try{{{K}.openMenu('{restore_scr}');}}catch(e){{}}}}")
         except Exception:
@@ -320,7 +323,13 @@ async def part_menu(pg, sub=None):
         # tapping #lbPick again is just another control in the same sweep... instead, reopen
         # explicitly between taps so every entry actually gets a fresh, visible target)
         async def picker_sweep():
+            # open the sheet first: it is hidden after the sweep above, and visible_indices on a
+            # hidden sheet finds nothing, which silently audited none of its entries
+            if not await pg.evaluate("()=>{const s=document.getElementById('lbSheet');return s&&!s.hidden;}"):
+                await finger(pg, '#lbPick'); await pg.wait_for_timeout(250)
             sel, idxs = await visible_indices(pg, '#lbSheet')
+            if not idxs:
+                table.add('sLb:picker', '#lbSheet entries', 'listed when the sheet opens', 'none visible', 'WRONG')
             for i in idxs:
                 if not time_left():
                     table.add('sLb:picker', '(remaining entries)', 'observable effect', 'skipped (wall-clock budget)', 'SKIP')
@@ -342,13 +351,20 @@ async def part_menu(pg, sub=None):
         await sweep_screen(pg, table, 'sSet', '#sSet', restore_scr='sSet',
                             skip_sel='#bHelp, #bCredits, #bBug, #bTickets, #bStalls, .gt')
         await closeStray(pg)  # #bPlace opens the placement sheet
-        # the graphics tier chips: tap Low, then back to Auto. Medium and High are not tapped here
-        # (each forces a full synchronous shader recompile -- many seconds, not hung, under headless
-        # swiftshader); tier switching end to end is covered by graphics_shots.py / pause_tier_check.py
-        h = await pg.query_selector('[data-tier="low"]')
-        if h: await check_tap(pg, table, 'sSet', h)
-        h = await pg.query_selector('[data-tier="auto"]')
-        if h: await check_tap(pg, table, 'sSet', h)
+        # the graphics tier chips: Low, back to Auto, Medium, back to Auto. Each waits (up to 60 s) for
+        # the tier change's shader work to drain (K.gfxBusy().applying) before the next tap. High is
+        # still not tapped here: under headless swiftshader its recompile runs past a 2 minute Bash cap;
+        # tier switching end to end, High included, is covered by graphics_shots.py / pause_tier_check.py
+        async def gfx_settle():
+            for _ in range(300):
+                busy = await pg.evaluate(f"()=>{{try{{const b={K}.gfxBusy();return !!(b.applying||b.busy);}}catch(e){{return false;}}}}")
+                if not busy: return
+                await pg.wait_for_timeout(200)
+        for tier in ('low', 'auto', 'medium', 'auto'):
+            h = await pg.query_selector(f'#sSet [data-tier="{tier}"]')
+            if h:
+                await check_tap(pg, table, 'sSet', h)
+                await gfx_settle()
 
         async def open_check(sel, want_curScr=None, want_ov=None):
             await pg.evaluate(f"()=>{K}.openMenu('sSet')"); await pg.wait_for_timeout(200)
@@ -363,9 +379,8 @@ async def part_menu(pg, sub=None):
             table.add('sSet', f'{sel} opens {want_curScr or want_ov}', f'curScr/overlay becomes {want_curScr or want_ov}', detail, status)
             return opened
 
-        # sStalls is a real finding (the setFoot footer covers #bStalls, see ALLOW/NOT-in-ALLOW
-        # notes above) -- a real touch never opens it, but K.nav() still gets us in to audit its
-        # Copy/Clear buttons rather than leaving them completely untested
+        # a real tap must open each; if one ever fails (WRONG, the old footer overlap), K.nav() still
+        # gets us in to audit sStalls' Copy/Clear buttons rather than leaving them untested
         for subscr, sel, force in (('sHelp', '#bHelp', None), ('sCredits', '#bCredits', None),
                                     ('sStalls', '#bStalls', f"()=>{K}.nav('sStalls')"), ('sTickets', '#bTickets', None)):
             opened = await open_check(sel, want_curScr=subscr)
@@ -375,9 +390,9 @@ async def part_menu(pg, sub=None):
             if opened:
                 await sweep_screen(pg, table, subscr, f'#{subscr}', restore_scr=subscr)
 
-        # same story for #bBug: force it open with K.bugOpen() to still audit the sheet's category
-        # and severity chips, the screenshot toggle and Cancel, even though the real tap finding
-        # (WRONG, covered by the footer) stands on its own
+        # same for #bBug: should a real tap fail (WRONG), force it open with K.bugOpen() to still audit
+        # the sheet's category and severity chips and Cancel (the screenshot toggle is hidden in the
+        # menu by design: 'No screenshot in the menu')
         opened = await open_check('#bBug', want_ov='bugOv')
         if not opened:
             await pg.evaluate(f"()=>{K}.bugOpen('settings')"); await pg.wait_for_timeout(200)
@@ -570,13 +585,20 @@ async def part_hud(pg, type_filter=None):
         if h: await check_tap(pg, table, f'hud:{t}', h)
         await pg.evaluate(f"()=>{{const s={K}.state();s.ap=null;}}")  # don't let autopilot fly the rest of the sweep
 
-        # GEAR
+        # GEAR on the ground: toggleGear deliberately leaves the gear down and says so in the side
+        # note (sideCfg -> #sideToast: 'GEAR DOWN / stays down on the ground'; 'GEAR FIXED' on the
+        # fixed-gear types). The real up/down toggle is checked airborne below.
+        gear_shown = False
         h = await pg.query_selector('#bGear')
         if h and await h.evaluate("e=>!!e.offsetParent"):
-            def gear_expect(bf, af, before_gear=before_gear):
-                return (af['st']['gearDown'] != bf['st']['gearDown']), f"gearDown {bf['st']['gearDown']}->{af['st']['gearDown']}"
-            await check_tap(pg, table, f'hud:{t}', h, expect_fn=gear_expect)
-            await check_tap(pg, table, f'hud:{t}', h, expect_fn=gear_expect)  # back to original
+            gear_shown = True
+            await pg.evaluate("()=>{const e=document.getElementById('sideToast');if(e)e.textContent='';}")
+            def gear_ground_expect(bf, af):
+                note = (af['txt'].get('sideToast') or '').replace('\n', ' ')
+                said = ('GEAR DOWN' in note and 'stays down' in note) or 'GEAR FIXED' in note
+                kept = af['st']['gearDown'] == bf['st']['gearDown'] and af['st']['gearDown'] is not False
+                return said and kept, f"gearDown {bf['st']['gearDown']}->{af['st']['gearDown']}, note {note[:34]!r}"
+            await check_tap(pg, table, f'hud:{t}', h, expect_fn=gear_ground_expect)
 
         # FLAP UP / DOWN
         hu = await pg.query_selector('#bFlapUp'); hd = await pg.query_selector('#bFlapDn')
@@ -605,6 +627,20 @@ async def part_hud(pg, type_filter=None):
                 ok_ = bool(held_brake) and not released_brake
                 table.add(f'hud:{t}', '#bBrake (held, then released)', 'brake true while held, false after release',
                            f"before={bf_brake} held={held_brake} released={released_brake}", 'OK' if ok_ else 'WRONG')
+
+        # GEAR airborne (retractable types): 300 m up, 120 kt, wings level, gear down; two taps flip it
+        # up then down again
+        if gear_shown and not await pg.evaluate("()=>(document.getElementById('sideToast').textContent||'').includes('GEAR FIXED')"):
+            await pg.evaluate(f"""()=>{{const K={K},s=K.state(),alt=300,V=120/1.94384/Math.sqrt(1.097*Math.exp(-alt/9200)/1.225);
+              s.pos.y=alt+K.groundHeight(s.pos.x,s.pos.z);s.vel.set(0,0,-V);s.quat.set(0,0,0,1);s.w.set(0,0,0);
+              s.onGround=false;s.airTime=30;s.throttle=s.power=0.7;s.gearDown=true;s.gearPos=1;s.ap=null;s.brake=false;}}""")
+            await pg.wait_for_timeout(150)
+            h = await pg.query_selector('#bGear')
+            def gear_air_expect(bf, af):
+                ok_ = af['st']['onGround'] is False and af['st']['gearDown'] != bf['st']['gearDown']
+                return ok_, f"airborne, gearDown {bf['st']['gearDown']}->{af['st']['gearDown']}"
+            await check_tap(pg, table, f'hud:{t} (airborne)', h, expect_fn=gear_air_expect)
+            await check_tap(pg, table, f'hud:{t} (airborne)', h, expect_fn=gear_air_expect)
 
         # DROP (C-130 airdrop, on the ground drop mission's HUD; FIRE/pylons etc re-tested in
         # part_mission against the real mission state, this is just the HUD control itself)
@@ -687,9 +723,13 @@ async def part_sensor(pg):
         table.add(f'sensor:{t}', '#bLock', 'locks the point under the crosshair', f"changed={changed}",
                    'OK' if changed else ('OK' if key in ALLOW else 'NO-EFFECT'))
 
+        # NEXT TARGET is hidden (the hidden attribute) while there is nothing to cycle through, as in
+        # free flight; not a zero-size skip. With targets it is tapped in part_mission.
         h = await pg.query_selector('#bNext')
-        if h:
+        if h and await h.evaluate("e=>!!e.offsetParent"):
             await check_tap(pg, table, f'sensor:{t}', h)
+        elif h:
+            table.add(f'sensor:{t}', '#bNext "NEXT TARGET"', 'hidden with no targets', 'hidden (tapped with targets in part_mission)', 'OK')
 
     return table
 
@@ -821,7 +861,7 @@ async def part_lesson(pg):
             break
         await check_tap(pg, table, 'lesson:brief', h)
         ans = await pg.query_selector('#brTrack .brQ .brAns')
-        if ans:
+        if ans and await ans.evaluate("e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;}"):  # gone once LET'S FLY closed the brief
             await check_tap(pg, table, 'lesson:brief', ans)
 
     table.add('lesson:brief', 'briefing finished', 'LES.on == first', str(await pg.evaluate(f"()=>{K}.LES.on")), 'OK' if await pg.evaluate(f"()=>{K}.LES.on") == 'first' else 'WRONG')
@@ -833,6 +873,11 @@ async def part_lesson(pg):
 
     def end_expect(bf, af):
         return af['les']['on'] is None, f"les.on={af['les']['on']}"
+    # the lesson card shows a moment after the briefing closes: wait for it rather than finding End 0x0
+    try:
+        await pg.wait_for_function("()=>{const r=document.getElementById('lesQuit').getBoundingClientRect();return r.width>0&&r.height>0;}", timeout=5000)
+    except Exception:
+        pass
     h = await pg.query_selector('#lesQuit')
     await check_tap(pg, table, 'lesson:hud', h, expect_fn=end_expect)
 
