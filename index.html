@@ -6806,6 +6806,13 @@ function pfsAirSetup(){
   if(THREE.PFS_AIR)return;THREE.PFS_AIR=true;
   const C=THREE.ShaderChunk,L=THREE.ShaderLib;
   const rep=(k,a,b)=>{if(C[k].indexOf(a)<0){console.warn('pfs air: no '+a.slice(0,40)+' in '+k);return;}C[k]=C[k].split(a).join(b);};
+  // fix2 item 9: the near cascade holds only aircraft as casters, and a thin wing at 0.09 texels of normal offset
+  // shadowed its own upper surface in diagonal stripes (acne). The airframes (the Standard and Physical materials:
+  // the world is Lambert) look it up 7 times further out along their normal in that cascade (0.63 texels, 0.27 m
+  // on Medium), the ground keeps 0.09 so the gear's contact shadow on the ramp stays tight
+  rep('shadowmap_vertex','shadowWorldNormal * directionalLightShadows[ i ].shadowNormalBias, 0 )',
+    'shadowWorldNormal * directionalLightShadows[ i ].shadowNormalBias * ( UNROLLED_LOOP_INDEX == 0 ? CSM_NBA : 1.0 ), 0 )');
+  C.shadowmap_pars_vertex='#ifdef STANDARD\n#define CSM_NBA 7.0\n#else\n#define CSM_NBA 1.0\n#endif\n'+C.shadowmap_pars_vertex;
   C.shadowmap_pars_fragment+=`
 #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
 uniform vec4 csmA;uniform vec4 csmB;uniform vec4 csmC;uniform vec4 csmD;uniform vec4 csmF;
@@ -7016,8 +7023,10 @@ const CSM={n:0,lights:[],L:[[],[],[]],stat:[],frame:0,act:0,prev:0,recvMs:0,rend
 const _csmD=new V3(),_csmF=new V3(),_csmC=new V3(),_csmX=new V3(),_csmY=new V3(),_csmUp=new V3(0,1,0),_csmOne=[null];
 {const SM=renderer.shadowMap,orig=SM.render;
  SM.render=function(lights,sc,cam){if(sc===CSM.showScene)return;if(sc!==scene||!CSM.n)return orig.call(this,lights,sc,cam);
-   for(let i=0;i<lights.length;i++){const L=lights[i],C=L.userData.csmL;if(!C||!L.shadow.needsUpdate)continue;
-     CSM.root.children=C;_csmOne[0]=L;orig.call(this,_csmOne,CSM.root,cam);CSM.renders++;}};}
+   const hg=PFX.hideG;if(hg)hg.visible=true;   // fix2 item 9: the split frame's world pass hides the aircraft, never its shadow
+   try{for(let i=0;i<lights.length;i++){const L=lights[i],C=L.userData.csmL;if(!C||!L.shadow.needsUpdate)continue;
+     CSM.root.children=C;_csmOne[0]=L;orig.call(this,_csmOne,CSM.root,cam);CSM.renders++;}}
+   finally{if(hg)hg.visible=false;}};}
 function csmLit(m,opaque){if(Array.isArray(m))return m.some(x=>csmLit(x,opaque));
   return !!m&&(m.isMeshLambertMaterial||m.isMeshStandardMaterial||m.isMeshPhongMaterial)&&!(opaque&&m.transparent);}
 // the tier's cascades (GFX_HOOKS): Low removes every light and the shadow map itself
@@ -7378,7 +7387,9 @@ function setTOD(id){TOD_N++;
   if(cloudMat)cloudsAuto();   // the flight's cloud preset and its colours (graphics item 6)
   for(const f of TOD_HOOKS)f();
   // the gunmetal drones: a faint lift at dusk and night so the airframe still reads against a dark sky
+  // (fix2 item 9: plus the ground light from below, pbrGlow)
   if(HD&&HD.MAT.gunmetal)HD.MAT.gunmetal.emissive.setHex(0x1f242b).multiplyScalar(TOD.night?1:TOD.id==='sunset'?0.35:0);
+  pbrGlow();
   const b=document.getElementById('todV');if(b)b.textContent=TOD.name;
   hbSync(false);
   document.querySelectorAll('.pick[data-tod]').forEach(e=>e.classList.toggle('sel',e.dataset.tod===TOD.id));
@@ -8835,8 +8846,18 @@ const HD=(function(){try{return makeHD();}catch(e){console.warn('HD airframes un
 // glass (canopies and windows) under a clear coat, bare metal (gear legs, spinners, nozzles, pitots), tyres; anything
 // else keeps its colour and finish with the same sky reflection as the paint around it. Blades and blur discs unchanged.
 const PBR_KIND={f16:'alu',c130:'alu',a10:'alu',reaper:'gun',mq9b:'gun',cessna:'gloss',archer:'gloss',b737:'gloss',a320:'gloss',b747:'gloss',alpha:'gel'};
-const PBR_PAINT={alu:{m:0.15,r:0.6,e:1.0,k:0.8},gun:{m:0.45,r:0.42,e:0.8},gloss:{m:0.02,r:0.32,e:0.7},gel:{m:0.04,r:0.25,e:0.8}};
+const PBR_PAINT={alu:{m:0.15,r:0.6,e:1.0,k:0.8},gun:{m:0.3,r:0.46,e:0.9},gloss:{m:0.02,r:0.32,e:0.7},gel:{m:0.04,r:0.25,e:0.8}};
 let PBR_MATS=null;
+// fix2 item 9: the drones' paint lit from below. Seen from under the wing against a bright sky their belly paint (an
+// albedo near 0.13) had only the hemisphere's ground colour, about a quarter of the light on top, and a 20 m wing read
+// as a black line. PBR_GLOW: their paint materials, given a faint emissive of that ground light (greyed two thirds of
+// the way) times PBR_GLOW_K, added at every setTOD (over the gunmetal's own dusk and night lift): an underside goes from 21 to about 90 of 255 by day (68 at sunset),
+// the sunlit top gains a little; at night the ground light is near black, so is this. A uniform only, no program.
+const PBR_GLOW=[],PBR_GLOW_K=0.8,_glowC=new THREE.Color();
+function pbrGlow(){const g=_glowC.copy(hemi.groundColor),l=0.2126*g.r+0.7152*g.g+0.0722*g.b;
+  g.setRGB(l+(g.r-l)*0.35,l+(g.g-l)*0.35,l+(g.b-l)*0.35).multiplyScalar(hemi.intensity*PBR_GLOW_K);
+  const gm=HD&&HD.MAT.gunmetal;
+  for(const m of PBR_GLOW)if(m===gm)m.emissive.setHex(0x1f242b).multiplyScalar(TOD.night?1:TOD.id==='sunset'?0.35:0).add(g);else m.emissive.copy(g);}
 // the skin canvas as a roughness map: near white tile, darker panel lines and rivets; the darker, the rougher
 function pbrRough(sh){sh.fragmentShader=sh.fragmentShader.replace('#include <roughnessmap_fragment>',
   'float roughnessFactor = roughness;\n#ifdef USE_ROUGHNESSMAP\n\tvec4 texelRoughness = texture2D( roughnessMap, vUv );\n'+
@@ -8845,7 +8866,7 @@ function pbrTune(mt,kind,inProp){
   if(!mt||!mt.isMeshStandardMaterial||mt.userData.pbr)return;mt.userData.pbr=1;
   const H=HD&&HD.MAT;if(H&&!PBR_MATS){PBR_MATS=new Set();for(const k in H)if(H[k]&&H[k].isMaterial)PBR_MATS.add(H[k]);}
   const P=PBR_PAINT[kind]||PBR_PAINT.alu,c=mt.color,lum=c?0.2126*c.r+0.7152*c.g+0.0722*c.b:1,shared=PBR_MATS&&PBR_MATS.has(mt);
-  if(H&&mt===H.gunmetal){mt.metalness=P.m;mt.roughness=P.r;mt.envMapIntensity=P.e;return;}
+  if(H&&mt===H.gunmetal){mt.metalness=P.m;mt.roughness=P.r;mt.envMapIntensity=P.e;if(kind==='gun'){PBR_GLOW.push(mt);pbrGlow();}return;}
   if(mt.emissive&&mt.emissive.r+mt.emissive.g+mt.emissive.b>0.05){mt.envMapIntensity=0.6;return;}   // beacons, lit lenses
   if(mt.isMeshPhysicalMaterial||(H&&mt===H.glassDark)){mt.clearcoat=1;mt.clearcoatRoughness=0.05;mt.envMapIntensity=1.4;return;}
   if(inProp&&mt.metalness<0.6){mt.envMapIntensity*=0.3;return;}                 // blades as they were
@@ -8858,6 +8879,7 @@ function pbrTune(mt,kind,inProp){
     if(!mt.transparent)mt.metalness=P.m;mt.roughness=P.r;mt.envMapIntensity=P.e;
     if(P.k&&!mt.transparent&&mt.color)mt.color.multiplyScalar(P.k);   // the grey was authored for the old flat sheen
     if(kind==='alu'&&H&&!mt.transparent&&(mt.map===H.skinA||mt.map===H.skinB)){mt.roughnessMap=mt.map;mt.onBeforeCompile=pbrRough;mt.needsUpdate=true;}
+    else if(kind==='gun'&&!mt.transparent&&mt.emissive){PBR_GLOW.push(mt);pbrGlow();}
     return;}
   mt.envMapIntensity=0.6;
 }
@@ -9393,7 +9415,7 @@ function warmTick(){
   // aircraft 10 to 55), so each does not cost a whole frame's wait behind the menu
   do{const a=performance.now();try{WARM_STEPS[WARM.i]();}catch(e){console.warn('warm',e);}WARM.ms.push(+(performance.now()-a).toFixed(1));WARM.i++;}
   while(WARM.i<WARM_STEPS.length&&performance.now()-t0<60);
-  if(WARM.i>=WARM_STEPS.length){WARM.done=true;WARM.total=performance.now()-WARM.t0;return;}
+  if(WARM.i>=WARM_STEPS.length){WARM.done=true;WARM.total=performance.now()-WARM.t0;setTimeout(()=>{if(PRE.done)pfxLayWarm();},250);return;}
   setTimeout(warmTick,60);
 }
 const shadowTex=tex(128,128,(x)=>{const gr=x.createRadialGradient(64,64,4,64,64,62);gr.addColorStop(0,'rgba(0,0,0,0.55)');gr.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=gr;x.fillRect(0,0,128,128);});
@@ -18898,7 +18920,7 @@ function renderIR(){
   scene.fog.color.setRGB(inv?1-sg-0.06:sg+0.06,inv?1-sg-0.06:sg+0.06,inv?1-sg-0.06:sg+0.06);
   scene.background=IR_BG;sky.visible=false;scene.overrideMaterial=IR_MAT;camera.layers.set(0);IR.pass=true;
   const ic=IR.ic;for(let i=0;i<ic.length;i++)if(!ic[i].instanceColor)ic[i].instanceColor=ic[i].userData.irIC;
-  try{renderer.render(scene,camera);}
+  try{pfxHold(()=>renderer.render(scene,camera));}   // fix2 item 9: resolved once, after the hot points
   finally{for(let i=0;i<ic.length;i++)if(ic[i].instanceColor===ic[i].userData.irIC)ic[i].instanceColor=null;}
   IR.pass=false;scene.overrideMaterial=null;scene.background=null;scene.fog.color.copy(_irFog);
   // hot points: every airport light on, grey, over the frame
@@ -18927,7 +18949,17 @@ function renderIR(){
 // Low draws straight to the canvas as before (tone mapping still comes free through the materials). The IR sensor
 // view bypasses the chain (renderIR draws to the canvas, raw grey, never bloomed), and so does the showroom.
 // No TAA: the engine keeps no motion vectors or frame history, and a history blend without them smears at 3 to 60 fps.
-const PFX={rt:null,ed:null,wt:null,b1:null,b2:null,w:0,h:0,bk:0,bloomed:false,frames:0};
+// fix2 item 9: thin wings antialiased. High (WebGL2) draws the whole scene multisampled (PFX_MSAA samples, three's
+// WebGLMultisampleRenderTarget: r128 resolves it into its texture at the end of each render() into it, pfxHold holds
+// a first resolve back when a frame draws it twice); its depth is never resolved and both buffers are invalidated once
+// resolved (pfxInv). Medium could not afford that (4x over the whole screen cost 12 to 28 percent of a frame on the
+// phone), so there, and on High under a dynamic scale, only the flown aircraft is multisampled: the layer (pfxLayer),
+// a 4x target of the aircraft's screen box at full density. ms: the scene target's samples (0 on Medium); msOff,
+// layerOff: the test hooks. lay: the layer's target (LAY_CAP of the full size, made once, a viewport inside it);
+// full: FULL, a plain full size target the scaled world is upscaled into when the layer goes over it; both kept
+// until a resize or a tier change; allocN counts every allocation (STALL's 'rt' tag).
+const PFX={rt:null,ed:null,wt:null,b1:null,b2:null,full:null,lay:null,w:0,h:0,bk:0,ms:0,msOff:false,layerOff:false,allocN:0,bloomed:false,frames:0};
+const PFX_MSAA={high:4},PFX_LAYMS=4,LAY_CAP=[0.75,0.62],LAY_AREA=0.35,LAY_PAD=12;
 const PFX_STR=0.45;
 const _pfxV=new THREE.Vector2(),_pfxC=new THREE.Color(),_pfxFog=new THREE.Color();
 // gfxfix item 3: the chain's targets are allocated once at the full backing size and a dynamic scale step draws into a
@@ -19049,13 +19081,27 @@ const PFX_Q=new THREE.Mesh(new THREE.PlaneGeometry(2,2),PFX_BLUR),PFX_S=new THRE
 PFX_Q.frustumCulled=false;PFX_S.add(PFX_Q);
 // the bloom prepass: depth only, so the sources behind the terrain or an airframe are hidden
 const PFX_OCCM=new THREE.MeshBasicMaterial({colorWrite:false});
-function pfxRT(w,h,depth){const t=new THREE.WebGLRenderTarget(w,h,{minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,format:THREE.RGBAFormat,depthBuffer:!!depth,stencilBuffer:false,generateMipmaps:false});
-  t.texture.encoding=THREE.sRGBEncoding;return t;}
-function pfxFree(){for(const k of ['rt','ed','wt','b1','b2'])if(PFX[k]){PFX[k].dispose();PFX[k]=null;}PFX.w=PFX.h=0;}
+// ms: samples (0 or none, a plain target). A multisampled one is set up here (its framebuffers made) and then told it
+// has no depth buffer, so r128's resolve blits the colour only (the depth renderbuffer stays attached and tested)
+function pfxRT(w,h,depth,ms){const o={minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,format:THREE.RGBAFormat,depthBuffer:!!depth,stencilBuffer:false,generateMipmaps:false};
+  const t=ms>0?new THREE.WebGLMultisampleRenderTarget(w,h,o):new THREE.WebGLRenderTarget(w,h,o);
+  t.texture.encoding=THREE.sRGBEncoding;
+  if(ms>0){t.samples=ms;const r=renderer,p=r.getRenderTarget();r.setRenderTarget(t);r.setRenderTarget(p);t.depthBuffer=false;}
+  return t;}
+// the scene target's samples: Medium and High (the post chain) on WebGL2, never above the GPU's maximum
+function pfxSamples(){const r=renderer;if(!GFX.post||PFX.msOff||!r.capabilities.isWebGL2)return 0;return Math.min(PFX_MSAA[GFX.tier]||0,r.capabilities.maxSamples||0);}
+// a draw into the current multisampled target with its resolve held back (a later draw into it this frame resolves);
+// f must not switch targets (no shadow map due: the quad scene has no lights, the IR pass none asked for)
+function pfxHold(f){const t=renderer.getRenderTarget();if(!t||!t.isWebGLMultisampleRenderTarget)return f();
+  t.isWebGLMultisampleRenderTarget=false;try{return f();}finally{delete t.isWebGLMultisampleRenderTarget;}}
+// after the last draw into a multisampled target this frame (r128 leaves it bound for drawing once resolved)
+function pfxInv(t){if(!t||!t.isWebGLMultisampleRenderTarget)return;const gl=renderer.getContext();
+  if(gl.invalidateFramebuffer)gl.invalidateFramebuffer(gl.DRAW_FRAMEBUFFER,[gl.COLOR_ATTACHMENT0,gl.DEPTH_ATTACHMENT]);}
+function pfxFree(){for(const k of ['rt','ed','wt','b1','b2','full','lay'])if(PFX[k]){PFX[k].dispose();PFX[k]=null;}PFX.w=PFX.h=0;}
 // the full backing size (scale 1): a dynamic scale step only moves the viewports (pfxRender), it allocates nothing
 function pfxSize(w,h,bk){
-  pfxFree();PFX.w=w;PFX.h=h;PFX.bk=bk;
-  PFX.rt=pfxRT(w,h,true);PFX.ed=pfxRT(w,h,false);PFX.wt=pfxRT(w,h,false);
+  pfxFree();PFX.w=w;PFX.h=h;PFX.bk=bk;PFX.ms=pfxSamples();PFX.allocN++;
+  PFX.rt=pfxRT(w,h,true,PFX.ms);PFX.ed=pfxRT(w,h,false);PFX.wt=pfxRT(w,h,false);
   const bw=Math.max(1,Math.round(w/bk)),bh=Math.max(1,Math.round(h/bk));
   PFX.b1=pfxRT(bw,bh,true);PFX.b2=pfxRT(bw,bh,false);
   for(const m of [PFX_EDGE,PFX_WGT,PFX_FIN])m.uniforms.resolution.value.set(1/w,1/h);
@@ -19080,13 +19126,68 @@ function pfxBloom(){
 // Fix2 item 4: in the sensor view (GFX.sens) the scene is drawn at scale 1, no bloom, no SMAA, and the composite
 // sharpens (PFX_CMP's uSharp: 0.35 day TV, 0.25 IR); on Low nothing is sharpened. PFX.last: the frame for __kgeu.pfx()
 const PFX_SHARP={tv:0.35,ir:0.25,off:false};
+// fix2 item 9, the aircraft layer: the flown aircraft drawn alone, multisampled, at full pixel density, over the world.
+// Its screen box: the corners of its own bounding box (made once per airframe, gear and burner included, 4 percent
+// over) and of the burner's while it burns, projected, padded LAY_PAD px; the layer runs when that box is under
+// LAY_AREA of the screen and fits the layer target (the chase and padlock views; in the cockpit the aircraft fills
+// the screen and is drawn with the world). The world pass hides the aircraft (its shadow still cast: the cascades'
+// wrapper shows it, PFX.hideG); the aircraft alone (every other child of the scene hidden but the lights: the same
+// fog, lights and shadow maps, no sky) goes into the box's rectangle of PFX.lay through camera.setViewOffset on the
+// full size, so its projection is the world's to the pixel, over a clear of transparent black (the resolve leaves
+// premultiplied coverage); PFX_LAY lays it over the world where the box is, before SMAA, into PFX.rt itself at scale
+// 1 or into FULL after PFX_CMP upscaled the scaled world there. Drawn last it is never hidden by terrain (fine from
+// the chase and padlock seats). Not in the sensor view, photo mode, the free cam, the crash or kill cam, nor on High
+// at scale 1 (the whole scene is multisampled there).
+function pfxSplitOK(){return !PFX.layerOff&&running&&!PHOTO.on&&!FREECAM&&!CRASH.cam&&!(DF.kc>0)&&!(st&&st.crashed)&&(camMode===0||camMode===3)&&!!plane&&pfxShown(plane.g);}
+const PFX_HID=[],_layB=new THREE.Box3(),_layV=new V3(),_layM=new THREE.Matrix4(),PFX_BOX=[0,0,0,0];
+const PFX_LAY=pfxMat({uniforms:{tLay:{value:null},uUvS:{value:new THREE.Vector2(1,1)}},transparent:true,blending:THREE.CustomBlending,
+  blendSrc:THREE.OneFactor,blendDst:THREE.OneMinusSrcAlphaFactor,blendSrcAlpha:THREE.ZeroFactor,blendDstAlpha:THREE.OneFactor,
+  fragmentShader:'uniform sampler2D tLay;varying vec2 vUv;\nvoid main(){gl_FragColor=texture2D(tLay,vUv);}'});
+// the aircraft's box on the W x H target (pixels, bottom left origin) into PFX_BOX; false if it is not worth a layer
+function pfxBox(W,H,cw,ch){
+  const g=plane.g;let lb=g.userData.layBox;
+  if(!lb){const p=g.position.clone(),q=g.quaternion.clone(),sc=g.scale.clone(),par=g.parent;
+    g.position.set(0,0,0);g.quaternion.identity();g.scale.set(1,1,1);if(par)par.remove(g);g.updateMatrixWorld(true);
+    lb=new THREE.Box3().setFromObject(g);lb.expandByVector(lb.getSize(_layV).multiplyScalar(0.04));
+    g.position.copy(p);g.quaternion.copy(q);g.scale.copy(sc);if(par)par.add(g);g.updateMatrixWorld(true);g.userData.layBox=lb;}
+  g.updateWorldMatrix(true,false);camera.updateMatrixWorld();camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+  _layM.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse);
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  const add=(b,m)=>{for(let k=0;k<8;k++){_layV.set(k&1?b.max.x:b.min.x,k&2?b.max.y:b.min.y,k&4?b.max.z:b.min.z);if(m)_layV.applyMatrix4(m);
+      const e=_layM.elements,x=_layV.x,y=_layV.y,z=_layV.z,w=e[3]*x+e[7]*y+e[11]*z+e[15];
+      if(w<camera.near)return false;
+      const nx=(e[0]*x+e[4]*y+e[8]*z+e[12])/w,ny=(e[1]*x+e[5]*y+e[9]*z+e[13])/w;
+      x0=Math.min(x0,nx);x1=Math.max(x1,nx);y0=Math.min(y0,ny);y1=Math.max(y1,ny);}return true;};
+  if(!add(lb,g.matrixWorld))return false;
+  if(plane.ab&&pfxShown(plane.ab)&&!add(_layB.setFromObject(plane.ab),null))return false;
+  const bx0=Math.max(0,Math.floor((x0*0.5+0.5)*W)-LAY_PAD),by0=Math.max(0,Math.floor((y0*0.5+0.5)*H)-LAY_PAD),
+    bx1=Math.min(W,Math.ceil((x1*0.5+0.5)*W)+LAY_PAD),by1=Math.min(H,Math.ceil((y1*0.5+0.5)*H)+LAY_PAD),bw=bx1-bx0,bh=by1-by0;
+  if(bw<=0||bh<=0||bw>cw||bh>ch||bw*bh>LAY_AREA*W*H)return false;
+  PFX_BOX[0]=bx0;PFX_BOX[1]=by0;PFX_BOX[2]=bw;PFX_BOX[3]=bh;return true;
+}
+// the aircraft alone into the layer's box rectangle (see above)
+function pfxLayer(W,H){
+  const r=renderer,L=PFX.lay,g=plane.g,C=scene.children,bg=scene.background,au=scene.autoUpdate,[x,y,w,h]=PFX_BOX,lw=L.width,lh=L.height;let top=g;
+  while(top.parent&&top.parent!==scene)top=top.parent;
+  for(let i=0;i<C.length;i++){const o=C[i];if(o!==top&&o.visible&&!o.isLight){o.visible=false;PFX_HID.push(o);}}
+  // the additive parts (lights' glows, the burner) add their colour but no coverage, so they never darken the world
+  let ad=g.userData.layAdd;if(!ad){ad=g.userData.layAdd=[];g.traverse(o=>{const ms=o.material?(Array.isArray(o.material)?o.material:[o.material]):[];
+    for(const m of ms)if(m.blending===THREE.AdditiveBlending&&ad.indexOf(m)<0)ad.push(m);});}
+  for(const m of ad){m.blending=THREE.CustomBlending;m.blendSrc=THREE.SrcAlphaFactor;m.blendDst=THREE.OneFactor;m.blendSrcAlpha=THREE.ZeroFactor;m.blendDstAlpha=THREE.OneFactor;}
+  scene.background=null;scene.autoUpdate=false;GFX.rs=1;
+  // r128 resolves the whole target's width and height: the box's corner only, while it draws
+  L.viewport.set(0,0,w,h);L.width=w;L.height=h;camera.setViewOffset(W,H,x,H-y-h,w,h);
+  try{r.setRenderTarget(L);r.setClearColor(0x000000,0);r.clear(true,true,false);r.autoClear=false;r.render(scene,camera);pfxInv(L);}
+  finally{camera.clearViewOffset();L.width=lw;L.height=lh;for(const m of ad)m.blending=THREE.AdditiveBlending;
+    for(let i=0;i<PFX_HID.length;i++)PFX_HID[i].visible=true;PFX_HID.length=0;scene.background=bg;scene.autoUpdate=au;r.autoClear=true;}
+}
 function pfxRender(ir){
   const r=renderer,sv=GFX.sens;
   if(!GFX.post){if(PFX.rt)pfxFree();r.setRenderTarget(null);if(ir)renderIR();else r.render(scene,camera);
     r.getDrawingBufferSize(_pfxV);PFX.last={w:_pfxV.x,h:_pfxV.y,sw:_pfxV.x,sh:_pfxV.y,bloomed:false,smaa:false,sharp:0,rs:1};return;}
   r.getDrawingBufferSize(_pfxV);
   const s=sv?1:GFX.scale,W=Math.max(1,Math.round(_pfxV.x)),H=Math.max(1,Math.round(_pfxV.y)),bk=GFX.tier==='high'?2:4;
-  if(!PFX.rt||PFX.w!==W||PFX.h!==H||PFX.bk!==bk)pfxSize(W,H,bk);
+  if(!PFX.rt||PFX.w!==W||PFX.h!==H||PFX.bk!==bk||PFX.ms!==pfxSamples())pfxSize(W,H,bk);
   // the scaled frame: the bottom left w x h of the full size targets (and of the bloom's), the passes' uv scaled to it
   const w=Math.max(1,Math.round(W*s)),h=Math.max(1,Math.round(H*s)),bw=PFX.b1.width,bh=PFX.b1.height,
     sw=Math.min(bw,Math.max(1,Math.round(w/bk))),sh=Math.min(bh,Math.max(1,Math.round(h/bk)));
@@ -19097,23 +19198,45 @@ function pfxRender(ir){
   // the sensor view drops them too (fix2 item 4)
   const th=GFX.thermS.on||sv,bloom=GFX.on('bloom')&&!th&&pfxSrcOn(),smaa=GFX.on('smaa')&&!th,ac=r.autoClear;
   r.getClearColor(_pfxC);const ca=r.getClearAlpha();
-  GFX.rs=s;r.setRenderTarget(PFX.rt);if(ir)renderIR();else r.render(scene,camera);
+  // the aircraft layer (Medium, or High under a scale): its target made once at LAY_CAP of the full size
+  let layer=false;
+  if(!sv&&!ir&&(!PFX.ms||s<1)&&r.capabilities.isWebGL2&&pfxSplitOK()){
+    const cw=Math.ceil(W*LAY_CAP[0]),ch=Math.ceil(H*LAY_CAP[1]);
+    layer=pfxBox(W,H,cw,ch);
+    if(layer&&!PFX.lay){PFX.lay=pfxRT(cw,ch,true,PFX_LAYMS);PFX.allocN++;}}
+  const split=layer;
+  GFX.rs=s;r.setRenderTarget(PFX.rt);
+  if(split){const g=plane.g;g.visible=false;PFX.hideG=g;try{r.render(scene,camera);}finally{g.visible=true;PFX.hideG=null;}}
+  else if(ir)renderIR();else r.render(scene,camera);
+  pfxInv(PFX.rt);
   r.autoClear=true;r.setClearColor(0x000000,0);
   // the bloom points keep their screen pixel size in b1 (bk times their share of it), so the blur makes a halo a few
   // times the light's own disc rather than a faint smudge
   if(bloom){GFX.rs=s;pfxBloom();}
   GFX.rs=1;PFX.bloomed=bloom;
+  let src=PFX.rt;
+  if(layer){
+    pfxLayer(W,H);
+    if(s<1){   // the scaled world upscaled into FULL (no sharpening, dust or bloom), the layer over it there
+      if(!PFX.full){PFX.full=pfxRT(W,H,false);PFX.allocN++;}
+      const u=PFX_CMP.uniforms;u.tColor.value=PFX.rt.texture;u.tBloom.value=PFX_BLACK;u.uStr.value=0;u.uSharp.value=0;u.uDust.value.set(0,0,0,0);
+      pfxPass(PFX_CMP,PFX.full);src=PFX.full;
+      PFX_UVS.value.set(1,1);for(const t of [PFX.ed,PFX.wt])t.viewport.set(0,0,W,H);}
+    const L=PFX.lay,[x,y,w2,h2]=PFX_BOX,vp=src.viewport,v0=vp.clone();
+    PFX_LAY.uniforms.tLay.value=L.texture;PFX_LAY.uniforms.uUvS.value.set(w2/L.width,h2/L.height);vp.set(x,y,w2,h2);
+    r.autoClear=false;if(src===PFX.rt)pfxHold(()=>pfxPass(PFX_LAY,src));else pfxPass(PFX_LAY,src);
+    r.autoClear=true;vp.copy(v0);if(src===PFX.rt)pfxInv(src);}
   const tb=bloom?PFX.b1.texture:PFX_BLACK,st=bloom?PFX_STR:0;
   {const D=DUSTFX,on=D.k>0.003&&D.fr===PFX.frames&&GFX.on('dust');   // fed this frame (a menu frame never is)
     for(const m of [PFX_FIN,PFX_CMP]){const u=m.uniforms;u.uDust.value.set(on?D.k:0,D.vg,D.ph,0);
     if(on){u.uDustF.value.set(D.foe.x,D.foe.y,camera.aspect,5);u.uDustC.value.copy(D.col);}}}
   const shp=sv&&!smaa&&!PFX_SHARP.off?(ir?PFX_SHARP.ir:PFX_SHARP.tv):0;
   if(smaa){
-    PFX_EDGE.uniforms.tDiffuse.value=PFX.rt.texture;pfxPass(PFX_EDGE,PFX.ed);
+    PFX_EDGE.uniforms.tDiffuse.value=src.texture;pfxPass(PFX_EDGE,PFX.ed);
     PFX_WGT.uniforms.tDiffuse.value=PFX.ed.texture;pfxPass(PFX_WGT,PFX.wt);
-    const u=PFX_FIN.uniforms;u.tDiffuse.value=PFX.wt.texture;u.tColor.value=PFX.rt.texture;u.tBloom.value=tb;u.uStr.value=st;pfxPass(PFX_FIN,null);}
-  else{const u=PFX_CMP.uniforms;u.tColor.value=PFX.rt.texture;u.tBloom.value=tb;u.uStr.value=st;u.uSharp.value=shp;u.uTexel.value.set(1/W,1/H);pfxPass(PFX_CMP,null);}
-  PFX.last={w:W,h:H,sw:w,sh:h,bloomed:bloom,smaa:smaa,sharp:shp,rs:s};
+    const u=PFX_FIN.uniforms;u.tDiffuse.value=PFX.wt.texture;u.tColor.value=src.texture;u.tBloom.value=tb;u.uStr.value=st;pfxPass(PFX_FIN,null);}
+  else{const u=PFX_CMP.uniforms;u.tColor.value=src.texture;u.tBloom.value=tb;u.uStr.value=st;u.uSharp.value=shp;u.uTexel.value.set(1/W,1/H);pfxPass(PFX_CMP,null);}
+  PFX.last={w:W,h:H,sw:w,sh:h,bloomed:bloom,smaa:smaa,sharp:shp,rs:s,samples:PFX.ms,layer:layer,box:layer?PFX_BOX.slice():null,split:layer&&s<1,full:layer&&s<1?[PFX.full.width,PFX.full.height]:null};
   r.setClearColor(_pfxC,ca);r.autoClear=ac;PFX.frames++;
 }
 // per frame, after the camera: the streaks' density, vignette, focus of expansion and scroll. The relative wind is the
@@ -19179,7 +19302,7 @@ function spawnClear(x,z,fx,fz){let o=1e9,t=1e9;
   return {obst:o,stand:t};}
 // the queue: one job a frame or more, at most ~40 ms of work a frame, so the splash and its bar keep moving. Every job
 // that draws puts the camera at the first flight's pose (preAt) and back before the frame's own menu draw.
-const PREQ={jobs:null,i:0,A:null,B:null,C:null,D:null,M:null,mv:false,mp:new V3(),mq:new Q4(),cp:new V3(),cq:new Q4(),cv:null};
+const PREQ={jobs:null,i:0,A:null,B:null,C:null,D:null,E:null,M:null,mv:false,mp:new V3(),mq:new Q4(),cp:new V3(),cq:new Q4(),cv:null};
 function preAt(f){
   const Q=PREQ,r=renderer,prevT=r.getRenderTarget(),ac=r.autoClear,lm=camera.layers.mask,P=prePose(),fx=Math.sin(P.h),fz=-Math.cos(P.h);
   Q.cp.copy(camera.position);Q.cq.copy(camera.quaternion);Q.M=null;Q.cv=null;
@@ -19237,23 +19360,29 @@ function preFrame(M,A){const r=renderer;
 // the compile job (and any later whole scene compile) links their programs
 function dfWarmBuild(){dfBuild();dfWBuild();if(!DF.pool.length)dfBandit();}
 function preJobs(){
-  const Q=PREQ,r=renderer;Q.A=pfxRT(16,16,true);Q.B=pfxRT(16,16,false);Q.C=pfxRT(16,16,false);Q.D=pfxRT(16,16,false);
-  const A=Q.A,B=Q.B,C=Q.C,D=Q.D;
+  // fix2 item 9: A is the scene target's kind (multisampled on High with WebGL2: a GPU builds its pipelines per sample
+  // count), E a plain one with depth like the bloom's b1 and the carousel's stand in for the canvas (A itself when A is
+  // plain)
+  const Q=PREQ,r=renderer;Q.A=pfxRT(16,16,true,pfxSamples());Q.B=pfxRT(16,16,false);Q.C=pfxRT(16,16,false);Q.D=pfxRT(16,16,false);Q.E=Q.A.isWebGLMultisampleRenderTarget?pfxRT(16,16,true):null;
+  const A=Q.A,B=Q.B,C=Q.C,D=Q.D,E=Q.E||Q.A;
   return [
     ['build',()=>{hbBuild();if(CLOUD_MESH&&GFX.on('clouds')&&!CLOUDS.cb)cloudCB();if(!DZ.built)dzBuild();dfWarmBuild();}],
     ['compile',()=>preAt(()=>{r.compile(scene,camera);preSwap(()=>r.compile(scene,camera));})],
     ['frame',()=>preAt(M=>preFrame(M,A))],
-    ['post chain',()=>{if(!GFX.post)return;preAt(()=>{
-      const bg=scene.background,lm=camera.layers.mask;scene.background=null;r.setRenderTarget(A);r.clear(true,true,false);
+    ['post chain',()=>{if(!GFX.post)return;preAt(M=>{
+      const bg=scene.background,lm=camera.layers.mask;scene.background=null;r.setRenderTarget(E);r.clear(true,true,false);
       try{camera.layers.set(PFX_OCC);scene.overrideMaterial=PFX_OCCM;r.render(scene,camera);scene.overrideMaterial=null;
         camera.layers.set(PFX_BLOOM);FXQ_MAT.uniforms.uBloom.value=1;r.render(scene,camera);}
       finally{FXQ_MAT.uniforms.uBloom.value=0;scene.overrideMaterial=null;camera.layers.mask=lm;scene.background=bg;}
       r.autoClear=true;
-      const u=PFX_BLUR.uniforms;u.tSrc.value=A.texture;u.uDir.value.set(1/16,0);pfxPass(PFX_BLUR,B);
+      const u=PFX_BLUR.uniforms;u.tSrc.value=E.texture;u.uDir.value.set(1/16,0);pfxPass(PFX_BLUR,B);
       PFX_EDGE.uniforms.tDiffuse.value=A.texture;pfxPass(PFX_EDGE,B);
       PFX_WGT.uniforms.tDiffuse.value=B.texture;pfxPass(PFX_WGT,C);
       for(const m of [PFX_FIN,PFX_CMP]){const f=m.uniforms;if(f.tDiffuse)f.tDiffuse.value=C.texture;f.tColor.value=A.texture;f.tBloom.value=B.texture;f.uStr.value=PFX_STR;pfxPass(m,D);}
       PFX_CMP.uniforms.uSharp.value=PFX_SHARP.tv;PFX_CMP.uniforms.uTexel.value.set(1/16,1/16);pfxPass(PFX_CMP,D);PFX_CMP.uniforms.uSharp.value=0;   // fix2 item 4: the sensor view's sharpened composite
+      // fix2 item 9: the aircraft layer: the scene into a multisampled target of its kind, laid over a plain one
+      // fix2 item 9: the aircraft layer's composite (its aircraft draw: pfxLayWarm)
+      PFX_LAY.uniforms.tLay.value=B.texture;r.autoClear=false;pfxPass(PFX_LAY,D);r.autoClear=true;PFX_LAY.uniforms.tLay.value=null;
       u.tSrc.value=null;PFX_EDGE.uniforms.tDiffuse.value=PFX_WGT.uniforms.tDiffuse.value=null;
       for(const m of [PFX_FIN,PFX_CMP]){const f=m.uniforms;if(f.tDiffuse)f.tDiffuse.value=null;f.tColor.value=null;f.tBloom.value=PFX_BLACK;f.uStr.value=0;}});}],
     ['explosion',()=>preAt(()=>fxWarmLayer(A))],
@@ -19267,7 +19396,7 @@ function preJobs(){
     ['carousel',()=>{if(PRE.car)return;PRE.car=true;const p=showItem(savedType||'cessna'),cam=SHOW.cam,prevT=r.getRenderTarget();p.visible=true;p.position.set(0,0,0);p.scale.setScalar(40/p.userData.dim);
       cam.aspect=1.6;cam.position.set(0,30,100);cam.lookAt(0,0,0);cam.updateProjectionMatrix();
       if(!SHOW.scene.environment)SHOW.scene.environment=envDay();
-      try{r.setRenderTarget(A);r.render(SHOW.scene,cam);}finally{p.visible=false;r.setRenderTarget(prevT);}}]];
+      try{r.setRenderTarget(E);r.render(SHOW.scene,cam);}finally{p.visible=false;r.setRenderTarget(prevT);}}]];
 }
 // one frame's share of the queue (tick, from the 4th frame); true once it has drained. BOOT.sub moves the bar through
 // the last stage as it goes. Gfxfix item 3: a tier change in the menu (GFX.setTier, GFX.pendingApply) runs it again
@@ -19294,7 +19423,7 @@ function gfxPrecompile(budget){
   while(Q.i<Q.jobs.length&&performance.now()-t0<(budget||40));
   BOOT.sub=Q.i/Q.jobs.length;BOOT.bar();
   if(Q.i<Q.jobs.length)return false;
-  for(const k of ['A','B','C','D'])if(Q[k]){Q[k].dispose();Q[k]=null;}
+  for(const k of ['A','B','C','D','E'])if(Q[k]){Q[k].dispose();Q[k]=null;}
   Q.jobs=null;PRE.done=true;PRE.total=+Object.values(PRE.ms).reduce((x,y)=>x+y,0).toFixed(1);PRE.wall=Math.round(performance.now()-PRE.t0);
   BOOT.mark('warm');return true;
 }
@@ -19308,7 +19437,18 @@ function gfxRequeue(){
 }
 GFX.requeue=gfxRequeue;   // GFX lives outside init()
 // a flight about to start (or resume) with the queue not drained: the rest of it now, behind the menu still on screen
-function gfxDrain(){
+// fix2 item 9: the flown aircraft drawn once into a 16 px 4x target, as the aircraft layer draws it, so a GPU builds its
+// multisampled pipelines before the flight. After the menu's WARM steps (it is the slowest draw headless and waits on
+// nothing), or at the latest when a flight starts (gfxDrain); once a session, again after a tier change
+function pfxLayWarm(){
+  if(PFX.layW===GFX.tier||!GFX.post||!renderer.capabilities.isWebGL2||(running&&!paused&&!menu.classList.contains('on')))return;
+  PFX.layW=GFX.tier;const F=pfxRT(16,16,true,PFX_LAYMS),r=renderer;
+  try{preAt(M=>{if(!M)return;const C=scene.children,hid=[];let top=M;while(top.parent&&top.parent!==scene)top=top.parent;
+    for(const o of C)if(o!==top&&o.visible&&!o.isLight){o.visible=false;hid.push(o);}
+    try{r.setRenderTarget(F);r.autoClear=true;r.render(scene,camera);}finally{for(const o of hid)o.visible=true;}});}
+  catch(e){console.warn('layer pipelines',e);}finally{F.dispose();}
+}
+function gfxDrain(){pfxLayWarm();
   if(PRE.done)return 0;const t0=performance.now();let n=0;
   // the GPU sync waits on the WARM steps: the rest of them now as well
   if(PRE.runs>1&&!WARM.done){while(WARM.i<WARM_STEPS.length){try{WARM_STEPS[WARM.i]();}catch(e){console.warn('wstep',e);}WARM.i++;}WARM.done=true;}
@@ -20719,7 +20859,7 @@ $('oFps').onclick=()=>setFps(!FPS.on);fpsUI();
 // (localStorage kgeuStalls with the skip counters, written at most every 2 s from a timer), Settings > Stutter log.
 var STALL={thr:250,log:[],prev:[],count:0,worst:0,marks:[],lastMarks:[],tags:[],tickMs:0,vis:false,held:true,saveT:0,spin:0,
   skip:{hidden:0,paused:0,idle:0,worst:0},skipPrev:{hidden:0,paused:0,idle:0,worst:0},
-  p:{prog:0,tex:0,geo:0,recv:0,bld:0,ch:0,pr:0,sc:0,tier:'',pw:0,ph:0,pbk:0,vw:0,vh:0,tls:0,env:0,tod:0,hbt:0,hb:false,warm:0,pre:0,fx:0,msl:0,trf:0,df:false,cr:false,pa:false,mn:false,heap:0}};
+  p:{prog:0,tex:0,geo:0,recv:0,bld:0,ch:0,pr:0,sc:0,tier:'',pw:0,ph:0,pbk:0,pn:0,vw:0,vh:0,tls:0,env:0,tod:0,hbt:0,hb:false,warm:0,pre:0,fx:0,msl:0,trf:0,df:false,cr:false,pa:false,mn:false,heap:0}};
 try{const o=JSON.parse(localStorage.getItem('kgeuStalls')||'null');if(o&&Array.isArray(o.log))STALL.prev=o.log.concat(Array.isArray(o.prev)?o.prev:[]).filter(r=>!(r.tags&&r.tags.indexOf('hidden')>=0)).slice(-30);
   const k=o&&o.skip,q=STALL.skipPrev;if(k)for(const n in q)q[n]=n==='worst'?Math.max(q[n],+k[n]||0):q[n]+(+k[n]||0);}catch(e){}
 // the skip counters this session plus the earlier sessions' (what is saved and shown)
@@ -20752,7 +20892,7 @@ function stallProbe(t){
     if(pr!==P.pr)T.push('pr');
     if(GFX.scale!==P.sc)T.push('scale');
     if(GFX.tier!==P.tier)T.push('tier');
-    if(PFX.w!==P.pw||PFX.h!==P.ph||PFX.bk!==P.pbk)T.push('rt');
+    if(PFX.w!==P.pw||PFX.h!==P.ph||PFX.bk!==P.pbk||PFX.allocN!==P.pn)T.push('rt');
     if(VP.w!==P.vw||VP.h!==P.vh)T.push('resize');
     if(TLS.n>P.tls)T.push('terrain '+Math.round(TLS.ms)+'ms');
     if(ENV.n>P.env)T.push('pmrem');
@@ -20779,7 +20919,7 @@ function stallProbe(t){
       stallAdd(g,tki,t);}
   }
   P.prog=prog;P.tex=tex;P.geo=geo;P.recv=CSM.recv;P.bld=CSM.builds;P.ch=ch;P.pr=pr;P.sc=GFX.scale;P.tier=GFX.tier;
-  P.pw=PFX.w;P.ph=PFX.h;P.pbk=PFX.bk;P.vw=VP.w;P.vh=VP.h;P.tls=TLS.n;P.env=ENV.n;P.tod=TOD_N;P.hbt=HB.tierN;P.hb=HB.on;
+  P.pw=PFX.w;P.ph=PFX.h;P.pbk=PFX.bk;P.pn=PFX.allocN;P.vw=VP.w;P.vh=VP.h;P.tls=TLS.n;P.env=ENV.n;P.tod=TOD_N;P.hbt=HB.tierN;P.hb=HB.on;
   P.warm=warm;P.pre=pre;P.fx=fx;P.msl=msl;P.trf=TRAFFIC.length;P.df=DF.on;P.cr=cr;P.pa=paused;P.mn=mn;P.heap=heap;
 }
 function stallAdd(g,tki,t){
@@ -21622,7 +21762,7 @@ const APP_VER='2026-10-15-bugs1';          // keep version.json in step when shi
     get P(){return E.P;}};
 })();
 
-window.__kgeu={gfxHold:n=>{GFX.holdF=n|0;},pfx:()=>{const L=PFX.last||{};return {w:L.w,h:L.h,sw:L.sw,sh:L.sh,bloomed:!!L.bloomed,smaa:!!L.smaa,sharp:L.sharp||0,scale:GFX.scale,rs:L.rs!=null?L.rs:GFX.rs,post:GFX.post,sens:GFX.sens};},setScale:s=>GFX.setScale(+s),sharpOff:v=>{PFX_SHARP.off=!!v;},gfxBusy:()=>({applying:gfxApplying(),resumeWait:GFX.resumeWait,preDone:PRE.done,warmDone:WARM.done,busy:GFX.busy}),stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>({id:p.id,name:p.name,cacheKey:p.cacheKey,usedTimes:p.usedTimes})),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
+window.__kgeu={gfxHold:n=>{GFX.holdF=n|0;},pfx:()=>{const L=PFX.last||{};return {w:L.w,h:L.h,sw:L.sw,sh:L.sh,bloomed:!!L.bloomed,smaa:!!L.smaa,sharp:L.sharp||0,samples:L.samples||0,layer:!!L.layer,box:L.box||null,split:!!L.split,full:L.full||null,webgl2:renderer.capabilities.isWebGL2,msaaRT:!!(PFX.rt&&PFX.rt.isWebGLMultisampleRenderTarget),allocN:PFX.allocN,scale:GFX.scale,rs:L.rs!=null?L.rs:GFX.rs,post:GFX.post,sens:GFX.sens};},setScale:s=>GFX.setScale(+s),sharpOff:v=>{PFX_SHARP.off=!!v;},msaaOff:v=>{PFX.msOff=!!v;},csmNBT:a=>{if(a)CSM.NBT=a.slice();if(CSM.n)csmRadii();return CSM.NBT.slice();},layerOff:v=>{PFX.layerOff=!!v;},splitOff:v=>{PFX.layerOff=!!v;},gfxBusy:()=>({applying:gfxApplying(),resumeWait:GFX.resumeWait,preDone:PRE.done,warmDone:WARM.done,busy:GFX.busy}),stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>({id:p.id,name:p.name,cacheKey:p.cacheKey,usedTimes:p.usedTimes})),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
   task:()=>({on:TASK.on,id:TASK.id,stage:TASK.stage&&TASK.stage.id,si:TASK.si,brief:TASK.brief,done:TASK.done,res:TASK.res,ask:TASK.ask&&{shown:TASK.ask.shown,opts:TASK.ask.opts.map(o=>o.k),t:TASK.ask.t},d:TASK.d,log:TASK.log.slice(),seed:TASK.seed}),
   tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzBuild:()=>dzBuild(),dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
