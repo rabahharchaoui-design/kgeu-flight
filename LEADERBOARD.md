@@ -77,6 +77,8 @@ game's `runMode()`), including the first flight lesson's assists. Every board ha
 | `lesson:stall` | Power off stall | lesson score | higher | 3 s | 0 to 100 | |
 | `lesson:engine` | Engine failure | lesson score | higher | 15 s | 0 to 100 | |
 | `lesson:pattern` | Pattern and touch and go | lesson score | higher | 45 s | 0 to 100 | |
+| `lesson:<id>` (family) | Every other flown lesson (school1, school2) and `lesson:ride`, the checkride (passes only) | lesson score | higher | 60 s | 0 to 100 | |
+| `task:<id>` (family) | Taskings: Overwatch, Lifeline, Shepherd, Finder | tasking score | higher | 120 s | 0 to 100 | |
 | `free:landing` | Free flight landing | landing points | higher | 8 s | 0 to 100 | |
 | `apt:RJTT` | Tokyo Haneda landing | arcade points | higher | 20 s | 0 to 1,500 | yes |
 | `apt:LFPG` | Paris CDG landing | arcade points | higher | 20 s | 0 to 1,500 | yes |
@@ -85,6 +87,8 @@ game's `runMode()`), including the first flight lesson's assists. Every board ha
 | `df:kills:easy`, `df:kills:hard` | Dogfight kills | kills in one run | higher | (fan out) | 0 to 10 | |
 | `df:clear:easy`, `df:clear:hard` | Dogfight clear time | s, one decimal, wins only | lower | (fan out) | 45 to 390 | |
 | `df:guns:easy`, `df:guns:hard` | Dogfight gun kills | gun kills in one run, 1 or more | higher | (fan out) | 0 to 10 | |
+
+The two families (`FAMILIES` in boards.js) take any id with their prefix; an exact `BOARDS` entry wins (the six lessons above keep their own limits). The old device boards (`kgeuTaskLB`) are read only now: the Boards screen shows "your best on this phone" until a global score is as good.
 
 **The Red Flag Dogfight boards are the exception to the merge: Easy and Hard are separate boards.** Each `df:` board
 has a `mode` (`easy` or `hard`, in boards.js and in `LB.board`): the server refuses a run in the other mode ("wrong

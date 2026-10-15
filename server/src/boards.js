@@ -83,9 +83,14 @@ export function dfProblem(d, score, secs, ac, tol = 1) {
 }
 // future modes register on the server in one line too, e.g.
 //   BOARDS['race:red'] = { dir: 1, min: 0, max: 1000, minSecs: 30, ref: 1000 };
-// and a whole family can share limits by prefix:
+// and a whole family can share limits by prefix (an exact BOARDS entry wins over
+// its family in boardOf). Flight school lessons (lesson:<id>, score 0 to 100, at
+// least a minute of flight) and Taskings (task:<id>, score 0 to 100, at least two
+// minutes) are families so a new lesson or tasking needs no Worker deploy; the six
+// first lesson boards keep their own BOARDS limits.
 const FAMILIES = [
-  // ['apt:', { dir: 1, min: 0, max: 100, minSecs: 20, ref: 100 }],
+  ['lesson:', { dir: 1, min: 0, max: 100, minSecs: 60, ref: 100 }],
+  ['task:',   { dir: 1, min: 0, max: 100, minSecs: 120, ref: 100 }],
 ];
 export function boardOf(id) {
   if (typeof id !== 'string' || id.length > 40) return null;

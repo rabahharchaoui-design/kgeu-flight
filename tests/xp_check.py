@@ -3,7 +3,8 @@
 #      area (a 47 px notch stood in), never takes a touch (the stick under it still gets the finger), two close together
 #      stack (the older one steps up), gone after about 2.5 s; 568x320 and 844x390.
 #  (b) the pops fire only when the (mocked) Worker grants XP, with its number: a free flight landing, a lesson, a
-#      challenge and the daily; none with no callsign, for a practice daily, a refused run or no connection.
+#      challenge, the daily, a school1 lesson (lesson: family) and a tasking (task: family); none with no callsign,
+#      for a practice daily, a refused run or no connection; nothing banked locally (kgeuTaskXP retired, bugs1).
 #  (c) Home: the rank insignia, callsign, total XP from the server and the bar to the next rank (filled to the right
 #      share, animated on transform), updated by a run's answer; the top rank and no callsign read right.
 # Run: .venv/bin/python tests/xp_check.py
@@ -115,35 +116,30 @@ async def main():
         sent, last = await run('free:landing', f"()=>{{const K={K};K.start('runway')}}", 90, 37)
         ok('(b) no connection (queued): no pop', not sent and last is None, (sent, last))
         m.offline = False
-        # school1 item 9: a device lesson board (climbs): no Worker, XP by its formula at the debrief, banked in kgeuTaskXP
-        async def les(lid, frac):
-            l0 = await pg.evaluate(f"()=>{K}.XPP.log.length"); x0 = await pg.evaluate("()=>+localStorage.getItem('kgeuTaskXP')||0")
+        # bugs1 item 1: the school1 and school2 lessons and the Taskings are global boards (the Worker's lesson: and task:
+        # families): a run token at the start, the score to /submit, the pop with the server's number; no local XP bank
+        async def les(lid, frac, gain):
+            m.extra['gain'] = gain; n0 = len(m.subs); l0 = await pg.evaluate(f"()=>{K}.XPP.log.length")
             await pg.evaluate(f"()=>{{const K={K};K.startLesson('{lid}',true);K.lesBriefSkip()}}"); await pg.wait_for_timeout(500)
             for _ in range(3): await pg.evaluate(f"()=>{K}.stepFrame(1/30,false,true)")
             run_ = await pg.evaluate(f"()=>!!{K}.LB.E.runs['lesson:{lid}']")
             await pg.evaluate(f"""(f)=>{{const K={K},G=K.G;let acc=0;G.def.tasks.forEach(t=>{{const w=t.w||0,y=acc+w<=f*100+0.01;if(y)acc+=w;
               G.tasks[t.id]={{kind:'event',ok:y,pts:y?w:0,detail:''}};}});K.gEnd()}}""", frac)
-            await pg.wait_for_timeout(700)
-            log = await pg.evaluate(f"(n)=>{K}.XPP.log.slice(n)", l0)
-            x1 = await pg.evaluate("()=>+localStorage.getItem('kgeuTaskXP')||0")
+            # the run queued while offline above goes out first (its own "Sent:" pop): wait for this lesson's answer
+            for _ in range(40):
+                await pg.wait_for_timeout(200)
+                if any(x.get('board') == f'lesson:{lid}' for x in m.subs[n0:]) and await pg.evaluate(f"(n)=>{K}.XPP.log.slice(n).some(x=>x.reason.startsWith('Lesson:'))", l0): break
+            log = await pg.evaluate(f"(n)=>{K}.XPP.log.slice(n).filter(x=>!x.reason.startsWith('Sent:'))", l0)
             line = await pg.evaluate("()=>{const e=document.querySelector('#gradeOv .lbLine');return e?e.textContent:''}")
-            return run_, log, x1 - x0, line
-        await pg.evaluate("()=>{localStorage.removeItem('kgeuTaskLB');localStorage.removeItem('kgeuTaskXP')}")
-        n0 = len(m.subs)
-        r, log, dx, line = await les('climbs', 0.7)
-        ok('(b9) a device lesson (climbs): one pop, "Lesson: Climbs, descents and turns", a positive amount', len(log) == 1 and log[0]['reason'] == 'Lesson: Climbs, descents and turns' and log[0]['amount'] > 0, log)
-        ok('(b9) kgeuTaskXP grows by the amount popped', log and dx == log[0]['amount'], (dx, log))
-        ok('(b9) the debrief board line: #1 of 1 on this device, first run', 'Board, this device' in line and '#1 of 1' in line and 'FIRST RUN' in line, line)
-        ok('(b9) no Worker run: no token asked, nothing submitted', not r and len(m.subs) == n0, (r, len(m.subs) - n0))
-        r, log, dx, line = await les('climbs', 1.0)
-        ok('(b9) a second better run: 78 XP (50 x1.25 Hard + 15 best), "Personal best" in the reason', len(log) == 1 and log[0]['amount'] == 78 and log[0]['reason'] == 'Lesson: Climbs, descents and turns  \u00b7  Personal best' and dx == 78, (log, dx))
-        ok('(b9) the board line: #1 of 2, personal best', '#1 of 2' in line and 'PERSONAL BEST' in line, line)
-        r, log, dx, line = await les('climbs', 0)
-        ok('(b9) an F: no pop, no XP banked, the run still on the board (#3 of 3)', not log and dx == 0 and '#3 of 3' in line and 'XP' not in line, (log, dx, line))
-        rows = await pg.evaluate(f"()=>{K}.LB.localRows('lesson:climbs').rows.map(x=>x.mode)")
-        ok('(b9) the device rows carry the mode (Standard tolerances: hard)', rows == ['hard'] * 3, rows)
-        ok('(b9) the Boards picker still lists only the six server lessons', await pg.evaluate(f"()=>!!{K}.LB.BOARDS['lesson:climbs'].local&&!{K}.LB.BOARDS['lesson:steep'].local"))
-        ok('(b9) no device lesson submitted to the Worker', not [x for x in m.subs if str(x.get('board', '')).startswith('lesson:') and x.get('board') != 'lesson:steep'], [x.get('board') for x in m.subs])
+            return run_, log, [x for x in m.subs[n0:] if x.get('board') != 'free:landing'], line
+        r, log, subs, line = await les('climbs', 0.7, 29)
+        ok('(b9) a school1 lesson (climbs): a run token at the start, one submission to lesson:climbs', r and [x.get('board') for x in subs] == ['lesson:climbs'], (r, [x.get('board') for x in subs]))
+        ok('(b9) its pop: the server\'s +29, "Lesson: Climbs, descents and turns"', len(log) == 1 and log[0]['amount'] == 29 and log[0]['reason'].startswith('Lesson: Climbs, descents and turns'), log)
+        ok('(b9) the debrief\'s board line is the Leaderboard one (resBoard), no device line', line.startswith('Leaderboard') and '#7 of 40' in line and 'this device' not in line, line)
+        ok('(b9) nothing banked on the phone (kgeuTaskXP retired)', await pg.evaluate("()=>localStorage.getItem('kgeuTaskXP')===null"))
+        ok('(b9) every lesson board is global (no local flag) and the Boards picker lists climbs', await pg.evaluate(f"()=>!{K}.LB.BOARDS['lesson:climbs'].local&&!{K}.LB.BOARDS['lesson:steep'].local"))
+        sent, last = await run('task:overwatch', f"()=>{{const K={K};K.pick('cessna');K.start('runway');K.LB.runStart('task:overwatch')}}", 81, 33, "{secs:300}")
+        ok('(b9) a tasking: the server\'s +33, "Tasking: Overwatch"', sent and last and last['amount'] == 33 and last['reason'].startswith('Tasking: Overwatch'), last)
         ok('(b) no page errors', not [e for e in pg.errs if 'pfs-mock' not in e and 'Failed to fetch' not in e and 'status of 400' not in e], pg.errs[:3])
         await pg.context.close()
         m = Mock(cs=None, gain=37)

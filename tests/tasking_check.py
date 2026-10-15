@@ -1,9 +1,10 @@
 # Tasking item 1: the mission framework. A drill template (two stages) runs through the whole engine: the seeded roll,
 # the briefing that holds the sim, the stage card, Mission Control on the radio (text, the squelch cue, Easy's plain
 # line), the reply buttons in the top bar (placed clear of pause, the readouts and the controls at three phone sizes),
-# a timed out ask, the score, the results card with the device board line, the XP pop (the Worker's formula), the
-# Taskings group of four on Challenges and its four device boards (the Worker refuses task: ids: tasking_worker_check),
-# RETRY rolling a new seed, and Back on the briefing.
+# a timed out ask, the score, the results card with its Leaderboard line from resBoard (bugs1: the task: boards are global
+# through the Worker's task: family, tasking_worker_check; the run token at ACCEPT; no local XP, the Worker grants it), the
+# Taskings group of four on Challenges and its boards ("your best on this phone" from the old device runs), RETRY rolling a
+# new seed, and Back on the briefing.
 # Run: .venv/bin/python tests/tasking_check.py
 import asyncio, json
 from playwright.async_api import async_playwright
@@ -20,7 +21,8 @@ DRILL = """()=>{const K=window.__kgeu;K.TASKS.drill={name:'Drill',role:'Test',ac
        K.tkAsk([{k:'WILCO',fn:()=>{d.w=1;}},{k:'UNABLE',fn:()=>{d.u=1;}}],{line:l});}),tick:d=>d.w||d.u},
     {id:'b',name:'Report',obj:d=>['Report ready','Tap REPORT'],enter:d=>{K.tkAsk([{k:'REPORT',say:'Skyhawk, ready.',fn:()=>{d.r=1;}}],{keep:1});},tick:d=>d.r},
     {id:'c',name:'Wait',obj:d=>['Wait','for the call'],enter:d=>{K.tkAsk([{k:'WILCO'}],{wait:2,late:()=>{d.late=1;}});},tick:d=>d.late}],
-  score:d=>({score:d.w?88:40,title:'Done',lines:[['Answered',d.w?'yes':'no']],wait:300})};}"""
+  score:d=>({score:d.w?88:40,title:'Done',lines:[['Answered',d.w?'yes':'no']],wait:300})};
+  if(!K.LB.BOARDS['task:drill'])K.LB.board('task:drill',{name:'Drill',group:'Taskings'});}"""
 
 async def air(pg, n=600):
     for _ in range(n // 30):
@@ -48,7 +50,9 @@ async def main():
             await pg.evaluate(f"()=>{K}.togglePause&&{K}.togglePause()")
             ok('pause does nothing under the briefing', await pg.evaluate(f"()=>document.getElementById('tkBrief').classList.contains('on')&&!document.getElementById('pauseOv').classList.contains('on')"))
             d1 = await pg.evaluate(f"()=>[{K}.task().d.r1,{K}.task().d.r2]")
+            ok('no board run before ACCEPT (the token clock starts with the flight)', await pg.evaluate(f"()=>!{K}.LB.E.runs['task:drill']"))
             await finger(pg, '#tkGo'); await pg.wait_for_timeout(200)
+            ok('ACCEPT starts the board run (LB.runStart)', await pg.evaluate(f"()=>!!{K}.LB.E.runs['task:drill']"))
             t = await pg.evaluate(f"()=>({{t:{K}.task(),p:{K}.paused(),card:document.getElementById('missT').textContent}})")
             ok('ACCEPT TASKING starts stage 1 and the sim; the card says 1/3 and the objective', not t['p'] and t['t']['stage'] == 'a' and t['card'].startswith('1/3') and 'Mission Control' in t['card'], t['card'])
             t = await air(pg)
@@ -75,16 +79,17 @@ async def main():
             await finger(pg, '#tkReply button[data-k="REPORT"]'); await pg.wait_for_timeout(150); await pg.evaluate(STEP, 3)
             t = await air(pg, 120)
             ok('REPORT: the stage after it', t['stage'] == 'c', t['stage'])
+            xn = await pg.evaluate(f"()=>{K}.XPP.log.length")
             await pg.evaluate(STEP, 120)
             t = await pg.evaluate(f"()=>{K}.task()")
             ok('an ask nobody answers times out: its late call runs, a missed reply is counted, the tasking ends', t['done'] and t['d']['missed'] >= 1 and t['res'], (t['done'], t['d'].get('missed')))
             await pg.wait_for_timeout(900)
             r = await pg.evaluate("()=>({on:document.getElementById('missOv').classList.contains('on'),t:document.getElementById('mTitle').textContent,s:document.getElementById('mScore').textContent,"
                                   "l:[...document.querySelectorAll('#mLines .gl')].map(e=>e.innerText.replace(/\\s+/g,' ')),retry:document.getElementById('mRetry').textContent})")
-            xp = await pg.evaluate(f"()=>{K}.XPP.log.slice(-1)[0]")
-            want = await pg.evaluate(f"()=>{K}.taskXp(88,'hard',true)")
+            xp = await pg.evaluate(f"()=>({{n:{K}.XPP.log.length,bank:localStorage.getItem('kgeuTaskXP'),run:!!{K}.LB.E.runs['task:drill'],lb:document.getElementById('missOv').dataset.lb}})")
             ok('the results card: the grade, 88 of 100, the lines, the time against par, RETRY DRILL', r['on'] and r['t'].startswith('Drill: Done') and r['s'].startswith('88') and any(x.startswith('Time') and 'par 1:00' in x for x in r['l']) and r['retry'] == 'RETRY DRILL', r)
-            ok('the device board line and the XP pop (the Worker formula, Hard, first run is a best)', any('Board, this device' in x and '#1 of 1' in x for x in r['l']) and xp and xp['amount'] == want == 72, (r['l'], xp))
+            ok('the Leaderboard line from resBoard (no callsign here: unranked), no device line, the card on the board', any(x.startswith('Leaderboard') and 'callsign' in x for x in r['l']) and not any('this device' in x for x in r['l']) and xp['lb'] == 'task:drill' and not xp['run'], (r['l'], xp))
+            ok('no local XP: nothing popped, nothing banked in kgeuTaskXP (the Worker grants it)', xp['n'] == xn and xp['bank'] is None, (xn, xp))
             # RETRY: a new seed, a new roll
             await finger(pg, '#mRetry'); await pg.wait_for_timeout(400)
             t = await pg.evaluate(f"()=>{K}.task()")
@@ -108,13 +113,14 @@ async def main():
         c = await pg.evaluate("()=>{const g=[...document.querySelectorAll('#arcCards > *')];const i=g.findIndex(e=>e.classList.contains('cgrp'));return {head:g[i]&&g[i].textContent,cards:i<0?[]:g.slice(i+1).map(e=>({id:e.dataset.m,b:e.querySelector('b').textContent,tro:!!e.querySelector('.tro'),ico:!!e.querySelector('svg')}))}}")
         built = await pg.evaluate(f"()=>['overwatch','lifeline','shepherd','finder'].filter(t=>{K}.TASKS[t]).map(t=>{K}.TASKS[t].name)")
         ok('Challenges: a Taskings group with a card for each tasking that is in, each with an icon and a board link (the drill has none)', (c['head'] == 'Taskings' if built else c['head'] is None) and [x['b'] for x in c['cards']] == built and all(x['tro'] and x['ico'] for x in c['cards']), (c, built))
-        # the device boards: two runs on Overwatch's board, the picker group, the rows, the note, works with no Worker
-        await pg.evaluate(f"()=>{{localStorage.removeItem('kgeuTaskLB');const L={K}.LB;window._a=L.localAdd('task:overwatch',71,240);window._b=L.localAdd('task:overwatch',64,250);window._c=L.localAdd('task:overwatch',90,230);}}")
-        a = await pg.evaluate("()=>[window._a,window._b,window._c]")
-        ok('localAdd ranks among this device\'s runs and spots a best', a[0] == {'rank': 1, 'total': 1, 'pb': True} and a[1] == {'rank': 2, 'total': 2, 'pb': False} and a[2] == {'rank': 1, 'total': 3, 'pb': True}, a)
+        # the old device runs (kgeuTaskLB, never written now): the global board (offline on the harness) pins "your best on
+        # this phone" with its EASY/HARD chip; localBest picks it
+        await pg.evaluate("()=>{const n=Date.now();localStorage.setItem('kgeuTaskLB',JSON.stringify({'task:overwatch':[{s:90,secs:230,ac:'reaper',mode:'easy',when:n-3e5},{s:71,secs:240,ac:'reaper',mode:'hard',when:n-2e5},{s:64,secs:250,ac:'reaper',mode:'hard',when:n-1e5}]}))}")
+        a = await pg.evaluate(f"()=>[{K}.LB.localBest('task:overwatch'),{K}.LB.localBest('task:lifeline'),typeof {K}.LB.localAdd]")
+        ok('localBest: the best old run on this phone (score, mode), null with none; localAdd is gone', a[0] and a[0]['score'] == 90 and a[0]['mode'] == 'easy' and a[1] is None and a[2] == 'undefined', a)
         await pg.evaluate(f"()=>{K}.LB.lbOpen('task:overwatch')"); await pg.wait_for_timeout(400)
-        lb = await pg.evaluate("()=>({t:document.getElementById('lbTitle').textContent,rows:[...document.querySelectorAll('#lbRowsIn .lbRow .s')].map(e=>e.textContent),me:document.getElementById('lbMe').innerText,tot:document.getElementById('lbTotal').textContent,msg:document.getElementById('lbRowsIn').innerText})")
-        ok('the Overwatch board shows this device\'s runs, best first, and says where they live', lb['t'] == 'Overwatch' and lb['rows'][:3] == ['90 pts', '71 pts', '64 pts'] and 'this device' in lb['me'] and lb['tot'] == '3 runs' and 'Offline' not in lb['msg'], lb)
+        lb = await pg.evaluate("()=>({t:document.getElementById('lbTitle').textContent,me:document.getElementById('lbMe').innerText,chip:(document.querySelector('#lbMe .modeTag')||{}).textContent||'',off:document.getElementById('lbMe').classList.contains('off'),msg:document.getElementById('lbRowsIn').innerText})")
+        ok('the Overwatch board: the global list (offline here) and the pinned row "your best on this phone", 90 pts, EASY', lb['t'] == 'Overwatch' and 'your best on this phone' in lb['me'] and '90 pts' in lb['me'] and lb['chip'] == 'EASY' and not lb['off'] and 'Offline' in lb['msg'] and 'this device' not in lb['me'].lower(), lb)
         await finger(pg, '#lbPick'); await pg.wait_for_timeout(300)
         g = await pg.evaluate("()=>{const h=[...document.querySelectorAll('#lbList h3')].map(e=>e.textContent);const i=h.indexOf('Taskings');return {h:h,ids:i<0?[]:[...document.querySelectorAll('#lbList .lbG')][i].querySelectorAll('button').length}}")
         ok('the board picker has a Taskings group of four', 'Taskings' in g['h'] and g['ids'] == 4, g)

@@ -696,7 +696,6 @@ body.divOn.appr #topCol{ left:calc(var(--padL) + var(--map) + var(--hudW) + 16px
 @media (prefers-reduced-motion: reduce){ #divCard.on{ animation:none; } }
 /* the diversion's GPS failure: no mini map (as under the hood) */
 body.navMapOff #map{ display:none; }
-.lbRow.lbLoc .c span{ white-space:normal; font-size:12px; font-weight:600; color:var(--brown); }   /* on the sand row: the rows' own brown, not the HUD grey */
 #dfBrief{ z-index:30; }
 #dfBrief .sheet{ max-width:600px; padding:12px 18px 14px; background:rgba(18,13,9,.95); text-align:center; }
 #dfBrief h3{ margin:0; font:800 22px/1.15 var(--font); letter-spacing:.06em; color:var(--sand); }
@@ -1786,6 +1785,11 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
    a tap on a row reads it out in full */
 @media (max-width:700px){ .lbRow .creator{ font-size:0; padding:0; width:18px; height:18px; line-height:18px; text-align:center; flex:none; margin-left:2px; vertical-align:0; }
   .lbRow .creator::before{ content:'\2605'; font-size:12px; letter-spacing:0; } .lbRow.me .c i{ display:none; } }
+/* bugs1: the pinned "your best on this phone" row (no global score yet): at narrow widths the label takes the callsign's
+   place (the callsign stays in data-full); a global me row with a better phone best keeps its "of N" note visible */
+.lbRow.lbDev .dvN{ display:none; }
+@media (max-width:700px){ .lbRow.lbDev .c > *{ display:none; } .lbRow.lbDev .c > .dvN{ display:inline; font-size:14px; font-weight:800; }
+  .lbRow.me.lbPh .c > span{ flex:0 1 auto; min-width:0; } .lbRow.me.lbPh .c i{ display:inline; flex:none; font-size:11px; letter-spacing:-.01em; font-style:normal; font-weight:700; } }
 @media (max-width:700px){ .lbRow{ gap:6px; padding:0 6px; font-size:17px; min-height:48px; } .lbRow .n{ width:auto; min-width:1.4em; } .lbRow .a{ width:4.9em; font-size:12px; } .lbRow.pod{ min-height:50px; } .lbRow.pod .n b{ width:26px; height:26px; font-size:14px; } }
 /* narrow: the period tabs read Today / week / time, the dogfight's chips wrap to a second bar line */
 .lbBr{ display:none; }
@@ -14747,9 +14751,9 @@ const menu=document.getElementById('menu'),crashEl=document.getElementById('cras
 // spawn(d) puts the aircraft where the tasking starts; stages run one at a time (obj(d) the card's text, enter(d) once,
 // tick(d,dt) true when done); score(d) gives 0 to 100 and the card's lines. The radio is text through the existing
 // queue (vqAdd, the subtitle and its squelch; a readback uses the recorded Wilco or Roger where one fits), and the
-// player answers with one or two context buttons in the top bar (tqAsk). The boards are task:<id>: the Worker does not
-// know them (server/src/boards.js has no task: entry, it refuses an unknown board), so they live on this device
-// (LB.localAdd) and the XP is counted here (taskXp, the Worker's formula) until the Worker takes them.
+// player answers with one or two context buttons in the top bar (tqAsk). The boards are task:<id>, global through the
+// Worker (the task: family in server/src/boards.js): the run token at ACCEPT (taskGo), the score at taskEnd, the XP the
+// Worker grants (xpGrant). Runs flown before bugs1 stay on this device in kgeuTaskLB, read only (LB.localBest).
 const TASK={on:false,id:null,def:null,d:null,R:null,seed:0,si:0,stage:null,t:0,st0:0,brief:false,ask:null,asks:[],done:false,res:null,
   tgts:[],sens:false,objs:[],later:[],askN:0,test:{seed:null,noBrief:false},log:[]};
 const TASK_IDS=['overwatch','lifeline','shepherd','finder'];
@@ -14858,8 +14862,10 @@ function taskStart(id,o){const D=TASKS[id];if(!D)return;
 function taskGo(){if(!TASK.on||TASK.done)return;audioSess();initAudio();
   const ov=$('tkBrief');ov.classList.remove('on');TASK.brief=false;paused=false;
   TASK.d.t0=st.time;TASK.lastT=st.time;tqStageGo(0);
+  if(LB)LB.runStart(tqBoard(TASK.id));   // the token clock starts with the flight, not the briefing
 }
 function taskStop(){if(!TASK.on&&!TASK.objs.length)return;
+  if(LB&&TASK.id)LB.runCancel(tqBoard(TASK.id));   // abandoned: its token is dropped (after taskEnd's runEnd there is nothing left)
   const D=TASK.def;if(D&&D.cleanup)try{D.cleanup(TASK.d);}catch(e){console.warn(e);}
   TASK.on=false;TASK.brief=false;TASK.ask=null;TASK.quiet=null;TASK.later=[];TASK.sens=false;tqReplyUI();tqClear();
   $('tkBrief').classList.remove('on');
@@ -14886,37 +14892,27 @@ function taskUpdate(dt){
   // the overall cap: a tasking is 3 to 6 minutes; past its limit Mission Control calls it
   if(!TASK.done&&D.limit&&st.time-d.t0>D.limit){d.timeout=1;tqMC(AC.csS+', Mission Control, we are out of time on this one. Knock it off, RTB.',{plain:'Time is up. The tasking ends here.'});taskEnd();}
 }
-// the end: score, the device board, the XP, the card (after the last call has had a moment)
+// the end: score, the board (the Worker grants the XP), the card (after the last call has had a moment)
 function taskEnd(){if(TASK.done)return;TASK.done=true;TASK.ask=null;tqReplyUI();
   const D=TASK.def,d=TASK.d;d.secs=st.time-d.t0;
   const r=D.score(d);r.score=Math.max(0,Math.min(100,Math.round(r.score)));
   r.letter=r.score>=90?'A':r.score>=75?'B':r.score>=60?'C':r.score>=40?'D':'F';
   TASK.res=r;
-  const b=tqBoard(TASK.id),L=LB?LB.localAdd(b,r.score,d.secs):null;
-  const pb=!!(L&&L.pb),xp=taskXp(r.score,d.mode,pb);r.xp=xp;r.lb=L;
-  runLog('tasking',{task:TASK.id,seed:d.seed,score:r.score,secs:Math.round(d.secs),letter:r.letter,xp:xp});
+  if(LB)LB.runEnd(tqBoard(TASK.id),r.score,{secs:d.secs});
+  runLog('tasking',{task:TASK.id,seed:d.seed,score:r.score,secs:Math.round(d.secs),letter:r.letter});
   tqBest(TASK.id,r);
   TASK.endT=setTimeout(()=>tqCard(r,d),r.wait!=null?r.wait:2600);
 }
-// XP for a tasking, the Worker's own formula (xpFor in server/src/boards.js): 10 for flying it, up to 40 for the score,
-// x1.25 in Hard, +15 for a best on this device. Kept on this device (kgeuTaskXP) until the Worker takes task: boards.
-function taskXp(score,mode,pb){return Math.round((10+40*Math.max(0,Math.min(1,score/100)))*(mode==='hard'?1.25:1))+(pb?15:0);}
+// the best per tasking on this phone (kgeuTaskBest): the Challenges cards' stars
 function tqBest(id,r){try{const B=JSON.parse(localStorage.getItem('kgeuTaskBest')||'{}'),o=B[id];
   if(!o||r.score>o.score)B[id]={score:r.score,letter:r.letter,when:Date.now()};
-  localStorage.setItem('kgeuTaskBest',JSON.stringify(B));
-  localStorage.setItem('kgeuTaskXP',String((+localStorage.getItem('kgeuTaskXP')||0)+(r.xp||0)));}catch(e){}}
+  localStorage.setItem('kgeuTaskBest',JSON.stringify(B));}catch(e){}}
 function tqCard(r,d){if(!TASK.on||!running)return;
   missHud(null);
-  const L=r.lb,lines=r.lines.slice();
+  const lines=r.lines.slice();
   lines.push(['Time',tqClock(d.secs)+(d.par?'  (par '+tqClock(d.par)+')':'')]);
-  resOpen(missOv,{letter:r.letter,title:TASKS[TASK.id].name+': '+r.title,score:r.score,sub:'of 100',stats:lines,board:'',tip:r.tip||'',retry:TASKS[TASK.id].name.toUpperCase()});
-  // the board line: this device's runs (the global boards need the Worker to know task: boards)
-  const box=missOv.querySelector('.rLines'),row=document.createElement('div');row.className='gl lbLine';
-  row.innerHTML='<span>Board, this device</span><b></b>';
-  row.lastChild.textContent=L?'#'+L.rank+' of '+L.total+'  +'+r.xp+' XP':'+'+r.xp+' XP';
-  if(L&&L.pb){const e=document.createElement('em');e.textContent=L.total>1?'PERSONAL BEST':'FIRST RUN';row.lastChild.appendChild(e);}
-  box.appendChild(row);resMore(box);
-  xpPop(r.xp,'Tasking: '+TASKS[TASK.id].name+(L&&L.pb&&L.total>1?'  ·  Personal best':''));
+  // the Leaderboard line comes from resBoard (the Worker's answer, or why the run is unranked); its XP pops through xpGrant
+  resOpen(missOv,{letter:r.letter,title:TASKS[TASK.id].name+': '+r.title,score:r.score,sub:'of 100',stats:lines,board:tqBoard(TASK.id),tip:r.tip||'',retry:TASKS[TASK.id].name.toUpperCase()});
 }
 
 // ---- the briefing: over the aircraft at its start, the sim held until ACCEPT TASKING ----
@@ -15761,7 +15757,7 @@ const SCH={cessna:{turn:95,slow:55,glide:68,thrTurn:0.79,thrSlow:0.53,cruise:100
 // ---- the curriculum (school1): one data structure, stages of lessons. Each lesson has three briefing cards, one quiz
 // question, the gradeable tasks (weights sum to 100, tol a number or a key into SCHOOL.tol), its logbook credit when
 // passed, and fly, the flight itself (start, tick, event; attached below from LESFLY). A lesson with no fly yet is soon:
-// listed, dimmed, not startable. server: the Worker knows that lesson: board; the others will rank on the device only
+// listed, dimmed, not startable. server: the lesson has its own BOARDS entry on the Worker; the others rank through its lesson: family
 const SCHOOL={
   cfi:{name:'Dana Reyes',title:'CFI',short:'Dana'},
   dpe:{name:'Frank Delgado',title:'DPE',short:'Frank'},   // school2 item 6: the examiner on the mock checkride
@@ -16490,14 +16486,14 @@ function startLesson(id,force,o){   // o.brief false: a restart (pause Restart, 
 // the flight begins: the briefing goes, the lesson card shows, the clock starts and the instructor's opening line goes out
 function lesGo(direct){if(!LES.on||(!LES.brief&&!direct))return;const L=lessonDef(LES.on);audioSess();initAudio();
   brClose();LES.brief=false;paused=false;pauseOv.classList.remove('on');LES.t=0;lesEl.classList.add('on');
-  gBegin(L);if(LB&&L.server)LB.runStart('lesson:'+LES.on);if(L.fly.open)L.fly.open(SCH[acType],LES.d);   // a device board (item 9) asks the Worker for nothing
+  gBegin(L);if(LB&&LB.BOARDS['lesson:'+LES.on])LB.runStart('lesson:'+LES.on);if(L.fly.open)L.fly.open(SCH[acType],LES.d);   // every lesson with a board (the checkride's: lesson:ride, its run kept across its tasks by rideRun)
 }
 // a lesson's marks in the world (pylons, lines, the aiming bar): lesAdd puts one in, lesClear (lesEnd) takes them all out
 const LES_OBJ=[];
 function lesAdd(o){scene.add(o);LES_OBJ.push(o);return o;}
 function lesClear(){for(const o of LES_OBJ){scene.remove(o);o.traverse&&o.traverse(m=>{if(m.isMesh&&m.geometry&&!m.geometry.userData.keep)m.geometry.dispose();});}LES_OBJ.length=0;}
 const HOOD={on:false,cam:0};let LES_W=null;   // school1 item 7: the hood (the camera it replaced), the flight's wind under a lesson's own
-function lesEnd(){LES.on=null;if(!RIDE.busy){RIDE.on=false;RIDE.q.length=0;RIDE.gap=0;}bannerFlush();navOff();lesClear();lesRestore();if(TASK.ask&&!TASK.on){TASK.ask=null;tqReplyUI();}if(G.holds.length){G.holds.length=0;gCue();}ezUI();if(LES.brief){LES.brief=false;brClose(true);}lesEl.classList.remove('on','tut');tutArrow.classList.remove('on');if(st){st.noProt=0;st.bankMax=0;st.easy=easy;}}
+function lesEnd(){LES.on=null;if(!RIDE.busy){RIDE.on=false;RIDE.q.length=0;RIDE.gap=0;if(LB)for(const b in LB.E.runs)if(/^lesson:/.test(b))LB.runCancel(b);}bannerFlush();navOff();lesClear();lesRestore();if(TASK.ask&&!TASK.on){TASK.ask=null;tqReplyUI();}if(G.holds.length){G.holds.length=0;gCue();}ezUI();if(LES.brief){LES.brief=false;brClose(true);}lesEl.classList.remove('on','tut');tutArrow.classList.remove('on');if(st){st.noProt=0;st.bankMax=0;st.easy=easy;}}
 // ---- the briefing (school1 item 3): three of Dana's cards and the lesson's quiz question, swiped or stepped with NEXT,
 // over the aircraft at its start with the sim held (LES.brief, as the tasking brief). A replay (any saved grade, F too) may skip it
 const brOv=$('brOv'),brTrack=$('brTrack'),brNext=$('brNext'),BR={slide:0,tgt:-1,tgtT:0,L:null};
@@ -16547,12 +16543,8 @@ function grade(score,title,lines,failWhy){
   if(!old||'ABCDF'.indexOf(L2)<'ABCDF'.indexOf(old)){schoolBest[key]=L2;try{localStorage.setItem('kgeuSchool',JSON.stringify(schoolBest));}catch(e){}}
   runLog('lesson',{lesson:LES.on,letter:L2,score:score});
   logbookAdd(LES.on,{letter:L2,score:score});   // the logbook: a pass credits the lesson's time, an F is an entry with none
-  const id=LES.on,lb='lesson:'+id,srv=!!(lessonDef(id)||{}).server;LES.last=id;
-  if(LB&&srv){if(failWhy)LB.runCancel(lb);else LB.runEnd(lb,score);}
-  // school1 item 9: a device lesson board: the run on this device's board (Easy when the run went Easy, runMode), XP by the
-  // Worker's formula (taskXp) banked in kgeuTaskXP with the Taskings', popped at the debrief; nothing for an F
-  const loc=LB&&!srv&&!failWhy&&LB.BOARDS[lb]?LB.localAdd(lb,score,LES.t):null,lxp=loc&&L2!=='F'?taskXp(score,runMode(),loc.pb):0;
-  if(lxp){try{localStorage.setItem('kgeuTaskXP',String((+localStorage.getItem('kgeuTaskXP')||0)+lxp));}catch(e){}}
+  const id=LES.on,lb='lesson:'+id,hasB=!!(LB&&LB.BOARDS[lb]);LES.last=id;
+  if(hasB){if(failWhy)LB.runCancel(lb);else LB.runEnd(lb,score);}   // every lesson board is global (the lesson: family); the XP is the Worker's
   // the debrief (item 4): a row a task with what was measured, then the quiz, then the board line (resBoard)
   const row=l=>Array.isArray(l)?'<div class="'+(l[0]?'ok':'no')+'">'+resEsc(l[1])+'</div>':l.why?'<div class="no">'+resEsc(l.name)+'</div>'
     :'<div class="gl gt '+(l.ok?'ok':'no')+'"><span>'+resEsc(l.name)+'</span><b>'+resEsc(l.detail||'')+'</b></div>';
@@ -16563,17 +16555,12 @@ function grade(score,title,lines,failWhy){
   const er=en?'<div class="gl gEnd"><span>Endorsement</span><b>'+resEsc((ENDORSE_NAME[ek]||ek)+', signed by '+en.by)+'</b></div>':'';
   const lg=L2!=='F'?logGain(id):'',lr=lg?'<div class="gl gLog"><span>Logbook</span><b>'+resEsc(lg)+'</b></div>':'';   // item 7: xc, night or instrument time credited
   resFill(gradeOv,{letter:L2,title:(id==='first'?'Lesson 1: ':'Debrief: ')+LES.name+(failWhy?': '+failWhy:''),score:failWhy?'':score+' of 100',
-    lines:er+lines.concat(qz).map(row).join('')+lr,board:failWhy||!srv?'':lb,tip:tl.length?dbTip(dr):''});
-  if(loc){const row=document.createElement('div');row.className='gl lbLine';row.innerHTML='<span>Board, this device</span><b></b>';   // as tqCard's
-    row.lastChild.textContent='#'+loc.rank+' of '+loc.total+(lxp?'  +'+lxp+' XP':'');
-    if(loc.pb){const e=document.createElement('em');e.textContent=loc.total>1?'PERSONAL BEST':'FIRST RUN';row.lastChild.appendChild(e);}
-    gradeOv.querySelector('.rLines').appendChild(row);}
+    lines:er+lines.concat(qz).map(row).join('')+lr,board:failWhy||!hasB?'':lb,tip:tl.length?dbTip(dr):''});
   if(G.def&&G.easy){const t=document.createElement('span');t.className='modeTag ezTag';t.textContent='EASY TOLERANCES, x2';$('gScore').appendChild(t);}
   bannerWait=true;try{lesEnd();}finally{bannerWait=false;}   // a held pop waits for the debrief to close (resClose flushes it); never left set
   if(id==='first'&&L2!=='F'){try{localStorage.setItem('kgeuTut','1');}catch(e){}}
   const nx=nextLesson(id),gn=$('gNext');gn.hidden=!nx||(L2==='F'&&nx.id!==id);if(nx)gn.textContent='Next lesson: '+nx.name;gn.dataset.l=nx?nx.id:'';
   resShow(gradeOv,false);
-  if(lxp)xpPop(lxp,'Lesson: '+(lessonDef(id)||{name:LES.name}).name+(loc.pb&&loc.total>1?'  \u00b7  Personal best':''));
   cfi((tl.length?dbSay(dr):L2==='F'?'Not to standard. Let us set it up again.':'Good flight.')+(en?' That is your '+lc1(ENDORSE_NAME[ek]||ek)+' endorsement. I am signing your logbook.':''),null,{offAir:1});
 }
 document.getElementById('gRetry').onclick=()=>{resClose(gradeOv);if(OR.res){oralStart(OR.id);return;}startLesson(LES.last,true,{brief:false});};   // the oral's RETRY draws 15 new questions
@@ -17354,7 +17341,6 @@ const rideName=id=>{const L=lessonDef(id);return RIDE_NAME[id]||(L&&(L.short||L.
 // the card's title, Checkride: Steep turns; on a narrow card (700 px or less) the task alone, the prefix hidden (.rPre)
 function rideTitle(n){lesT.innerHTML='<span class="rPre">Checkride: </span>'+resEsc(n);}
 const RIDE_STOP=/^(stalled|off field|off the runway|no recovery)$/;
-const RIDE_XP=500;
 function rideSeed(n){let a=n>>>0;RIDE.rnd=()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;};}   // a test hook, as oralSeed
 const rideRand=()=>RIDE.rnd?RIDE.rnd():Math.random();
 function rideDraw(){const P=RIDE_POOL.slice();for(let i=P.length-1;i>0;i--){const j=Math.floor(rideRand()*(i+1)),t=P[i];P[i]=P[j];P[j]=t;}
@@ -17390,7 +17376,9 @@ function rideTick(dt){RIDE.t+=dt;
   if(RIDE.gT>=2&&!RIDE.q.length&&RIDE.qT<=0)rideRun(RIDE.next);}   // after the pause and Frank's line
 // a task flown as its lesson starts, without the briefing: the same set up as startLesson and lesGo
 function rideRun(i){const id=RIDE.seq[i],L=lessonDef(id);if(!L||!L.fly){rideFinish(true);return;}
+  const rr=LB&&LB.E.runs['lesson:ride'];   // the ride's board run outlives each task's start() (LB.reset, a new st)
   RIDE.i=i;RIDE.gap=0;RIDE.busy=1;bannerWait=true;start(L.fly.at||'final','kgeu');bannerWait=false;RIDE.busy=0;A.land=1;   // start(): a clean flight, the ride kept (RIDE.busy), held pops held
+  if(rr){rr.st=st;LB.E.runs['lesson:ride']=rr;}
   const S=SCH[acType];lesEl.classList.remove('tut');$('lesQuit').textContent='End';
   RUNSTART={k:'les',id:'ride'};LES.on=id;LES.t=0;LES.ph=0;LES.d={};LES.name=L.name;LES.quiz=null;LES.brief=false;LES.last='ride';rideTitle(rideName(id));
   st.ezManFlap=0;navOff();L.fly.start(S,LES.d);
@@ -17422,9 +17410,8 @@ function rideFinish(stopped){const R=RIDE.res.slice(),seq=RIDE.seq.slice(),pass=
   runLog('lesson',{lesson:'ride',letter:L2,score:score});
   logbookAdd('ride',{letter:L2,score:score});   // a pass credits 1.5 h dual and a landing; a fail is an entry with none
   const cs=(LB&&LB.E&&LB.E.P&&LB.E.P.cs)||AC.cs;
-  let loc=null,xp=0;
-  if(pass){certSet(cs,score);loc=LB&&LB.BOARDS['lesson:ride']?LB.localAdd('lesson:ride',score,secs):null;   // the device board, passes only
-    if(loc){xp=RIDE_XP+taskXp(score,runMode(),loc.pb);try{localStorage.setItem('kgeuTaskXP',String((+localStorage.getItem('kgeuTaskXP')||0)+xp));}catch(e){}}}
+  if(pass)certSet(cs,score);
+  if(LB){if(pass)LB.runEnd('lesson:ride',score,{secs:secs});else LB.runCancel('lesson:ride');}   // the global board, passes only; the Worker grants the XP
   const rows=seq.map((id,k)=>{const r=R[k];if(!r)return '<div class="gl gt rr nf"><span>'+resEsc(rideName(id))+'</span><b>not flown</b></div>';
     return '<div class="gl gt rr '+(r.ok?'ok':'no')+'"><span>'+resEsc(rideName(id))+'</span><b>'+(r.failWhy?resEsc(r.failWhy)+', ':'')+r.score+' of 100</b></div>';}).join('');
   const say=pass?'Congratulations. You are a private pilot. This is your temporary certificate; the plastic one comes in the mail.'
@@ -17436,17 +17423,13 @@ function rideFinish(stopped){const R=RIDE.res.slice(),seq=RIDE.seq.slice(),pass=
   else{const F=R.filter(r=>!r.ok);
     lines=rows+(F.length?'<p class="orMh">Retrain</p>'+F.map(r=>'<div class="gl rtRow"><span>'+resEsc((lessonDef(r.id)||{name:r.id}).name)+'</span><button class="rtGo" data-l="'+r.id+'">RETRAIN</button></div>').join(''):'');}
   OR.res=false;LES.last='ride';LES.name='Mock checkride';
-  resFill(gradeOv,{letter:L2,title:'Checkride: '+(pass?'Private pilot':'Notice of disapproval'),score:pass?'':stopped?'':score+' of 100',lines:lines,board:'',retry:'CHECKRIDE',tip:pass?'':say});
+  resFill(gradeOv,{letter:L2,title:'Checkride: '+(pass?'Private pilot':'Notice of disapproval'),score:pass?'':stopped?'':score+' of 100',lines:lines,board:pass?'lesson:ride':'',retry:'CHECKRIDE',tip:pass?'':say});
   gradeOv.classList.remove('oral');gradeOv.classList.toggle('cert',pass);$('gFree').hidden=false;$('gSchool').textContent='MAIN MENU';
-  if(loc){const row=document.createElement('div');row.className='gl lbLine';row.innerHTML='<span>Board, this device</span><b></b>';   // as grade()'s
-    row.lastChild.textContent='#'+loc.rank+' of '+loc.total+(xp?'  +'+xp+' XP':'');
-    if(loc.pb){const e=document.createElement('em');e.textContent=loc.total>1?'PERSONAL BEST':'FIRST RUN';row.lastChild.appendChild(e);}
-    gradeOv.querySelector('.rLines').appendChild(row);}
   gradeOv.querySelectorAll('.rtGo').forEach(b=>b.onclick=()=>{resClose(gradeOv);startLesson(b.dataset.l,true);});   // the lesson with its briefing
   bannerWait=true;lesEnd();bannerWait=false;   // a held pop waits for the card to close
   $('gNext').hidden=true;$('gNext').dataset.l='';
   resShow(gradeOv,false);
-  if(pass){if(xp)xpPop(xp,'Private pilot certificate',{big:1,dur:1100,hold:2500});else hapPattern('success');}   // the burst over the card, with the success haptic
+  if(pass)hapPattern('success');
   dpe(say,null,{offAir:1});}
 LESFLY.ride={at:'runway',twr:1,start(S,d){rideStart();},open(S,d){rideOpen();},tick(){}};
 LESSONS.forEach(l=>{if(LESFLY[l.id])l.fly=LESFLY[l.id];if(!l.fly&&!l.oral)l.soon=true;});   // no flight yet: listed, not startable (the oral exam has none and needs none)
@@ -20679,27 +20662,23 @@ const APP_VER='2026-10-14-gfxfix';          // keep version.json in step when sh
   board('arc:drop',{name:'Airdrop accuracy',group:'Arcade',dir:-1,fmt:'m',how:'Metres from the drop zone centre'});
   board('arc:strike',{name:'Strike accuracy',group:'Arcade',how:'0 to 100: hits 45%, average miss 30%, time on target 25%'});
   board('arc:gunrun',{name:'A-10 gun run',group:'Arcade',go:()=>{pickType('a10',1);start('range');},how:'0 to 100: hits 45%, average miss 30%, time on target 25%'});
-  LESSONS.filter(l=>l.server).forEach(l=>board('lesson:'+l.id,{name:l.name,group:'Flight school',how:'The lesson score, 0 to 100'}));
-  // school1 item 9: the other lessons (climbs, ground, landings, solo, short, soft, xwind, emerg, hood) rank on the device, as
-  // the Taskings do: the Worker refuses a lesson: id it does not know (boardOf, no lesson: family). Not in PICK; the debrief's line only
-  LESSONS.filter(l=>!l.server&&l.fly&&!l.ride).forEach(l=>board('lesson:'+l.id,{name:l.name,group:'Flight school',local:1,how:'The lesson score, 0 to 100. Runs on this device'}));
-  // school2 item 6: the mock checkride ranks on the device too (the Worker is unchanged), passes only, and is in the picker
-  board('lesson:ride',{name:'Checkride',group:'Flight school',local:1,how:'The checkride score, 0 to 100, passes only. Runs on this device'});
+  // every flown lesson has a global board: the six first ones by their own BOARDS entries on the Worker, the rest (school1
+  // and school2) through its lesson: family (bugs1); the checkride too, passes only
+  LESSONS.filter(l=>l.fly&&!l.ride).forEach(l=>board('lesson:'+l.id,{name:l.name,group:'Flight school',how:'The lesson score, 0 to 100'}));
+  board('lesson:ride',{name:'Checkride',group:'Flight school',how:'The checkride score, 0 to 100, passes only'});
   board('free:landing',{name:'Free flight landing',group:'Free flight',how:'The landing grade points, 0 to 100'});
-  // Taskings: one board each, 0 to 100. local: the Worker refuses an id it does not know (boardOf in server/src/boards.js
-  // has no task: entry), so these rank the runs flown on this device until it does; nothing is sent
+  // Taskings: one board each, 0 to 100, global through the Worker's task: family
   [['overwatch','Overwatch','time on target, standoff, report timing, on station'],['lifeline','Lifeline','drop accuracy, time, smoke call, pickup pass'],
    ['shepherd','Shepherd','station keeping, the lane, the join'],['finder','Finder','find time, mark accuracy, the orbit, the report']].forEach(([id,n,how])=>
-    board('task:'+id,{name:n,group:'Taskings',local:1,go:()=>taskStart(id),how:'0 to 100: '+how+'. Runs on this device'}));
-  // a tasking's score on this device's board: rank among its runs here, a personal best
-  function localAdd(b,score,secs){const A=load('kgeuTaskLB',{}),L=A[b]||(A[b]=[]),B=BOARDS[b]||{dir:1},better=(x,y)=>B.dir>0?x>y:x<y;
-    const pb=!L.length||L.every(x=>better(score,x.s));
-    L.push({s:score,secs:Math.round(secs*10)/10,ac:acType,mode:runMode(),when:Date.now()});
-    L.sort((a,c)=>(B.dir>0?c.s-a.s:a.s-c.s)||a.when-c.when);if(L.length>60)L.length=60;save('kgeuTaskLB',A);
-    return {rank:1+L.filter(x=>better(x.s,score)).length,total:L.length,pb:pb};}
+    board('task:'+id,{name:n,group:'Taskings',go:()=>taskStart(id),how:'0 to 100: '+how}));
+  // the runs flown before these boards went global (kgeuTaskLB, written by the old device boards, never written now):
+  // read only, for the Boards screen's "your best on this phone" row until a global score is as good
   function localRows(b,p){const A=load('kgeuTaskLB',{}),now=Date.now(),day=utcDay();
-    const L=(A[b]||[]).filter(x=>p==='today'?utcDay(x.when)===day:p==='week'?now-x.when<7*864e5:true);
-    return {local:1,rows:L.slice(0,30).map((x,i)=>({r:i+1,score:x.s,ac:x.ac,mode:x.mode,when:x.when,secs:x.secs})),total:L.length};}
+    const L=(A[b]||[]).filter(x=>x&&Number.isFinite(x.s)&&(p==='today'?utcDay(x.when)===day:p==='week'?now-x.when<7*864e5:true));
+    return {rows:L.slice(0,30).map((x,i)=>({r:i+1,score:x.s,ac:x.ac,mode:x.mode,when:x.when,secs:x.secs})),total:L.length};}
+  function localBest(b,p){const B=BOARDS[b]||{dir:1},L=localRows(b,p).rows;if(!L.length)return null;
+    const x=L.reduce((a,c)=>(B.dir>0?c.score>a.score:c.score<a.score)?c:a);return {score:x.score,mode:x.mode||null,ac:x.ac||null};}
+  try{localStorage.removeItem('kgeuTaskXP');}catch(e){}   // the retired local XP bank (the Worker grants every board's XP)
   // the world airports: the 5 mile landing challenge to each region's home runway (aptStart switches region when needed)
   APT_IDS.forEach(id=>board(aptBoard(id),{name:REGIONS[id].base+' landing',group:'World airports',ghost:1,go:()=>aptStart(id),
     how:'Points: 1,000 x par / your time (up to 1.5x), x the landing grade. Runway '+REGIONS[id].main}));
@@ -20808,13 +20787,14 @@ const APP_VER='2026-10-14-gfxfix';          // keep version.json in step when sh
   // granted nothing. A dogfight (its boards, or the daily on a dogfight day: the answer carries ach) banks to its
   // results card instead (dfXpBank), never a pop in the fight; a queued run that lands mid fight waits for the card too.
   const XP_WHY={'free:landing':'Landing graded',daily:'Daily challenge','arc:strike':'Strike range','arc:drop':'Airdrop','mission:short':'Short field landing'};
-  function xpWhy(b,j,live){const B=BOARDS[b]||{name:''};let w=XP_WHY[b]||(/^lesson:/.test(b)?'Lesson: '+B.name:B.name);
+  function xpWhy(b,j,live){const B=BOARDS[b]||{name:''};let w=XP_WHY[b]||(/^lesson:/.test(b)?'Lesson: '+B.name:/^task:/.test(b)?'Tasking: '+B.name:B.name);
     if(!live)w='Sent: '+w;
     if(j.rankUp)w+='  \u00b7  Rank up: '+j.rankUp;else if(j.top10&&j.rank<=10)w+='  \u00b7  Top 10';else if(j.pb)w+='  \u00b7  Personal best';
     return w;}
   function xpGrant(b,j,live){const xp=(+j.gain||0)+(+j.achXp||0);if(xp<=0)return;
     if((/^df:/.test(b)||Array.isArray(j.ach))&&live){if(typeof dfXpBank==='function')dfXpBank(xp,j,b);return;}
     if(typeof DF!=='undefined'&&DF.live){E.xpLater.push([xp,xpWhy(b,j,live)]);return;}   // another run's XP: after the fight
+    if(b==='lesson:ride'&&live){xpPop(xp,'Private pilot certificate',{big:1,dur:1100,hold:2500});return;}   // a passed checkride: the big burst over the certificate
     xpPop(xp,xpWhy(b,j,live));}
 
   // ---- the end of run badge: a slide-in like the landing badge, never pauses, a tap opens the board
@@ -21088,7 +21068,7 @@ const APP_VER='2026-10-14-gfxfix';          // keep version.json in step when sh
   // with its EASY or HARD chip. Hidden boards (the landing challenges, the dash, the gun run, the world airports) keep
   // their rows on the server and still open from code (lbOpen), they just have no entry
   const V={b:'daily',p:'today',seq:0,cache:{},dm:null,ds:'score'};
-  const PICK=[['Challenges',['daily','df','arc:strike','arc:drop','mission:short']],['Taskings',TASK_IDS.map(id=>'task:'+id)],['Free flight',['free:landing']],['Flight school',LESSONS.filter(l=>l.server).map(l=>'lesson:'+l.id).concat('lesson:ride')]];
+  const PICK=[['Challenges',['daily','df','arc:strike','arc:drop','mission:short']],['Taskings',TASK_IDS.map(id=>'task:'+id)],['Free flight',['free:landing']],['Flight school',LESSONS.filter(l=>l.fly&&!l.ride).map(l=>'lesson:'+l.id).concat('lesson:ride')]];
   const PNAME={daily:'Daily challenge',df:'Red Flag Dogfight','arc:strike':'Strike range','arc:drop':'Airdrop','mission:short':'Short field landing','free:landing':'Landings','lesson:ride':'Checkride'};
   const DF_STAT={score:'Score',kills:'Kills',clear:'Clear time',guns:'Gun kills'};
   const isDf=b=>/^df:/.test(b),entryOf=b=>isDf(b)?'df':b;
@@ -21128,13 +21108,22 @@ const APP_VER='2026-10-14-gfxfix';          // keep version.json in step when sh
   }
   // a tap on a row reads it out in full (a 12 letter callsign is cut on a narrow phone; nothing hovers on a phone)
   ['lbRowsIn','lbMe'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('click',ev=>{const r=ev.target.closest('.lbRow[data-full]');if(r)toast(r.dataset.full,3);});});
+  // the pinned row from this phone's old device runs (localBest) while there is no global score as good: callsign or You,
+  // "your best on this phone", the score and its EASY/HARD chip
+  // (only with no global score; a global me row with a worse score keeps its rank and gets "phone best" in its note: phoneBetter)
+  const phoneBetter=gm=>{const x=localBest(V.b,V.p),B=BOARDS[V.b];return x&&B&&gm&&(B.dir>0?x.score>gm.score:x.score<gm.score)?x:null;};
+  function lbDev(gm){const x=localBest(V.b,V.p),B=BOARDS[V.b];if(!x||!B||gm)return '';
+    const cs=E.P?E.P.cs:'You',sub='your best on this phone';
+    return '<div class="lbRow me lbDev" data-full="'+esc(cs+'  ·  '+sub+'  ·  '+fmtS(V.b,x.score))+'"><span class="n">&ndash;</span><span class="c">'+(E.P?csTag(cs,rankIdx(E.P.xp||0),E.P.creator,sub):'<span>'+esc(cs)+'</span><i>'+esc(sub)+'</i>')+'<span class="dvN">Your best on this phone</span></span>'+lbMode(x.mode)+'<span class="s">'+esc(fmtS(V.b,x.score))+'</span><span class="a">'+(x.ac&&AC_TAG[x.ac]?lbAc(x.ac):'YOU')+'</span></div>';}
   function lbRows(j){
     const inn=$('lbRowsIn'),me=$('lbMe'),B=BOARDS[V.b];
-    if(!j){inn.innerHTML='<div class="lbMsg"><b>Offline</b>Leaderboards need a connection. Runs you fly now are saved and sent when you are back online.</div>';me.innerHTML='';me.classList.add('off');$('lbTotal').textContent='';return;}
+    if(!j){inn.innerHTML='<div class="lbMsg"><b>Offline</b>Leaderboards need a connection. Runs you fly now are saved and sent when you are back online.</div>';
+      const lo=lbDev(null);me.innerHTML=lo;me.classList.toggle('off',!lo);$('lbTotal').textContent='';return;}
     const mine=E.P?E.P.cs:'',myRow=j.rows.find(r=>r.cs===mine),myAc=j.me&&(j.me.ac||myRow&&myRow.ac);
     inn.innerHTML=j.rows.length?j.rows.map(r=>'<div class="lbRow'+(r.cs===mine?' me':'')+(r.r===1?' top1':'')+(r.r<=3?' pod p'+r.r:'')+'" data-full="'+esc(r.cs+'  ·  #'+num(r.r)+'  ·  '+fmtS(V.b,r.score)+'  ·  '+(AC_TAG[r.ac]||'')+'  ·  '+(r.mode==='easy'?'Easy':'Hard'))+'"><span class="n">'+(r.r<=3?'<b>'+r.r+'</b>':num(r.r))+'</span><span class="c">'+csTag(r.cs,rankByName(r.rank),r.creator)+'</span>'+lbMode(r.mode)+'<span class="s">'+esc(fmtS(V.b,r.score))+'</span><span class="a">'+lbAc(r.ac)+'</span></div>').join('')
       :'<div class="lbMsg"><b>No scores yet</b>'+(V.p==='today'?'Nobody has flown this one today. ':'')+'Be the first on the board.</div>';
-    me.innerHTML=j.me?'<div class="lbRow me" data-full="'+esc(j.me.cs+'  ·  #'+num(j.me.r)+' of '+num(j.total)+'  ·  '+fmtS(V.b,j.me.score))+'"><span class="n">#'+num(j.me.r)+'</span><span class="c">'+csTag(j.me.cs,rankByName(j.me.rank),j.me.creator,'of '+num(j.total))+'</span>'+lbMode(j.me.mode)+'<span class="s">'+esc(fmtS(V.b,j.me.score))+'</span><span class="a">'+(myAc&&AC_TAG[myAc]?lbAc(myAc):'YOU')+'</span></div>'
+    const lo=lbDev(j.me),ph=phoneBetter(j.me),phT=ph?'  ·  phone best '+fmtS(V.b,ph.score):'';
+    me.innerHTML=lo?lo:j.me?'<div class="lbRow me'+(ph?' lbPh':'')+'" data-full="'+esc(j.me.cs+'  ·  #'+num(j.me.r)+' of '+num(j.total)+'  ·  '+fmtS(V.b,j.me.score)+phT)+'"><span class="n">#'+num(j.me.r)+'</span><span class="c">'+csTag(j.me.cs,rankByName(j.me.rank),j.me.creator,'of '+num(j.total)+phT)+'</span>'+lbMode(j.me.mode)+'<span class="s">'+esc(fmtS(V.b,j.me.score))+'</span><span class="a">'+(myAc&&AC_TAG[myAc]?lbAc(myAc):'YOU')+'</span></div>'
       :E.P?'<div class="lbRow me"><span class="n">&ndash;</span><span class="c">'+csTag(E.P.cs,rankIdx(E.P.xp||0),E.P.creator,'no score '+(V.p==='today'?'today':V.p==='week'?'this week':'yet'))+'</span><span class="s"></span><span class="a">YOU</span></div>'
       :'<div class="lbRow me"><span class="c"><span>Pick a callsign in Settings to get on the boards</span></span></div>';
     $('lbTotal').textContent=num(j.total)+' pilot'+(j.total===1?'':'s');
@@ -21146,15 +21135,7 @@ const APP_VER='2026-10-14-gfxfix';          // keep version.json in step when sh
     let off=false;if(r){const a=r.getBoundingClientRect(),b=rows.getBoundingClientRect();off=a.top>=b.top-1&&a.bottom<=b.bottom-56+1;}
     if(me.classList.contains('off')!==off)me.classList.toggle('off',off);}
   $('lbRows').addEventListener('scroll',lbPin,{passive:true});
-  // a device board: this device's runs, best first, the date under the callsign; works offline
-  function lbLocal(j){const inn=$('lbRowsIn'),me=$('lbMe'),P=E.P,cs=P?P.cs:'You',ri=P?rankIdx(P.xp||0):0,cr=P&&P.creator;
-    const dt=w=>new Date(w).toLocaleDateString('en-US',{month:'short',day:'numeric'});
-    inn.innerHTML=j.rows.length?j.rows.map(r=>'<div class="lbRow'+(r.r===1?' top1 me':'')+(r.r<=3?' pod p'+r.r:'')+'" data-full="'+esc(cs+'  ·  #'+r.r+'  ·  '+fmtS(V.b,r.score)+'  ·  '+(AC_TAG[r.ac]||'')+'  ·  '+(r.mode==='easy'?'Easy':'Hard')+'  ·  '+dt(r.when))+'"><span class="n">'+(r.r<=3?'<b>'+r.r+'</b>':num(r.r))+'</span><span class="c">'+csTag(cs,ri,cr,dt(r.when))+'</span>'+lbMode(r.mode)+'<span class="s">'+esc(fmtS(V.b,r.score))+'</span><span class="a">'+lbAc(r.ac)+'</span></div>').join('')
-      :'<div class="lbMsg"><b>No runs yet</b>'+(V.p==='today'?'Nothing flown today. ':'')+'Fly this tasking from Challenges.</div>';
-    me.innerHTML='<div class="lbRow me lbLoc"><span class="c"><span>On this device. Global Taskings boards are coming.</span></span></div>';me.classList.remove('off');
-    $('lbTotal').textContent=num(j.total)+' run'+(j.total===1?'':'s');$('lbRace').hidden=true;$('lbRows').scrollTop=0;}
   function lbFetch(force){
-    if(BOARDS[V.b]&&BOARDS[V.b].local){++V.seq;lbLocal(localRows(V.b,V.p));return Promise.resolve();}
     const key=V.b+'|'+V.p,seq=++V.seq,c=V.cache[key];
     if(c)lbRows(c);else $('lbRowsIn').innerHTML='<div class="lbMsg">Loading...</div>';
     if(!E.enabled){lbRows(null);return Promise.resolve();}
@@ -21234,11 +21215,11 @@ const APP_VER='2026-10-14-gfxfix';          // keep version.json in step when sh
   return {E:E,BOARDS:BOARDS,ORDER:ORDER,board:board,runStart:runStart,runEnd:runEnd,runCancel:runCancel,frame:frame,reset:reset,armFree:armFree,
     boot:boot,homeRank:homeRank,sheet:sheet,sheetOn:()=>!$('lbSheet').hidden,csHold:()=>csHold,paintModel:paintModel,paintAll:paintAll,lbOpen:lbOpen,lbRender:lbRender,race:race,ui:ui,flush:flush,csOpen:csOpen,dice:dice,
     fameDraw:fameDraw,fameFetch:fameFetch,fameApply:fameApply,fameApplyCity:fameApplyCity,ghostStart:ghostStart,decodePath:decodePath,rankSVG:rankSVG,rankByName:rankByName,utcDay:utcDay,fmtS:fmtS,showBadge:showBadge,ghostOff:ghostOff,runBoard:runBoard,
-    localAdd:localAdd,localRows:localRows,
+    localRows:localRows,localBest:localBest,
     get P(){return E.P;}};
 })();
 
-window.__kgeu={stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>p.cacheKey),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),taskXp:taskXp,tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
+window.__kgeu={stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>p.cacheKey),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
   task:()=>({on:TASK.on,id:TASK.id,stage:TASK.stage&&TASK.stage.id,si:TASK.si,brief:TASK.brief,done:TASK.done,res:TASK.res,ask:TASK.ask&&{shown:TASK.ask.shown,opts:TASK.ask.opts.map(o=>o.k),t:TASK.ask.t},d:TASK.d,log:TASK.log.slice(),seed:TASK.seed}),
   tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzBuild:()=>dzBuild(),dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),

@@ -102,7 +102,7 @@ async def main():
         ok('the score: 0 to 100 from time on target, standoff, report and station; one early call and one overflight cost points', r and 50 <= r['score'] < 100 and [l[0] for l in r['lines']] == ['Time on target', 'Standoff in band', 'Report after departure', 'On station', 'Talk-on'] and '1 early' in r['lines'][2][1] and '1 overflight' in r['lines'][1][1], r and (r['score'], r['lines']))
         await pg.wait_for_timeout(3200)
         c = await pg.evaluate("()=>({on:document.getElementById('missOv').classList.contains('on'),t:document.getElementById('mTitle').textContent,l:[...document.querySelectorAll('#mLines .gl')].map(e=>e.innerText.replace(/\\s+/g,' ')),retry:document.getElementById('mRetry').textContent})")
-        ok('the results card: Overwatch, the lines, the time against par, this device\'s board and XP, RETRY OVERWATCH', c['on'] and c['t'].startswith('Overwatch: ') and any('Board, this device' in x and 'XP' in x for x in c['l']) and c['retry'] == 'RETRY OVERWATCH', c)
+        ok('the results card: Overwatch, the lines, the time against par, its Leaderboard line (resBoard), RETRY OVERWATCH', c['on'] and c['t'].startswith('Overwatch: ') and any(x.startswith('Leaderboard') for x in c['l']) and not any('this device' in x for x in c['l']) and c['retry'] == 'RETRY OVERWATCH', c)
         await shot(pg, '/tmp/tasking_ow_card.png')
         ok('no console errors', not pg.errs, pg.errs[:3])
         # replays differ
