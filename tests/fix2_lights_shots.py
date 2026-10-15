@@ -10,7 +10,7 @@
 # clock at t=0.03 s, which is always inside the lit window, before every shot -- the same
 # effect ("keep the one where the strobe is on") but deterministic under slow headless
 # rendering.
-# Usage: .venv/bin/python tests/fix2_lights_shots.py <outdir> [type ...]
+# Usage: .venv/bin/python tests/fix2_lights_shots.py [--out DIR | <outdir>] [type ...]  (MQ-9s also get lights_<type>_day[_crop].png)
 # Writes <outdir>/lights_<type>_{sunset,night}.png and _crop variants, plus
 # lights_<mq9a|mq9b>_{sunset,night}_tailcrop.png for the two MQ-9s.
 import asyncio, os, sys
@@ -18,8 +18,11 @@ from playwright.async_api import async_playwright
 from harness import serve, launch, page, IPHONE_15
 
 args = [a for a in sys.argv[1:] if not a.startswith('--')]
-OUT = os.path.abspath(args[0] if args else 'overnight-screenshots/fix2/before/lights')
-TYPES = args[1:] or ['mq9b', 'reaper', 'f16', 'c130', 'a10', 'b737', 'a320', 'b747', 'cessna', 'archer', 'alpha']
+outs = [a.split('=', 1)[1] for a in sys.argv[1:] if a.startswith('--out=')]
+if not outs and '--out' in sys.argv:
+    i = sys.argv.index('--out'); outs = [sys.argv[i + 1]]; args.remove(sys.argv[i + 1])
+OUT = os.path.abspath(outs[0] if outs else (args.pop(0) if args else 'overnight-screenshots/fix2/before/lights'))
+TYPES = args or ['mq9b', 'reaper', 'f16', 'c130', 'a10', 'b737', 'a320', 'b747', 'cessna', 'archer', 'alpha']
 MQ9 = {'mq9b': 'mq9b', 'reaper': 'mq9a'}   # reaper's display name is MQ-9A
 
 try:
@@ -65,7 +68,7 @@ async def main():
             await pg.evaluate("(m)=>{let k=0;while(window.__kgeu.camMode()!==m&&k++<5)window.__kgeu.cycleCam();}", mode)
 
         for t in TYPES:
-            for tod in ['sunset', 'night']:
+            for tod in ['sunset', 'night'] + (['day'] if t in MQ9 else []):   # fix2 item 10: a day crop of the two MQ-9s
                 await pg.evaluate(f"()=>{{{K}.setTOD('{tod}');{K}.pick('{t}');{K}.pickBase('luke');{K}.start('runway');}}")
                 await pg.wait_for_timeout(300)
                 await cam(0)
@@ -77,7 +80,7 @@ async def main():
                 await pg.screenshot(path=full, timeout=120000)
                 print('  wrote', full)
                 crop2x(full, os.path.join(OUT, f'lights_{t}_{tod}_crop.png'))
-                if t in MQ9:
+                if t in MQ9 and tod != 'day':
                     crop2x(full, os.path.join(OUT, f'lights_{MQ9[t]}_{tod}_tailcrop.png'), cy_off=20, half_w=150, half_h=100)
                 await pg.evaluate("()=>window.__kgeu.lightClock(null)")
         if pg.errs:
