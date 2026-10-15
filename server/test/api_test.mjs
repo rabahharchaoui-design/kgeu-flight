@@ -298,6 +298,57 @@ async function main() {
   ok('31st submission in an hour refused as rate limited', last.s === 429 && last.j.reason.startsWith('over 30'), JSON.stringify(last.j));
   }
 
+  // ---- bug reports (local only: live, every report opens a real GitHub issue and sends a push)
+  if (!LIVE) {
+    const JPG = Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOjM9PDkzODdASFxOQERXRTc4UG1RV19iZ2hnPk1xeXBkeFxlZ2P/2wBDARESEhgVGC8aGi9jQjhCY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2P/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwCSiiivGPWP/9k=', 'base64');
+    const rep = (k, extra = {}) => call('/report', Object.assign({ key: k, category: 'controls', severity: 'broken', text: 'The stick sticks\nsecond line', context: { screen: 'flight', ac: 'cessna', errors: ['TypeError: x'] } }, extra));
+    const K1 = key(), K2 = key();
+    const g1 = await rep(K1, { shot: 'data:image/jpeg;base64,' + JPG.toString('base64') });
+    ok('report: a guest report with a JPEG is stored with a shot id', g1.s === 200 && g1.j.ok && g1.j.id > 0 && /^[0-9a-f]{32}$/.test(g1.j.shot || '') && g1.j.issue === null, JSON.stringify(g1.j));
+    const sr = await fetch(BASE + '/shot/' + g1.j.shot + '.jpg');
+    const sb2 = Buffer.from(await sr.arrayBuffer());
+    ok('report: /shot/<id>.jpg serves the same JPEG bytes', sr.status === 200 && sr.headers.get('content-type') === 'image/jpeg' && /immutable/.test(sr.headers.get('cache-control') || '') && sb2.equals(JPG), sr.status + ' ' + sb2.length);
+    ok('report: an unknown shot is 404', (await fetch(BASE + '/shot/' + '0'.repeat(32) + '.jpg')).status === 404);
+    const g1r = sql(`SELECT * FROM reports WHERE id=${g1.j.id}`)[0] || {};
+    ok('report: the guest row has callsign guest, status open, a hashed device', g1r.callsign === 'guest' && g1r.status === 'open' && g1r.device && g1r.device !== K1 && g1r.shot === g1.j.shot && g1r.text === 'The stick sticks\nsecond line', JSON.stringify(g1r).slice(0, 300));
+    const pl = await call('/report', Object.assign({ category: 'boards', severity: 'annoying', text: '  My XP went missing  ' }, dg));
+    const plr = sql(`SELECT callsign, text FROM reports WHERE id=${pl.j.id | 0}`)[0] || {};
+    ok('report: a signed in player\'s report carries the callsign, text trimmed', pl.s === 200 && plr.callsign === dg.cs && plr.text === 'My XP went missing', JSON.stringify(pl.j) + JSON.stringify(plr));
+    const long = await rep(K2, { text: 'x'.repeat(1001) });
+    ok('report: text of 1001 chars refused', long.s === 400 && long.j.error === 'bad', JSON.stringify(long.j));
+    ok('report: an empty text refused', (await rep(K2, { text: '   ' })).s === 400);
+    const bc = await rep(K2, { category: 'weather' });
+    ok('report: a bad category refused', bc.s === 400 && bc.j.reason === 'category', JSON.stringify(bc.j));
+    ok('report: a bad severity refused', (await rep(K2, { severity: 'meh' })).j.reason === 'severity');
+    ok('report: from another origin refused', (await call('/report', { key: K2, category: 'other', severity: 'annoying', text: 'x' }, 'https://evil.example')).s === 403);
+    const big = Buffer.alloc(301 * 1024, 7); big[0] = 0xFF; big[1] = 0xD8; big[2] = 0xFF;
+    const bg = await rep(K1, { shot: big.toString('base64') });
+    ok('report: a 301 KB shot is rejected, the report kept', bg.s === 200 && bg.j.shot === 'rejected' && (sql(`SELECT shot FROM reports WHERE id=${bg.j.id | 0}`)[0] || {}).shot === null, JSON.stringify(bg.j));
+    const png = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13]);
+    const pn = await rep(K1, { shot: png.toString('base64') });
+    ok('report: a PNG shot is rejected, the report kept', pn.s === 200 && pn.j.shot === 'rejected' && pn.j.id > 0, JSON.stringify(pn.j));
+    const cx = await rep(K1, { context: { screen: 'menu', log: 'y'.repeat(9000) } });
+    const cxr = sql(`SELECT context FROM reports WHERE id=${cx.j.id | 0}`)[0] || {};
+    let cxo = null; try { cxo = JSON.parse(cxr.context); } catch (e) { }
+    ok('report: a context over 8000 chars is stored truncated', cx.s === 200 && cxr.context.length <= 8000 && cxo && cxo.truncated === true, (cxr.context || '').length + '');
+    const m = await call('/reports/mine?key=' + K1 + '&cs=');
+    const ids = (m.j.reports || []).map(r => r.id);
+    ok('reports/mine (GET): this device\'s reports newest first, all open, not another device\'s',
+      m.s === 200 && ids.join() === [cx.j.id, pn.j.id, bg.j.id, g1.j.id].join() && m.j.reports.every(r => r.status === 'open' && r.text.length <= 80) && !ids.includes(pl.j.id), JSON.stringify(m.j).slice(0, 300));
+    const mp = await call('/reports/mine', Object.assign({}, dg));
+    ok('reports/mine (POST): the player\'s device lists its own report', mp.s === 200 && mp.j.reports.length === 1 && mp.j.reports[0].id === pl.j.id && mp.j.reports[0].category === 'boards', JSON.stringify(mp.j));
+    const g5 = await rep(K1);
+    ok('report: the 5th from one device in a day passes', g5.s === 200, JSON.stringify(g5.j));
+    const g6 = await rep(K1);
+    ok('report: the 6th from one device in a day is 429, nothing stored', g6.s === 429 && g6.j.error === 'rate' && sql(`SELECT COUNT(*) n FROM reports WHERE device=(SELECT device FROM reports WHERE id=${g1.j.id})`)[0].n === 5, JSON.stringify(g6.j));
+    const k2 = await rep(K2);
+    ok('report: a different device key still passes', k2.s === 200, JSON.stringify(k2.j));
+    // 7 stored from this IP so far: 3 more fill the 10 a day, the 11th is refused whatever the key
+    for (let i = 0; i < 3; i++) await rep(key());
+    const ip11 = await rep(key());
+    ok('report: the 11th from one IP in a day is 429', ip11.s === 429 && ip11.j.error === 'rate', JSON.stringify(ip11.j));
+  }
+
   // ---- every refusal is on record
   const fl = sql(`SELECT reason FROM flagged WHERE created>=${T0} AND callsign IN ('${A}','${B}','${C}','F4GG0T','OHRABAH')`);
   const reasons = fl.map(r => r.reason);

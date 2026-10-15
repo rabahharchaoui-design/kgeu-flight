@@ -163,8 +163,8 @@ async def mult_section(b, url):
     r = await end_run(pg, 3)
     sc = r['sc']
     want = round(sc['base'] * 1.15)
-    ok('a run with LIGHT + HALF: score = base x 1.15 (3 kills and the wave bank), base kept for the boards', sc['base'] >= 300 and sc['score'] == want and sc['mult'] == 1.15 and sc['lo'] == 'light/half', sc)
-    ok('the results card shows the multiplied score and the Multiplier row (x1.15, board points = base)', r['card'] and r['score'].startswith(format(want, ',')) and 'Multiplier' in r['lines'] and 'x1.15' in r['lines'] and ('board points ' + format(sc['base'], ',')) in r['lines'], (r['score'], r['lines']))
+    ok('a run with LIGHT + HALF: score = base x 1.15 (3 kills and the wave bank)', sc['base'] >= 300 and sc['score'] == want and sc['mult'] == 1.15 and sc['lo'] == 'light/half', sc)
+    ok('the results card shows the multiplied score and the Multiplier row (x1.15, no board points suffix: the boards rank the score)', r['card'] and r['score'].startswith(format(want, ',')) and 'Multiplier' in r['lines'] and 'x1.15' in r['lines'] and 'board points' not in r['lines'], (r['score'], r['lines']))
     ok('the local best keeps the card score', r['best'] and r['best']['pts'] == want, r['best'])
     await shot(pg, 'a3_results_844.png')
     # the default: no multiplier row, the score is the base
@@ -284,7 +284,7 @@ async def balance_section(b, url):
     await pg.context.close()
 
 async def submit_section(b, url):
-    """item 5: the run submission carries the loadout and multiplier with the base score; the card shows the loadout; the XP burst"""
+    """item 5 (Bugs1 2): the run submission carries the loadout and multiplier with the multiplied score; the card shows the loadout; the XP burst"""
     m = Mock(gain=37)
     st = {'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuType': 'f16'}; st.update(m.storage())
     pg = await page(b, url, vp=IPHONE_15, storage=st, pre=m.install)
@@ -296,7 +296,7 @@ async def submit_section(b, url):
     sub = m.subs[-1] if m.subs else {}
     df = sub.get('df') or {}
     sc = r['sc']
-    ok('the submission: df:score:hard, the BASE score (what the Worker can check), the stats as before', sub.get('board') == 'df:score:hard' and sub.get('score') == sc['base'] and df.get('kills') == 3 and 'bank' in df, {k: sub.get(k) for k in ('board', 'score', 'mode')})
+    ok('the submission: df:score:hard, the MULTIPLIED score (the Worker multiplies its cap by mult), the stats as before', sub.get('board') == 'df:score:hard' and sub.get('score') == sc['score'] and sc['score'] > sc['base'] and df.get('kills') == 3 and 'bank' in df, {k: sub.get(k) for k in ('board', 'score', 'mode')})
     ok('the df block carries the loadout (light/half), the multiplier (1.15) and the card points', df.get('lo') == 'light/half' and df.get('mult') == 1.15 and df.get('pts') == sc['score'] and df.get('srm') == 4 and df.get('mrm') == 0, df)
     await pg.wait_for_timeout(2500)
     card = await pg.evaluate("()=>{const x=document.querySelector('#arcOv .rXp');return {lines:document.getElementById('aLines').innerText,xp:x&&x.textContent,done:!!(x&&x.classList.contains('done'))}}")

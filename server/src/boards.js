@@ -40,7 +40,8 @@ for (const m of ['easy', 'hard']) {
   BOARDS['df:guns:' + m] =  { dir: 1, min: 0, max: 10, minSecs: 20, ref: 10, mode: m, fan: 'g' };
 }
 // the dogfight's caps (LEADERBOARD.md): 4 rounds of 90 s, 10 bandits, 3 hits; points 100 a kill (+100 by gun), 2 a
-// second banked, 250 a win, -75 a hit. Achievement XP is given once per player, ever (table achs).
+// second banked, 250 a win, -75 a hit; the cap is multiplied by the loadout multiplier (df.mult, 1 to 1.15, none: 1) and
+// rounded like the game's dfScore. Achievement XP is given once per player, ever (table achs).
 export const DF = { waves: 4, round: 90, kills: 10, hits: 3, perKill: 4, winSecs: 45, maxSecs: 4 * 90 + 30 };
 export const DF_ACH_XP = { ace: 150, guns: 75, flaresave: 50, untouchable: 200 };
 // a dogfight day for the daily challenge: the UTC day number (days since 1970-01-01) % 5 === 3
@@ -63,7 +64,10 @@ export function dfProblem(d, score, secs, ac, tol = 1) {
   if (won && secs < DF.winSecs) return 'a win in ' + secs.toFixed(1) + ' s, under ' + DF.winSecs + ' s';
   // banked seconds: whole seconds up per cleared wave, so up to one more a wave
   if (!Number.isFinite(bank) || bank < 0 || bank > Math.max(0, DF.round * waves - DF.perKill * kills) + waves) return 'banked ' + d.bank + ' s, too many for ' + waves + ' waves and ' + kills + ' kills';
-  const cap = Math.max(0, 100 * kills + 100 * guns + 2 * bank + (won ? 250 : 0) - 75 * hits);
+  // the loadout multiplier (absent on older builds: 1); the game sends Math.round(base * mult), so the cap rounds the same
+  const mult = d.mult == null ? 1 : d.mult;
+  if (typeof mult !== 'number' || !Number.isFinite(mult) || mult < 1 || mult > 1.15) return 'loadout multiplier ' + d.mult + ' not 1 to 1.15';
+  const cap = Math.max(0, Math.round((100 * kills + 100 * guns + 2 * bank + (won ? 250 : 0) - 75 * hits) * mult));
   if (score > cap + tol) return 'dogfight score ' + score + ' over the ' + cap + ' its stats allow';
   if (d.clear != null) {
     const cl = +d.clear;
@@ -83,9 +87,14 @@ export function dfProblem(d, score, secs, ac, tol = 1) {
 }
 // future modes register on the server in one line too, e.g.
 //   BOARDS['race:red'] = { dir: 1, min: 0, max: 1000, minSecs: 30, ref: 1000 };
-// and a whole family can share limits by prefix:
+// and a whole family can share limits by prefix (an exact BOARDS entry wins over
+// its family in boardOf). Flight school lessons (lesson:<id>, score 0 to 100, at
+// least a minute of flight) and Taskings (task:<id>, score 0 to 100, at least two
+// minutes) are families so a new lesson or tasking needs no Worker deploy; the six
+// first lesson boards keep their own BOARDS limits.
 const FAMILIES = [
-  // ['apt:', { dir: 1, min: 0, max: 100, minSecs: 20, ref: 100 }],
+  ['lesson:', { dir: 1, min: 0, max: 100, minSecs: 60, ref: 100 }],
+  ['task:',   { dir: 1, min: 0, max: 100, minSecs: 120, ref: 100 }],
 ];
 export function boardOf(id) {
   if (typeof id !== 'string' || id.length > 40) return null;

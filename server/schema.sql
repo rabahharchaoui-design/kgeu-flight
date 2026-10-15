@@ -71,3 +71,28 @@ CREATE TABLE IF NOT EXISTS achs(
   created   INTEGER NOT NULL,
   PRIMARY KEY(player_id, ach)
 );
+-- bug reports from the game (POST /report), mirrored to a GitHub issue and a push, best effort
+CREATE TABLE IF NOT EXISTS reports(
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  created   INTEGER NOT NULL,              -- ms since epoch
+  callsign  TEXT NOT NULL,                 -- the signed in player's callsign, or 'guest'
+  device    TEXT NOT NULL,                 -- HMAC of 'd:' + device key (or IP and user agent); the key itself is never stored
+  ip        TEXT,
+  category  TEXT NOT NULL,                 -- controls, graphics, crash, boards, missions, school, sound, other
+  severity  TEXT NOT NULL,                 -- annoying, broken, cantplay
+  text      TEXT NOT NULL,                 -- the player's words, 1 to 1000 chars
+  context   TEXT,                          -- JSON from the game (screen, aircraft, version, console errors), up to 8000 chars
+  shot      TEXT,                          -- shots.id of the screenshot, or null
+  issue     INTEGER,                       -- the GitHub issue number, null if none was opened
+  status    TEXT NOT NULL DEFAULT 'open',  -- 'open', 'fixed' (closed with a 'Fixed in' comment) or 'closed'
+  fixed_in  TEXT,                          -- the version named in the 'Fixed in' comment
+  checked   INTEGER NOT NULL DEFAULT 0     -- ms of the last GitHub status refresh
+);
+CREATE INDEX IF NOT EXISTS reports_d ON reports(device, created);
+CREATE TABLE IF NOT EXISTS shots(
+  id        TEXT PRIMARY KEY,              -- 32 random hex chars, the public /shot/<id>.jpg
+  report_id INTEGER,
+  created   INTEGER NOT NULL,
+  mime      TEXT NOT NULL,                 -- 'image/jpeg'
+  data      BLOB NOT NULL                  -- the JPEG, at most 300 KB
+);

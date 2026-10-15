@@ -7,9 +7,10 @@
 # school_grade_check, the emergency descent and field of school_emerg_check, the hood of school_hood_check, the three circuits
 # of school_landings_check with Frank's Go around); the pause between tasks reads Next: <task>; no Dana line in the ride;
 # (c) the certificate: TEMPORARY AIRMAN CERTIFICATE, the callsign, today's date, Examiner: Frank Delgado, DPE, Checkride n of
-# 100, six task rows, the board line, kgeuCert, the logbook entry (1.5 h dual, a landing), the XP burst (500 + taskXp: the big
-# pop, on at once and 1.5 s later, over the sheet, topmost at its centre with the pointer events on for the probe), the
-# fit at 844x390 with 44 px buttons; (d) the Boards screen lists Checkride under Flight school with the device row; the school
+# 100, six task rows, the Leaderboard line (bugs1: lesson:ride is global through the Worker's lesson: family, mocked here
+# with ui1_mock: one token for the whole ride, one Hard submission), kgeuCert, the logbook entry (1.5 h dual, a landing), the
+# XP burst (the server's gain, no local bonus: the big pop over the sheet, topmost at its centre with the pointer events on
+# for the probe), the fit at 844x390 with 44 px buttons; (d) the Boards screen lists Checkride under Flight school; the school
 # header says Private pilot, certificated and Stage 4 shows done; (e) rideSeed(1) (slow flight first) stalled: the ride
 # stops, the F card titled Notice of disapproval, slow flight red, the rest not flown, a Retrain row with a 44 px RETRAIN that
 # opens Slow flight with its briefing; (f) no page errors. Prints every Frank line of the passed run.
@@ -17,6 +18,7 @@
 import asyncio, sys, math, json, datetime
 from playwright.async_api import async_playwright
 from harness import serve, launch, page, Checks, PLACED, IPHONE_15, finger
+from ui1_mock import Mock
 from school_fly import K, BASE, DEBRIEF, rwy, call, climbout, downwind, base, final, touchdown, stop
 import school_fly
 ok = Checks()
@@ -135,7 +137,9 @@ async def main():
     srv, url = serve()
     async with async_playwright() as p:
         b = await launch(p)
-        pg = await page(b, url, vp=IPHONE_15, storage=dict(BASE, kgeuSchoolEasy='1', **PLACED))
+        m = Mock(gain=86)
+        pg = await page(b, url, vp=IPHONE_15, storage=dict(BASE, kgeuSchoolEasy='1', **PLACED, **m.storage()), pre=m.install)
+        await pg.wait_for_timeout(600)
         # (a) the draw, the start, Frank's opening
         seq = await pg.evaluate(f"()=>{{{K}.rideSeed(42);const s={K}.rideDraw();{K}.rideSeed(42);return s}}")
         ok('(a) rideSeed(42): steep, slow, stall, emerg, hood, landings', seq == ['steep', 'slow', 'stall', 'emerg', 'hood', 'landings'], seq)
@@ -165,7 +169,10 @@ async def main():
             easy.append(await pg.evaluate(f"()=>{K}.G.easy"))
             await DRIVE[tid](pg)
             if k < 5: gaps.append(await gap(pg))
-        pop = await pg.evaluate(POP)   # right after the certificate opens: the big burst over the card
+        for _ in range(30):   # the Worker's (mocked) answer: the big burst over the card
+            pop = await pg.evaluate(POP)
+            if pop.get('on'): break
+            await pg.wait_for_timeout(150)
         await pg.wait_for_timeout(1000)
         await pg.screenshot(path='/tmp/ride_pop.png')
         pop2 = await pg.evaluate(POP)   # 1.5 s on: counted up, fully shown, still there
@@ -185,14 +192,18 @@ async def main():
         sc = round(sum(r[1] for r in res) / 6)
         ok('(c) Checkride <mean> of 100 and six task rows, all green', c['score'] == f'Checkride {sc} of 100' and len(c['rows']) == 6 and all(r[1] == 'ok' for r in c['rows'])
            and [r[0] for r in c['rows']] == ['Steep turns', 'Slow flight', 'Stalls', 'Emergencies', 'Under the hood', 'Landings'], c)
-        x = await pg.evaluate(f"()=>{{const K={K},L=K.XPP.log;return {{x:L.length?L[L.length-1]:null,tx:K.taskXp({sc},'hard',true)}}}}")
-        ok('(c) the board line: #1 of 1, +XP, FIRST RUN', c['board'] and c['board'].startswith('Board, this device#1 of 1') and f"+{500 + x['tx']} XP" in c['board'] and 'FIRST RUN' in c['board'], c['board'])
-        amt = 500 + x['tx']
+        x = await pg.evaluate(f"()=>{{const K={K},L=K.XPP.log;return {{x:L.length?L[L.length-1]:null,n:L.length}}}}")
+        sub = [y for y in m.subs if y.get('board') == 'lesson:ride']
+        ok('(c) one submission to lesson:ride: the mean score, Hard, the whole ride\'s time; only the ride\'s token asked', len(sub) == 1 and sub[0]['score'] == sc and sub[0]['mode'] == 'hard' and sub[0]['secs'] >= 60
+           and not [y for y in m.subs if y.get('board') != 'lesson:ride'], m.subs)
+        ok('(c) the Leaderboard line (resBoard): the rank and the server\'s +86 XP, no device line', c['board'] and c['board'].startswith('Leaderboard') and '+86 XP' in c['board'] and 'this device' not in c['board'], c['board'])
+        amt = 86
         ok('(c) at once: the big burst on (the on class) over the open certificate, its label the amount and the reason, topmost at its centre, z-index over #gradeOv, 1.6x type',
            pop.get('on') and pop.get('card') and pop.get('aria') == f'+{amt} XP, Private pilot certificate' and pop['top'] and pop['overSheet']
            and pop['z'] > (int(pop['gz']) if pop['gz'].lstrip('-').isdigit() else 0) and pop['fs'] >= 60, pop)
         ok('(c) 1.5 s on: still on and topmost, fully shown, reading +amount XP and the reason', pop2.get('on') and pop2['op'] == '1' and pop2['txt'] == f'+{amt:,}XPPrivate pilot certificate' and pop2['top'], pop2)
-        ok('(c) the XP burst: 500 + taskXp, Private pilot certificate', x['x'] and x['x']['amount'] == 500 + x['tx'] and x['x']['reason'] == 'Private pilot certificate', x)
+        ok('(c) the XP burst: the server\'s gain, Private pilot certificate, once; nothing banked on the phone', x['x'] and x['x']['amount'] == amt and x['x']['reason'] == 'Private pilot certificate' and x['n'] == 1
+           and await pg.evaluate("()=>localStorage.getItem('kgeuTaskXP')===null"), x)
         st = await pg.evaluate("()=>({cert:JSON.parse(localStorage.getItem('kgeuCert')||'null'),log:JSON.parse(localStorage.getItem('kgeuLogbook')||'{}').entries.slice(-1)[0],best:JSON.parse(localStorage.getItem('kgeuSchool')||'{}')['cessna:ride']})")
         ok('(c) kgeuCert {at, cs, score, examiner}', st['cert'] and st['cert']['cs'] == cs and st['cert']['score'] == sc and st['cert']['examiner'] == 'Frank Delgado, DPE' and st['cert']['at'] > 0, st['cert'])
         ok('(c) the logbook: the ride, 1.5 h dual, one landing; the best letter', st['log']['id'] == 'ride' and st['log']['dual'] == 1.5 and st['log']['ldg'] == 1 and st['log']['letter'] != 'F' and st['best'] == st['log']['letter'], st)
@@ -214,7 +225,7 @@ async def main():
           return {g:g,title:document.getElementById('lbTitle').textContent,rows:document.querySelectorAll('#lbRowsIn .lbRow').length,how:document.getElementById('lbHow').textContent}}""")
         fs = dict(lb['g']).get('Flight school', [])
         ok('(d) the Boards picker lists Checkride under Flight school', ['lesson:ride', 'Checkride'] in fs, lb['g'])
-        ok('(d) the Checkride board shows the device row', lb['title'] == 'Checkride' and lb['rows'] >= 1 and 'passes only' in lb['how'], lb)
+        ok('(d) the Checkride board shows the global rows', lb['title'] == 'Checkride' and lb['rows'] >= 1 and 'passes only' in lb['how'] and 'this device' not in lb['how'].lower(), lb)
         await pg.evaluate(f"()=>{K}.openMenu('sSchool')"); await pg.wait_for_timeout(300)
         await pg.evaluate("()=>{const b=document.querySelector('#schMap [data-st=s4]');if(b)b.click()}"); await pg.wait_for_timeout(300)
         h = await pg.evaluate("""()=>({c:document.getElementById('schCert').textContent,vis:!document.getElementById('schCert').hidden&&getComputedStyle(document.getElementById('schCert')).display!=='none',
@@ -240,7 +251,8 @@ async def main():
         ok("(e) Frank's notice as the tip, the Retrain row with a 44 px RETRAIN for slow flight", c['tip'].startswith('Notice of disapproval. Retrain the tasks below') and c['rt'] == [['slow', 'RETRAIN', c['rt'][0][2], c['rt'][0][3]]]
            and c['rt'][0][2] >= 44 and c['rt'][0][3] >= 44 and not c['board'], c)
         st = await pg.evaluate("()=>({cert:localStorage.getItem('kgeuCert'),log:JSON.parse(localStorage.getItem('kgeuLogbook')||'{}').entries.slice(-1)[0],xp:window.__kgeu.XPP.log.length,lb:(JSON.parse(localStorage.getItem('kgeuTaskLB')||'{}')['lesson:ride']||[]).length})")
-        ok('(e) no certificate, no XP, no board entry; a logbook entry with the F and no time', not st['cert'] and st['xp'] == 0 and st['lb'] == 0 and st['log']['id'] == 'ride' and st['log']['letter'] == 'F' and st['log']['dual'] == 0, st)
+        st['run'] = await pg.evaluate(f"()=>!!{K}.LB.E.runs['lesson:ride']")
+        ok('(e) no certificate, no XP, no board entry, the run dropped; a logbook entry with the F and no time', not st['cert'] and st['xp'] == 0 and st['lb'] == 0 and not st['run'] and st['log']['id'] == 'ride' and st['log']['letter'] == 'F' and st['log']['dual'] == 0, st)
         bad = await pg.evaluate(FIT, '#gradeOv')
         ok('(e) 844x390: the F card fits, 44 px buttons', not bad, bad)
         await pg.screenshot(path='/tmp/ride_fail.png')

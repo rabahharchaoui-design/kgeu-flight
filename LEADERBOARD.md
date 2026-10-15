@@ -77,6 +77,8 @@ game's `runMode()`), including the first flight lesson's assists. Every board ha
 | `lesson:stall` | Power off stall | lesson score | higher | 3 s | 0 to 100 | |
 | `lesson:engine` | Engine failure | lesson score | higher | 15 s | 0 to 100 | |
 | `lesson:pattern` | Pattern and touch and go | lesson score | higher | 45 s | 0 to 100 | |
+| `lesson:<id>` (family) | Every other flown lesson (school1, school2) and `lesson:ride`, the checkride (passes only) | lesson score | higher | 60 s | 0 to 100 | |
+| `task:<id>` (family) | Taskings: Overwatch, Lifeline, Shepherd, Finder | tasking score | higher | 120 s | 0 to 100 | |
 | `free:landing` | Free flight landing | landing points | higher | 8 s | 0 to 100 | |
 | `apt:RJTT` | Tokyo Haneda landing | arcade points | higher | 20 s | 0 to 1,500 | yes |
 | `apt:LFPG` | Paris CDG landing | arcade points | higher | 20 s | 0 to 1,500 | yes |
@@ -85,6 +87,8 @@ game's `runMode()`), including the first flight lesson's assists. Every board ha
 | `df:kills:easy`, `df:kills:hard` | Dogfight kills | kills in one run | higher | (fan out) | 0 to 10 | |
 | `df:clear:easy`, `df:clear:hard` | Dogfight clear time | s, one decimal, wins only | lower | (fan out) | 45 to 390 | |
 | `df:guns:easy`, `df:guns:hard` | Dogfight gun kills | gun kills in one run, 1 or more | higher | (fan out) | 0 to 10 | |
+
+The two families (`FAMILIES` in boards.js) take any id with their prefix; an exact `BOARDS` entry wins (the six lessons above keep their own limits). The old device boards (`kgeuTaskLB`) are read only now: the Boards screen shows "your best on this phone" until a global score is as good.
 
 **The Red Flag Dogfight boards are the exception to the merge: Easy and Hard are separate boards.** Each `df:` board
 has a `mode` (`easy` or `hard`, in boards.js and in `LB.board`): the server refuses a run in the other mode ("wrong
@@ -219,6 +223,7 @@ Barry M. Goldwater Range, F-16 and the mode, with the countdown; GO starts the d
 after the switch and resume) with its dice seeded from the day (`DF.seed`, yyyymmdd), so it is the same fight
 worldwide. The daily score is `min(1500, round(dfScore().score / 2))`, submitted to `daily` (one official attempt,
 practice after, as always) with the same `df` block and no flight path; it does not go to the regular dogfight boards.
+The dogfight cap is multiplied by the loadout multiplier (`df.mult`, 1 to 1.15, absent: 1; anything else is refused).
 The server checks a daily on a dogfight day with the dogfight caps (2 x score against the formula cap, +2) instead of
 `parMax` and refuses one without `df`; on any other day a daily carrying `df` is refused. Tests: `K.dailyKind('dogfight'
 |'landing'|null)` forces the kind; `K.dailyRegion('az')` still pins a landing daily. (Dogfight days in October 2026:
@@ -329,6 +334,42 @@ to the @OhRabah hangar banner. At a world airport, the all time best on its `apt
 is lettered on the @OhRabah city billboard ("TOKYO #1  CALLSIGN", "COULD BE YOU" while there is none),
 from the `apt` field of `/fame` (cached in `kgeuFame` like the rest). The player's callsign is painted small on the F-16 canopy rail and
 on the nose of every other aircraft.
+
+## Bug reports
+
+Tickets from the game, stored in D1 first, then mirrored best effort (a missing secret, a timeout or a
+GitHub error never loses a report, the answer is still 200).
+
+- `POST /report` (origin locked): `{cs?, key, category, severity, text, context?, shot?}`. Signed in
+  (`cs` and `key` pass) the row carries the callsign, otherwise `guest`. The device is
+  HMAC(`d:` + key), or of the IP and user agent without a key; the key is never stored. category one
+  of controls, graphics, crash, boards, missions, school, sound, other; severity annoying, broken,
+  cantplay; text trimmed, 1 to 1000 chars (over 1000 is refused, not cut); context an object, stored
+  as JSON up to 8000 chars (longer: `{truncated:true, head}`); shot base64 JPEG (a
+  `data:image/jpeg;base64,` prefix allowed), at most 300 KB decoded, anything else stores the report
+  without it and answers `shot:'rejected'`. Answer `{ok, id, issue, shot}`; 400 `{error:'bad', reason}`.
+- Limits (hits kind `report`, rolling 24 h): 5 per device, 10 per IP; over answers 429 `{error:'rate'}`
+  and stores nothing. Refused requests do not count.
+- `GET /shot/<32 hex>.jpg`: the screenshot, public, cached for a year (the id is 128 random bits).
+- `GET /reports/mine?key=&cs=` or `POST /reports/mine {key, cs}`: the device's reports, `open` or
+  `fixed` (closed without a fix drops off), newest first, 30 at most. Before answering, up to 8 open
+  reports with an issue not checked in 10 minutes are refreshed: a closed issue with a comment
+  "Fixed in <version>" becomes `fixed` with `fixed_in`, a closed one without becomes `closed`.
+  60 calls per IP an hour (hits kind `mine`).
+- Tables `reports` (id, created, callsign, device, ip, category, severity, text, context, shot, issue,
+  status, fixed_in, checked) and `shots` (id, report_id, created, mime, data BLOB).
+- Secrets (both optional, `npx wrangler secret put NAME`): `GITHUB_TOKEN`, a fine grained token with
+  **Issues read and write only** on `rabahharchaoui-design/pocketsim-bugs` (one issue per report, labels
+  `<category>` and `<severity>`, the screenshot linked from the Worker); `NTFY_TOPIC`, the ntfy.sh topic
+  for the push (tapping it opens the issue).
+- `npm test` covers all of this locally; `npm run test:live` skips it (a live report opens a real issue).
+
+```sh
+# the last 20 reports
+npx wrangler d1 execute pfs-scores --remote --command "SELECT id, datetime(created/1000,'unixepoch') at, callsign, category, severity, status, issue, fixed_in, shot, substr(text,1,80) text FROM reports ORDER BY id DESC LIMIT 20"
+# delete a report's screenshot (its id from the query above)
+npx wrangler d1 execute pfs-scores --remote --command "DELETE FROM shots WHERE id='<shot id>'; UPDATE reports SET shot=NULL WHERE shot='<shot id>'"
+```
 
 ## Updating the app
 

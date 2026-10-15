@@ -50,6 +50,9 @@ async function route(c) {
   if (g && p === '/fame') return fame(c);
   if (g && p === '/ghost') return ghost(c);
   if (g && p === '/ranks') return json({ ranks: RANKS, boards: Object.keys(BOARDS) });
+  const sm = g && /^\/shot\/([0-9a-f]{32})\.jpg$/.exec(p);
+  if (sm) return shot(c, sm[1]);
+  if (g && p === '/reports/mine') { c.body = { key: c.url.searchParams.get('key') || '', cs: c.url.searchParams.get('cs') || '' }; return mine(c); }
   if (po) {
     const body = await c.req.json().catch(() => null);
     if (!body || typeof body !== 'object') return json({ error: 'body' }, 400);
@@ -61,6 +64,8 @@ async function route(c) {
     if (p === '/token') return token(c);
     if (p === '/pool') return pool(c);
     if (p === '/submit') return submit(c);
+    if (p === '/report') return report(c);
+    if (p === '/reports/mine') return mine(c);
   }
   return json({ error: 'not found' }, 404);
 }
@@ -482,4 +487,176 @@ async function fame(c) {
     apt[icao] = r ? { cs: r.cs, score: r.score, mode: r.mode === 'easy' ? 'easy' : 'hard' } : null;
   }));
   return json({ day, daily: d || null, top: top.map(x => ({ cs: x.cs, xp: x.xp, rank: rankOf(x.xp).name, creator: !!x.creator })), apt });
+}
+
+// ---------------------------------------------------------------- bug reports
+// A ticket from the game: stored first, then mirrored to a private GitHub issue and an ntfy push,
+// both best effort (no secret set, a timeout or an error never loses the report). The game's
+// "My reports" list reads the status back, refreshed from the issue when it is closed with
+// a "Fixed in <version>" comment.
+const BUG_REPO = 'rabahharchaoui-design/pocketsim-bugs';
+const BUG_CATS = { controls: 'Controls', graphics: 'Screen or graphics', crash: 'Crash or freeze', boards: 'Leaderboard or XP',
+  missions: 'Missions', school: 'Flight school', sound: 'Sound', other: 'Other' };
+const BUG_SEVS = { annoying: 'Annoying', broken: 'Broken', cantplay: "Can't play" };
+const REPORTS_PER_DEVICE = 5, REPORTS_PER_IP = 10;   // per day
+const SHOT_MAX = 300 * 1024, CONTEXT_MAX = 8000;
+
+// one id per phone for tickets: the device key when the game sends one, else the IP and browser
+async function deviceOf(c) {
+  const key = c.body.key;
+  if (typeof key === 'string' && key.length >= 32 && key.length <= 128) return hashOf(c.env, 'd:' + key);
+  return hashOf(c.env, 'd:' + c.ip + '|' + (c.req.headers.get('User-Agent') || ''));
+}
+async function fetchT(url, opts, ms) {
+  const ac = new AbortController(), t = setTimeout(() => ac.abort(), ms);
+  try { return await fetch(url, Object.assign({}, opts, { signal: ac.signal })); } finally { clearTimeout(t); }
+}
+// the GitHub token has Issues read and write on the bugs repo, nothing else: only the issues API is called
+function gh(c, path, method = 'GET', body) {
+  return fetchT('https://api.github.com/repos/' + BUG_REPO + '/issues' + path, { method, headers: {
+    'Authorization': 'Bearer ' + c.env.GITHUB_TOKEN, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': 'pfs-scores', 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }, 6000);
+}
+// the context as stored: JSON up to 8000 chars, else a marker and the start of it
+function contextJson(o) {
+  if (o == null) return null;
+  const s = JSON.stringify(o);
+  if (s.length <= CONTEXT_MAX) return s;
+  for (let n = 7900; n > 0; n -= 500) { const t = JSON.stringify({ truncated: true, head: s.slice(0, n) }); if (t.length <= CONTEXT_MAX) return t; }
+  return JSON.stringify({ truncated: true });
+}
+// base64 (a data: prefix allowed) to JPEG bytes, or null when it is not a JPEG of at most 300 KB
+function jpegOf(s) {
+  if (typeof s !== 'string') return null;
+  s = s.replace(/^data:image\/jpeg;base64,/, '');
+  if (s.length > Math.ceil(SHOT_MAX / 3) * 4 + 8) return null;
+  let b;
+  try { b = atob(s); } catch (e) { return null; }
+  if (b.length > SHOT_MAX || b.length < 3) return null;
+  const o = new Uint8Array(b.length);
+  for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i);
+  return o[0] === 0xFF && o[1] === 0xD8 && o[2] === 0xFF ? o : null;
+}
+const firstLine = t => t.split(/\r?\n/).find(x => x.trim()) || '';
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const cell = v => esc(typeof v === 'object' ? JSON.stringify(v).slice(0, 200) : String(v).slice(0, 200)).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+
+function issueBody(c, r, ctx, shotId) {
+  const out = [r.text.split(/\r?\n/).map(l => '> ' + esc(l)).join('\n'), ''];
+  if (shotId) out.push('![screenshot](' + c.url.origin + '/shot/' + shotId + '.jpg)', '');
+  if (ctx && typeof ctx === 'object') {
+    let logs = null;
+    const rows = [];
+    for (const [k, v] of Object.entries(ctx)) {
+      if ((k === 'errors' || k === 'console') && Array.isArray(v)) { logs = v; continue; }
+      if (v === null || v === undefined) continue;
+      rows.push('| ' + cell(k) + ' | ' + cell(v) + ' |');
+    }
+    if (rows.length) out.push('| key | value |', '|---|---|', ...rows, '');
+    if (logs && logs.length) out.push('```', ...logs.slice(-20).map(l => String(typeof l === 'object' ? JSON.stringify(l) : l).replace(/```/g, "'''").slice(0, 300)), '```', '');
+  }
+  out.push('Report #' + r.id + ' · ' + new Date(r.created).toISOString() + ' · ' + r.callsign + ' · severity ' + r.severity + ' · category ' + r.category);
+  return out.join('\n');
+}
+
+async function report(c) {
+  const B = c.body;
+  const p = await auth(c);
+  const cs = p ? p.callsign : 'guest', device = await deviceOf(c);
+  if (await tooMany(c, 'report', 'd:' + device, REPORTS_PER_DEVICE, DAY) || await tooMany(c, 'report', 'ip:' + c.ip, REPORTS_PER_IP, DAY))
+    return json({ error: 'rate' }, 429);
+  const bad = reason => json({ error: 'bad', reason }, 400);
+  const cat = String(B.category || ''), sev = String(B.severity || '');
+  if (!BUG_CATS[cat]) return bad('category');
+  if (!BUG_SEVS[sev]) return bad('severity');
+  if (typeof B.text !== 'string') return bad('text');
+  const text = B.text.trim();
+  if (!text.length || text.length > 1000) return bad('text length ' + text.length + ', 1 to 1000');
+  const ctxObj = B.context;
+  if (ctxObj != null && (typeof ctxObj !== 'object' || Array.isArray(ctxObj))) return bad('context');
+  const jpg = B.shot != null ? jpegOf(B.shot) : null;
+
+  const ins = await c.env.DB.batch([
+    c.env.DB.prepare("INSERT INTO reports(created,callsign,device,ip,category,severity,text,context,status) VALUES(?,?,?,?,?,?,?,?,'open')")
+      .bind(c.now, cs, device, c.ip, cat, sev, text, contextJson(ctxObj)),
+    hit(c, 'report', 'd:' + device), hit(c, 'report', 'ip:' + c.ip)
+  ]);
+  const r = { id: ins[0].meta.last_row_id, created: c.now, callsign: cs, category: cat, severity: sev, text };
+
+  // everything below is best effort: the report is already stored
+  let shotId = B.shot != null && !jpg ? 'rejected' : null, issue = null, url = null;
+  if (jpg) {
+    try {
+      const id = randHex(16);
+      await c.env.DB.batch([
+        c.env.DB.prepare("INSERT INTO shots(id,report_id,created,mime,data) VALUES(?,?,?,'image/jpeg',?)").bind(id, r.id, c.now, jpg.buffer),
+        c.env.DB.prepare('UPDATE reports SET shot=? WHERE id=?').bind(id, r.id)
+      ]);
+      shotId = id;
+    } catch (e) { shotId = null; }
+  }
+  if (c.env.GITHUB_TOKEN) {
+    try {
+      const title = '#' + r.id + ' ' + BUG_SEVS[sev] + ' · ' + BUG_CATS[cat] + ' · ' + cs + ': ' + firstLine(text).trim().slice(0, 60);
+      const res = await gh(c, '', 'POST', { title, body: issueBody(c, r, ctxObj, shotId !== 'rejected' ? shotId : null), labels: [cat, sev] });
+      if (res.status === 201) {
+        const j = await res.json();
+        issue = j.number | 0 || null; url = j.html_url || null;
+        if (issue) await c.env.DB.prepare('UPDATE reports SET issue=?, checked=? WHERE id=?').bind(issue, c.now, r.id).run();
+      }
+    } catch (e) { }
+  }
+  if (c.env.NTFY_TOPIC) {
+    try {
+      await fetchT('https://ntfy.sh/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        topic: c.env.NTFY_TOPIC, title: '🐞 #' + r.id + ' ' + BUG_SEVS[sev] + ' · ' + BUG_CATS[cat],
+        message: cs + ': ' + firstLine(text).trim().slice(0, 120), click: url || 'https://github.com/' + BUG_REPO + '/issues', tags: ['bug'] }) }, 5000);
+    } catch (e) { }
+  }
+  return json({ ok: true, id: r.id, issue, shot: shotId });
+}
+
+// a stored screenshot, public: its id is 128 random bits
+async function shot(c, id) {
+  const r = await c.env.DB.prepare('SELECT mime, data FROM shots WHERE id=?').bind(id).first();
+  if (!r) return json({ error: 'not found' }, 404);
+  return new Response(new Uint8Array(r.data), { headers: { 'Content-Type': r.mime || 'image/jpeg', 'Cache-Control': 'public, max-age=31536000, immutable' } });
+}
+
+// a closed issue: 'fixed' with the version when a comment says "Fixed in <version>", else 'closed'
+async function issueState(c, n) {
+  const res = await gh(c, '/' + n);
+  if (!res.ok) return null;
+  const j = await res.json();
+  if (j.state !== 'closed') return { status: 'open' };
+  const pages = Math.max(1, Math.ceil((j.comments | 0) / 30));
+  const cr = await gh(c, '/' + n + '/comments?per_page=30&page=' + pages);
+  if (!cr.ok) return null;
+  let fixed = null;
+  for (const cm of await cr.json()) {
+    const m = /Fixed in (\S+)/i.exec(String(cm.body || ''));
+    if (m) fixed = m[1].replace(/[.,;:!?)\]]+$/, '');
+  }
+  return fixed ? { status: 'fixed', fixed_in: fixed } : { status: 'closed' };
+}
+
+// this phone's reports, newest first; closed without a fix drops off the list
+async function mine(c) {
+  if (await tooMany(c, 'mine', c.ip, 60)) return json({ error: 'rate' }, 429);
+  await hit(c, 'mine', c.ip).run();
+  const device = await deviceOf(c);
+  if (c.env.GITHUB_TOKEN) {
+    const due = (await c.env.DB.prepare("SELECT id, issue FROM reports WHERE device=? AND status='open' AND issue IS NOT NULL AND checked<? ORDER BY checked ASC LIMIT 8")
+      .bind(device, c.now - 10 * 60e3).all()).results;
+    await Promise.all(due.map(async r => {
+      let st = null;
+      try { st = await issueState(c, r.issue); } catch (e) { st = null; }
+      // checked is set even when GitHub failed, so a failing GitHub never makes every call slow
+      await c.env.DB.prepare('UPDATE reports SET status=?, fixed_in=?, checked=? WHERE id=?')
+        .bind(st ? st.status : 'open', st && st.fixed_in ? String(st.fixed_in).slice(0, 40) : null, c.now, r.id).run();
+    }));
+  }
+  const rows = (await c.env.DB.prepare("SELECT id, created, category, severity, text, issue, status, fixed_in FROM reports WHERE device=? AND status IN ('open','fixed') ORDER BY created DESC, id DESC LIMIT 30")
+    .bind(device).all()).results;
+  return json({ ok: true, reports: rows.map(r => Object.assign(r, { text: String(r.text).slice(0, 80) })) });
 }

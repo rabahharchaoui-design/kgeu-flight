@@ -4,8 +4,9 @@
 # and its longest corridor, LIFELINE at 18 km with 16 kt, OVERWATCH Hard); every reply set the game asks (WILCO/UNABLE,
 # CONTACT/LOOKING, YELLOW/VIOLET smoke, REPORT vehicle departs, REPORT talk-on, MARK over the flash) in the plain bar, in
 # the ball view and beside the C-130's LOOK pad; the stage card's longest lines; a results card with 100 of 100, a long
-# title, every line long and "#60 of 60 +81 XP PERSONAL BEST"; a board with 60 runs (scores 100 to 0), a 12 letter
-# callsign (the server's longest, all W), no callsign, one run, none; the Challenges cards with best scores.
+# title, every line long and its Leaderboard line; a board (global since bugs1, offline on the harness) whose pinned row is
+# "your best on this phone" from 60 old device runs, a 12 letter callsign (the server's longest, all W), no callsign, one
+# run, none; the Challenges cards with best scores.
 #   .venv/bin/python tests/tasking_break_check.py --size 568x320   (one size per run)
 import asyncio, os, sys, json
 from playwright.async_api import async_playwright
@@ -72,7 +73,7 @@ async def main():
                     if name == 'contact': await shot(pg, f'reply_{tid}_{skill}')
                 await pg.evaluate(f"()=>{{const K={K};K.TASK.ask=null;}}"); await pg.evaluate(STEP, 40)
                 await audit(pg, '#topCol', f'{skill} {tid} stage card and radio line')
-            # the results card at its worst, through a template's score and a full device board
+            # the results card at its worst, through a template's score (its Leaderboard line from resBoard)
             await pg.evaluate(f"""()=>{{const K={K};K.taskStop();const L=[];for(let i=0;i<59;i++)L.push({{s:Math.max(0,99-Math.floor(i*1.7)),secs:300,ac:'mq9b',mode:i%2?'easy':'hard',when:Date.now()-i*36e5}});
               localStorage.setItem('kgeuTaskLB',JSON.stringify({{'task:overwatch':L}}));
               K.TASKS.drillw={{name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limit:600,roll:(R,d)=>{{d.wdir=360;d.wkt=22;d.par=419;}},
@@ -80,8 +81,6 @@ async def main():
                 score:d=>({{score:100,title:'Eyes never left it',wait:0,lines:[['Time on target','100 %  (338 of 338 s)'],['Standoff in band','100 %  ·  9 overflights'],['Report after departure','39.9 s  ·  12 early'],['On station','4:44  (par 4:44)'],['Talk-on','the team found it']],
                   tip:'Lock the ball on the target (LOCK) and it stays on as you circle.'}})}};}}""")
             await pg.evaluate(f"()=>{{const K={K};K.TASK.test.noBrief=true;K.taskStart('drillw',{{seed:1}})}}"); await pg.evaluate(STEP, 3)
-            # the device board is task:drillw's own: put the same 59 runs there so this run is #1 of 60, a best
-            await pg.evaluate(f"()=>{{const A=JSON.parse(localStorage.getItem('kgeuTaskLB'));A['task:drillw']=A['task:overwatch'];localStorage.setItem('kgeuTaskLB',JSON.stringify(A));}}")
             await pg.wait_for_timeout(600); await pg.evaluate(STEP, 3)
             await audit(pg, '#missOv', f'{skill} results card, 100 of 100, every line long')
             await shot(pg, f'results_{skill}')
@@ -90,7 +89,8 @@ async def main():
             await pg.evaluate(f"()=>{{const K={K};K.nav('sHome');K.nav('sArc');document.getElementById('arcCards').scrollTop=1e4;}}"); await pg.wait_for_timeout(300)
             await audit(pg, '#sArc', f'{skill} Challenges scrolled to the Taskings, best scores 0 and 100')
             await shot(pg, f'challenges_{skill}')
-            # the boards: 60 runs with the longest callsign, then none, then one, then no callsign
+            # the boards: 60 old device runs with the longest callsign, then none, then one, then no callsign (offline here:
+            # the pinned row is the best on this phone)
             await pg.evaluate("()=>{const P=JSON.parse(localStorage.getItem('kgeuLB')||'null');}")
             for state, lb, cs in [('60 runs, 12 letter callsign', 'full', 'WWWWWWWWWWWW'), ('no runs', 'none', 'WWWWWWWWWWWW'), ('one run', 'one', 'WWWWWWWWWWWW'), ('no callsign', 'full', None)]:
                 await pg.evaluate(f"""([lb,cs])=>{{const K={K},E=K.LB.E;E.P=cs?{{cs:cs,key:'k'.repeat(48),xp:16000,creator:false}}:null;
@@ -99,13 +99,14 @@ async def main():
                 await audit(pg, '#sLb', f'{skill} Shepherd board: {state}')
                 if state.startswith('60'):
                     await pg.evaluate("()=>document.querySelector('[data-lbp=all]').click()"); await pg.wait_for_timeout(300)
-                    n = await pg.evaluate("()=>document.querySelectorAll('#lbRowsIn .lbRow').length")
-                    await audit(pg, '#sLb', f'{skill} Shepherd board: all time, {n} rows')
-                    ok(f'{TAG} {skill} all time shows this device\'s 30 best of 60, the total 60', n == 30 and await pg.evaluate("()=>document.getElementById('lbTotal').textContent") == '60 runs', n)
+                    await audit(pg, '#sLb', f'{skill} Shepherd board: all time, best on this phone')
+                    me = await pg.evaluate("()=>document.getElementById('lbMe').textContent")
+                    ok(f'{TAG} {skill} all time pins the best of the 60 on this phone, 100 pts', 'your best on this phone' in me.lower() and '100 pts' in me, me)   # the narrow label reads 'Your best on this phone' in place of the callsign
                     await pg.evaluate("()=>document.querySelector('[data-lbp=today]').click()")
-                t = await pg.evaluate("()=>({tot:document.getElementById('lbTotal').textContent,me:document.getElementById('lbMe').innerText,msg:document.getElementById('lbRowsIn').innerText.slice(0,40)})")
-                if state == 'one run': ok(f'{TAG} {skill} one run reads "1 run"', t['tot'] == '1 run', t)
-                if state == 'no runs': ok(f'{TAG} {skill} no runs: an empty state, not a blank list', 'No runs yet' in t['msg'] and t['tot'] == '0 runs', t)
+                t = await pg.evaluate("()=>({tot:document.getElementById('lbTotal').textContent,me:document.getElementById('lbMe').innerText,off:document.getElementById('lbMe').classList.contains('off'),msg:document.getElementById('lbRowsIn').innerText.slice(0,40)})")
+                if state == 'one run': ok(f'{TAG} {skill} one run: the pinned row is its score on this phone', 'your best on this phone' in t['me'].lower() and '100 pts' in t['me'] and not t['off'], t)
+                if state == 'no runs': ok(f'{TAG} {skill} no runs: the offline state, no pinned row', 'Offline' in t['msg'] and t['off'], t)
+                if state == 'no callsign': ok(f'{TAG} {skill} no callsign: the pinned row says You', 'You' in t['me'] and 'WWWW' not in t['me'] and 'your best on this phone' in t['me'].lower(), t)
                 if state.startswith('60'): await shot(pg, f'board_{skill}')
             ok(f'{TAG} {skill}: no console errors', not pg.errs, pg.errs[:3])
             await pg.close()
