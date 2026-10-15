@@ -100,13 +100,13 @@ async def main():
                 if state.startswith('60'):
                     await pg.evaluate("()=>document.querySelector('[data-lbp=all]').click()"); await pg.wait_for_timeout(300)
                     await audit(pg, '#sLb', f'{skill} Shepherd board: all time, best on this phone')
-                    me = await pg.evaluate("()=>document.getElementById('lbMe').innerText")
-                    ok(f'{TAG} {skill} all time pins the best of the 60 on this phone, 100 pts', 'your best on this phone' in me and '100 pts' in me, me)
+                    me = await pg.evaluate("()=>document.getElementById('lbMe').textContent")
+                    ok(f'{TAG} {skill} all time pins the best of the 60 on this phone, 100 pts', 'your best on this phone' in me.lower() and '100 pts' in me, me)   # the narrow label reads 'Your best on this phone' in place of the callsign
                     await pg.evaluate("()=>document.querySelector('[data-lbp=today]').click()")
                 t = await pg.evaluate("()=>({tot:document.getElementById('lbTotal').textContent,me:document.getElementById('lbMe').innerText,off:document.getElementById('lbMe').classList.contains('off'),msg:document.getElementById('lbRowsIn').innerText.slice(0,40)})")
-                if state == 'one run': ok(f'{TAG} {skill} one run: the pinned row is its score on this phone', 'your best on this phone' in t['me'] and '100 pts' in t['me'] and not t['off'], t)
+                if state == 'one run': ok(f'{TAG} {skill} one run: the pinned row is its score on this phone', 'your best on this phone' in t['me'].lower() and '100 pts' in t['me'] and not t['off'], t)
                 if state == 'no runs': ok(f'{TAG} {skill} no runs: the offline state, no pinned row', 'Offline' in t['msg'] and t['off'], t)
-                if state == 'no callsign': ok(f'{TAG} {skill} no callsign: the pinned row says You', 'You' in t['me'] and 'WWWW' not in t['me'] and 'your best on this phone' in t['me'], t)
+                if state == 'no callsign': ok(f'{TAG} {skill} no callsign: the pinned row says You', 'You' in t['me'] and 'WWWW' not in t['me'] and 'your best on this phone' in t['me'].lower(), t)
                 if state.startswith('60'): await shot(pg, f'board_{skill}')
             ok(f'{TAG} {skill}: no console errors', not pg.errs, pg.errs[:3])
             await pg.close()
