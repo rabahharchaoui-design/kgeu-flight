@@ -305,7 +305,7 @@ body:not(.touch) #shTR{ top:calc(var(--padT) + var(--icon) + 8px); }
 /* day TV grain, a faint 8 px block pattern and a vignette, over the scene and under the HUD */
 #sensorFx{ position:fixed; inset:0; pointer-events:none; display:none; }
 #sensorFx.on{ display:block; }
-#sensorFx .gr{ position:absolute; inset:0; opacity:.12; background-size:128px 128px; }
+#sensorFx .gr{ position:absolute; inset:0; opacity:.07; background-size:128px 128px; }
 #sensorFx.ir .gr{ display:none; }
 #sensorFx .vg{ position:absolute; inset:0; background:radial-gradient(ellipse at center,rgba(0,0,0,0) 58%,rgba(0,0,0,.42) 100%); }
 /* the ball view has its own readouts, so the flight cards step aside */
@@ -3581,9 +3581,13 @@ var GFX={tier:'medium',auto:'medium',override:'auto',scale:1,bench:null,dyn:true
   on(name){const m=GFX.FX[name];return m==null||tierRank(GFX.tier)>=tierRank(m);},
   // the tier's pixel ratio before the dynamic scale: medium is the pre tier value (1.5 on touch, 2 on desktop)
   base(){const d=window.devicePixelRatio||1;return GFX.tier==='high'?Math.min(d,2):GFX.tier==='low'?Math.min(d,1):Math.min(d,isTouch?1.5:2);},
-  applyPR(){const r=GFX.renderer;if(!r)return;const pr=GFX.base()*(GFX.post?1:GFX.scale);if(Math.abs(r.getPixelRatio()-pr)>1e-6)r.setPixelRatio(pr);},
+  // fix2 item 4: sens, the sensor view is up (camMode 2, no photo): the scene is drawn at the tier's full pixel ratio
+  // whatever the dynamic scale (eff() is 1; GFX.scale and the dynamic state are kept, frozen, for when it is left)
+  sens:false,
+  eff(){return GFX.sens?1:GFX.scale;},
+  applyPR(){const r=GFX.renderer;if(!r)return;const pr=GFX.base()*(GFX.post?1:GFX.eff());if(Math.abs(r.getPixelRatio()-pr)>1e-6)r.setPixelRatio(pr);},
   // the pixel ratio the 3D scene is drawn at (the canvas's own one when the post chain is off)
-  scenePR(){return GFX.base()*GFX.scale;},
+  scenePR(){return GFX.base()*GFX.eff();},
   postWant(){return GFX.on('bloom')||GFX.on('smaa');},
   // gfxfix item 3: a tier change recompiles every lit program (the cascade count), the haboob's defines, the clouds and
   // the post chain, so it only ever runs in the menu (the chips, the battery guard's pendingTier at openMenu or start):
@@ -15690,7 +15694,7 @@ function hudClear(){
   resCloseAll();taskStop();for(const id of ['recOv','storyOv'])$(id).classList.remove('on');
   STRIKE.active=false;tgtMarkHide();
   if(camMode>1)camMode=0;   // the ball view is entered in flight, where its autopilot can take over
-  if(sensOn){sensOn=false;hudSens.classList.remove('on');document.body.classList.remove('sensorOn');glc.style.filter='';}
+  if(sensOn){sensOn=false;hudSens.classList.remove('on');document.body.classList.remove('sensorOn');glc.style.filter='';GFX.sens=false;GFX.applyPR();}
   lesEnd();arcStop();dfStop();missReset();DASH.on=false;   // missReset: the pallet, the mission card, the drop camera, dzStop
   guideShow(null);crashClear();cfgReset();badgeHide();
   for(const b of $('badges').children)badgeOff(b);
@@ -15723,7 +15727,7 @@ function bugGrab(){BUG.want=0;
     return BUG.shot;}catch(e){return null;}}
 // Settings, a flight running and no recent pause frame: draw one frame now and take it (the menu covers the canvas)
 function bugFresh(){if(!running)return null;
-  try{if(camMode===2&&SENSOR.mode!=='tv'&&!PHOTO.on&&!FREECAM)renderIR();else pfxRender();}catch(e){return null;}
+  try{pfxRender(camMode===2&&SENSOR.mode!=='tv'&&!PHOTO.on&&!FREECAM);}catch(e){return null;}
   return bugGrab();}
 function togglePause(){if(DF.brief||TASK.brief||LES.brief)return;   // the dogfight briefing holds the sim itself; FIGHT'S ON is the way on
   if(RES.brief)resClose(RES.brief);if(paused){pzResume();return;}paused=true;pauseOv.classList.add('on');{BUG.want=running?1:0;radioFade(120);CARP.sync();PZ0={t:savedType,b:SPAWN_BASE,p:SPAWN_POS};PZ_LOC=null;locSel();pzApplyUI();requestAnimationFrame(locShow);if(window.stickReset)stickReset();musicUI();}}
@@ -18746,7 +18750,7 @@ const SENSOR_FOV=[14,7,3.5,1.75];
 // aircraft lights) live on layer 1 and go in a second pass without the override, as
 // grey hot points. Black hot is the same with the grey inverted (uInvert), the points
 // then darken the frame through multiply blending. No render target, no extra pass.
-const IR={pass:false,t:0};let irDirty=true;
+const IR={pass:false,t:0,ic:[]};let irDirty=true;
 const IR_BG=new THREE.Color(),_irFog=new THREE.Color(),_irSun=new V3();
 const IR_WHITE=new THREE.DataTexture(new Uint8Array([255,255,255,255]),1,1,THREE.RGBAFormat);IR_WHITE.needsUpdate=true;
 const IR_MAT=new THREE.ShaderMaterial({
@@ -18815,7 +18819,7 @@ function irHook(){
 // pavement, anything standing is a structure); points to layer 1. Runs on entering IR,
 // after a kill, and once a second while IR is up, so models built later are covered.
 function irTag(){
-  irDirty=false;IR.t=performance.now();
+  irDirty=false;IR.t=performance.now();IR.ic.length=0;
   const walk=(o,hh,vv)=>{
     const d=o.userData;if(d.heat!==undefined){hh=d.heat;vv=d.irVar!==undefined?d.irVar:0.1;}
     if(o.isPoints){o.layers.mask=2|(o.layers.mask&(1<<PFX_BLOOM));}   // layer 1 only (and the bloom bit if it had it)
@@ -18828,8 +18832,12 @@ function irTag(){
         const flat=bb.max.y-bb.min.y<0.02*Math.max(bb.max.x-bb.min.x,bb.max.z-bb.min.z)+0.01;h=flat?0.36:0.6;v=flat?0.3:0.15;}
       d.irHeat=h;d.irVar=v===undefined?0.1:v;
       // r128 keeps one IR program for every instanced mesh, with or without instance colours;
-      // give the plain ones white colours so the attribute is always there
-      if(o.isInstancedMesh&&!o.instanceColor)o.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(o.instanceMatrix.count*3).fill(1),3);
+      // give the plain ones white colours so the attribute is always there. Fix2 item 4: only for the IR pass (renderIR
+      // puts them on and takes them off again): left on, the mesh's own material would need its USE_INSTANCING_COLOR
+      // program when drawn normally after the IR view (the cloud puffs' cloudHD linked in flight)
+      if(o.isInstancedMesh&&(!o.instanceColor||o.instanceColor===d.irIC)){
+        if(!d.irIC)d.irIC=new THREE.InstancedBufferAttribute(new Float32Array(o.instanceMatrix.count*3).fill(1),3);
+        IR.ic.push(o);}
       if(!d.irHooked){d.irHooked=true;const f=o.onBeforeRender;
         o.onBeforeRender=f===THREE.Object3D.prototype.onBeforeRender?irHook:function(){irHook.call(this);f.apply(this,arguments);};}
     }
@@ -18850,7 +18858,9 @@ function renderIR(){
   const bg=scene.background,skyV=sky.visible;_irFog.copy(scene.fog.color);
   scene.fog.color.setRGB(inv?1-sg-0.06:sg+0.06,inv?1-sg-0.06:sg+0.06,inv?1-sg-0.06:sg+0.06);
   scene.background=IR_BG;sky.visible=false;scene.overrideMaterial=IR_MAT;camera.layers.set(0);IR.pass=true;
-  renderer.render(scene,camera);
+  const ic=IR.ic;for(let i=0;i<ic.length;i++)if(!ic[i].instanceColor)ic[i].instanceColor=ic[i].userData.irIC;
+  try{renderer.render(scene,camera);}
+  finally{for(let i=0;i<ic.length;i++)if(ic[i].instanceColor===ic[i].userData.irIC)ic[i].instanceColor=null;}
   IR.pass=false;scene.overrideMaterial=null;scene.background=null;scene.fog.color.copy(_irFog);
   // hot points: every airport light on, grey, over the frame
   const AU=AL_MAT.uniforms,lw=AU.uLights.value,bl=inv?THREE.MultiplyBlending:THREE.AdditiveBlending;
@@ -18922,8 +18932,15 @@ vec3 pfxDust(vec3 c){
 }
 `;
 const PFX_DU=()=>({tDust:{value:DUSTFX.tex},uDust:{value:new THREE.Vector4()},uDustF:{value:new THREE.Vector4(0.5,0.5,1,5)},uDustC:{value:new THREE.Color()}});
-const PFX_CMP=pfxMat({uniforms:Object.assign({tColor:{value:null},tBloom:{value:PFX_BLACK},uStr:{value:0},uUvS:PFX_UVS,uUvB:PFX_UVB},PFX_DU()),vertexShader:PFX_VS2,fragmentShader:`uniform sampler2D tColor,tBloom;uniform float uStr;varying vec2 vUv;
-${PFX_ADD}${PFX_DUST}void main(){gl_FragColor=vec4(pfxDust(pfxBl(texture2D(tColor,vUv).rgb)),1.0);}`});
+// fix2 item 4: the sensor view's light unsharp mask, uniforms only (uSharp 0 is the plain composite): the centre less
+// the mean of its four neighbours (uTexel apart, held inside the drawn uUvS rectangle), times uSharp, the difference
+// clamped to 0.1 so an edge gains at most a one pixel lift, no halo or ringing
+const PFX_CMP=pfxMat({uniforms:Object.assign({tColor:{value:null},tBloom:{value:PFX_BLACK},uStr:{value:0},uSharp:{value:0},uTexel:{value:new THREE.Vector2(1,1)},uUvS:PFX_UVS,uUvB:PFX_UVB},PFX_DU()),vertexShader:PFX_VS2,fragmentShader:`uniform sampler2D tColor,tBloom;uniform float uStr,uSharp;uniform vec2 uTexel,uUvS;varying vec2 vUv;
+${PFX_ADD}${PFX_DUST}vec3 pfxSh(){vec3 c=texture2D(tColor,vUv).rgb;if(uSharp<=0.0)return c;
+  vec2 lo=uTexel*0.5,hi=uUvS-uTexel*0.5,dx=vec2(uTexel.x,0.0),dy=vec2(0.0,uTexel.y);
+  vec3 n=texture2D(tColor,clamp(vUv+dx,lo,hi)).rgb+texture2D(tColor,clamp(vUv-dx,lo,hi)).rgb+texture2D(tColor,clamp(vUv+dy,lo,hi)).rgb+texture2D(tColor,clamp(vUv-dy,lo,hi)).rgb;
+  return clamp(c+clamp((c-n*0.25)*uSharp,-0.1,0.1),0.0,1.0);}
+void main(){gl_FragColor=vec4(pfxDust(pfxBl(pfxSh())),1.0);}`});
 // SMAA 1x medium with colour edge detection: three r128 examples/js SMAAShader and SMAAPass, compacted (WebGL port notes kept in the maths)
 const PFX_EDGE=pfxMat({defines:{SMAA_THRESHOLD:'0.1'},uniforms:{tDiffuse:{value:null},resolution:{value:new THREE.Vector2()},uUvS:PFX_UVS},
   vertexShader:`uniform vec2 resolution,uUvS;varying vec2 vUv;varying vec4 vOffset[3];
@@ -19020,12 +19037,16 @@ function pfxBloom(){
     u.tSrc.value=PFX.b1.texture;u.uDir.value.set(i/bw,0);pfxPass(PFX_BLUR,PFX.b2);
     u.tSrc.value=PFX.b2.texture;u.uDir.value.set(0,i/bh);pfxPass(PFX_BLUR,PFX.b1);}
 }
-// the frame: straight to the canvas on Low, else through the chain
-function pfxRender(){
-  const r=renderer;
-  if(!GFX.post){if(PFX.rt)pfxFree();r.render(scene,camera);return;}
+// the frame: straight to the canvas on Low, else through the chain. ir: the IR sensor view (renderIR draws the scene).
+// Fix2 item 4: in the sensor view (GFX.sens) the scene is drawn at scale 1, no bloom, no SMAA, and the composite
+// sharpens (PFX_CMP's uSharp: 0.35 day TV, 0.25 IR); on Low nothing is sharpened. PFX.last: the frame for __kgeu.pfx()
+const PFX_SHARP={tv:0.35,ir:0.25,off:false};
+function pfxRender(ir){
+  const r=renderer,sv=GFX.sens;
+  if(!GFX.post){if(PFX.rt)pfxFree();r.setRenderTarget(null);if(ir)renderIR();else r.render(scene,camera);
+    r.getDrawingBufferSize(_pfxV);PFX.last={w:_pfxV.x,h:_pfxV.y,sw:_pfxV.x,sh:_pfxV.y,bloomed:false,smaa:false,sharp:0,rs:1};return;}
   r.getDrawingBufferSize(_pfxV);
-  const s=GFX.scale,W=Math.max(1,Math.round(_pfxV.x)),H=Math.max(1,Math.round(_pfxV.y)),bk=GFX.tier==='high'?2:4;
+  const s=sv?1:GFX.scale,W=Math.max(1,Math.round(_pfxV.x)),H=Math.max(1,Math.round(_pfxV.y)),bk=GFX.tier==='high'?2:4;
   if(!PFX.rt||PFX.w!==W||PFX.h!==H||PFX.bk!==bk)pfxSize(W,H,bk);
   // the scaled frame: the bottom left w x h of the full size targets (and of the bloom's), the passes' uv scaled to it
   const w=Math.max(1,Math.round(W*s)),h=Math.max(1,Math.round(H*s)),bw=PFX.b1.width,bh=PFX.b1.height,
@@ -19034,9 +19055,10 @@ function pfxRender(){
   for(const t of [PFX.b1,PFX.b2])t.viewport.set(0,0,sw,sh);
   PFX_UVS.value.set(w/W,h/H);PFX_UVB.value.set(sw/bw,sh/bh);PFX.sw=w;PFX.sh=h;
   // the battery guard (GFX.thermS.on) drops the bloom and SMAA passes: the plain composite, compiled with the rest
-  const th=GFX.thermS.on,bloom=GFX.on('bloom')&&!th&&pfxSrcOn(),smaa=GFX.on('smaa')&&!th,ac=r.autoClear;
+  // the sensor view drops them too (fix2 item 4)
+  const th=GFX.thermS.on||sv,bloom=GFX.on('bloom')&&!th&&pfxSrcOn(),smaa=GFX.on('smaa')&&!th,ac=r.autoClear;
   r.getClearColor(_pfxC);const ca=r.getClearAlpha();
-  GFX.rs=s;r.setRenderTarget(PFX.rt);r.render(scene,camera);
+  GFX.rs=s;r.setRenderTarget(PFX.rt);if(ir)renderIR();else r.render(scene,camera);
   r.autoClear=true;r.setClearColor(0x000000,0);
   // the bloom points keep their screen pixel size in b1 (bk times their share of it), so the blur makes a halo a few
   // times the light's own disc rather than a faint smudge
@@ -19046,11 +19068,13 @@ function pfxRender(){
   {const D=DUSTFX,on=D.k>0.003&&D.fr===PFX.frames&&GFX.on('dust');   // fed this frame (a menu frame never is)
     for(const m of [PFX_FIN,PFX_CMP]){const u=m.uniforms;u.uDust.value.set(on?D.k:0,D.vg,D.ph,0);
     if(on){u.uDustF.value.set(D.foe.x,D.foe.y,camera.aspect,5);u.uDustC.value.copy(D.col);}}}
+  const shp=sv&&!smaa&&!PFX_SHARP.off?(ir?PFX_SHARP.ir:PFX_SHARP.tv):0;
   if(smaa){
     PFX_EDGE.uniforms.tDiffuse.value=PFX.rt.texture;pfxPass(PFX_EDGE,PFX.ed);
     PFX_WGT.uniforms.tDiffuse.value=PFX.ed.texture;pfxPass(PFX_WGT,PFX.wt);
     const u=PFX_FIN.uniforms;u.tDiffuse.value=PFX.wt.texture;u.tColor.value=PFX.rt.texture;u.tBloom.value=tb;u.uStr.value=st;pfxPass(PFX_FIN,null);}
-  else{const u=PFX_CMP.uniforms;u.tColor.value=PFX.rt.texture;u.tBloom.value=tb;u.uStr.value=st;pfxPass(PFX_CMP,null);}
+  else{const u=PFX_CMP.uniforms;u.tColor.value=PFX.rt.texture;u.tBloom.value=tb;u.uStr.value=st;u.uSharp.value=shp;u.uTexel.value.set(1/W,1/H);pfxPass(PFX_CMP,null);}
+  PFX.last={w:W,h:H,sw:w,sh:h,bloomed:bloom,smaa:smaa,sharp:shp,rs:s};
   r.setClearColor(_pfxC,ca);r.autoClear=ac;PFX.frames++;
 }
 // per frame, after the camera: the streaks' density, vignette, focus of expansion and scroll. The relative wind is the
@@ -19172,16 +19196,17 @@ function preJobs(){
       PFX_EDGE.uniforms.tDiffuse.value=A.texture;pfxPass(PFX_EDGE,B);
       PFX_WGT.uniforms.tDiffuse.value=B.texture;pfxPass(PFX_WGT,C);
       for(const m of [PFX_FIN,PFX_CMP]){const f=m.uniforms;if(f.tDiffuse)f.tDiffuse.value=C.texture;f.tColor.value=A.texture;f.tBloom.value=B.texture;f.uStr.value=PFX_STR;pfxPass(m,D);}
+      PFX_CMP.uniforms.uSharp.value=PFX_SHARP.tv;PFX_CMP.uniforms.uTexel.value.set(1/16,1/16);pfxPass(PFX_CMP,D);PFX_CMP.uniforms.uSharp.value=0;   // fix2 item 4: the sensor view's sharpened composite
       u.tSrc.value=null;PFX_EDGE.uniforms.tDiffuse.value=PFX_WGT.uniforms.tDiffuse.value=null;
       for(const m of [PFX_FIN,PFX_CMP]){const f=m.uniforms;if(f.tDiffuse)f.tDiffuse.value=null;f.tColor.value=null;f.tBloom.value=PFX_BLACK;f.uStr.value=0;}});}],
     ['explosion',()=>preAt(()=>fxWarmLayer(A))],
     ['dz smoke',()=>{const sp=DZ.smoke[0];if(!sp)return;const v=sp.visible,o=sp.material.opacity;sp.visible=true;sp.material.opacity=0.5;
       try{warmObj(sp,true);}finally{sp.visible=v;sp.material.opacity=o;}}],
-    // the IR pass, its tagging undone after (irTag gives every plain instanced mesh white instance colours and puts the
-    // points on layer 1 only; a normal program compiled while they are there would expect the colours of an instanced
-    // mesh built later without them), so it tags afresh when the sensor is first used
-    ['ir',()=>preAt(()=>{const ic=[],pm=[];scene.traverse(o=>{if(o.isInstancedMesh&&!o.instanceColor)ic.push(o);else if(o.isPoints)pm.push([o,o.layers.mask]);});
-      try{r.setRenderTarget(A);renderIR();}finally{for(const o of ic)o.instanceColor=null;for(const [o,m] of pm)o.layers.mask=m;irDirty=true;IR.pass=false;}})],
+    // the IR pass, its tagging undone after (irTag puts the points on layer 1 only; the white instance colours of the
+    // plain instanced meshes renderIR itself takes off after its pass, fix2 item 4), so it tags afresh when the sensor is
+    // first used
+    ['ir',()=>preAt(()=>{const pm=[];scene.traverse(o=>{if(o.isPoints)pm.push([o,o.layers.mask]);});
+      try{r.setRenderTarget(A);renderIR();}finally{for(const [o,m] of pm)o.layers.mask=m;irDirty=true;IR.pass=false;}})],
     ['carousel',()=>{if(PRE.car)return;PRE.car=true;const p=showItem(savedType||'cessna'),cam=SHOW.cam,prevT=r.getRenderTarget();p.visible=true;p.position.set(0,0,0);p.scale.setScalar(40/p.userData.dim);
       cam.aspect=1.6;cam.position.set(0,30,100);cam.lookAt(0,0,0);cam.updateProjectionMatrix();
       if(!SHOW.scene.environment)SHOW.scene.environment=envDay();
@@ -19262,16 +19287,19 @@ function warmRun(budget){const t0=performance.now();if(!WARM.i)WARM.t0=t0;
   while(WARM.i<WARM_STEPS.length&&performance.now()-t0<budget){const a=performance.now();try{WARM_STEPS[WARM.i]();}catch(e){console.warn('warm',e);}WARM.ms.push(+(performance.now()-a).toFixed(1));WARM.i++;}
   if(WARM.i>=WARM_STEPS.length&&!WARM.done){WARM.done=true;WARM.total=performance.now()-WARM.t0;}
   return performance.now()-t0;}
-// ---- day TV: grain and a faint 8 px block pattern, one small tile stepped every 80 ms ----
+// ---- day TV: a fine grain, one small tile stepped every 80 ms. Fix2 item 4: plain per pixel grain (the 8 px block
+// pattern gone), the tile drawn at the screen's device pixels (128 CSS px, up to 3x) so the browser never upscales it ----
 const sensorFx=$('sensorFx'),sensorGr=sensorFx.firstChild;let sfxT=0;
-(function(){const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d'),id=x.createImageData(128,128),d=id.data;
-  const blk=[];for(let i=0;i<256;i++)blk.push((Math.random()-0.5)*50);
-  for(let y=0;y<128;y++)for(let X=0;X<128;X++){const v=clamp(128+(Math.random()-0.5)*180+blk[(y>>3)*16+(X>>3)],0,255),k=(y*128+X)*4;d[k]=d[k+1]=d[k+2]=v;d[k+3]=255;}
-  x.putImageData(id,0,0);sensorGr.style.backgroundImage='url('+c.toDataURL()+')';})();
+(function(){const N=128*Math.min(3,Math.max(1,Math.round(window.devicePixelRatio||1)));
+  const c=document.createElement('canvas');c.width=c.height=N;const x=c.getContext('2d'),id=x.createImageData(N,N),d=id.data;
+  for(let k=0;k<d.length;k+=4){const v=clamp(128+(Math.random()-0.5)*180,0,255);d[k]=d[k+1]=d[k+2]=v;d[k+3]=255;}
+  x.putImageData(id,0,0);
+  const set=u=>{sensorGr.style.backgroundImage='url('+u+')';};
+  if(c.toBlob)c.toBlob(b=>set(b?URL.createObjectURL(b):c.toDataURL()));else set(c.toDataURL());})();
 function sensorFxUpdate(on,ts){
   sensorFx.classList.toggle('on',on);if(!on)return;
   sensorFx.classList.toggle('ir',SENSOR.mode!=='tv');
-  if(SENSOR.mode==='tv'&&ts-sfxT>0.08){sfxT=ts;sensorGr.style.backgroundPosition=((Math.random()*16|0)*8)+'px '+((Math.random()*16|0)*8)+'px';}
+  if(SENSOR.mode==='tv'&&ts-sfxT>0.08){sfxT=ts;sensorGr.style.backgroundPosition=(Math.random()*128|0)+'px '+(Math.random()*128|0)+'px';}
 }
 // ---- the overlay text ----
 const shEl={TL:$('shTL'),TR:$('shTR'),BL:$('shBL'),BR:$('shBR'),Mid:$('shMid')};
@@ -20566,6 +20594,7 @@ function gfxDyn(t,d){
   if(S.t0!==RUN.t0){S.t0=RUN.t0;GFX.dynReset();GFX.thermalReset();}
   if(!GFX.dyn)return;
   if(paused){S.lowT=S.highT=0;GFX.thermS.lowT=0;return;}
+  if(GFX.sens)return;   // fix2 item 4: frozen in the sensor view (drawn at scale 1), resumed as it was on leaving it
   if(!FPS.st||t-FPS.dynT>=250){FPS.dynT=t;FPS.st=fpsStats();}
   GFX.dynFeed(FPS.st.avg,FPS.st.low1,d/1000);GFX.thermalFeed(FPS.st.avg,FPS.st.low1,d/1000);
 }
@@ -20780,7 +20809,7 @@ function tick(t,skipRender){
   socks.forEach((p,i)=>{p.rotation.order='YXZ';p.rotation.y=Math.atan2(-(Math.cos(wd)),(-Math.sin(wd)))*1;p.rotation.z=-(1-clamp(wkt/15,0,1))*1.1+0.05*Math.sin(ts*3+i);});
   // cameras
   {const sv=camMode===2&&!PHOTO.on;
-   if(sv!==sensOn){sensOn=sv;hudSens.classList.toggle('on',sv);document.body.classList.toggle('sensorOn',sv);}
+   if(sv!==sensOn){sensOn=sv;hudSens.classList.toggle('on',sv);document.body.classList.toggle('sensorOn',sv);GFX.sens=sv;GFX.applyPR();}
    const flt=sv&&SENSOR.mode==='tv'?'saturate(0.75) contrast(1.05)':'';if(glc.style.filter!==flt)glc.style.filter=flt;
    sensorFxUpdate(sv,ts);}
   if(camMode!==0||PHOTO.on||FREECAM||DF.kc>0)DCAM.chLive=false;
@@ -20853,7 +20882,7 @@ function tick(t,skipRender){
   // it pushed the menu's WARM steps past warm_console_check's window); kgeuNoPre keeps the old 40 frames
   else{if((!menu.classList.contains('on')||(frameN<40&&(!PRE.done||PRE.skip)))&&!FM.on){   // the open map is opaque: no 3D frame under it
       rebuildTerrain(camera.position.x,camera.position.z);   // the LOD rings round the camera this frame looks from
-      if(camMode===2&&SENSOR.mode!=='tv'&&!PHOTO.on&&!FREECAM){csmIdle();renderIR();}else{csmFrame(Math.min(0.1,rdt));pfxRender();}
+      if(camMode===2&&SENSOR.mode!=='tv'&&!PHOTO.on&&!FREECAM){csmIdle();pfxRender(true);}else{csmFrame(Math.min(0.1,rdt));pfxRender();}
       if(BUG.want){if(paused)bugGrab();else BUG.want=0;}}   // the bug report's screenshot: this frame, in this task (bugs1)
     const po=pauseOv.classList.contains('on');document.body.classList.toggle('pauseOn',po);}
 }
@@ -21491,7 +21520,7 @@ const APP_VER='2026-10-15-bugs1';          // keep version.json in step when shi
     get P(){return E.P;}};
 })();
 
-window.__kgeu={gfxHold:n=>{GFX.holdF=n|0;},gfxBusy:()=>({applying:gfxApplying(),resumeWait:GFX.resumeWait,preDone:PRE.done,warmDone:WARM.done,busy:GFX.busy}),stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>({id:p.id,name:p.name,cacheKey:p.cacheKey,usedTimes:p.usedTimes})),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
+window.__kgeu={gfxHold:n=>{GFX.holdF=n|0;},pfx:()=>{const L=PFX.last||{};return {w:L.w,h:L.h,sw:L.sw,sh:L.sh,bloomed:!!L.bloomed,smaa:!!L.smaa,sharp:L.sharp||0,scale:GFX.scale,rs:L.rs!=null?L.rs:GFX.rs,post:GFX.post,sens:GFX.sens};},setScale:s=>GFX.setScale(+s),sharpOff:v=>{PFX_SHARP.off=!!v;},gfxBusy:()=>({applying:gfxApplying(),resumeWait:GFX.resumeWait,preDone:PRE.done,warmDone:WARM.done,busy:GFX.busy}),stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>({id:p.id,name:p.name,cacheKey:p.cacheKey,usedTimes:p.usedTimes})),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
   task:()=>({on:TASK.on,id:TASK.id,stage:TASK.stage&&TASK.stage.id,si:TASK.si,brief:TASK.brief,done:TASK.done,res:TASK.res,ask:TASK.ask&&{shown:TASK.ask.shown,opts:TASK.ask.opts.map(o=>o.k),t:TASK.ask.t},d:TASK.d,log:TASK.log.slice(),seed:TASK.seed}),
   tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzBuild:()=>dzBuild(),dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),

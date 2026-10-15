@@ -1,7 +1,7 @@
 # fix2 before/after shots: MQ-9A sensor ball at all four zoom levels, Day TV and IR
 # white, locked on the Luke runway, at iPhone landscape (844x390). Lifted from
 # tests/sensor_shots.py's PLACE/AIM helpers.
-# Usage: .venv/bin/python tests/fix2_sensor_shots.py <outdir>
+# Usage: [PFS_TIER=medium] .venv/bin/python tests/fix2_sensor_shots.py <outdir>
 # Writes <outdir>/daytv_x1.png .. daytv_x8.png, ir_x1.png, ir_x8.png, daytv_x4_crop.png
 import asyncio, os, sys
 from playwright.async_api import async_playwright
@@ -60,7 +60,10 @@ async def main():
     srv, url = serve()
     async with async_playwright() as p:
         b = await launch(p)
-        pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'})
+        st = {'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'}
+        if os.environ.get('PFS_TIER'):   # e.g. PFS_TIER=medium (the harness's auto tier is Low, SwiftShader)
+            st['kgeuTier'] = os.environ['PFS_TIER']
+        pg = await page(b, url, vp=IPHONE_15, storage=st)
         await pg.evaluate("()=>{const K=window.__kgeu;K.setTOD('day');K.pick('reaper');K.pickBase('luke');K.start('final');}")
         await pg.wait_for_timeout(600)
         await pg.evaluate(PLACE)
