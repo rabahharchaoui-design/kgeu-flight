@@ -105,7 +105,7 @@ class Run:
             print('  leg error:', note['error'])
         wall = time.time() - t0
         prog = await pg.evaluate(PROG)
-        keys = await pg.evaluate(f"()=>{K}.progList()")
+        keys = await pg.evaluate(f"()=>{K}.progList().map(p=>p.cacheKey)")
         new = [k for k in keys if k not in set(self.keys)]
         menu_c = note.pop('menu_compiles', 0) if isinstance(note, dict) else 0
         own = await pg.evaluate(OWNERS, new) if new else []
@@ -326,7 +326,7 @@ async def main():
         await pg.wait_for_timeout(2000)
         tier = await pg.evaluate(f"()=>({{tier:{K}.GFX.tier,override:{K}.GFX.override}})")
         run.prog = prog0 = await pg.evaluate(PROG)
-        run.keys = await pg.evaluate(f"()=>{K}.progList()")
+        run.keys = await pg.evaluate(f"()=>{K}.progList().map(p=>p.cacheKey)")
         await pg.evaluate(f"()=>{K}.stallsClear()")
         # the threshold comes from flight frames (the menu draws no world, its frames say nothing): 1,000 ms until the
         # takeoff leg has flown 3 s, then max(250, 3 x the median of three 1 s means of fpsStats().ms)

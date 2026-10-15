@@ -9523,7 +9523,11 @@ function farAdd(g){if(g.parent!==scene)return;_farB.setFromObject(g).getSize(_fa
 PARKED.forEach(farAdd);PARKED.forEach(csmStatic);TRAFFIC.forEach(o=>{if(o.grp!=='b')farAdd(o.m.g);});
 // warm up (menu and pause sheet only, one model a step): one offscreen draw with the cull off, so a
 // model first seen from far away already has its buffers on the GPU when the player gets near
-function farWarm(f){for(const m of f.ms)m.layers.mask=1;try{warmObj(f.g);}finally{for(const m of f.ms)m.layers.mask=f.off?0:1;}}
+// fix2 item 2: a pooled traffic model (M) is drawn whole: the full model and the far stand-in both shown, gear down,
+// so every buffer it can draw in flight is on the GPU before the first population
+function farWarm(f,M){for(const m of f.ms)m.layers.mask=1;
+  const v=M?[M.full.visible,M.lod.visible,M.gear?M.gear.visible:false]:null;if(M){M.full.visible=M.lod.visible=true;if(M.gear)M.gear.visible=true;}
+  try{warmObj(f.g);}finally{for(const m of f.ms)m.layers.mask=f.off?0:1;if(M){M.full.visible=v[0];M.lod.visible=v[1];if(M.gear)M.gear.visible=v[2];}}}
 FAR.forEach(f=>WARM_STEPS.push(()=>farWarm(f)));
 // device pixels per metre of size, per metre of distance, in the current view
 function farK(){return Math.max(1,glcH)*renderer.getPixelRatio()/(2*Math.tan(camera.fov*Math.PI/360));}
@@ -9581,7 +9585,7 @@ function tfcMake(type,i){
   return M;
 }
 [['airliner',5],['cessna',2],['f16',2],['heli',2]].forEach(([type,n])=>{TFC.pool[type]=[];
-  for(let i=0;i<n;i++){const M=tfcMake(type,i);TFC.pool[type].push(M);farAdd(M.g);const f=FAR[FAR.length-1];WARM_STEPS.push(()=>farWarm(f));}});
+  for(let i=0;i<n;i++){const M=tfcMake(type,i);TFC.pool[type].push(M);farAdd(M.g);const f=FAR[FAR.length-1];WARM_STEPS.push(()=>farWarm(f,M));}});
 function tfcEnd(code,num){return RWY_ENDS.find(e=>e.rwy.code===code&&e.num===num);}
 // Arizona: Sky Harbor arrivals on 8/26 and departures off 7L/25R, Glendale left traffic on 1/19,
 // the Luke overhead to 3L/21R with departures off 3R/21L, helicopters over Phoenix (a world region: tfcRegion)
@@ -19111,6 +19115,17 @@ function preDepth(){
     if(mo)m.updateMorphTargets();m.updateMatrixWorld(true);L.push(m);}
   return PREQ.dp=L;
 }
+// fix2 item 2: the world regions' landmarks (Tokyo, Paris, Rio) swap their meshes between a day and a night material
+// at setTOD (tkTOD, parisTOD, rioTOD; the lit night ones skip the fog, useFog false). The compile job only sees the
+// material on the mesh at the time, so the other one linked its program on the first frame at the other time of day:
+// on the iPhone the first flight frame after a region start or resume at night (prog+1, beside traffic+8, the first
+// population). preSwap(f) puts every landmark on its other material for f, then back.
+function preSwap(f){
+  const S=[];for(const R of [TKY,PARIS,RIO])if(R&&R.built&&R.night)for(const o of R.night)for(const m of o.ms){S.push([m,m.material]);m.material=m.material===o.day?o.night:o.day;}
+  if(!S.length)return 0;   // Arizona: nothing to swap, no second compile
+  try{f();}finally{for(const [m,mt] of S)m.material=mt;}
+  return S.length;
+}
 // the main scene drawn once round the first flight's camera into the 16 px target A, the shadow maps with every caster
 // variant (the 'frame' job, and the requeue's 'gpu sync')
 function preFrame(M,A){const r=renderer;
@@ -19131,7 +19146,7 @@ function preJobs(){
   const A=Q.A,B=Q.B,C=Q.C,D=Q.D;
   return [
     ['build',()=>{hbBuild();if(CLOUD_MESH&&GFX.on('clouds')&&!CLOUDS.cb)cloudCB();if(!DZ.built)dzBuild();dfWarmBuild();}],
-    ['compile',()=>preAt(()=>r.compile(scene,camera))],
+    ['compile',()=>preAt(()=>{r.compile(scene,camera);preSwap(()=>r.compile(scene,camera));})],
     ['frame',()=>preAt(M=>preFrame(M,A))],
     ['post chain',()=>{if(!GFX.post)return;preAt(()=>{
       const bg=scene.background,lm=camera.layers.mask;scene.background=null;r.setRenderTarget(A);r.clear(true,true,false);
@@ -21428,7 +21443,7 @@ const APP_VER='2026-10-15-bugs1';          // keep version.json in step when shi
     get P(){return E.P;}};
 })();
 
-window.__kgeu={stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>p.cacheKey),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
+window.__kgeu={stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>({id:p.id,name:p.name,cacheKey:p.cacheKey,usedTimes:p.usedTimes})),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
   task:()=>({on:TASK.on,id:TASK.id,stage:TASK.stage&&TASK.stage.id,si:TASK.si,brief:TASK.brief,done:TASK.done,res:TASK.res,ask:TASK.ask&&{shown:TASK.ask.shown,opts:TASK.ask.opts.map(o=>o.k),t:TASK.ask.t},d:TASK.d,log:TASK.log.slice(),seed:TASK.seed}),
   tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzBuild:()=>dzBuild(),dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
