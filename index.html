@@ -103,6 +103,10 @@ button.on{ background:var(--caution); color:#15110a; border-color:transparent; }
 #hWind svg{ transition:transform .25s linear; }
 #hAp{ display:none; background:var(--caution); color:#15110a; font-weight:700; font-size:11px; letter-spacing:.04em; border-radius:6px; padding:2px 8px; }
 #hAp.on{ display:block; }
+/* fix2 item 5: the strike range clock under the readouts, amber in the last minute */
+#hud #hRng{ display:none; width:auto; min-width:0; font-size:11px; font-weight:700; letter-spacing:.05em; padding:2px 8px !important; color:var(--soft); font-variant-numeric:tabular-nums; }
+#hud #hRng.on{ display:block; } #hud #hRng.lo{ color:var(--caution); }
+#sensorHud .rngT{ font-weight:inherit; font-variant-numeric:tabular-nums; } #sensorHud .rngT.lo{ color:var(--caution); }
 @media (min-width:900px){ :root{ --map:120px; } .big{ font-size:26px; } #hud .card{ min-width:84px; } }
 
 /* ---------- pause, top centre ---------- */
@@ -2041,6 +2045,7 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
     </div>
     <div id="hLine" class="card"><span id="hFlap">FLAPS 0&deg;</span><span id="hGear"></span><span id="hWind"><svg viewBox="0 0 20 20" width="12" height="12"><path id="hWindA" d="M10 2 L15 11 L11.5 11 L11.5 18 L8.5 18 L8.5 11 L5 11 Z" fill="currentColor"/></svg><span id="hWindT">050&deg; 5 KT</span></span><span id="hG"><i><b></b></i><em>1.0</em> G</span><span id="hCn"></span></div>
     <div id="hAp"></div>
+    <div id="hRng" class="card"></div>
   </div>
   <button id="hDest" hidden aria-label="Destination, tap to clear"><svg id="dArrow" viewBox="0 0 24 24"><path d="M12 2 L20 20 L12 15.5 L4 20Z" fill="#D98A3D" stroke="#2A1608" stroke-width="1.2" stroke-linejoin="round"/></svg><span id="dTxt"></span></button><div id="navLog" aria-label="Nav log"></div>
   <button id="bPause" title="Pause (P)" aria-label="Pause"><svg viewBox="0 0 20 20"><rect x="4" y="3" width="4" height="14" rx="1" fill="currentColor"/><rect x="12" y="3" width="4" height="14" rx="1" fill="currentColor"/></svg></button>
@@ -11738,13 +11743,19 @@ function dashLand(e){
   return {secs:secs,g:DASH.g,better:better};
 }
 
-// ---- MQ-9 loiter and strike score: time on target plus hit accuracy ----
+// ---- MQ-9 loiter and strike score (fix2 item 5): targets destroyed first, then accuracy and time ----
+// sc: hits, avg (average miss of the missiles that came down, m; null: none came down), t (range time used, s),
+// ended ('all' targets destroyed, 'spent' weapons, 'time' out). Every kill is worth a 20 point tier, so 4 of 4
+// (80 to 99) always beats 3 of 4 (60 to 79), 2 of 4 (40 to 59) and 1 of 4 (20 to 39) whatever the rest. Inside
+// the tier the old accuracy and time weights (30 and 25) share 19 points: accuracy by the average miss; time by
+// how fast all four went (full under 3 minutes) when they did, else the old time on target band; a time out gets none.
 function loiterScore(sc){
-  const tot=STRIKE.tot||0;
-  const sHits=sc.hits*20;                                  // 0..80
-  const sAcc =band(sc.avg,[[0,100],[3,100],[8,80],[20,50],[45,20],[80,0]]);
-  const sTot =band(tot,[[0,0],[20,40],[45,75],[90,100],[240,100]]);
-  const pts=Math.round(sHits*0.45+sAcc*0.30+sTot*0.25);
+  const tot=STRIKE.tot||0,h=Math.min(4,sc.hits|0);
+  const sAcc=sc.avg==null?(sc.hits?100:0):band(sc.avg,[[0,100],[3,100],[8,80],[20,50],[45,20],[80,0]]);
+  const sTime=sc.ended==='time'?0:sc.ended==='all'?band(sc.t,[[0,100],[180,100],[360,80],[600,50]])
+    :band(tot,[[0,0],[20,40],[45,75],[90,100],[240,100]]);
+  const q=(sAcc*0.30+sTime*0.25)/55;
+  const pts=Math.round(h*20+q*19);
   return {pts:pts,hits:sc.hits,avg:sc.avg,t:sc.t,tot:Math.round(tot)};
 }
 
@@ -14720,7 +14731,7 @@ function hogGun(dt){
     if(tg&&!tg.dead&&SENSOR.valid&&SENSOR.slant<1500){_sd.set(tg.x-st.pos.x,tg.y-st.pos.y,tg.z-st.pos.z).normalize();
       if(_sd.dot(_dfN)>0.94){HOG.on+=dt;if(HOG.on>=0.8){HOG.on=0;hogHit(tg);}}}
     else HOG.on=Math.max(0,HOG.on-dt);
-    if(HOG.rounds<=0&&!HOG.dry){HOG.dry=true;toast('Winchester gun');}
+    if(HOG.rounds<=0&&!HOG.dry){HOG.dry=true;toast('Winchester gun');strikeScore();}   // the last weapon may be the gun
   }
   dfTracers(dt);
 }
@@ -19321,10 +19332,35 @@ function sensorHudUpdate(){
     const inr=SENSOR.valid&&SENSOR.slant>=RNG_MIN&&SENSOR.slant<=RNG_MAX;
     const rng=SENSOR.valid?(SENSOR.slant/1000).toFixed(1)+' km':'---';
     const tof=STRIKE.missiles.length?'  TOF '+Math.max(0,Math.ceil(STRIKE.missiles[0].tof)):'';
-    mid=(lock||'NO LOCK')+'\nSLANT '+rng+'  '+(inr?'IN RANGE':'NO RANGE')+'\nMSL '+(4-STRIKE.shots)+tof;
-    if(r&&STRIKE.shots<4)mid+=SENSOR.tgt?(inr?'\nTap FIRE':''):'\nTap NEXT TARGET, then FIRE';}
+    // the range clock sits on the MSL line, amber in the last minute (fix2 item 5)
+    const rc=rngClock();
+    let h=resEsc((lock||'NO LOCK')+'\nSLANT '+rng+'  '+(inr?'IN RANGE':'NO RANGE')+'\nMSL '+(4-STRIKE.shots)+tof)+'  <b class="rngT'+(rc.lo?' lo':'')+'">'+rc.t+'</b>';
+    let tail='';
+    if(r&&STRIKE.shots<4&&!STRIKE.cleared)tail+=SENSOR.tgt?(inr?'\nTap FIRE':''):'\nTap NEXT TARGET, then FIRE';
+    if(SENSOR.gimbal)tail+='\nGIMBAL';
+    h+=resEsc(tail);
+    if(SH_MID!==h){SH_MID=h;shEl.Mid.innerHTML=h;}
+    return;}
   if(SENSOR.gimbal)mid+=(mid?'\n':'')+'GIMBAL';
+  if(SH_MID!==null){SH_MID=null;shEl.Mid.textContent='';}
   shSet('Mid',mid);
+}
+let SH_MID=null;   // the strike's centre block, written as html (the range clock is a span); null: plain text
+// 'RANGE 9:58', seconds left on the range, rounded up; lo under a minute
+function rngClock(){const L=Math.max(0,Math.ceil(STRIKE.limit-STRIKE.clock));
+  return {t:'RANGE '+Math.floor(L/60)+':'+String(L%60).padStart(2,'0'),lo:L<60,left:L};}
+// the range clock chip in the readout column (outside the sensor view) and FIRE dimmed with the rails empty,
+// both written only on a change
+const RNGUI={on:null,t:'',lo:null,dim:null};
+function strikeUI(){
+  const on=STRIKE.active&&running;
+  if(on!==RNGUI.on){RNGUI.on=on;$('hRng').classList.toggle('on',on);}
+  const dim=STRIKE.active&&(STRIKE.shots>=4||STRIKE.cleared);
+  if(dim!==RNGUI.dim){RNGUI.dim=dim;$('bFire').classList.toggle('dim',dim);}
+  if(!on)return;
+  const rc=rngClock();
+  if(rc.t!==RNGUI.t){RNGUI.t=rc.t;$('hRng').textContent=rc.t;}
+  if(rc.lo!==RNGUI.lo){RNGUI.lo=rc.lo;$('hRng').classList.toggle('lo',rc.lo);}
 }
 // ---- target markers: a diamond with name and distance on every live target in view, an
 // arrow on the edge for the ones outside it, an x for 3 s where one died. 8 of each, pooled.
@@ -19379,8 +19415,10 @@ function tgtMarkUpdate(dt){
 }
 const GIM_AZ=2.6,GIM_EL_LO=-1.48,GIM_EL_HI=-0.06;     // ball limits, radians
 const RNG_MIN=700,RNG_MAX=8200;                        // in range window, metres
+// clock: range time used since 'cleared hot' (sim time, so it stops with pause), limit: the range time;
+// imp: missiles that came down (hit, miss or lost), the average miss is over these; ended: why the run graded
 const STRIKE={active:false,built:false,group:null,targets:[],missiles:[],
-  shots:0,hits:0,missSum:0,t0:0,cleared:false,armed:false};
+  shots:0,hits:0,missSum:0,t0:0,cleared:false,armed:false,clock:0,limit:600,imp:0,goal:4,ended:''};
 
 // ---- pooled smoke trail, hard capped at 60 particles ----
 const SMOKE_MAX=60;
@@ -20329,6 +20367,7 @@ function missileMesh(){
 const MSL=[];for(let i=0;i<4;i++)MSL.push(missileMesh());
 function fireMissile(){
   if(!STRIKE.active)return;
+  if(STRIKE.cleared&&STRIKE.ended==='time'){toast('Range is cold');return;}
   if(!SENSOR.valid){toast('No laser spot');return;}
   if(STRIKE.shots>=4){toast('Winchester, no missiles left');return;}
   if(SENSOR.slant<RNG_MIN||SENSOR.slant>RNG_MAX){toast('Out of range');return;}
@@ -20382,8 +20421,8 @@ function missileUpdate(dt){
       m.mesh.glow.material.opacity=Math.max(0,m.mesh.glow.material.opacity-dt*0.8);
       if(m.t%0.05<dt)puff(m.pos.x,m.pos.y,m.pos.z);
       const gh=groundHeight(m.pos.x,m.pos.z);
-      if(m.pos.y<=gh+0.5||d<4){impact(m,gh);STRIKE.missiles.splice(i,1);continue;}
-      if(m.t>40){m.mesh.g.visible=false;STRIKE.missiles.splice(i,1);continue;}
+      if(m.pos.y<=gh+0.5||d<4){STRIKE.missiles.splice(i,1);impact(m,gh);continue;}   // off the list first: impact grades the run on the last one down
+      if(m.t>40){m.mesh.g.visible=false;m.mesh.glow.material.opacity=0;STRIKE.missiles.splice(i,1);STRIKE.imp++;STRIKE.missSum+=999;toast('Missile lost');strikeScore();continue;}
     }
     m.mesh.g.position.copy(m.pos);
     if(m.vel.lengthSq()>1)m.mesh.g.quaternion.setFromUnitVectors(_st2.set(0,0,1),
@@ -20404,7 +20443,7 @@ function impact(m,gh){hapPattern('impact');
   explode(x,killed?hit.y:y,z,{scale:sc,secondary:K==='bunker'?2:K==='hull'?1:0,
     debris:K==='bunker'?16:K==='hull'?12:10,smokeSec:killed?60:14,fireSec:killed?600:0});
   if(killed){killTarget(hit);STRIKE.hits++;}
-  STRIKE.missSum+=Math.min(miss,999);
+  STRIKE.missSum+=Math.min(miss,999);STRIKE.imp++;
   const md=miss<999?Math.round(miss)+' m':'long';
   toast(killed?('Good hit. '+hit.name+' destroyed'):('Miss by '+md+(m.trackLost?'. Track broke':'')));
   vqAdd(killed
@@ -20456,38 +20495,55 @@ function boom(x,z,s,dl0){
   }catch(e){}
 }
 // ---- score ----
-function strikeScore(){
-  const done=(STRIKE.shots>=4&&(!hogOn()||HOG.rounds<=0))||STRIKE.targets.every(t=>t.dead);
-  if(!done||STRIKE.cleared)return;
-  STRIKE.cleared=true;
-  const avg=STRIKE.shots?STRIKE.missSum/STRIKE.shots:0,secs=Math.round(st.time-STRIKE.t0);
-  const sc={hits:STRIKE.hits,avg:Math.round(avg),t:secs,mode:runMode()};runLog('strike',{hits:sc.hits,avg:sc.avg,t:secs});
-  const loit=loiterScore(sc);
-  const hog=AC.id==='a10';
-  if(scRecord(hog?'a10':'reaper',loit))bannerShow('NEW RECORD',loit.pts+' pts,  '+loit.hits+'/4,  '+loit.tot+' s on target');
+// fix2 item 5: the run grades only at its end: (a) every weapon spent and nothing still flying (four missiles
+// launched and come down; the A-10 also its gun at 0 rounds), (b) all four targets destroyed, or (c) the range
+// time out (why 'time', from strikeTick). A ripple of missiles grades at the last impact, not the first.
+function strikeEndWhy(){
+  if(STRIKE.hits>=STRIKE.goal||STRIKE.targets.every(t=>t.dead))return 'all';
+  if(STRIKE.shots>=4&&!STRIKE.missiles.length&&(AC.id!=='a10'||HOG.rounds<=0))return 'spent';
+  return '';
+}
+const STRIKE_END={all:'all targets destroyed',spent:'weapons spent',time:'time out'};
+function strikeScore(why){
+  if(!STRIKE.active||STRIKE.cleared)return;
+  const end=strikeEndWhy()||(why==='time'?'time':'');
+  if(!end)return;
+  STRIKE.cleared=true;STRIKE.ended=end;
+  const hits=Math.min(STRIKE.goal,STRIKE.hits),avg=STRIKE.imp?STRIKE.missSum/STRIKE.imp:null,secs=Math.round(Math.min(STRIKE.clock,STRIKE.limit));
+  const sc={hits:hits,avg:avg==null?null:Math.round(avg),t:secs,ended:end,mode:runMode()};runLog('strike',{hits:sc.hits,avg:sc.avg,t:secs,ended:end});
+  const loit=loiterScore(sc);STRIKE.pts=loit.pts;
+  const hog=AC.id==='a10',avgT=sc.avg==null?'---':sc.avg+' m';
+  if(scRecord(hog?'a10':'reaper',loit))bannerShow('NEW RECORD',loit.pts+' pts,  '+loit.hits+'/4,  '+fmtT(secs));
   if(LB)LB.runEnd(hog?'arc:gunrun':'arc:strike',loit.pts);
+  const sa=sc.avg==null?0:sc.avg,ba=strikeBest?(strikeBest.avg==null?0:strikeBest.avg):0;
   const better=!strikeBest||sc.hits>strikeBest.hits||
-    (sc.hits===strikeBest.hits&&sc.avg<strikeBest.avg)||
-    (sc.hits===strikeBest.hits&&sc.avg===strikeBest.avg&&sc.t<strikeBest.t);
+    (sc.hits===strikeBest.hits&&sa<ba)||
+    (sc.hits===strikeBest.hits&&sa===ba&&sc.t<strikeBest.t);
   if(better){strikeBest=sc;try{localStorage.setItem('kgeuStrikeBest',JSON.stringify(sc));}catch(e){}}
-  toast(`${sc.hits} of 4 hits. Average miss ${sc.avg} m, ${sc.t} s${better?'. New best':''}`);
+  toast(`${end==='time'?'Time out. ':''}${sc.hits} of 4 targets. Average miss ${avgT}, ${fmtT(secs)}${better?'. New best':''}`);
   // the results card follows the last impact, once the boom has played
   resArm(()=>{if(!running||!STRIKE.active)return;RES.kind='strike';
-    resOpen(arcOv,{letter:letterFor(loit.pts),title:(hog?'Gun run: ':'Strike range: ')+sc.hits+' of 4 hits'+(better?', new best':''),score:loit.pts+' pts',sub:'of 100',
-      stats:[['Hits',sc.hits+' of 4'+(hog&&STRIKE.gun?' ('+STRIKE.gun+' by gun)':'')],['Average miss',sc.avg+' m'],['Time on target',loit.tot+' s'],['Time',fmtT(sc.t)],['Best',strikeBestText()]],board:hog?'arc:gunrun':'arc:strike'});},4);
+    resOpen(arcOv,{letter:letterFor(loit.pts),title:(hog?'Gun run: ':'Strike range: ')+sc.hits+' of 4 targets'+(better?', new best':''),score:loit.pts+' pts',sub:'of 100',
+      stats:[['Targets',sc.hits+' of 4'+(hog&&STRIKE.gun?' ('+STRIKE.gun+' by gun)':'')],['Accuracy (average miss)',avgT],['Time',fmtT(secs)],['Ended',STRIKE_END[end]],['Best',strikeBestText()]],board:hog?'arc:gunrun':'arc:strike'});},4);
   vqAdd(L('Gila Range Control','tower',
     `${AC.csS}, range is cold. ${sc.hits} of 4.`,
     [csTs(),'t_gila_range','t_range_cold','t_n_'+sc.hits,'t_of_four']));
 }
+// every flying frame of the run: the range clock, and the time out
+function strikeTick(dt){
+  if(!STRIKE.active||STRIKE.cleared)return;
+  STRIKE.clock+=dt;
+  if(STRIKE.clock>=STRIKE.limit){STRIKE.clock=STRIKE.limit;strikeScore('time');}
+}
 function strikeBestText(){
-  return strikeBest?`${strikeBest.hits}/4, ${strikeBest.avg} m avg, ${strikeBest.t} s`:'none yet';
+  return strikeBest?`${strikeBest.hits}/4, ${strikeBest.avg==null?'---':strikeBest.avg+' m'} avg, ${fmtT(strikeBest.t)}`:'none yet';
 }
 // ---- mode control ----
 function strikeStart(){
   if(!REGION.az)return;
   buildRange();
   STRIKE.active=true;STRIKE.cleared=false;STRIKE.shots=0;STRIKE.hits=0;STRIKE.missSum=0;
-  STRIKE.missiles.length=0;STRIKE.t0=0;STRIKE.tot=0;
+  STRIKE.missiles.length=0;STRIKE.t0=0;STRIKE.tot=0;STRIKE.clock=0;STRIKE.imp=0;STRIKE.ended='';STRIKE.pts=null;
   for(const t of STRIKE.targets){
     if(t.dead){t.dead=false;t.mesh.rotation.z=0;t.deadT=0;t.mesh.userData.heat=t.kind==='bunker'?0.7:0.9;irDirty=true;
       t.mesh.traverse(o=>{if(o.isMesh&&o.userData.m0)o.material=o.userData.m0;});}
@@ -20789,7 +20845,7 @@ function tick(t,skipRender){
   if(running&&!paused&&!st.crashed){
     if(STRIKE.built){rangeMoving(dt);targetsTick(dt);}
     if(STRIKE.active||TASK.sens||(camMode===2&&hasBall()))sensorUpdate(dt);
-    if(STRIKE.active){missileUpdate(dt);if(AC.id==='a10')hogGun(dt);
+    if(STRIKE.active){missileUpdate(dt);if(AC.id==='a10')hogGun(dt);strikeTick(dt);
       // time on target: the ball locked onto an actual target, not a ground point
       if(SENSOR.tgt&&!SENSOR.tgt.dead)STRIKE.tot=(STRIKE.tot||0)+dt;}
   }
@@ -20811,7 +20867,7 @@ function tick(t,skipRender){
   {const sv=camMode===2&&!PHOTO.on;
    if(sv!==sensOn){sensOn=sv;hudSens.classList.toggle('on',sv);document.body.classList.toggle('sensorOn',sv);GFX.sens=sv;GFX.applyPR();}
    const flt=sv&&SENSOR.mode==='tv'?'saturate(0.75) contrast(1.05)':'';if(glc.style.filter!==flt)glc.style.filter=flt;
-   sensorFxUpdate(sv,ts);}
+   sensorFxUpdate(sv,ts);strikeUI();}
   if(camMode!==0||PHOTO.on||FREECAM||DF.kc>0)DCAM.chLive=false;
   if(PHOTO.on){photoCam();snapCamera=false;}
   else if(FREECAM){snapCamera=false;// test hook: camera at an offset in the aircraft frame, looking at an offset in the same frame (w: world coordinates)
@@ -20921,8 +20977,8 @@ const APP_VER='2026-10-15-bugs1';          // keep version.json in step when shi
   board('arc:landing',{name:'Landing challenge, 5 mile',group:'Arcade',ghost:1,go:()=>arcStart('landing'),how:'Points: 1,000 x par / your time (up to 1.5x), x the landing grade'});
   board('arc:landing1',{name:'Landing challenge, 1 mile',group:'Arcade',ghost:1,go:()=>arcStart('landing1'),how:'Points: 1,000 x par / your time (up to 1.5x), x the landing grade'});
   board('arc:drop',{name:'Airdrop accuracy',group:'Arcade',dir:-1,fmt:'m',how:'Metres from the drop zone centre'});
-  board('arc:strike',{name:'Strike accuracy',group:'Arcade',how:'0 to 100: hits 45%, average miss 30%, time on target 25%'});
-  board('arc:gunrun',{name:'A-10 gun run',group:'Arcade',go:()=>{pickType('a10',1);start('range');},how:'0 to 100: hits 45%, average miss 30%, time on target 25%'});
+  board('arc:strike',{name:'Strike accuracy',group:'Arcade',how:'0 to 100: 20 a target destroyed, then up to 19 for accuracy and time'});
+  board('arc:gunrun',{name:'A-10 gun run',group:'Arcade',go:()=>{pickType('a10',1);start('range');},how:'0 to 100: 20 a target destroyed, then up to 19 for accuracy and time'});
   // every flown lesson has a global board: the six first ones by their own BOARDS entries on the Worker, the rest (school1
   // and school2) through its lesson: family (bugs1); the checkride too, passes only
   LESSONS.filter(l=>l.fly&&!l.ride).forEach(l=>board('lesson:'+l.id,{name:l.name,group:'Flight school',how:'The lesson score, 0 to 100'}));
@@ -21603,7 +21659,19 @@ window.__kgeu={gfxHold:n=>{GFX.holdF=n|0;},pfx:()=>{const L=PFX.last||{};return 
     const e=new THREE.Euler().setFromQuaternion(st.quat,'YXZ');
     let az=Math.atan2(dx,-dz)-(-e.y);az=Math.atan2(Math.sin(az),Math.cos(az));
     SENSOR.az=clamp(az,-GIM_AZ,GIM_AZ);SENSOR.el=clamp(Math.atan2(dy,hz),GIM_EL_LO,GIM_EL_HI);
-    return Math.abs(az)<=GIM_AZ;}};
+    return Math.abs(az)<=GIM_AZ;},
+  // fix2 item 5: the strike run's state, and aim, fire and clock hooks. strikeAim locks target i like a real lock
+  // (offsetM > 0: a ground point that far east of it instead, so the shot misses by about that much)
+  strike:()=>({active:STRIKE.active,shots:STRIKE.shots,hits:STRIKE.hits,flying:STRIKE.missiles.length,limit:STRIKE.limit,
+    left:Math.max(0,STRIKE.limit-STRIKE.clock),cleared:STRIKE.cleared,ended:STRIKE.ended,pts:STRIKE.pts==null?null:STRIKE.pts,gun:STRIKE.gun||0,imp:STRIKE.imp}),
+  strikeAim:(i,off)=>{const t=STRIKE.targets[i];if(!t)return {ok:false};off=+off||0;
+    SENSOR.slewTo=null;SENSOR.tgt=null;SENSOR.track=null;
+    if(off>0)SENSOR.track=new V3(t.x+off,groundHeight(t.x+off,t.z),t.z);else SENSOR.tgt=t;
+    sensorUpdate(0);
+    const inr=SENSOR.valid&&SENSOR.slant>=RNG_MIN&&SENSOR.slant<=RNG_MAX;
+    return {ok:!!(SENSOR.tgt||SENSOR.track)&&inr,valid:SENSOR.valid,slant:Math.round(SENSOR.slant),tgt:SENSOR.tgt?SENSOR.tgt.name:null,dead:!!t.dead};},
+  strikeFire:()=>{const n=STRIKE.shots;fireMissile();return STRIKE.shots>n;},
+  strikeClock:sec=>{if(!STRIKE.active||STRIKE.cleared)return false;STRIKE.clock=Math.max(0,STRIKE.clock+(+sec||0)-0.001);strikeTick(0.001);return STRIKE.cleared;}};
 // stars: a fixed dome of points that only shows once the sun is down
 (function(){
   const N=520,pos=new Float32Array(N*3);
