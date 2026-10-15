@@ -52,7 +52,7 @@ async def main():
                 await pg.evaluate("()=>{window.__kgeu.openMenu();window.__kgeu.LB.lbOpen('daily','easy')}")
                 await pg.wait_for_function("()=>document.querySelectorAll('#lbRowsIn .lbRow').length>=10", timeout=10000)
                 await pg.wait_for_timeout(400)
-                ok(name + ': a merged board: no EASY/HARD chip in the bar (ui1: only the dogfight has one)', await pg.evaluate("()=>document.getElementById('lbMode').hidden&&!document.querySelector('#sLb [data-lbm]')"))
+                ok(name + ': a merged board: no EASY/HARD segment in the bar (bugs1: none anywhere)', await pg.evaluate("()=>!document.getElementById('lbMode')&&!document.querySelector('#sLb [data-lbm]')"))
                 ok(name + ': Today / This week / All time kept', await pg.evaluate("()=>[...document.querySelectorAll('#sLb [data-lbp]')].map(b=>b.getAttribute('aria-label')).join('|')") == 'Today|This week|All time')
                 bu = [u for u in seen if '/board?' in u]
                 ok(name + ': the board is fetched with no mode', bu and all('&m=' not in u and '?m=' not in u for u in bu), bu[-1:])

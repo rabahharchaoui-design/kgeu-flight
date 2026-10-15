@@ -1,6 +1,6 @@
 # Red Flag Dogfight on the leaderboards (5.5). iPhone landscape 844x390, the Worker stubbed (http://lb.test).
-# (a) the eight boards df:score|kills|clear|guns:easy|hard are registered single mode in the 'Red Flag Dogfight' group and
-#     listed on the Boards screen as separate entries ("Dogfight score (Hard)"), their rows carry no EASY/HARD chip.
+# (a) the eight boards df:score|kills|clear|guns:easy|hard are registered single mode in the 'Red Flag Dogfight' group; the
+#     Boards screen has one Red Flag Dogfight entry with a stat segment and no EASY/HARD segment (bugs1), every row has its chip.
 # (b) Hard: no token under the briefing card; FIGHT'S ON asks for exactly one token, for df:score:hard. A won run sends one
 #     submit to df:score:hard with the df block (kills, guns, hits, waves, won, clear, bank, flares, ach) and no path; the
 #     results card shows the rank line, the personal bests line, "+150 XP  ACE" and the rank up from the stubbed answer.
@@ -10,11 +10,15 @@
 #     (DF.daily, DF.seed the day, the same spawn twice), one token for 'daily', a submit to daily with score round(score/2)
 #     and the df block; K.dailyRegion('az') still pins a landing daily.
 # (f) no console errors.
+# (g) bugs1: one merged list from df:<stat>:easy and df:<stat>:hard (the ui1_mock Mock, 4 rows a board): 7 rows, sorted,
+#     the callsign on both boards once with its better (Hard) score, a tie sharing a rank, every row chipped, my row the
+#     Easy answer re-ranked 'of 7', the stat segment switches both fetched boards, the clear stat sorts ascending.
 # Usage: .venv/bin/python tests/dogfight_lb_check.py
 import asyncio, sys, json, os
 from playwright.async_api import async_playwright
 sys.path.insert(0, os.path.dirname(__file__))
-from harness import serve, launch, IPHONE_15, Checks, finger, THREE, IGNORE, splash_gone
+from harness import serve, launch, page, IPHONE_15, Checks, finger, THREE, IGNORE, splash_gone
+from ui1_mock import Mock
 
 ok = Checks()
 K = 'window.__kgeu'
@@ -66,6 +70,20 @@ async def newpage(b, url, storage):
     await pg.wait_for_timeout(500)
     return pg
 
+# (g) the two boards of one dogfight stat, as the Worker answers them (Mock.extra['boards'] hands them in as they are)
+R = lambda r, cs, sc, m, w=1, ac='f16': {'r': r, 'cs': cs, 'score': sc, 'secs': 200, 'ac': ac, 'mode': m, 'xp': 2000, 'rank': 'Wingman', 'creator': False, 'when': w}
+MERGE = {
+    'df:score:hard': {'rows': [R(1, 'VIPER', 1700, 'hard'), R(2, 'SHARED', 1600, 'hard'), R(3, 'TIEA', 1500, 'hard', 1), R(4, 'HOGWASH', 1200, 'hard')], 'me': None, 'total': 4, 'ghost': None},
+    'df:score:easy': {'rows': [R(1, 'TIEB', 1500, 'easy', 2), R(2, 'SHARED', 1400, 'easy'), R(3, 'ACEPILOT', 1300, 'easy'), R(4, 'EZFOUR', 1000, 'easy')],
+                      'me': {'r': 3, 'cs': 'ACEPILOT', 'score': 1300, 'mode': 'easy', 'xp': 1650, 'rank': 'Flight Lead', 'creator': False}, 'total': 4, 'ghost': None},
+    'df:clear:hard': {'rows': [R(1, 'SHARED', 120, 'hard'), R(2, 'SLOWER', 200, 'hard')], 'me': None, 'total': 2, 'ghost': None},
+    'df:clear:easy': {'rows': [R(1, 'QUICK', 100, 'easy'), R(2, 'SHARED', 150, 'easy'), R(3, 'SLOWEST', 300, 'easy')], 'me': None, 'total': 3, 'ghost': None},
+}
+ROWSJS = """()=>{const rd=r=>({cs:(r.querySelector('.c span')||{}).textContent,n:r.querySelector('.n').textContent.trim(),s:r.querySelector('.s').textContent,
+  m:(r.querySelector('.modeTag')||{}).textContent||'',t:r.innerText.replace(/\\s+/g,' ')});
+  return {rows:[...document.querySelectorAll('#lbRowsIn .lbRow')].map(rd),me:rd(document.querySelector('#lbMe .lbRow')),tot:document.getElementById('lbTotal').textContent,
+    seg:!!document.getElementById('lbMode'),race:document.getElementById('lbRace').hidden,title:document.getElementById('lbTitle').textContent}}"""
+
 STEP = "(n)=>{const K=window.__kgeu;for(let i=0;i<n;i++)K.stepFrame(0.1,false,true);}"
 UNTIL = """([cond,max])=>{const K=window.__kgeu,D=K.DF,f=new Function('K','D','return ('+cond+')');
   for(let i=0;i<max*10;i++){K.stepFrame(0.1,false,true);if(f(K,D))return true;}return false;}"""
@@ -110,14 +128,14 @@ async def main():
         try: await pg.wait_for_selector('#lbRowsIn .lbRow', timeout=6000, state='attached')
         except Exception: pass
         lbt = await pg.evaluate("()=>[...document.querySelectorAll('#lbList [data-lbb]')].map(e=>e.dataset.lbb+'='+e.textContent)")
-        bar = await pg.evaluate("()=>({mode:!document.getElementById('lbMode').hidden&&document.querySelector('[data-lbmode].sel').dataset.lbmode,stat:!document.getElementById('lbStat').hidden&&document.querySelector('[data-lbstat].sel').dataset.lbstat,sel:(document.querySelector('#lbList .sel')||{}).dataset})")
-        ok('(a) ui1: the picker has one Red Flag Dogfight entry; the bar shows EASY/HARD (Hard) and the stat (Kills)',
-           [x for x in lbt if 'Dogfight' in x] == ['df=Red Flag Dogfight'] and bar['mode'] == 'hard' and bar['stat'] == 'kills' and bar['sel'] and bar['sel']['lbb'] == 'df', (lbt, bar))
-        rw = await pg.evaluate("()=>({n:document.querySelectorAll('#lbRowsIn .lbRow').length,chip:document.querySelectorAll('#lbRowsIn .modeTag').length,s:(document.querySelector('#lbRowsIn .lbRow .s')||{}).textContent,t:document.getElementById('lbTitle').textContent})")
-        ok('(a) a dogfight board: rows without the EASY/HARD chip, kills formatted', rw['n'] == 1 and rw['chip'] == 0 and rw['s'] == '1,700 kills' and rw['t'] == 'Red Flag Dogfight, kills', rw)
-        await pg.evaluate("()=>document.querySelector('[data-lbmode=easy]').click()"); await pg.wait_for_timeout(300)
-        ez = await pg.evaluate("()=>[document.querySelector('[data-lbmode].sel').dataset.lbmode,document.getElementById('lbTitle').textContent]")
-        ok('(a) ui1: the EASY chip switches to the Easy kills board', ez == ['easy', 'Red Flag Dogfight, kills'], ez)
+        bar = await pg.evaluate("()=>({mode:!!document.getElementById('lbMode')||!!document.querySelector('[data-lbmode]'),stat:!document.getElementById('lbStat').hidden&&document.querySelector('[data-lbstat].sel').dataset.lbstat,sel:(document.querySelector('#lbList .sel')||{}).dataset})")
+        ok('(a) the picker has one Red Flag Dogfight entry; the bar shows the stat (Kills) and no EASY/HARD segment (bugs1)',
+           [x for x in lbt if 'Dogfight' in x] == ['df=Red Flag Dogfight'] and bar['mode'] is False and bar['stat'] == 'kills' and bar['sel'] and bar['sel']['lbb'] == 'df', (lbt, bar))
+        rw = await pg.evaluate("()=>({n:document.querySelectorAll('#lbRowsIn .lbRow').length,chip:[...document.querySelectorAll('#lbRowsIn .modeTag')].map(e=>e.textContent),s:(document.querySelector('#lbRowsIn .lbRow .s')||{}).textContent,t:document.getElementById('lbTitle').textContent})")
+        ok('(a) a dogfight board: one merged row (VIPER on both stubbed boards) with its HARD chip, kills formatted', rw['n'] == 1 and rw['chip'] == ['HARD'] and rw['s'] == '1,700 kills' and rw['t'] == 'Red Flag Dogfight, kills', rw)
+        await pg.evaluate(f"()=>{K}.LB.lbOpen('df:kills:easy')"); await pg.wait_for_timeout(300)
+        ez = await pg.evaluate("()=>[document.querySelector('[data-lbstat].sel').dataset.lbstat,document.getElementById('lbTitle').textContent,(document.querySelector('#lbList .sel')||{dataset:{}}).dataset.lbb,document.querySelectorAll('#lbRowsIn .lbRow').length]")
+        ok('(a) an Easy board key (the results card badge) opens the same merged list', ez == ['kills', 'Red Flag Dogfight, kills', 'df', 1], ez)
         await pg.screenshot(path=os.path.join(os.path.dirname(__file__), '..', 'overnight-screenshots', 'dogfight_lb_boards.png'))
 
         # ---------------- (b) a Hard win ----------------
@@ -213,6 +231,36 @@ async def main():
         ok('(e) the daily fight is the same each time (seeded spawns), a regular run is not seeded', s2 == s3 and s2[-1][0] == s1['day'] and s4[0] != s2[0] and len(p2) == 2, (s2, s3, s4))
         await pg.evaluate(f"()=>{{{K}.dailyKind(null);{K}.openMenu();}}")
         ok('(f) no console errors', not pg.errs, pg.errs[:4])
+        await pg.context.close()
+
+        # ---------------- (g) bugs1: the merged Easy + Hard list ----------------
+        m = Mock(cs='ACEPILOT', xp=1650); m.extra['boards'] = MERGE
+        st = {'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'}; st.update(m.storage())
+        pg = await page(b, url, vp=IPHONE_15, storage=st, pre=m.install)
+        await pg.wait_for_timeout(400)
+        await pg.evaluate(f"()=>{{{K}.openMenu();{K}.LB.lbOpen('df:score:hard')}}")
+        try: await pg.wait_for_function("()=>document.querySelectorAll('#lbRowsIn .lbRow').length>=7", timeout=8000)
+        except Exception: pass
+        await pg.wait_for_timeout(300)
+        g = await pg.evaluate(ROWSJS)
+        fb = {x[0] for x in m.boards}
+        ok('(g) both boards fetched (df:score:easy and df:score:hard), #lbMode gone', {'df:score:easy', 'df:score:hard'} <= fb and not g['seg'], (fb, g['seg']))
+        cs = [r['cs'] for r in g['rows']]
+        ok('(g) one merged list of 7 rows, best first, the tie by the earlier run', cs == ['VIPER', 'SHARED', 'TIEA', 'TIEB', 'ACEPILOT', 'HOGWASH', 'EZFOUR'], g['rows'])
+        sh = [r for r in g['rows'] if r['cs'] == 'SHARED']
+        ok('(g) the callsign on both boards once, its better score with the HARD chip', len(sh) == 1 and sh[0]['s'] == '1,600 pts' and sh[0]['m'] == 'HARD', sh)
+        ok('(g) the tied pair share rank 3, the next rank is 5', [r['n'] for r in g['rows']] == ['1', '2', '3', '3', '5', '6', '7'], [r['n'] for r in g['rows']])
+        ok('(g) every row carries its chip', [r['m'] for r in g['rows']] == ['HARD', 'HARD', 'HARD', 'EASY', 'EASY', 'HARD', 'EASY'], [r['m'] for r in g['rows']])
+        ok("(g) my row: the Easy answer, EASY chip, #5 of 7; the pilots count says 7", g['me']['m'] == 'EASY' and g['me']['n'] == '#5' and 'of 7' in g['me']['t'] and g['me']['s'] == '1,300 pts' and g['tot'] == '7 pilots', (g['me'], g['tot']))
+        ok('(g) no Race the leader on a dogfight board', g['race'], g)
+        m.boards.clear()
+        await pg.evaluate("()=>document.querySelector('[data-lbstat=clear]').click()"); await pg.wait_for_timeout(600)
+        c = await pg.evaluate(ROWSJS)
+        fb = {x[0] for x in m.boards}
+        ok('(g) the Clear stat fetches df:clear:easy and df:clear:hard', {'df:clear:easy', 'df:clear:hard'} <= fb and not any(x.startswith('df:score') for x in fb), fb)
+        ok('(g) the clear list sorts ascending (lower is better), merged and chipped', [r['cs'] for r in c['rows']] == ['QUICK', 'SHARED', 'SLOWER', 'SLOWEST'] and [r['m'] for r in c['rows']] == ['EASY', 'HARD', 'HARD', 'EASY']
+           and c['rows'][1]['s'] == '2:00.0' and c['title'] == 'Red Flag Dogfight, clear time', c)
+        ok('(g) no console errors', not pg.errs, pg.errs[:4])
         await pg.context.close()
         await b.close()
     sys.exit(ok.done('dogfight_lb_check'))
