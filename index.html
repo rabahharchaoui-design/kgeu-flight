@@ -1715,6 +1715,23 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
   padding:9px 16px; border-radius:12px; background:rgba(18,13,9,.95); border:1px solid rgba(246,193,119,.35); color:var(--sand); font:700 15px/1.25 var(--font); text-align:center;
   pointer-events:none; opacity:0; transition:opacity 200ms ease-out; }
 #bugTip.on{ opacity:1; }
+/* bugs1 item 6: "Something broke. Report it?" after an uncaught error or a long stall in flight. Not a modal: a small
+   bar under the pause button (landscape, clear of the stick zone and the throttle column) or under the map and the
+   readouts (portrait, above the controls); in 200 ms with a 10 px slide, out in 140 ms, gone by itself after 8 s */
+#bugAsk{ position:absolute; z-index:20; left:50%; top:calc(var(--padT) + var(--icon) + 6px); width:max-content; max-width:calc(100% - 2 * (var(--padR) + var(--col) + 8px)); box-sizing:border-box;
+  display:flex; align-items:center; gap:8px; padding:3px 3px 3px 14px; border-radius:14px; background:rgba(18,13,9,.92); border:1px solid rgba(246,193,119,.4);
+  box-shadow:0 6px 18px rgba(0,0,0,.35); color:var(--sand); font:700 14px/1.2 var(--font); pointer-events:auto;
+  visibility:hidden; opacity:0; transform:translate(-50%,-10px);
+  transition:opacity 140ms ease-in, transform 140ms ease-in, visibility 0s linear 140ms; }
+#bugAsk.on{ visibility:visible; opacity:1; transform:translate(-50%,0);
+  transition:opacity 200ms ease-out, transform 200ms cubic-bezier(.23,1,.32,1), visibility 0s; }
+#bugAsk span{ flex:1 1 auto; min-width:0; }
+#bugAsk button{ flex:none; min-height:44px; min-width:44px; margin:0; border-radius:11px; padding:0 14px; touch-action:manipulation; transition:transform 120ms ease-out; }
+#bugAsk button:active{ transform:scale(.96); }
+#bugAsk #bugAskGo{ font:900 14px var(--font); letter-spacing:.08em; background:var(--rust); color:#fff4e0; border:2px solid var(--rust); }
+#bugAsk #bugAskX{ width:44px; padding:0; font:800 17px var(--font); background:none; color:var(--sand); border:0; }
+@media (orientation:portrait){ #bugAsk{ top:calc(var(--padT) + max(var(--map), var(--hudH)) + 8px); max-width:calc(100% - var(--padL) - var(--padR)); } }
+@media (prefers-reduced-motion:reduce){ #bugAsk, #bugAsk.on{ transform:translate(-50%,0); } #bugAsk button{ transition:none; } }
 /* ================= leaderboards: callsign card, boards, ranks, the end of run badge ================= */
 #csOv{ background:var(--sand); color:var(--night); z-index:40; padding:var(--padT) var(--padR) var(--padB) var(--padL); align-items:flex-start; }
 .csWrap{ display:flex; gap:clamp(14px,3vw,34px); align-items:center; width:min(900px,100%); margin:auto; }
@@ -1942,6 +1959,25 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 #menu .lrow .azTag{ position:absolute; top:5px; right:10px; margin:0; font-size:8px; background:rgba(42,22,8,.1); color:var(--brown); }
 #menu .lrow.next .azTag{ background:rgba(246,193,119,.16); color:#e8cfa5; }
 </style>
+<script>/* bugs1 item 6: the console ring for bug reports, installed before anything else runs so boot errors are kept.
+   The last 20 console errors and warnings, uncaught errors and unhandled rejections {t: s since load, k, m: message and
+   the first stack line, 300 chars}; keys, tokens and URL query strings are cut out. __pfsBug.hook (set by the game) sees
+   the uncaught ones and the rejections. */
+(function(){var B=window.__pfsBug={log:[],hook:null};
+  function scrub(x){return String(x).replace(/\b(key|token|tok|sig|auth|secret|password)(["']?\s*[:=]\s*["']?)[^\s"'&,;})]+/gi,'$1$2…')
+    .replace(/(https?:\/\/[^\s?#"']*)\?[^\s#"')]*/g,'$1?…').replace(/\b[0-9a-f]{32,}\b/gi,'[hex]');}
+  function line1(st){if(!st)return '';var L=String(st).split('\n');for(var i=0;i<L.length;i++){var l=L[i].trim();if(/^at |@/.test(l))return l;}return '';}
+  function fmt(a){if(a instanceof Error){var f=line1(a.stack);return (a.name&&a.name!=='Error'?a.name+': ':'')+a.message+(f?' | '+f:'');}
+    if(a&&typeof a==='object'){try{return JSON.stringify(a).slice(0,200);}catch(e){return String(a);}}return String(a);}
+  function add(k,m){try{B.log.push({t:Math.round(performance.now()/100)/10,k:k,m:scrub(m).slice(0,300)});if(B.log.length>20)B.log.shift();
+    if((k==='uncaught'||k==='promise')&&B.hook)B.hook(k);}catch(e){}}
+  B.add=add;
+  ['error','warn'].forEach(function(k){var o=console[k];if(!o)return;
+    console[k]=function(){try{add(k,Array.prototype.map.call(arguments,fmt).join(' '));}catch(e){}return o.apply(this,arguments);};});
+  window.addEventListener('error',function(e){var er=e.error,f=er?line1(er.stack):'';
+    add('uncaught',(e.message||(er&&er.message)||'error')+(f?' | '+f:e.filename?' | '+String(e.filename).split('/').pop()+':'+e.lineno:''));});
+  window.addEventListener('unhandledrejection',function(e){var r=e.reason;add('promise',r instanceof Error?fmt(r):'Unhandled rejection: '+fmt(r));});
+})();</script>
 </head>
 <body class="menuOn">
 <!-- splash: plain HTML so it paints before any script runs, then fades into the home screen -->
@@ -1977,6 +2013,7 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
   </div>
   <button id="hDest" hidden aria-label="Destination, tap to clear"><svg id="dArrow" viewBox="0 0 24 24"><path d="M12 2 L20 20 L12 15.5 L4 20Z" fill="#D98A3D" stroke="#2A1608" stroke-width="1.2" stroke-linejoin="round"/></svg><span id="dTxt"></span></button><div id="navLog" aria-label="Nav log"></div>
   <button id="bPause" title="Pause (P)" aria-label="Pause"><svg viewBox="0 0 20 20"><rect x="4" y="3" width="4" height="14" rx="1" fill="currentColor"/><rect x="12" y="3" width="4" height="14" rx="1" fill="currentColor"/></svg></button>
+  <div id="bugAsk" role="status" aria-live="polite"><span>Something broke. Report it?</span><button id="bugAskGo">REPORT</button><button id="bugAskX" aria-label="Dismiss">✕</button></div>
   <button id="tk" aria-label="Now playing, tap for music controls"><span class="tkP"><svg class="tkPl" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 1 11 6l-8.5 5z" fill="currentColor"/></svg><svg class="tkN" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 1.5 11 0v8.2a1.9 1.6 0 1 1-1.2-1.5V2.4L5.7 3.3v6.4a1.9 1.6 0 1 1-1.2-1.5z" fill="currentColor"/></svg><span id="tkV"><span id="tkT"><i></i><i aria-hidden="true"></i></span></span></span></button>
   <div id="tkCtl" role="group" aria-label="Music"><button id="tkPrev" aria-label="Previous song">Prev</button><button class="playPause" id="tkPlay" aria-label="Play or pause music">Pause</button><button id="tkNext" aria-label="Next song">Next</button></div>
   <button id="bFull" class="donly" title="Full screen">Full screen</button>
@@ -15620,13 +15657,14 @@ function hudClear(){
   if(window.layoutCtl)layoutCtl();   // the LOOK pad and DROP button go with the mission
 }
 const pauseOv=$('pauseOv');
-function openMenu(scr){GFX.pendingApply();if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.forced=null;hudClear();pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
+function openMenu(scr){GFX.pendingApply();if(BUG&&BUG.askHide)BUG.askHide();if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.forced=null;hudClear();pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
 // the pause button, P and a backgrounded app all land here; the sheet shows while paused
 // bugs1 item 5: the bug report's screenshot. Going to paused asks for one frame: the render loop copies the WebGL canvas
 // right after its next render, in the same task, so preserveDrawingBuffer stays off and no other frame pays anything.
 // Downscaled through a 2D canvas to 960 px on the long side, JPEG 0.6 (0.45, then 0.3 while over 280 KB). BUG.shot
 // {url, at, w, h} stays in memory for the report sheet.
-var BUG={want:0,shot:null,cv:null,onShot:null};
+var BUG={want:0,shot:null,cv:null,onShot:null,
+  asked:false,log:(window.__pfsBug&&window.__pfsBug.log)||[],ask:null,askHide:null,onStall:null};   // item 6: the prompt (once a session) and the console ring
 function bugBytes(u){const n=u.length-u.indexOf(',')-1;return Math.floor(n*3/4)-(u.endsWith('==')?2:u.endsWith('=')?1:0);}
 function bugGrab(){BUG.want=0;
   try{const w=glc.width,h=glc.height;if(!w||!h)return null;
@@ -20526,6 +20564,7 @@ function stallAdd(g,tki,t){
   if(!hid){S.count++;if(g>S.worst)S.worst=g;}
   console.log('[stall] '+g+' ms tick '+tki+' ms '+r.scene+(r.tags.length?' '+r.tags.join(' '):''));
   if(!S.saveT)S.saveT=setTimeout(stallSave,2000);
+  if(g>3000&&!hid&&BUG&&BUG.onStall)BUG.onStall(r);   // bugs1 item 6: a long stall in flight may ask for a report
 }
 function stallSave(){STALL.saveT=0;
   try{localStorage.setItem('kgeuStalls',JSON.stringify({v:stallVer(),log:STALL.log,prev:STALL.prev}));}catch(e){}
@@ -21459,8 +21498,88 @@ const BUGF={from:null,cat:null,sev:'annoying',shot:null,shotOn:true,sending:fals
 function bugKey(){let k='';try{k=localStorage.getItem('kgeuBugKey')||'';}catch(e){}
   if(!/^[0-9a-f]{48}$/.test(k)){const a=new Uint8Array(24);crypto.getRandomValues(a);k=[...a].map(x=>x.toString(16).padStart(2,'0')).join('');try{localStorage.setItem('kgeuBugKey',k);}catch(e){}}
   return k;}
-// what the report carries about the game and the phone (item 6 adds the rest here)
-function bugContext(){return {app:LB&&LB.APP_VER,screen:innerWidth+'x'+innerHeight+'@'+devicePixelRatio};}
+// ---- bugs1 item 6: what every report carries without the player typing it. The phone as best the browser tells it
+// (an iPhone class from its screen points and pixel ratio, an iPad, an Android model, else the platform), the game's
+// state (aircraft, mode, region, base, time of day, where: a menu screen or the kind of flight), frame rate, graphics
+// tier, memory, the callsign, the last 20 console errors and warnings (BUG.log, the head script's ring) and the last
+// long stall. Strings at most 120 chars, the whole under 6,000 (the Worker cuts at 8,000).
+const BUG_IPH={'320x568@2':'iPhone SE (1st gen) class','375x667@2':'iPhone SE class','414x736@3':'iPhone 6/7/8 Plus class',
+  '375x812@3':'iPhone X/XS/11 Pro/12 mini class','390x844@3':'iPhone 12/13/14 class','393x852@3':'iPhone 14 Pro/15/16 class',
+  '414x896@2':'iPhone XR/11 class','414x896@3':'iPhone XR/11 class','428x926@3':'iPhone 12/13 Pro Max class',
+  '430x932@3':'iPhone 14 Pro Max/15 Plus/16 Plus class','402x874@3':'iPhone 16 Pro class','440x956@3':'iPhone 16 Pro Max class'};
+function bugPlat(){const n=navigator;return (n.userAgentData&&n.userAgentData.platform)||n.platform||'unknown';}
+function bugIPad(ua){return /iPad/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1&&!/Chrome\//.test(ua));}
+function bugDevice(){const ua=navigator.userAgent||'',dpr=Math.round(devicePixelRatio||1);
+  if(/iPhone|iPod/.test(ua)){const a=Math.min(screen.width,screen.height),b=Math.max(screen.width,screen.height);
+    return BUG_IPH[a+'x'+b+'@'+dpr]||'iPhone '+a+'x'+b;}
+  if(bugIPad(ua))return 'iPad';
+  if(/Android/.test(ua)){const m=ua.match(/Android[^;)]*;\s*([^;)]+?)\s*(?:Build\/[^;)]*)?\)/);return m&&m[1]&&m[1]!=='K'?m[1].trim():'Android';}
+  return bugPlat();}
+function bugOS(){const ua=navigator.userAgent||'';let m;
+  if((m=ua.match(/(?:iPhone|iPad|iPod)[^)]*? OS (\d+)_(\d+)/)))return 'iOS '+m[1]+'.'+m[2];
+  if(bugIPad(ua))return (m=ua.match(/Version\/(\d+(?:\.\d+)?)/))?'iPadOS '+m[1]:'iPadOS';
+  if((m=ua.match(/Android (\d+(?:\.\d+)?)/)))return 'Android '+m[1];
+  return bugPlat();}
+function bugBrowser(){const ua=navigator.userAgent||'';let m;
+  if((m=ua.match(/Edg(?:A|iOS)?\/([\d.]+)/)))return 'Edge '+m[1];
+  if((m=ua.match(/CriOS\/([\d.]+)/)))return 'Chrome '+m[1];
+  if((m=ua.match(/(?:FxiOS|Firefox)\/([\d.]+)/)))return 'Firefox '+m[1];
+  if((m=ua.match(/Chrome\/([\d.]+)/)))return (/; wv\)/.test(ua)?'WebView ':'Chrome ')+m[1];
+  if((m=ua.match(/Version\/([\d.]+).*Safari\//)))return 'Safari '+m[1];
+  if(/iPhone|iPad|iPod/.test(ua))return navigator.standalone?'Safari (home screen)':'WebView';
+  return 'unknown';}
+function bugStandalone(){try{return !!navigator.standalone||matchMedia('(display-mode: standalone)').matches;}catch(e){return !!navigator.standalone;}}
+// where the player is: a menu screen, or the kind of flight from the game's state
+function bugScr(){
+  if(!running||menu.classList.contains('on'))return curScr||'sHome';
+  if(DF.on)return DF.daily?'daily':'dogfight';
+  if(TASK.on)return 'task:'+(TASK.id||'?');
+  if(RIDE.on)return 'ride';
+  if(LES.on)return 'lesson:'+LES.on;
+  if(ARC.on)return ARC.kind==='daily'?'daily':'arc:'+ARC.kind;
+  if(MISS.on)return 'mission:'+(MISS.kind||'?');
+  if(STRIKE.active)return 'mission:range';
+  return 'free';}
+function bugContext(){
+  const c=x=>x==null?null:String(x).slice(0,120),q=(f,d)=>{try{const v=f();return v===undefined?d:v;}catch(e){return d;}};
+  const sm=performance.memory,P=LB&&LB.E?LB.E.P:null,ls=STALL.log[STALL.log.length-1];
+  const fp=q(()=>{if(!running)return null;const f=fpsStats();return f.n?{avg:f.avg,low1:f.low1}:null;},null);
+  const o={app:c(q(()=>LB.APP_VER,null)),device:c(q(bugDevice,null)),
+    screen:c(innerWidth+'x'+innerHeight+'@'+(Math.round(devicePixelRatio*100)/100)+' '+(innerWidth>=innerHeight?'landscape':'portrait')+', PWA '+(bugStandalone()?'yes':'no')),
+    os:c(q(bugOS,null)),browser:c(q(bugBrowser,null)),
+    gfx:q(()=>({tier:c(GFX.tier),scale:Math.round(GFX.scale*100)/100,post:GFX.post==null?null:typeof GFX.post==='boolean'?GFX.post:c(GFX.post)}),null),
+    fps:fp,ac:c(acType),mode:c(q(runMode,null)),region:c(REGION.id),city:c(REGION.city),base:c(q(()=>st.base,null)),tod:c(q(()=>TOD.id,null)),
+    scr:c(q(bugScr,null)),running:!!running,paused:!!paused,up:Math.round(performance.now()/1000),online:navigator.onLine!==false,
+    lang:c(navigator.language||null),mem:sm&&sm.usedJSHeapSize?Math.round(sm.usedJSHeapSize/1048576):null,cs:c(P&&P.cs?P.cs:'guest'),
+    stall:ls?{t:ls.t,gap:ls.gap,tick:ls.tick,scene:c(ls.scene),tags:c((ls.tags||[]).join(' '))}:null,
+    errors:BUG.log.slice(-20).map(e=>({t:e.t,k:e.k,m:String(e.m).slice(0,300)}))};
+  while(JSON.stringify(o).length>6000&&o.errors.length)o.errors.shift();   // the oldest go first
+  return o;}
+// the prompt: once a session, after an uncaught error or a rejection, or a stall over 3 s in flight
+const BUGA={kind:null,t:0,ht:0};
+function bugAskCan(){
+  if(BUG.asked||performance.now()<5000||!running||menu.classList.contains('on'))return false;
+  if(DF.brief||TASK.brief||LES.brief||RES.brief||document.body.classList.contains('crashOn'))return false;
+  if(document.querySelector('.overlay.on'))return false;   // a results card, a briefing, the pause sheet, the report form
+  return true;}
+function bugAsk(kind){kind=kind==='stall'?'stall':'error';
+  if(!bugAskCan())return false;
+  BUG.asked=true;BUGA.kind=kind;
+  const e=$('bugAsk');clearTimeout(BUGA.t);clearTimeout(BUGA.ht);e.classList.add('on');
+  BUGA.t=setTimeout(bugAskHide,8000);return true;}
+function bugAskHide(){clearTimeout(BUGA.t);$('bugAsk').classList.remove('on');}
+function bugAskGo(){const k=BUGA.kind;bugAskHide();
+  if(running&&!paused&&!st.crashed){togglePause();bugOpen('pause');}   // the pause button's own path: the frame is captured
+  else bugOpen('settings');
+  BUGF.cat=k==='stall'?'graphics':'crash';bugPaint();}
+$('bugAskGo').onclick=bugAskGo;   // a click: nothing trails it onto the sheet that opens
+$('bugAskX').onclick=bugAskHide;
+BUG.askHide=bugAskHide;
+if(window.__pfsBug)window.__pfsBug.hook=()=>{bugAsk('error');};
+// a stall over 3 s: only in a flight running for 20 s or more, never with the page hidden, a tier change or a pause
+BUG.onStall=r=>{if(!running||paused||menu.classList.contains('on')||Date.now()-RUN.t0<20000||STALL.vis||document.hidden)return;
+  if(r.tags.some(t=>t==='tier'||t==='pause'||t==='menu'||t==='hidden'))return;
+  bugAsk('stall');};
 // the HUD toast sits under the menu and the sheets, so the bug messages also get their own line on top of those
 function bugSay(msg){toast(msg,4);if(!(menu.classList.contains('on')||pauseOv.classList.contains('on')||$('bugOv').classList.contains('on')))return;
   const e=$('bugTip');e.textContent=msg;e.classList.add('on');clearTimeout(BUGF.tipT);BUGF.tipT=setTimeout(()=>e.classList.remove('on'),3500);}
@@ -21516,6 +21635,7 @@ $('bugX').onclick=bugClose;
 $('pBug').onclick=()=>bugOpen('pause');
 $('bBug').onclick=()=>bugOpen('settings');
 Object.assign(window.__kgeu,{bugOpen:bugOpen,bugClose:bugClose,bugShot:()=>BUG.shot,bugContext:bugContext,
+  bugLog:()=>BUG.log.slice(),bugAsk:bugAsk,bugAsked:()=>BUG.asked,bugAskShown:()=>$('bugAsk').classList.contains('on'),
   bugState:()=>({cat:BUGF.cat,sev:BUGF.sev,text:$('bugTx').value,shotOn:!!(BUGF.shot&&BUGF.shotOn),open:$('bugOv').classList.contains('on'),from:BUGF.from,hasShot:!!BUGF.shot,queued:LB?LB.reportQueued():0})});
 // the Red Flag Dogfight (5.1)
 Object.assign(window.__kgeu,{dfScore:dfScore,dfStars:dfStars,dfGrade:dfGrade,dfAch:dfAch,dfPFlare:dfPFlare,ACH:ACH,SCORE:SCORE,scoreOf:scoreOf,DF:DF,DFM:DFM,dfStart:dfStart,dfKill:dfKill,dfHit:dfHit,dfEnd:dfEnd,dfStop:dfStop,dfFox:dfFox,dfCall:dfCall,DF_CFG:DF_CFG,dfWv:dfWv,DF_RAMP:DF_RAMP,dfBreak:dfBreak,musicTitle:musicTitle,ARS:ARS,ARS_RACKS:ARS_RACKS,ARS_GUNS:ARS_GUNS,arsLo:arsLo,arsPick:arsPick,arsApply:arsApply,arsOpen:arsOpen,dfWsel:dfWsel,dfWcycle:dfWcycle,dfShoot:dfShoot,DFA:DFA,dfMask:dfMask,dfLaunch:dfLaunch});
