@@ -223,6 +223,7 @@ Barry M. Goldwater Range, F-16 and the mode, with the countdown; GO starts the d
 after the switch and resume) with its dice seeded from the day (`DF.seed`, yyyymmdd), so it is the same fight
 worldwide. The daily score is `min(1500, round(dfScore().score / 2))`, submitted to `daily` (one official attempt,
 practice after, as always) with the same `df` block and no flight path; it does not go to the regular dogfight boards.
+The dogfight cap is multiplied by the loadout multiplier (`df.mult`, 1 to 1.15, absent: 1; anything else is refused).
 The server checks a daily on a dogfight day with the dogfight caps (2 x score against the formula cap, +2) instead of
 `parMax` and refuses one without `df`; on any other day a daily carrying `df` is refused. Tests: `K.dailyKind('dogfight'
 |'landing'|null)` forces the kind; `K.dailyRegion('az')` still pins a landing daily. (Dogfight days in October 2026:

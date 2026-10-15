@@ -13712,12 +13712,12 @@ function dfEnd(why){
   missHud(null);
   // the boards: one submission with the whole run (a run with no points and no kills is not sent). The daily's points
   // are half the run's, up to 1,500; the Worker fans a df:score run out to the kills, clear and guns boards
-  const L=DF.lo,bonus=dfBonus(DF),dp=Math.min(1500,Math.round(r.score/2)),dpB=Math.min(1500,Math.round(r.base/2)),send=r.score>0||r.kills>0,lb=DF.daily?'daily':'df:score:'+r.mode;
+  const L=DF.lo,bonus=dfBonus(DF),dp=Math.min(1500,Math.round(r.score/2)),send=r.score>0||r.kills>0,lb=DF.daily?'daily':'df:score:'+r.mode;
   if(DF.daily&&send)scRecord('arc:daily:'+todayKey(),{pts:dp,secs:r.secs,letter:letter,stars:stars,ac:AC.name,df:1});
-  if(LB&&DF.lb){if(send)LB.runEnd(DF.lb,DF.daily?dpB:r.base,{secs:Math.round(DF.fightT*100)/100,df:{kills:r.kills,guns:r.gunKills,hits:r.hits,waves:r.waves,won:r.won,
+  if(LB&&DF.lb){if(send)LB.runEnd(DF.lb,DF.daily?dp:r.score,{secs:Math.round(DF.fightT*100)/100,df:{kills:r.kills,guns:r.gunKills,hits:r.hits,waves:r.waves,won:r.won,
       clear:r.won?r.clearT:null,bank:bonus/DF_PTS.sec,flares:(DF.flr0||DF_FLARES)-DF.flares,ach:DF.ach.slice(),brk:DF.brks,ov:DF.ovs,
-      // arsenal item 5: the loadout flown, its multiplier and the card's points (pts); the Worker reads only the fields above
-      // (boards.js dfProblem) and ignores these, the score sent is the base it can check
+      // arsenal item 5: the loadout flown, its multiplier and the card's points (pts); the Worker multiplies its cap by
+      // mult (boards.js dfProblem) and ignores the rest, the score sent is the multiplied one the card shows
       lo:L?L.r+'/'+L.g:'std/full',mult:r.mult,pts:DF.daily?dp:r.score,srm:L?L.srm:DF_CFG[r.mode==='easy'?'easy':'hard'].fox,mrm:L?L.mrm:0,msh:DF.mShots,mk:DF.mKills,lr:DF.lrShots}});else LB.runCancel(DF.lb);}
   if(why==='crash')return;
   const B=SCORE.best[dfKey(r.mode)];
@@ -13726,7 +13726,7 @@ function dfEnd(why){
   // item 5: the loadout flown, always (STANDARD · 6 SRM · 510 rds), and its MRM kills when it had any
   if(L)stats.push(['Loadout',L.name+' · '+arsTxt(L)+' · '+L.rds+' rds']);
   if(DF.mShots)stats.push(['Radar missiles',DF.mKills+' of '+DF.mShots+' hit']);
-  if(r.mult!==1)stats.push(['Multiplier',arsX(r.mult)+', board points '+resNum(DF.daily?dpB:r.base)]);   // the boards rank the base (above)
+  if(r.mult!==1)stats.push(['Multiplier',arsX(r.mult)]);
   if(DF.brks||DF.ovs)stats.push(['Defence',DF.brks+(DF.brks===1?' break, ':' breaks, ')+DF.ovs+' overshoot'+(DF.ovs===1?'':'s')+' forced']);
   if(DF.daily)stats.push(['Daily points',resNum(dp)+' (half the score)']);
   stats.push(['Best',B?resNum(B.pts)+' pts, '+B.kills+' kills'+(B.clr!=null?', '+dfClock(B.clr):''):'none yet']);
@@ -13817,9 +13817,8 @@ DF.cfg=()=>rookie()?DF_CFG.easy:DF_CFG.hard;
 // [Hard, Easy]. STANDARD with the FULL gun is today's fight (DF_CFG fox, DF_FLARES, DF_ROUNDS) and every install's
 // first pick; the pick is kept (kgeuLoadout). arsApply puts the stores on the jet (dfStart, and again at FIGHT'S ON).
 // Item 3, the score multiplier: m per rack [Hard, Easy] plus the gun's (HALF +0.05), so a full rack is not strictly best;
-// at most x1.15. The run's points times it are the card's score, the stars, the grade and the local best. The boards
-// rank the base points: the Worker caps a dogfight score at what its kills, bank and hits allow (boards.js dfProblem,
-// not changed here), so a multiplied score would be refused; the loadout and its multiplier ride along with the run.
+// at most x1.15. The run's points times it are the card's score, the stars, the grade, the local best and the boards:
+// the Worker multiplies its dogfight cap (kills, bank, hits) by the df block's mult (boards.js dfProblem).
 const ARS_RACKS=[
   {id:'std',name:'STANDARD',srm:[6,10],mrm:[0,0],flr:30,m:[1,1]},
   {id:'light',name:'LIGHT',srm:[4,6],mrm:[0,0],flr:30,m:[1.1,1.1]},
