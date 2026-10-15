@@ -1599,6 +1599,22 @@ body.menuOn #tutArrow, body.pauseOn #tutArrow{ display:none !important; }
 #stallList li{ display:block; font-size:13px; font-variant-numeric:tabular-nums; min-height:0; line-height:1.35; }
 #stallList li.old{ opacity:.5; } #stallList li.lab{ font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--rust); margin-top:4px; }
 .stallFoot{ display:flex; gap:8px; justify-content:flex-end; flex:none; } .stallFoot button{ padding:0 18px; }
+/* bugs1 item 7: My tickets. Rows of 44 px or more that only show (no press feedback); the text one line with an ellipsis */
+#sTickets .helpBody{ align-items:stretch; width:100%; }
+.tkNote{ margin:0; flex:none; font-size:13px; font-weight:700; color:var(--brown); }
+#menu .tkList{ gap:4px; touch-action:pan-y; overscroll-behavior:contain; }
+#menu .tkList li.tkRow{ display:flex; align-items:center; gap:10px; min-height:44px; padding:4px 10px; box-sizing:border-box; border-radius:10px; background:rgba(42,22,8,.07); flex:none; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
+.tkL{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.tkM{ display:flex; align-items:baseline; gap:8px; min-width:0; white-space:nowrap; font-size:15px; line-height:1.2; }
+.tkM b{ color:var(--night); font-weight:800; font-variant-numeric:tabular-nums; flex:none; }
+#menu .tkM span{ font-size:14px; font-weight:700; letter-spacing:0; text-transform:none; color:var(--night); flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+#menu .tkM span.tkD{ flex:none; font-weight:600; color:var(--brown); }
+.tkT{ display:block; font-style:normal; font-size:12.5px; line-height:1.25; color:var(--brown); opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#menu .tkS{ flex:0 1 auto; max-width:58%; display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:2px 5px; font-size:12.5px; font-weight:800; letter-spacing:0; text-transform:none; color:var(--night); text-align:right; }
+.tkS i{ font-style:normal; color:#3f8f4f; font-size:15px; font-weight:900; }
+.tkS em{ font-style:normal; font-size:12px; font-weight:800; padding:2px 8px; border-radius:8px; background:rgba(42,22,8,.1); color:var(--brown); white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+.tkS.fx em{ background:rgba(63,143,79,.16); color:#2c6a39; }
+#menu .tkList li.tkMsg{ display:block; font-size:15px; color:var(--brown); min-height:0; padding:6px 2px; }
 .creditsList{ list-style:none; margin:0; padding:2px 2px 2px 0; width:100%; height:100%; overflow-y:auto; display:flex; flex-direction:column; gap:6px; }
 .creditsList li{ display:flex; align-items:baseline; gap:8px; font-size:15px; color:var(--brown); min-height:28px; }
 .creditsList b{ color:var(--night); font-weight:700; }
@@ -2184,7 +2200,7 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
     <div class="srow"><span>Sound</span><div class="chips"><button class="tog oSound" id="oSound">Sound: On</button><button class="tog oHap" id="oHap">Haptics: On</button></div></div>
     <div class="srow"><span>Help</span><div class="chips" id="helpRow"><button class="slink" id="bHelp" aria-label="Controls help"><span class="hL">Controls help</span><span class="hS">Controls</span><i class="chev" aria-hidden="true"></i></button><button id="bReplay" aria-label="Replay lesson 1"><span class="hL">Replay lesson 1</span><span class="hS">Lesson 1</span></button><button id="bPlace" aria-label="Retake placement"><span class="hL">Retake placement</span><span class="hS">Placement</span></button></div></div>
     <div class="srow"><span>About</span><div class="chips"><button class="slink" id="bCredits">Music credits<i class="chev" aria-hidden="true"></i></button><button class="tog" id="oFps" aria-label="Developer: FPS counter">FPS counter: Off</button></div></div>
-    <div class="srow"><span>Bugs</span><div class="chips"><button class="slink" id="bBug">Report a bug<i class="chev" aria-hidden="true"></i></button></div></div>
+    <div class="srow"><span>Bugs</span><div class="chips"><button class="slink" id="bBug">Report a bug<i class="chev" aria-hidden="true"></i></button><button class="slink" id="bTickets"><span id="bTicketsT">My tickets</span><i class="chev" aria-hidden="true"></i></button></div></div>
     <div class="srow"><span>Stutter log</span><div class="chips"><button class="slink" id="bStalls"><span id="bStallsT">No stalls yet</span><i class="chev" aria-hidden="true"></i></button></div></div>
    </div>
   </div>
@@ -2221,6 +2237,13 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
    <ul class="creditsList stallList" id="stallList"></ul>
   </div>
   <div class="stallFoot"><button id="bStallCopy">Copy</button><button id="bStallClr">Clear</button></div>
+ </div>
+ <div class="scr" id="sTickets">
+  <header class="mh"><h2>My tickets</h2></header>
+  <p class="tkNote" id="tkNote" hidden></p>
+  <div class="helpBody">
+   <ul class="creditsList tkList" id="tkList"></ul>
+  </div>
  </div>
  <div class="scr" id="sLb">
   <div class="lbBar">
@@ -17663,11 +17686,11 @@ function showScr(id){
   curScr=id;document.body.classList.toggle('menuOn',menu.classList.contains('on'));document.querySelectorAll('#menu .scr').forEach(e=>e.classList.toggle('on',e.id===id));
   menu.classList.toggle('see3d',id==='sFly');SHOW.on=id==='sFly'&&menu.classList.contains('on');
   if(id==='sFly'){CARM.sync();sumUI();requestAnimationFrame(locShow);}
-  if(id==='sSchool'){schoolList();ezInit();if(!PLACE)plOpen();}else{plClose(true);orClose(true);}if(id==='sHome')startHereUI();if(id==='sArc')arcList();if(id==='sLog')logRender();if(id==='sSet')stallUI();
+  if(id==='sSchool'){schoolList();ezInit();if(!PLACE)plOpen();}else{plClose(true);orClose(true);}if(id==='sHome')startHereUI();if(id==='sArc')arcList();if(id==='sLog')logRender();if(id==='sSet'){stallUI();tkUI();}
   if(LB){if(id==='sLb')LB.lbRender();else LB.sheet(false);if(id==='sSet'||id==='sFly'||id==='sHome')LB.ui();}
   tabsUI();
 }
-const TAB_OF={sHelp:'sSet',sCredits:'sSet',sStalls:'sSet',sLog:'sSchool'};
+const TAB_OF={sHelp:'sSet',sCredits:'sSet',sStalls:'sSet',sTickets:'sSet',sLog:'sSchool'};
 function tabsUI(){const t=TAB_OF[curScr]||curScr;menu.dataset.scr=curScr;
   document.querySelectorAll('#mTabs [data-go]').forEach(b=>{const on=b.dataset.go===t;b.classList.toggle('sel',on);b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1;});
   const bk=$('mBack');bk.hidden=!(fromPause||NAV.length);bk.classList.toggle('fl',fromPause&&!NAV.length);bk.setAttribute('aria-label',fromPause&&!NAV.length?'Back to the flight':'Back');}
@@ -21384,7 +21407,7 @@ const APP_VER='2026-10-14-gfxfix';          // keep version.json in step when sh
     boot:boot,homeRank:homeRank,sheet:sheet,sheetOn:()=>!$('lbSheet').hidden,csHold:()=>csHold,paintModel:paintModel,paintAll:paintAll,lbOpen:lbOpen,lbRender:lbRender,race:race,ui:ui,flush:flush,csOpen:csOpen,dice:dice,
     fameDraw:fameDraw,fameFetch:fameFetch,fameApply:fameApply,fameApplyCity:fameApplyCity,ghostStart:ghostStart,decodePath:decodePath,rankSVG:rankSVG,rankByName:rankByName,utcDay:utcDay,fmtS:fmtS,showBadge:showBadge,ghostOff:ghostOff,runBoard:runBoard,
     localRows:localRows,localBest:localBest,
-    report:report,reportQueue:reportQueue,reportFlush:reportFlush,reportQueued:reportQueued,APP_VER:APP_VER,
+    api:api,report:report,reportQueue:reportQueue,reportFlush:reportFlush,reportQueued:reportQueued,APP_VER:APP_VER,
     get P(){return E.P;}};
 })();
 
@@ -21634,8 +21657,48 @@ $('bugSend').onclick=bugSend;
 $('bugX').onclick=bugClose;
 $('pBug').onclick=()=>bugOpen('pause');
 $('bBug').onclick=()=>bugOpen('settings');
+// ---- bugs1 item 7: My tickets (Settings > Bugs). GET /reports/mine with the key this phone reports under: E.P.key with
+// a callsign, else the guest key (kgeuBugKey). A ticket sent as a guest and later ones sent with a callsign live under two
+// keys on the Worker; the list shows only the current key's (the cache remembers its key and is ignored for another).
+// kgeuBugMine {key, at, list}: the last good answer, for the row's count and the offline list. A fetch on open when the
+// cache is a minute old or more (else the cache, no request); a failed one shows the cache with 'Offline, last checked'.
+const TK_CAT={controls:'Controls',graphics:'Screen or graphics',crash:'Crash or freeze',boards:'Leaderboard or XP',missions:'Missions',school:'Flight school',sound:'Sound',other:'Other'};
+const TKM={busy:false,err:false};
+function tkWho(){const P=LB&&LB.E.P;return P?{key:P.key,cs:P.cs}:{key:bugKey(),cs:''};}
+function tkCache(){let c=null;try{c=JSON.parse(localStorage.getItem('kgeuBugMine')||'null');}catch(e){}
+  if(!c||!Array.isArray(c.list)||!LB)return null;const P=LB.E.P;let k=P?P.key:'';if(!P){try{k=localStorage.getItem('kgeuBugKey')||'';}catch(e){}}
+  return k&&c.key===k?c:null;}
+function tkUI(){const b=$('bTicketsT');if(!b)return;const c=LB&&LB.E.enabled?tkCache():null;
+  b.textContent=c&&c.list.length?'My tickets · '+c.list.length:'My tickets';}
+const tkEsc=x=>String(x==null?'':x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function tkWhen(ms){const d=new Date(ms),t=d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  return d.toDateString()===new Date().toDateString()?t:d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+', '+t;}
+function tkRow(r){const id='#'+(+r.id||0),cat=TK_CAT[r.category]||'Other',dt=r.created?new Date(+r.created).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+  const tx=String(r.text||''),line=tx.split('\n')[0],fx=r.status==='fixed';
+  const st=fx?'<span class="tkS fx"><i aria-hidden="true">✓</i>Fixed in'+(r.fixed_in?' <em>'+tkEsc(r.fixed_in)+'</em>':''):'<span class="tkS"><em>Open</em>';
+  return '<li class="tkRow'+(fx?' fixed':'')+'" data-id="'+(+r.id||0)+'" data-full="'+tkEsc(id+' · '+cat+' · '+tx)+'"><div class="tkL"><div class="tkM"><b>'+id+'</b><span>'+tkEsc(cat)+'</span><span class="tkD">'+tkEsc(dt)+'</span></div><i class="tkT">'+tkEsc(line)+'</i></div>'+st+'</span></li>';}
+function tkRender(){const ul=$('tkList'),nt=$('tkNote');if(!ul)return;const c=tkCache();
+  nt.hidden=!(c&&TKM.err);if(c&&TKM.err)nt.textContent='Offline, last checked '+tkWhen(c.at);
+  if(!c){ul.innerHTML='<li class="tkMsg">'+(TKM.busy?'Loading…':TKM.err?'My tickets need a connection':'Loading…')+'</li>';return;}
+  ul.innerHTML=c.list.length?c.list.map(tkRow).join(''):'<li class="tkMsg">No tickets yet. Report a bug and it shows up here.</li>';}
+function tkFetch(){if(TKM.busy||!LB||!LB.E.enabled)return;const w=tkWho();TKM.busy=true;
+  const done=()=>{TKM.busy=false;tkUI();if(curScr==='sTickets'&&menu.classList.contains('on'))tkRender();};
+  LB.api('/reports/mine?key='+encodeURIComponent(w.key)+'&cs='+encodeURIComponent(w.cs),null,9000).then(j=>{
+    if(j&&j.ok&&Array.isArray(j.reports)){TKM.err=false;
+      const list=j.reports.slice(0,30).map(r=>({id:r.id,created:r.created,category:r.category,severity:r.severity,text:String(r.text||'').slice(0,80),status:r.status==='fixed'?'fixed':'open',fixed_in:r.fixed_in||null}))
+        .sort((a,b)=>(+b.created||0)-(+a.created||0)||(+b.id||0)-(+a.id||0));
+      try{localStorage.setItem('kgeuBugMine',JSON.stringify({key:w.key,at:Date.now(),list:list}));}catch(e){}}
+    else TKM.err=true;
+    done();},()=>{TKM.err=true;done();});}
+function tkOpen(){
+  if(!LB||!LB.E.enabled){bugSay('Tickets need the online game');return;}
+  const c=tkCache();TKM.err=false;nav('sTickets');tkRender();
+  if(!c||Date.now()-c.at>=60e3)tkFetch();}
+$('bTickets').onclick=tkOpen;
+document.getElementById('tkList').addEventListener('click',e=>{const r=e.target.closest('.tkRow[data-full]');if(r)bugSay(r.dataset.full);});
+tkUI();
 Object.assign(window.__kgeu,{bugOpen:bugOpen,bugClose:bugClose,bugShot:()=>BUG.shot,bugContext:bugContext,
-  bugLog:()=>BUG.log.slice(),bugAsk:bugAsk,bugAsked:()=>BUG.asked,bugAskShown:()=>$('bugAsk').classList.contains('on'),
+  bugLog:()=>BUG.log.slice(),bugAsk:bugAsk,tkOpen:tkOpen,tkState:()=>({busy:TKM.busy,err:TKM.err,cache:tkCache()}),bugAsked:()=>BUG.asked,bugAskShown:()=>$('bugAsk').classList.contains('on'),
   bugState:()=>({cat:BUGF.cat,sev:BUGF.sev,text:$('bugTx').value,shotOn:!!(BUGF.shot&&BUGF.shotOn),open:$('bugOv').classList.contains('on'),from:BUGF.from,hasShot:!!BUGF.shot,queued:LB?LB.reportQueued():0})});
 // the Red Flag Dogfight (5.1)
 Object.assign(window.__kgeu,{dfScore:dfScore,dfStars:dfStars,dfGrade:dfGrade,dfAch:dfAch,dfPFlare:dfPFlare,ACH:ACH,SCORE:SCORE,scoreOf:scoreOf,DF:DF,DFM:DFM,dfStart:dfStart,dfKill:dfKill,dfHit:dfHit,dfEnd:dfEnd,dfStop:dfStop,dfFox:dfFox,dfCall:dfCall,DF_CFG:DF_CFG,dfWv:dfWv,DF_RAMP:DF_RAMP,dfBreak:dfBreak,musicTitle:musicTitle,ARS:ARS,ARS_RACKS:ARS_RACKS,ARS_GUNS:ARS_GUNS,arsLo:arsLo,arsPick:arsPick,arsApply:arsApply,arsOpen:arsOpen,dfWsel:dfWsel,dfWcycle:dfWcycle,dfShoot:dfShoot,DFA:DFA,dfMask:dfMask,dfLaunch:dfLaunch});

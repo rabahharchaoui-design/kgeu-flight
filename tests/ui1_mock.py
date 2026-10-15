@@ -1,6 +1,7 @@
 # A stand-in for the pfs-scores Worker, for the ui1 checks and screenshots: the page points LB at a fake URL
 # (localStorage kgeuLBUrl) and Playwright answers every call. MOCK.subs records the submissions; MOCK.gain sets the
 # XP the fake server grants per run. MOCK.reports records the bug reports (/report); extra['report'] overrides its answer.
+# /reports/mine (GET or POST) answers extra['mine'] or [] and records each call in MOCK.mine.
 import json, random
 
 FAKE = 'https://pfs-mock.test'
@@ -16,6 +17,7 @@ class Mock:
         self.cs, self.xp, self.nrows, self.me_rank, self.gain, self.offline = cs, xp, rows, me_rank, gain, offline
         self.subs, self.boards = [], []
         self.reports, self.report_id = [], 7   # POST /report bodies; the next ticket number (bugs1 item 5)
+        self.mine = []   # /reports/mine calls: (method, key, cs) (bugs1 item 7); extra['mine'] is the reports list it answers
         self.extra = {}
 
     def storage(self):
@@ -69,6 +71,14 @@ class Mock:
                 if o:
                     await route.fulfill(status=o.get('status', 200), content_type='application/json', body=json.dumps(o.get('body', {})), headers={'Access-Control-Allow-Origin': '*'}); return
                 out = {'ok': True, 'id': self.report_id, 'issue': None, 'shot': None}; self.report_id += 1
+            elif path == '/reports/mine':
+                if req.method == 'POST': k, c = body.get('key', ''), body.get('cs', '')
+                else:
+                    from urllib.parse import parse_qs
+                    q = parse_qs(url.split('?', 1)[1] if '?' in url else '', keep_blank_values=True)
+                    k, c = q.get('key', [''])[0], q.get('cs', [''])[0]
+                self.mine.append((req.method, k, c))
+                out = {'ok': True, 'reports': self.extra.get('mine', [])}
             elif path == '/submit' and self.extra.get('reject'):
                 self.subs.append(body)
                 await route.fulfill(status=400, content_type='application/json', body=json.dumps({'ok': False, 'reason': self.extra['reject']}), headers={'Access-Control-Allow-Origin': '*'}); return
