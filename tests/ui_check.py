@@ -30,7 +30,7 @@ GROUPS = [
     ('hudcard', '#hud .card',                      False),
     ('minimap', '#map',                            True),
     ('dest',    '#hDest:not([hidden])',            True),
-    ('radio',   '#atc.on',                         False),
+    ('radio',   '#atc.on, #lesson.lc.call #lesRow', False),   # fix2 item 11: the caption (#cap > #atc), or the lesson strip's call line
     ('mission', '#miss.on',                        False),
     ('lesson',  '#lesson.on',                      False),
     ('sixpack', '#sixpack.on',                     False),
@@ -119,7 +119,7 @@ SETSAFE = """([t,l,r,b])=>{const s=document.documentElement.style;s.setProperty(
 TOPG = [
     ('pause',   '#bPause', 1), ('map', '#map', 1), ('hudcard', '#hud .card', 1), ('ap', '#hAp.on', 1),
     ('ticker',  '#tk.on', 1), ('music', '#tkCtl.on', 1), ('mission', '#miss.on', 1), ('jump', '#jumpLt.on', 1),
-    ('warn',    '#warn.on', 1), ('toast', '#toast.on', 1), ('radio', '#atc.on', 1), ('badge', '.badge.on', 1), ('lesson', '#lesson.on', 1),
+    ('warn',    '#warn.on', 1), ('toast', '#toast.on', 1), ('radio', '#atc.on, #lesson.lc.call #lesRow', 1), ('badge', '.badge.on', 1), ('lesson', '#lesson.on', 1),
     ('lookpad', '#lookPad', 1), ('dest', '#hDest:not([hidden])', 1),
     ('stick',   '#stickZone', 0), ('throttle', '#thr', 0), ('button', '#dock button', 0),
 ]
@@ -127,11 +127,13 @@ TOPG = [
 # TOP put up (the frame loop would clear them), and measure everything in the same breath
 TOPSET = """([g,o])=>{const K=window.__kgeu,$=id=>document.getElementById(id);K.stepFrame(1/60,false,false);
   const u=window.__topUndo=[];const keep=e=>u.push([e,e.className,e.textContent]);
-  const w=$('warn');keep(w);w.textContent='FLAP SPEED';w.classList.add('on');
+  const w=$('warn');keep(w);if(!o.nowarn){w.textContent='FLAP SPEED';w.classList.add('on');}
   const ts=$('toast');keep(ts);ts.textContent='Now playing: Pocket Sim Original \u2014 Main Theme';ts.classList.add('on');
   const j=$('jumpLt');if(o.jump&&!j.classList.contains('on')){keep(j.lastChild);j.lastChild.textContent='ONE MINUTE';u.push([j,j.className,null]);j.classList.add('on');}
   if(o.lesson){const l=$('lesson');u.push([l,l.className,null]);for(const [id,t] of [['lesT','Lesson 4'],['lesI','Hold 70 kt down final, nose on the numbers'],['lesM','Speed 72 kt, on the glide path']]){keep($(id));$(id).textContent=t;}
     l.classList.add('on');K.sideCfg('AUTOLAND COMPLETE','your airplane');}   // the readout places itself when it fires, so with the panel up
+  if(window.__tkWas)$('atc').classList.add('on');   // TOP's subtitle stays up (a real call that just ended would take it down 4 s later)
+  K.hudFit();   // fix2 item 11: what the next frame does (the subtitle's place, two at most in the top column)
   const out=[];
   for(const [kind,sel,top] of g){
     document.querySelectorAll(sel).forEach(el=>{
@@ -184,14 +186,18 @@ async def top_scene(pg, label, w, h, shot, lesson=True):
     n = await pg.evaluate("()=>document.querySelectorAll('#badges .badge.on').length")
     if n != 1:
         failures.append(f'{w}x{h} {label}: {n} badges up at once (they take turns in one slot)'); print(f'  FAIL {w}x{h} {label}: {n} badges up at once')
-    await top_audit(pg, label, w, h, BASE | {'mission', 'jump'}, jump=True)
+    # fix2 item 11: the top column shows two at most and only above 26% of the height: the warning first (under 415 px
+    # tall it is the only one), then the mission pill with the jump lamps inside it; the toast waits. Then without the warning.
+    await top_audit(pg, label, w, h, BASE - {'toast'}, jump=True)
+    await pg.evaluate(TOPUNDO)
+    await top_audit(pg, label + ', no warning', w, h, (BASE - {'toast', 'warn'}) | {'mission', 'jump'}, jump=True, nowarn=True)
     await audit(pg, label + ', full layout', w, h)
     os.makedirs(SHOTS, exist_ok=True)
     await pg.screenshot(path=os.path.join(SHOTS, shot))
     await pg.evaluate(TOPUNDO)
     if lesson:
         await pg.evaluate("()=>{if(!window.__kgeu.MISS.on)document.getElementById('miss').classList.remove('on')}")
-        await top_audit(pg, label + ', lesson', w, h, BASE | {'lesson'}, lesson=True)
+        await top_audit(pg, label + ', lesson', w, h, (BASE - {'toast'}) | {'lesson'}, lesson=True)
         await audit(pg, label + ', lesson, full layout', w, h)
         await pg.screenshot(path=os.path.join(SHOTS, shot.replace('.png', '_lesson.png')))
         await pg.evaluate(TOPUNDO)

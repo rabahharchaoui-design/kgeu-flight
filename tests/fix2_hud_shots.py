@@ -7,13 +7,19 @@
 # cross-track error zeroed every 0.5 s (0.36 throttle alone can't hold 140 kt in this
 # configuration -- airspeed bleeds off and settles near 55 m/s before DZ.tRel starts
 # falling through 60, confirmed by hand before writing this loop).
-# Usage: .venv/bin/python tests/fix2_hud_shots.py <outdir> [airdrop|range|dogfight ...]
-# Writes <outdir>/hud_airdrop_<size>.png, hud_range_844.png, hud_dogfight_844.png
+# Usage: .venv/bin/python tests/fix2_hud_shots.py <outdir> [airdrop|range|dogfight|call|settings ...] [--sizes WxH,..]
+#        (or --out <outdir>)
+# Writes <outdir>/hud_airdrop_<size>.png, hud_range_844.png, hud_dogfight_844.png; item 11 adds call (844x390 at the
+# GREEN LIGHT: hud_airdrop_844x390_call.png) and settings (Settings with the Radio row's Captions toggle:
+# hud_settings_captions_844.png) and lesson (hud_lesson_<size>.png at 568x320 and 844x390, Dana's line in the strip);
+# the default set stays the first three.
 import asyncio, os, sys
 from playwright.async_api import async_playwright
 from harness import serve, launch, page, IPHONE_15
 
-args = [a for a in sys.argv[1:] if not a.startswith('--')]
+_av = sys.argv[1:]
+args = [a for i, a in enumerate(_av) if not a.startswith('--') and not (i and _av[i - 1] in ('--out', '--sizes'))]
+if '--out' in _av: args.insert(0, _av[_av.index('--out') + 1])
 OUT = os.path.abspath(args[0] if args else 'overnight-screenshots/fix2/before/hud')
 MODES = args[1:] or ['airdrop', 'range', 'dogfight']
 K = 'window.__kgeu'
@@ -67,6 +73,38 @@ async def airdrop_one(pg, size):
     await shot(pg, f'hud_airdrop_{size["width"]}x{size["height"]}.png')
 
 
+async def call_shot(pg):
+    await pg.evaluate(f"()=>{{{K}.setTOD('day');{K}.radioLog(true);{K}.mission('drop')}}")
+    await pg.wait_for_timeout(300)
+    await pg.evaluate(PLACE_DZ)
+    light = ''
+    for i in range(40):   # to the green light, 2.5 s slices
+        await pg.evaluate(STEER, 5)
+        light = await pg.evaluate(f"()=>{K}.DZ.light")
+        if light == 'green': break
+    await pg.evaluate(f"()=>{{for(let i=0;i<3;i++)window.__kgeu.stepFrame(1/30);window.__kgeu.hudFit();}}")
+    await pg.wait_for_function("()=>{const a=document.getElementById('atc');return !a.classList.contains('on')||parseFloat(getComputedStyle(a).opacity)>0.9}", timeout=8000)
+    print(f'  call: light={light} pill={await pg.evaluate("()=>document.getElementById(\'miss\').innerText")!r}')
+    await shot(pg, 'hud_airdrop_844x390_call.png')
+
+
+async def lesson_shot(pg, size):
+    await pg.evaluate(f"()=>{{{K}.setTOD('day');{K}.startLesson('pattern',true);{K}.lesBriefSkip();}}")
+    await pg.wait_for_timeout(300)
+    await pg.evaluate(f"()=>{{for(let i=0;i<30;i++){K}.stepFrame(1/30);{K}.coach2('Full power, rotate at 55 knots, then hold 70 knots in the climb.');}}")
+    for i in range(15):
+        on = await pg.evaluate(f"()=>{{{K}.stepFrame(1/30);{K}.hudFit();return document.getElementById('lesson').classList.contains('call')}}")
+        if on: break
+    await pg.wait_for_timeout(400)
+    await shot(pg, f'hud_lesson_{size["width"]}x{size["height"]}.png')
+
+
+async def settings_shot(pg):
+    await pg.evaluate(f"()=>{K}.nav('sSet',true)")
+    await pg.wait_for_timeout(500)
+    await shot(pg, 'hud_settings_captions_844.png')
+
+
 async def range_shot(pg):
     await pg.evaluate(f"()=>{{{K}.setTOD('day');{K}.mission('range')}}")
     await pg.wait_for_timeout(300)
@@ -91,6 +129,20 @@ async def main():
                 await airdrop_one(pg, size)
                 if pg.errs:
                     print(f'  page errors (airdrop {size["width"]}x{size["height"]}):', pg.errs[:5])
+                await pg.context.close()
+        if 'lesson' in MODES:   # item 11 round 2: the lesson strip at 844 and 568
+            for size in [z for z in SIZES if z['height'] < 400]:
+                pg = await page(b, url, vp=size, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'})
+                await lesson_shot(pg, size)
+                if pg.errs:
+                    print('  page errors (lesson):', pg.errs[:5])
+                await pg.context.close()
+        for m, fn in (('call', call_shot), ('settings', settings_shot)):
+            if m in MODES:
+                pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'})
+                await fn(pg)
+                if pg.errs:
+                    print(f'  page errors ({m}):', pg.errs[:5])
                 await pg.context.close()
         if 'range' in MODES:
             pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'})
