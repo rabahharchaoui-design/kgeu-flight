@@ -1605,7 +1605,7 @@ body.menuOn #tutArrow, body.pauseOn #tutArrow{ display:none !important; }
 #sTickets .helpBody{ align-items:stretch; width:100%; }
 .tkNote{ margin:0; flex:none; font-size:13px; font-weight:700; color:var(--brown); }
 #menu .tkList{ gap:4px; touch-action:pan-y; overscroll-behavior:contain; }
-#menu .tkList li.tkRow{ display:flex; align-items:center; gap:10px; min-height:44px; padding:4px 10px; box-sizing:border-box; border-radius:10px; background:rgba(42,22,8,.07); flex:none; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
+#menu .tkList li.tixRow{ display:flex; align-items:center; gap:10px; min-height:44px; padding:4px 10px; box-sizing:border-box; border-radius:10px; background:rgba(42,22,8,.07); flex:none; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
 .tkL{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
 .tkM{ display:flex; align-items:baseline; gap:8px; min-width:0; white-space:nowrap; font-size:15px; line-height:1.2; }
 .tkM b{ color:var(--night); font-weight:800; font-variant-numeric:tabular-nums; flex:none; }
@@ -21664,43 +21664,43 @@ $('bBug').onclick=()=>bugOpen('settings');
 // keys on the Worker; the list shows only the current key's (the cache remembers its key and is ignored for another).
 // kgeuBugMine {key, at, list}: the last good answer, for the row's count and the offline list. A fetch on open when the
 // cache is a minute old or more (else the cache, no request); a failed one shows the cache with 'Offline, last checked'.
-const TK_CAT={controls:'Controls',graphics:'Screen or graphics',crash:'Crash or freeze',boards:'Leaderboard or XP',missions:'Missions',school:'Flight school',sound:'Sound',other:'Other'};
-const TKM={busy:false,err:false};
-function tkWho(){const P=LB&&LB.E.P;return P?{key:P.key,cs:P.cs}:{key:bugKey(),cs:''};}
-function tkCache(){let c=null;try{c=JSON.parse(localStorage.getItem('kgeuBugMine')||'null');}catch(e){}
+const TIX_CAT={controls:'Controls',graphics:'Screen or graphics',crash:'Crash or freeze',boards:'Leaderboard or XP',missions:'Missions',school:'Flight school',sound:'Sound',other:'Other'};
+const TIX={busy:false,err:false};
+function tixWho(){const P=LB&&LB.E.P;return P?{key:P.key,cs:P.cs}:{key:bugKey(),cs:''};}
+function tixCache(){let c=null;try{c=JSON.parse(localStorage.getItem('kgeuBugMine')||'null');}catch(e){}
   if(!c||!Array.isArray(c.list)||!LB)return null;const P=LB.E.P;let k=P?P.key:'';if(!P){try{k=localStorage.getItem('kgeuBugKey')||'';}catch(e){}}
   return k&&c.key===k?c:null;}
-function tkUI(){const b=$('bTicketsT');if(!b)return;const c=LB&&LB.E.enabled?tkCache():null;
+function tixUI(){const b=$('bTicketsT');if(!b)return;const c=LB&&LB.E.enabled?tixCache():null;
   const n=c&&c.list.length?' · '+c.list.length:'';b.textContent='My tickets'+n;const s=$('bTicketsS');if(s)s.textContent='Tickets'+n;}
-const tkEsc=x=>String(x==null?'':x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function tkWhen(ms){const d=new Date(ms),t=d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+const tixEsc=x=>String(x==null?'':x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function tixWhen(ms){const d=new Date(ms),t=d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
   return d.toDateString()===new Date().toDateString()?t:d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+', '+t;}
-function tkRow(r){const id='#'+(+r.id||0),cat=TK_CAT[r.category]||'Other',dt=r.created?new Date(+r.created).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+function tixRow(r){const id='#'+(+r.id||0),cat=TIX_CAT[r.category]||'Other',dt=r.created?new Date(+r.created).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
   const tx=String(r.text||''),line=tx.split('\n')[0],fx=r.status==='fixed';
-  const st=fx?'<span class="tkS fx"><i aria-hidden="true">✓</i>Fixed in'+(r.fixed_in?' <em>'+tkEsc(r.fixed_in)+'</em>':''):'<span class="tkS"><em>Open</em>';
-  return '<li class="tkRow'+(fx?' fixed':'')+'" data-id="'+(+r.id||0)+'" data-full="'+tkEsc(id+' · '+cat+' · '+tx)+'"><div class="tkL"><div class="tkM"><b>'+id+'</b><span>'+tkEsc(cat)+'</span><span class="tkD">'+tkEsc(dt)+'</span></div><i class="tkT">'+tkEsc(line)+'</i></div>'+st+'</span></li>';}
-function tkRender(){const ul=$('tkList'),nt=$('tkNote');if(!ul)return;const c=tkCache();
-  nt.hidden=!(c&&TKM.err);if(c&&TKM.err)nt.textContent='Offline, last checked '+tkWhen(c.at);
-  if(!c){ul.innerHTML='<li class="tkMsg">'+(TKM.busy?'Loading…':TKM.err?'My tickets need a connection':'Loading…')+'</li>';return;}
-  ul.innerHTML=c.list.length?c.list.map(tkRow).join(''):'<li class="tkMsg">No tickets yet. Report a bug and it shows up here.</li>';}
-function tkFetch(){if(TKM.busy||!LB||!LB.E.enabled)return;const w=tkWho();TKM.busy=true;
-  const done=()=>{TKM.busy=false;tkUI();if(curScr==='sTickets'&&menu.classList.contains('on'))tkRender();};
+  const st=fx?'<span class="tkS fx"><i aria-hidden="true">✓</i>Fixed in'+(r.fixed_in?' <em>'+tixEsc(r.fixed_in)+'</em>':''):'<span class="tkS"><em>Open</em>';
+  return '<li class="tixRow'+(fx?' fixed':'')+'" data-id="'+(+r.id||0)+'" data-full="'+tixEsc(id+' · '+cat+' · '+tx)+'"><div class="tkL"><div class="tkM"><b>'+id+'</b><span>'+tixEsc(cat)+'</span><span class="tkD">'+tixEsc(dt)+'</span></div><i class="tkT">'+tixEsc(line)+'</i></div>'+st+'</span></li>';}
+function tixRender(){const ul=$('tkList'),nt=$('tkNote');if(!ul)return;const c=tixCache();
+  nt.hidden=!(c&&TIX.err);if(c&&TIX.err)nt.textContent='Offline, last checked '+tixWhen(c.at);
+  if(!c){ul.innerHTML='<li class="tkMsg">'+(TIX.busy?'Loading…':TIX.err?'My tickets need a connection':'Loading…')+'</li>';return;}
+  ul.innerHTML=c.list.length?c.list.map(tixRow).join(''):'<li class="tkMsg">No tickets yet. Report a bug and it shows up here.</li>';}
+function tixFetch(){if(TIX.busy||!LB||!LB.E.enabled)return;const w=tixWho();TIX.busy=true;
+  const done=()=>{TIX.busy=false;tixUI();if(curScr==='sTickets'&&menu.classList.contains('on'))tixRender();};
   LB.api('/reports/mine?key='+encodeURIComponent(w.key)+'&cs='+encodeURIComponent(w.cs),null,9000).then(j=>{
-    if(j&&j.ok&&Array.isArray(j.reports)){TKM.err=false;
+    if(j&&j.ok&&Array.isArray(j.reports)){TIX.err=false;
       const list=j.reports.slice(0,30).map(r=>({id:r.id,created:r.created,category:r.category,severity:r.severity,text:String(r.text||'').slice(0,80),status:r.status==='fixed'?'fixed':'open',fixed_in:r.fixed_in||null}))
         .sort((a,b)=>(+b.created||0)-(+a.created||0)||(+b.id||0)-(+a.id||0));
       try{localStorage.setItem('kgeuBugMine',JSON.stringify({key:w.key,at:Date.now(),list:list}));}catch(e){}}
-    else TKM.err=true;
-    done();},()=>{TKM.err=true;done();});}
-function tkOpen(){
+    else TIX.err=true;
+    done();},()=>{TIX.err=true;done();});}
+function tixOpen(){
   if(!LB||!LB.E.enabled){bugSay('Tickets need the online game');return;}
-  const c=tkCache();TKM.err=false;nav('sTickets');tkRender();
-  if(!c||Date.now()-c.at>=60e3)tkFetch();}
-$('bTickets').onclick=tkOpen;
-document.getElementById('tkList').addEventListener('click',e=>{const r=e.target.closest('.tkRow[data-full]');if(r)bugSay(r.dataset.full);});
-tkUI();
+  const c=tixCache();TIX.err=false;nav('sTickets');tixRender();
+  if(!c||Date.now()-c.at>=60e3)tixFetch();}
+$('bTickets').onclick=tixOpen;
+document.getElementById('tkList').addEventListener('click',e=>{const r=e.target.closest('.tixRow[data-full]');if(r)bugSay(r.dataset.full);});
+tixUI();
 Object.assign(window.__kgeu,{bugOpen:bugOpen,bugClose:bugClose,bugShot:()=>BUG.shot,bugContext:bugContext,
-  bugLog:()=>BUG.log.slice(),bugAsk:bugAsk,tkOpen:tkOpen,tkState:()=>({busy:TKM.busy,err:TKM.err,cache:tkCache()}),bugAsked:()=>BUG.asked,bugAskShown:()=>$('bugAsk').classList.contains('on'),
+  bugLog:()=>BUG.log.slice(),bugAsk:bugAsk,tixOpen:tixOpen,tixState:()=>({busy:TIX.busy,err:TIX.err,cache:tixCache()}),bugAsked:()=>BUG.asked,bugAskShown:()=>$('bugAsk').classList.contains('on'),
   bugState:()=>({cat:BUGF.cat,sev:BUGF.sev,text:$('bugTx').value,shotOn:!!(BUGF.shot&&BUGF.shotOn),open:$('bugOv').classList.contains('on'),from:BUGF.from,hasShot:!!BUGF.shot,queued:LB?LB.reportQueued():0})});
 // the Red Flag Dogfight (5.1)
 Object.assign(window.__kgeu,{dfScore:dfScore,dfStars:dfStars,dfGrade:dfGrade,dfAch:dfAch,dfPFlare:dfPFlare,ACH:ACH,SCORE:SCORE,scoreOf:scoreOf,DF:DF,DFM:DFM,dfStart:dfStart,dfKill:dfKill,dfHit:dfHit,dfEnd:dfEnd,dfStop:dfStop,dfFox:dfFox,dfCall:dfCall,DF_CFG:DF_CFG,dfWv:dfWv,DF_RAMP:DF_RAMP,dfBreak:dfBreak,musicTitle:musicTitle,ARS:ARS,ARS_RACKS:ARS_RACKS,ARS_GUNS:ARS_GUNS,arsLo:arsLo,arsPick:arsPick,arsApply:arsApply,arsOpen:arsOpen,dfWsel:dfWsel,dfWcycle:dfWcycle,dfShoot:dfShoot,DFA:DFA,dfMask:dfMask,dfLaunch:dfLaunch});

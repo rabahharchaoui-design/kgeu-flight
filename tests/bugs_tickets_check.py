@@ -25,7 +25,7 @@ TICKETS = [   # newest first, the Worker's order
     {'id': 9, 'created': ms(2026, 10, 12, 9), 'category': 'graphics', 'severity': 'annoying', 'text': 'Runway lights flicker\nat dusk', 'issue': 2, 'status': 'fixed', 'fixed_in': '2026-10-15-bugfix'},
     {'id': 4, 'created': ms(2026, 10, 9, 18), 'category': 'sound', 'severity': 'annoying', 'text': 'No engine sound', 'issue': None, 'status': 'open', 'fixed_in': None},
 ]
-ROWS = """()=>[...document.querySelectorAll('#tkList li.tkRow')].map(li=>{const r=li.getBoundingClientRect(),t=li.querySelector('.tkT'),s=li.querySelector('.tkS');
+ROWS = """()=>[...document.querySelectorAll('#tkList li.tixRow')].map(li=>{const r=li.getBoundingClientRect(),t=li.querySelector('.tkT'),s=li.querySelector('.tkS');
   return {n:li.querySelector('.tkM b').textContent,cat:li.querySelector('.tkM span').textContent,date:li.querySelector('.tkD').textContent,text:t.textContent,
     h:r.height,sw:li.scrollWidth,cw:li.clientWidth,tsw:t.scrollWidth,tcw:t.clientWidth,ell:getComputedStyle(t).textOverflow,ws:getComputedStyle(t).whiteSpace,th:t.getBoundingClientRect().height,
     st:s.textContent.trim(),fixed:li.classList.contains('fixed'),check:!!s.querySelector('i')&&getComputedStyle(s.querySelector('i')).color,chip:s.querySelector('em')&&s.querySelector('em').textContent,
@@ -51,7 +51,7 @@ async def settings(pg):
 async def open_tickets(pg):
     await settings(pg)
     await finger(pg, '#bTickets'); await pg.wait_for_timeout(300)
-    await wait_for(pg, f"()=>!{K}.tkState().busy")
+    await wait_for(pg, f"()=>!{K}.tixState().busy")
     await pg.wait_for_timeout(200)
 
 
@@ -77,7 +77,7 @@ async def part1(b, url):
         ok('(1) the long text: one line, an ellipsis where it does not fit (cut checked at 568 and 390 in part 3)', L['ell'] == 'ellipsis' and L['ws'] == 'nowrap' and L['th'] < 22, L)
         ok('(1) no row overflows (scrollWidth equals clientWidth)', all(r['sw'] == r['cw'] for r in rows), [(r['sw'], r['cw']) for r in rows])
         ok('(1) every row at least 44 px, no pointer cursor', all(r['h'] >= 43.5 and r['act'] != 'pointer' for r in rows), [r['h'] for r in rows])
-    await finger(pg, '#tkList li.tkRow'); await pg.wait_for_timeout(300)
+    await finger(pg, '#tkList li.tixRow'); await pg.wait_for_timeout(300)
     tip = await pg.evaluate("()=>document.getElementById('bugTip').textContent")
     ok('(1) a tap on a row shows its full text', LONG in tip and tip.startswith('#12'), tip)
     await pg.screenshot(path=os.path.join(SHOTS, 'tickets_844.png'))
@@ -123,8 +123,8 @@ async def part2(b, url):
     g = Mock(cs=None)   # a guest: kgeuBugKey
     st = dict(BASE); st.update(g.storage()); st['kgeuBugKey'] = 'ab' * 24
     pg = await page(b, url, vp=IPHONE_15, storage=st, pre=g.install)
-    await pg.evaluate(f"()=>{K}.tkOpen()"); await pg.wait_for_timeout(400)
-    await wait_for(pg, f"()=>!{K}.tkState().busy")
+    await pg.evaluate(f"()=>{K}.tixOpen()"); await pg.wait_for_timeout(400)
+    await wait_for(pg, f"()=>!{K}.tixState().busy")
     ok('(2) a guest asks with kgeuBugKey and no callsign', g.mine and g.mine[0][1] == 'ab' * 24 and g.mine[0][2] == '', g.mine)
     ok('(2) guest: no console errors', not pg.errs, pg.errs[:3])
     await pg.context.close()
@@ -143,7 +143,7 @@ AUDIT = """()=>{const s=document.getElementById('sTickets'),ul=document.getEleme
   const q=ul.getBoundingClientRect();if(q.left<-0.5||q.right>W+0.5||q.bottom>H+0.5)bad.push('list outside the screen '+JSON.stringify([q.left,q.right,q.bottom]));
   if(s.scrollWidth>s.clientWidth+1)bad.push('screen scrolls sideways');
   const h=s.querySelector('.mh').getBoundingClientRect();if(h.bottom>q.top+0.5)bad.push('header over the list');
-  [...ul.querySelectorAll('li.tkRow')].forEach((li,i)=>{const r=li.getBoundingClientRect();if(r.height<43.5)bad.push('row '+i+' '+r.height);if(li.scrollWidth>li.clientWidth)bad.push('row '+i+' overflows');
+  [...ul.querySelectorAll('li.tixRow')].forEach((li,i)=>{const r=li.getBoundingClientRect();if(r.height<43.5)bad.push('row '+i+' '+r.height);if(li.scrollWidth>li.clientWidth)bad.push('row '+i+' overflows');
     li.querySelectorAll('.tkM b,.tkS em,.tkS i').forEach(e=>{const x=e.getBoundingClientRect();if(x.right>r.right+0.5||x.left<r.left-0.5)bad.push('row '+i+' '+e.tagName+' clipped');});});
   const bk=document.getElementById('mBack'),b=bk.getBoundingClientRect(),hit=document.elementFromPoint(b.x+b.width/2,b.y+b.height/2);
   const back=!bk.hidden&&b.width>=43.5&&b.height>=43.5&&b.top>=0&&b.left>=0&&b.right<=W&&!!hit&&bk.contains(hit);
