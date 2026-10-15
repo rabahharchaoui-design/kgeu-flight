@@ -1660,6 +1660,61 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 #osmCredit span{ display:block; white-space:nowrap; }   /* three short lines: map data, runways (4.6b), terrain (4.6b) */
 #rotate{ position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:24px; text-align:center; background:rgba(8,14,22,.92); z-index:20; font-size:22px; font-weight:700; }
 @media (orientation:portrait){ body.touch:not(.portraitok) #rotate{ display:flex; } }
+/* ---------- bugs1 item 5: the pause sheet's bug button (Boards, Settings and the bug share the nav's second row) and the
+   bug report sheet. Enters on opacity and translateY only (a scale would make the 44 px targets measure 42 in the break-ui
+   check), leaves faster; chips change state with no animation; press feedback scale(.97) over 120 ms. ---------- */
+.pzNav{ display:flex; flex-wrap:wrap; }
+.pzNav #pArc, .pzNav #pSch{ flex:1 1 calc(50% - 6px); }
+.pzNav #pLb, .pzNav #pSet{ flex:1 1 0; }
+.pzNav #pBug{ flex:0 0 auto; min-width:44px; display:flex; align-items:center; justify-content:center; gap:5px; padding:0 10px; }
+#pBug .bgG{ font-size:19px; line-height:1; }
+@media (max-width:739px){ #pBug .bgL{ display:none; } .pzNav #pBug{ padding:0 8px; } }
+#bugOv{ z-index:42; background:rgba(8,6,4,.62); }
+#bugOv.on{ animation:plFade 200ms ease-out both; } #bugOv.on .sheet{ animation:bugIn 200ms cubic-bezier(.23,1,.32,1) both; }
+#bugOv.on.out{ animation:plOut 140ms ease-in both; } #bugOv.on.out .sheet{ animation:bugOut 140ms ease-in both; }
+@keyframes bugIn{ from{ opacity:0; transform:translateY(12px); } }
+@keyframes bugOut{ to{ opacity:0; transform:translateY(8px); } }
+#bugOv .sheet{ box-sizing:border-box; max-width:780px; padding:12px 16px 14px; background:rgba(18,13,9,.96); border-color:rgba(246,193,119,.22); color:var(--sand); text-align:left;
+  display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px 16px; align-items:start;
+  max-height:100%; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
+#bugOv [hidden]{ display:none !important; }
+.bgCol{ display:flex; flex-direction:column; gap:8px; min-width:0; }
+.bgH{ margin:0; font:800 19px/1.1 var(--font); color:var(--sand); letter-spacing:.02em; }
+.bgCap{ margin:2px 0 0; font:800 12px/1.2 var(--font); letter-spacing:.08em; text-transform:uppercase; color:var(--orange); }
+.bgCats{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.bgSevs{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+#bugOv button{ min-height:44px; touch-action:manipulation; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent;
+  transition:transform 120ms ease-out; border-radius:12px; }
+#bugOv button:active:not(:disabled){ transform:scale(.97); }
+#bugOv .chip{ min-width:0; padding:4px 8px; background:rgba(246,193,119,.1); color:var(--sand); border:2px solid rgba(246,193,119,.22); font:700 14px/1.15 var(--font); text-align:center; }
+#bugOv .chip.sel{ background:var(--sand); color:var(--night); border-color:var(--sand); }
+.bgTxW{ position:relative; }
+#bugTx{ display:block; box-sizing:border-box; width:100%; height:calc(4 * 1.3em + 18px); min-height:calc(3 * 1.3em + 18px); resize:none; margin:0; padding:8px 10px;
+  font:500 16px/1.3 var(--font); color:#fff4e0; background:rgba(0,0,0,.35); border:2px solid rgba(246,193,119,.3); border-radius:12px; outline:none;
+  -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; touch-action:pan-y; }
+#bugTx:focus{ border-color:var(--sand); }
+#bugTx::placeholder{ color:rgba(246,193,119,.55); }
+.bgN{ position:absolute; right:10px; bottom:5px; font:700 11px/1 var(--font); color:#e8cfa5; background:rgba(18,13,9,.85); padding:2px 4px; border-radius:4px; pointer-events:none; }
+.bgN.full{ color:#ff9a7a; }
+.bgShot{ display:flex; align-items:center; gap:10px; }
+.bgTh{ flex:none; width:120px; min-height:44px; display:flex; align-items:center; justify-content:center; border-radius:8px; overflow:hidden; }
+.bgTh img{ display:block; width:auto; height:auto; max-width:120px; max-height:96px; border-radius:8px; border:1px solid rgba(246,193,119,.3); }
+.bgTh span{ box-sizing:border-box; width:100%; padding:6px; font:700 12px/1.2 var(--font); color:#e8cfa5; text-align:center; border:1.5px dashed rgba(246,193,119,.35); border-radius:8px; }
+.bgTh.has span{ display:none; }
+#bugOv .tog{ flex:1 1 auto; min-width:0; padding:0 10px; font:800 14px var(--font); white-space:nowrap; background:rgba(246,193,119,.1); color:var(--sand); border:2px solid rgba(246,193,119,.22); box-shadow:none; }
+#bugOv .tog.on{ background:var(--sand); color:var(--night); border-color:var(--sand); }
+.bgActs{ display:flex; gap:12px; }
+#bugOv #bugSend{ flex:2 1 0; min-width:0; font:900 18px var(--font); letter-spacing:.08em; background:var(--rust); color:#fff4e0; border:2px solid var(--rust); box-shadow:0 4px 0 var(--brown); }
+#bugOv #bugSend:disabled{ opacity:.45; box-shadow:none; }
+#bugOv #bugX{ flex:1 1 0; min-width:0; font:800 15px var(--font); background:rgba(26,16,9,.9); color:var(--sand); border:2px solid rgba(246,193,119,.3); }
+@media (max-height:360px){ #bugOv .sheet{ padding:8px 12px 10px; gap:8px 12px; } .bgCol{ gap:6px; } .bgH{ font-size:17px; } #bugTx{ height:calc(3 * 1.3em + 18px); } }
+@media (orientation:portrait){ #bugOv .sheet{ grid-template-columns:minmax(0,1fr); } }
+@media (prefers-reduced-motion:reduce){ #bugOv.on, #bugOv.on .sheet, #bugOv.on.out, #bugOv.on.out .sheet{ animation:none; } #bugOv button{ transition:none; } }
+/* the bug report's own toast: the HUD toast sits under the menu and the sheets */
+#bugTip{ position:fixed; z-index:46; left:50%; top:calc(var(--padT) + 6px); transform:translateX(-50%); max-width:min(560px,calc(100vw - 32px)); box-sizing:border-box;
+  padding:9px 16px; border-radius:12px; background:rgba(18,13,9,.95); border:1px solid rgba(246,193,119,.35); color:var(--sand); font:700 15px/1.25 var(--font); text-align:center;
+  pointer-events:none; opacity:0; transition:opacity 200ms ease-out; }
+#bugTip.on{ opacity:1; }
 /* ================= leaderboards: callsign card, boards, ranks, the end of run badge ================= */
 #csOv{ background:var(--sand); color:var(--night); z-index:40; padding:var(--padT) var(--padR) var(--padB) var(--padL); align-items:flex-start; }
 .csWrap{ display:flex; gap:clamp(14px,3vw,34px); align-items:center; width:min(900px,100%); margin:auto; }
@@ -2092,6 +2147,7 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
     <div class="srow"><span>Sound</span><div class="chips"><button class="tog oSound" id="oSound">Sound: On</button><button class="tog oHap" id="oHap">Haptics: On</button></div></div>
     <div class="srow"><span>Help</span><div class="chips" id="helpRow"><button class="slink" id="bHelp" aria-label="Controls help"><span class="hL">Controls help</span><span class="hS">Controls</span><i class="chev" aria-hidden="true"></i></button><button id="bReplay" aria-label="Replay lesson 1"><span class="hL">Replay lesson 1</span><span class="hS">Lesson 1</span></button><button id="bPlace" aria-label="Retake placement"><span class="hL">Retake placement</span><span class="hS">Placement</span></button></div></div>
     <div class="srow"><span>About</span><div class="chips"><button class="slink" id="bCredits">Music credits<i class="chev" aria-hidden="true"></i></button><button class="tog" id="oFps" aria-label="Developer: FPS counter">FPS counter: Off</button></div></div>
+    <div class="srow"><span>Bugs</span><div class="chips"><button class="slink" id="bBug">Report a bug<i class="chev" aria-hidden="true"></i></button></div></div>
     <div class="srow"><span>Stutter log</span><div class="chips"><button class="slink" id="bStalls"><span id="bStallsT">No stalls yet</span><i class="chev" aria-hidden="true"></i></button></div></div>
    </div>
   </div>
@@ -2191,7 +2247,7 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
   </div>
   <div class="pzBody">
    <div class="pzL">
-    <div class="pzNav" role="group" aria-label="Go to"><button id="pArc">Challenges</button><button id="pSch" aria-label="Flight school">School</button><button id="pLb" aria-label="Leaderboards">Boards</button><button id="pSet">Settings</button></div>
+    <div class="pzNav" role="group" aria-label="Go to"><button id="pArc">Challenges</button><button id="pSch" aria-label="Flight school">School</button><button id="pLb" aria-label="Leaderboards">Boards</button><button id="pSet">Settings</button><button id="pBug" aria-label="Report a bug"><span class="bgG" aria-hidden="true">🐞</span><span class="bgL" aria-hidden="true">Report</span></button></div>
     <div class="pzQ"><button class="qs oSound" id="pSound" aria-label="Sound on or off"><i>Sound</i><b>On</b></button><button class="qs oInv" id="pInv" aria-label="Invert pitch"><i>Invert</i><b>Off</b></button><button class="qs" id="pSens" aria-label="Stick sensitivity, tap for the next step"><i>Stick</i><b class="oSensV">Medium</b></button><button class="qs oHap" id="pHap" aria-label="Haptics on or off"><i><span class="lg">Haptics</span><span class="sm">Haptic</span></i><b>On</b></button></div>
     <div class="pzMusic"><span class="mbTitle" id="pMusTitle">&mdash;</span><div class="pzMus"><button id="pPrev" aria-label="Previous song">Prev</button><button class="tog playPause" id="pMusic" aria-label="Play or pause music">Pause</button><button class="oMnext" id="pMnext">Next</button></div></div>
    </div>
@@ -2210,6 +2266,22 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
    </div>
   </div>
  </div></div>
+<!-- bugs1 item 5: the bug report sheet (the pause sheet's bug button, Settings > Report a bug) -->
+<div class="overlay" id="bugOv" role="dialog" aria-modal="true" aria-label="Report a bug"><div class="sheet">
+ <div class="bgCol">
+  <h3 class="bgH">Report a bug</h3>
+  <p class="bgCap" id="bugCatL">What&rsquo;s wrong?</p>
+  <div class="bgCats" id="bugCats" role="radiogroup" aria-labelledby="bugCatL"><button class="chip" data-cat="controls" role="radio" aria-checked="false">Controls</button><button class="chip" data-cat="graphics" role="radio" aria-checked="false">Screen or graphics</button><button class="chip" data-cat="crash" role="radio" aria-checked="false">Crash or freeze</button><button class="chip" data-cat="boards" role="radio" aria-checked="false">Leaderboard or XP</button><button class="chip" data-cat="missions" role="radio" aria-checked="false">Missions</button><button class="chip" data-cat="school" role="radio" aria-checked="false">Flight school</button><button class="chip" data-cat="sound" role="radio" aria-checked="false">Sound</button><button class="chip" data-cat="other" role="radio" aria-checked="false">Other</button></div>
+  <p class="bgCap" id="bugSevL">How bad?</p>
+  <div class="bgSevs" id="bugSevs" role="radiogroup" aria-labelledby="bugSevL"><button class="chip" data-sev="annoying" role="radio" aria-checked="false">Annoying</button><button class="chip" data-sev="broken" role="radio" aria-checked="false">Broken</button><button class="chip" data-sev="cantplay" role="radio" aria-checked="false">Can’t play</button></div>
+ </div>
+ <div class="bgCol">
+  <div class="bgTxW"><textarea id="bugTx" maxlength="1000" rows="4" placeholder="What happened? What did you expect?" aria-label="What happened? What did you expect?" autocomplete="off"></textarea><span class="bgN" id="bugN" aria-live="polite" hidden></span></div>
+  <div class="bgShot"><div class="bgTh" id="bugTh"><img id="bugImg" alt="Screenshot of the game" hidden><span id="bugNo">No screenshot in the menu</span></div><button class="tog on" id="bugShotT" aria-pressed="true">Screenshot: On</button></div>
+  <div class="bgActs"><button class="primary" id="bugSend" disabled>SEND</button><button id="bugX">Cancel</button></div>
+ </div>
+</div></div>
+<div id="bugTip" role="status" aria-live="polite"></div>
 <div class="overlay" id="mapOv"><canvas id="fmap"></canvas>
   <div class="mt mkeep">Map</div>
   <div id="mapLeg" class="mkeep"><button id="mapLegT" aria-expanded="true"><span>Legend</span><i></i></button><div id="mapLegL"></div></div>
@@ -15550,8 +15622,29 @@ function hudClear(){
 const pauseOv=$('pauseOv');
 function openMenu(scr){GFX.pendingApply();if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.forced=null;hudClear();pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
 // the pause button, P and a backgrounded app all land here; the sheet shows while paused
+// bugs1 item 5: the bug report's screenshot. Going to paused asks for one frame: the render loop copies the WebGL canvas
+// right after its next render, in the same task, so preserveDrawingBuffer stays off and no other frame pays anything.
+// Downscaled through a 2D canvas to 960 px on the long side, JPEG 0.6 (0.45, then 0.3 while over 280 KB). BUG.shot
+// {url, at, w, h} stays in memory for the report sheet.
+var BUG={want:0,shot:null,cv:null,onShot:null};
+function bugBytes(u){const n=u.length-u.indexOf(',')-1;return Math.floor(n*3/4)-(u.endsWith('==')?2:u.endsWith('=')?1:0);}
+function bugGrab(){BUG.want=0;
+  try{const w=glc.width,h=glc.height;if(!w||!h)return null;
+    const k=Math.min(1,960/Math.max(w,h)),W=Math.max(1,Math.round(w*k)),H=Math.max(1,Math.round(h*k));
+    const c=BUG.cv||(BUG.cv=document.createElement('canvas'));c.width=W;c.height=H;
+    const g=c.getContext('2d');g.drawImage(glc,0,0,W,H);
+    let u='';for(const q of [0.6,0.45,0.3]){u=c.toDataURL('image/jpeg',q);if(bugBytes(u)<=280*1024)break;}
+    c.width=c.height=1;   // the pixels live in the data URL now
+    if(!/^data:image\/jpeg;base64,/.test(u))return null;
+    BUG.shot={url:u,at:Date.now(),w:W,h:H};
+    if(BUG.onShot)BUG.onShot(BUG.shot);   // a sheet opened from the pause before this frame came
+    return BUG.shot;}catch(e){return null;}}
+// Settings, a flight running and no recent pause frame: draw one frame now and take it (the menu covers the canvas)
+function bugFresh(){if(!running)return null;
+  try{if(camMode===2&&SENSOR.mode!=='tv'&&!PHOTO.on&&!FREECAM)renderIR();else pfxRender();}catch(e){return null;}
+  return bugGrab();}
 function togglePause(){if(DF.brief||TASK.brief||LES.brief)return;   // the dogfight briefing holds the sim itself; FIGHT'S ON is the way on
-  if(RES.brief)resClose(RES.brief);if(paused)gfxDrain();paused=!paused;pauseOv.classList.toggle('on',paused);if(paused){radioFade(120);CARP.sync();PZ0={t:savedType,b:SPAWN_BASE,p:SPAWN_POS};PZ_LOC=null;locSel();pzApplyUI();requestAnimationFrame(locShow);if(window.stickReset)stickReset();musicUI();}}
+  if(RES.brief)resClose(RES.brief);if(paused)gfxDrain();paused=!paused;pauseOv.classList.toggle('on',paused);if(paused){BUG.want=running?1:0;radioFade(120);CARP.sync();PZ0={t:savedType,b:SPAWN_BASE,p:SPAWN_POS};PZ_LOC=null;locSel();pzApplyUI();requestAnimationFrame(locShow);if(window.stickReset)stickReset();musicUI();}}
 $('pResume').onclick=()=>{gfxDrain();paused=false;pauseOv.classList.remove('on');initAudio();radioVolApply();};
 // Restart and Apply are one button: it restarts this flight (same start, mission or range) until
 // an aircraft, base or start is changed on the sheet, then it reads Apply and flies the new picks.
@@ -20618,7 +20711,8 @@ function tick(t,skipRender){
   // it pushed the menu's WARM steps past warm_console_check's window); kgeuNoPre keeps the old 40 frames
   else{if((!menu.classList.contains('on')||(frameN<40&&(!PRE.done||PRE.skip)))&&!FM.on){   // the open map is opaque: no 3D frame under it
       rebuildTerrain(camera.position.x,camera.position.z);   // the LOD rings round the camera this frame looks from
-      if(camMode===2&&SENSOR.mode!=='tv'&&!PHOTO.on&&!FREECAM){csmIdle();renderIR();}else{csmFrame(Math.min(0.1,rdt));pfxRender();}}
+      if(camMode===2&&SENSOR.mode!=='tv'&&!PHOTO.on&&!FREECAM){csmIdle();renderIR();}else{csmFrame(Math.min(0.1,rdt));pfxRender();}
+      if(BUG.want){if(paused)bugGrab();else BUG.want=0;}}   // the bug report's screenshot: this frame, in this task (bugs1)
     const po=pauseOv.classList.contains('on');document.body.classList.toggle('pauseOn',po);}
 }
 // test hook: headless UI checks need to reach a few internals
@@ -21193,6 +21287,27 @@ const APP_VER='2026-10-14-gfxfix';          // keep version.json in step when sh
   $('oCsCh').onclick=()=>{if(!E.enabled){toast('Callsigns need the online version of the game');return;}csOpen(E.P?'rename':'pick','settings');};
   $('oCsRe').onclick=()=>{if(!E.enabled){toast('Callsigns need the online version of the game');return;}csOpen('restore','settings');};
 
+  // ---- bugs1 item 5: bug reports, POST /report (server/src/worker.js). A report that could not reach the Worker (no
+  // network, a 5xx) waits in kgeuBugQ, 5 at most (the oldest dropped), screenshot and all, and goes one at a time from
+  // reportFlush: at boot, on 'online', after any report that went through. A 4xx on a queued one drops it quietly.
+  function report(body){return api('/report',body,20000);}
+  function bugQSave(Q){try{localStorage.setItem('kgeuBugQ',JSON.stringify(Q));return;}catch(e){}
+    for(const q of Q)if(q.body&&q.body.shot){delete q.body.shot;try{localStorage.setItem('kgeuBugQ',JSON.stringify(Q));return;}catch(e){}}   // over quota: shots go first, oldest first
+    save('kgeuBugQ',Q.slice(-1));}
+  function reportQueue(body){const Q=load('kgeuBugQ',[]);Q.push({body:body,when:Date.now()});while(Q.length>5)Q.shift();bugQSave(Q);}
+  let rFlushing=false;
+  function reportFlush(){
+    if(rFlushing||!E.enabled)return;const Q=load('kgeuBugQ',[]);if(!Array.isArray(Q)||!Q.length)return;
+    const it=Q[0];rFlushing=true;
+    api('/report',it.body,20000).then(j=>{rFlushing=false;
+      if(j._s>=500)return;
+      const R=load('kgeuBugQ',[]).filter(q=>q.when!==it.when);bugQSave(R);
+      if(j.ok)(E.say||toast)('Queued report sent: ticket #'+j.id);
+      if(R.length)setTimeout(reportFlush,300);
+    },()=>{rFlushing=false;});
+  }
+  const reportQueued=()=>{const Q=load('kgeuBugQ',[]);return Array.isArray(Q)?Q.length:0;};
+
   // ---- start up: see if the Worker answers; ask for a callsign after the splash if there is none
   function boot(){
     window.__kgeu.APP_VER=APP_VER;
@@ -21212,9 +21327,9 @@ const APP_VER='2026-10-14-gfxfix';          // keep version.json in step when sh
       else api('/me',auth()).then(j=>{if(j._s===401){toast('Your callsign was restored on another device',5);E.P=null;saveP();try{localStorage.removeItem('kgeuLB');}catch(e){}paintAll();ui();return;}
         if(j.cs){Object.assign(E.P,{cs:j.cs,xp:j.xp,creator:!!j.creator,renamed:j.renamed,renameAt:j.renameAt});saveP();ui();paintAll();}},()=>{});
       if(E.P){flush();topUpPool();}
-      fameFetch();
+      fameFetch();reportFlush();
     },()=>csRelease());
-    addEventListener('online',()=>{flush();});
+    addEventListener('online',()=>{flush();reportFlush();});
     setInterval(()=>{if(E.Q.length&&navigator.onLine!==false)flush();},60e3);
   }
   function reset(){E.runs={};E.rec=null;E.armed=true;if(E.ghost&&E.ghost.st!==st)ghostOff();}
@@ -21230,6 +21345,7 @@ const APP_VER='2026-10-14-gfxfix';          // keep version.json in step when sh
     boot:boot,homeRank:homeRank,sheet:sheet,sheetOn:()=>!$('lbSheet').hidden,csHold:()=>csHold,paintModel:paintModel,paintAll:paintAll,lbOpen:lbOpen,lbRender:lbRender,race:race,ui:ui,flush:flush,csOpen:csOpen,dice:dice,
     fameDraw:fameDraw,fameFetch:fameFetch,fameApply:fameApply,fameApplyCity:fameApplyCity,ghostStart:ghostStart,decodePath:decodePath,rankSVG:rankSVG,rankByName:rankByName,utcDay:utcDay,fmtS:fmtS,showBadge:showBadge,ghostOff:ghostOff,runBoard:runBoard,
     localRows:localRows,localBest:localBest,
+    report:report,reportQueue:reportQueue,reportFlush:reportFlush,reportQueued:reportQueued,APP_VER:APP_VER,
     get P(){return E.P;}};
 })();
 
@@ -21335,6 +21451,72 @@ window.__kgeu.TCAS={levels:tcasLevels,state:()=>({ta:TCAS.list.some(o=>tcasLvl(o
   shown:TCAS.shown,on:TCAS.on,raT:TCAS.raT}),tcasConflict:tcasConflict,setTcas:setTcas,T:TCAS,tcasVoiceLog:TCAS.voiceLog};
 window.__kgeu.tcasConflict=tcasConflict;window.__kgeu.tcasVoiceLog=TCAS.voiceLog;
 window.__kgeu.LB=LB;try{LB.boot();}catch(e){console.warn('leaderboards',e);}
+// ---- bugs1 item 5: the bug report sheet. The pause sheet's bug button and Settings > Report a bug open it; SEND posts
+// through LB.report (the callsign's key, or a guest key made once on this phone: kgeuBugKey, so a guest's tickets group);
+// no connection or a 5xx queues it (LB.reportQueue, sent by LB.reportFlush). The screenshot is the frame at the pause
+// (BUG.shot), or from Settings a fresh frame while a flight is running, else none.
+const BUGF={from:null,cat:null,sev:'annoying',shot:null,shotOn:true,sending:false,t:0,tipT:0};
+function bugKey(){let k='';try{k=localStorage.getItem('kgeuBugKey')||'';}catch(e){}
+  if(!/^[0-9a-f]{48}$/.test(k)){const a=new Uint8Array(24);crypto.getRandomValues(a);k=[...a].map(x=>x.toString(16).padStart(2,'0')).join('');try{localStorage.setItem('kgeuBugKey',k);}catch(e){}}
+  return k;}
+// what the report carries about the game and the phone (item 6 adds the rest here)
+function bugContext(){return {app:LB&&LB.APP_VER,screen:innerWidth+'x'+innerHeight+'@'+devicePixelRatio};}
+// the HUD toast sits under the menu and the sheets, so the bug messages also get their own line on top of those
+function bugSay(msg){toast(msg,4);if(!(menu.classList.contains('on')||pauseOv.classList.contains('on')||$('bugOv').classList.contains('on')))return;
+  const e=$('bugTip');e.textContent=msg;e.classList.add('on');clearTimeout(BUGF.tipT);BUGF.tipT=setTimeout(()=>e.classList.remove('on'),3500);}
+if(LB)LB.E.say=bugSay;
+function bugPaint(){
+  const tx=$('bugTx'),n=tx.value.length,send=$('bugSend');
+  $('bugCats').querySelectorAll('.chip').forEach(b=>{const on=b.dataset.cat===BUGF.cat;b.classList.toggle('sel',on);b.setAttribute('aria-checked',on);});
+  $('bugSevs').querySelectorAll('.chip').forEach(b=>{const on=b.dataset.sev===BUGF.sev;b.classList.toggle('sel',on);b.setAttribute('aria-checked',on);});
+  const N=$('bugN');N.hidden=n<900;N.textContent=n+' / 1000';N.classList.toggle('full',n>=1000);
+  send.disabled=BUGF.sending||!BUGF.cat||!tx.value.trim();send.textContent=BUGF.sending?'Sending…':'SEND';
+  const s=BUGF.shot,img=$('bugImg'),T=$('bugShotT');
+  $('bugTh').classList.toggle('has',!!s);img.hidden=!s;
+  if(s){if(img.getAttribute('src')!==s.url)img.src=s.url;img.style.aspectRatio=s.w+' / '+s.h;}else img.removeAttribute('src');
+  $('bugNo').textContent=BUGF.from==='settings'&&!running?'No screenshot in the menu':'No screenshot';
+  T.hidden=!s;T.textContent='Screenshot: '+(BUGF.shotOn?'On':'Off');T.classList.toggle('on',BUGF.shotOn);T.setAttribute('aria-pressed',BUGF.shotOn);
+}
+function bugOpen(from){
+  BUGF.from=from==='settings'?'settings':'pause';
+  let s=null;
+  if(BUGF.from==='pause')s=BUG.want?null:BUG.shot;   // still to come: bugGrab hands it over (BUG.onShot)
+  else if(running&&paused&&BUG.shot&&Date.now()-BUG.shot.at<600e3)s=BUG.shot;
+  else if(running)s=bugFresh();
+  BUGF.shot=s;BUGF.shotOn=true;BUGF.sending=false;bugPaint();
+  const ov=$('bugOv');clearTimeout(BUGF.t);ov.classList.remove('out');ov.classList.add('on');ov.querySelector('.sheet').scrollTop=0;
+}
+BUG.onShot=s=>{if(BUGF.from==='pause'&&!BUGF.shot&&$('bugOv').classList.contains('on')){BUGF.shot=s;bugPaint();}};
+function bugClose(){const ov=$('bugOv');if(!ov.classList.contains('on'))return;try{$('bugTx').blur();}catch(e){}
+  ov.classList.add('out');clearTimeout(BUGF.t);BUGF.t=setTimeout(()=>{ov.classList.remove('on','out');BUGF.shot=null;$('bugImg').removeAttribute('src');},140);}
+function bugReset(){$('bugTx').value='';BUGF.cat=null;BUGF.sev='annoying';bugPaint();}
+function bugQueue(body){LB.reportQueue(body);bugClose();bugReset();bugSay('Saved, sends when you are back online');}
+function bugSend(){
+  if(BUGF.sending)return;
+  if(!LB||!LB.E.enabled){bugSay('Bug reports need the online game');return;}
+  const text=$('bugTx').value.trim().slice(0,1000);if(!BUGF.cat||!text)return;
+  const P=LB.E.P,body={cs:P?P.cs:undefined,key:P?P.key:bugKey(),category:BUGF.cat,severity:BUGF.sev,text:text,context:bugContext()};
+  if(BUGF.shot&&BUGF.shotOn)body.shot=BUGF.shot.url;
+  BUGF.sending=true;bugPaint();
+  LB.report(body).then(j=>{BUGF.sending=false;
+    if(j.ok){bugClose();bugReset();try{hapPattern('success');}catch(e){}bugSay('Ticket #'+j.id+' sent ✅');LB.reportFlush();return;}
+    if(j._s===429){bugPaint();bugSay('Daily report limit reached, try again tomorrow');return;}
+    if(!(j._s>=400&&j._s<500)){BUGF.sending=false;bugQueue(body);return;}
+    bugPaint();bugSay('Not sent: '+(j.reason||j.error||'refused'));
+  },()=>{BUGF.sending=false;bugQueue(body);});
+}
+$('bugCats').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;BUGF.cat=b.dataset.cat;bugPaint();});
+$('bugSevs').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;BUGF.sev=b.dataset.sev;bugPaint();});
+{const tx=$('bugTx');
+  tx.addEventListener('input',()=>{if(tx.value.length>1000)tx.value=tx.value.slice(0,1000);bugPaint();});
+  ['keydown','keyup'].forEach(k=>tx.addEventListener(k,e=>e.stopPropagation()));}   // typing is not flying: the game's keys stay out
+$('bugShotT').onclick=()=>{BUGF.shotOn=!BUGF.shotOn;bugPaint();};
+$('bugSend').onclick=bugSend;
+$('bugX').onclick=bugClose;
+$('pBug').onclick=()=>bugOpen('pause');
+$('bBug').onclick=()=>bugOpen('settings');
+Object.assign(window.__kgeu,{bugOpen:bugOpen,bugClose:bugClose,bugShot:()=>BUG.shot,bugContext:bugContext,
+  bugState:()=>({cat:BUGF.cat,sev:BUGF.sev,text:$('bugTx').value,shotOn:!!(BUGF.shot&&BUGF.shotOn),open:$('bugOv').classList.contains('on'),from:BUGF.from,hasShot:!!BUGF.shot,queued:LB?LB.reportQueued():0})});
 // the Red Flag Dogfight (5.1)
 Object.assign(window.__kgeu,{dfScore:dfScore,dfStars:dfStars,dfGrade:dfGrade,dfAch:dfAch,dfPFlare:dfPFlare,ACH:ACH,SCORE:SCORE,scoreOf:scoreOf,DF:DF,DFM:DFM,dfStart:dfStart,dfKill:dfKill,dfHit:dfHit,dfEnd:dfEnd,dfStop:dfStop,dfFox:dfFox,dfCall:dfCall,DF_CFG:DF_CFG,dfWv:dfWv,DF_RAMP:DF_RAMP,dfBreak:dfBreak,musicTitle:musicTitle,ARS:ARS,ARS_RACKS:ARS_RACKS,ARS_GUNS:ARS_GUNS,arsLo:arsLo,arsPick:arsPick,arsApply:arsApply,arsOpen:arsOpen,dfWsel:dfWsel,dfWcycle:dfWcycle,dfShoot:dfShoot,DFA:DFA,dfMask:dfMask,dfLaunch:dfLaunch});
 Object.defineProperty(window.__kgeu,'audioSessionSet',{get:()=>AUD_SESS,configurable:true});   // 5.4: navigator.audioSession set to playback

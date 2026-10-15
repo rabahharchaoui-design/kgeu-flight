@@ -1,6 +1,6 @@
 # A stand-in for the pfs-scores Worker, for the ui1 checks and screenshots: the page points LB at a fake URL
 # (localStorage kgeuLBUrl) and Playwright answers every call. MOCK.subs records the submissions; MOCK.gain sets the
-# XP the fake server grants per run.
+# XP the fake server grants per run. MOCK.reports records the bug reports (/report); extra['report'] overrides its answer.
 import json, random
 
 FAKE = 'https://pfs-mock.test'
@@ -15,6 +15,7 @@ class Mock:
     def __init__(self, cs='ACEPILOT', xp=1650, rows=30, me_rank=24, gain=37, offline=False):
         self.cs, self.xp, self.nrows, self.me_rank, self.gain, self.offline = cs, xp, rows, me_rank, gain, offline
         self.subs, self.boards = [], []
+        self.reports, self.report_id = [], 7   # POST /report bodies; the next ticket number (bugs1 item 5)
         self.extra = {}
 
     def storage(self):
@@ -62,6 +63,12 @@ class Mock:
                 from urllib.parse import unquote
                 b = unquote(q.get('b', 'daily')); self.boards.append((b, q.get('p')))
                 out = self.board(b, q.get('p', 'today'))
+            elif path == '/report':
+                self.reports.append(body)
+                o = self.extra.get('report')   # {'status': 429, 'body': {...}} overrides the answer
+                if o:
+                    await route.fulfill(status=o.get('status', 200), content_type='application/json', body=json.dumps(o.get('body', {})), headers={'Access-Control-Allow-Origin': '*'}); return
+                out = {'ok': True, 'id': self.report_id, 'issue': None, 'shot': None}; self.report_id += 1
             elif path == '/submit' and self.extra.get('reject'):
                 self.subs.append(body)
                 await route.fulfill(status=400, content_type='application/json', body=json.dumps({'ok': False, 'reason': self.extra['reject']}), headers={'Access-Control-Allow-Origin': '*'}); return
