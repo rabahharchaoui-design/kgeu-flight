@@ -75,7 +75,9 @@ async def main():
     # at 0.1 s, so that is about 2-3 s of wall time. Wait for the call, not a fixed 2.5 s.
     try: await pg.wait_for_function("()=>/cleared for takeoff/.test(document.getElementById('atc').textContent)", timeout=15000)
     except Exception: pass
-    line=await pg.evaluate("()=>{const e=document.getElementById('atc');return {on:e.classList.contains('on'),txt:e.textContent};}")
+    line=await pg.evaluate("()=>{const e=document.getElementById('atc'),r=e.getBoundingClientRect(),c=e.querySelector('b');return {on:e.classList.contains('on'),txt:e.textContent,in:e.parentNode.id,top:r.top,H:innerHeight,col:c?getComputedStyle(c).color:''};}")
+    # fix2 item 11: the subtitle is the bottom caption (#cap), below 80% of the height, the station tinted
+    chk('the clearance is on the bottom caption, the station tinted', line['in'] == 'cap' and line['top'] >= line['H'] * 0.8 - 0.5 and line['col'] == 'rgb(127, 212, 255)', repr((line['in'], round(line['top']), line['col'])))
     chk('takeoff clearance is transmitted', line['on'] and 'cleared for takeoff' in line['txt'], repr(line['txt'][:110]))
     chk('it names the right tower and runway', 'Luke Tower' in line['txt'] and '03L' in line['txt'], repr(line['txt'][:110]))
     chk('it uses the C-130 callsign', 'Herky 71' in line['txt'], repr(line['txt'][:60]))
