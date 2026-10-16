@@ -7904,6 +7904,12 @@ function hbSpawn(){
   HB.ktPrev=st.windKt;st.windKt=HB.kt0;st.dustDir=(HB.hdg+180)%360;
   hbPlace(4500);hbUpdate(0);
 }
+// how far the wall's front is from the field, metres (positive: still ahead of it); null before the wall is placed
+function hbFieldD(){
+  if(!HB.on||HB.st!==st)return null;
+  const px=APC.x-HB.C.x,pz=APC.z-HB.C.z,al=px*HB.T.x+pz*HB.T.z,s=clamp(px*HB.Lat.x+pz*HB.Lat.z,-HB.W/2,HB.W/2);
+  return al+s*s/(2*HB.R);
+}
 // put back the clear air values the storm pulled on
 function hbRestore(){
   if(!HB.dirty)return;HB.dirty=false;
@@ -9644,7 +9650,10 @@ function wxCond(){
     o.sT='ceiling '+c.toLocaleString('en-US')+' broken, thunderstorms in the vicinity';o.sC=['t_ceiling'].concat(ftC(c),['t_broken','t_ts_vicinity']);o.sP='thunderstorms nearby';}
   else if(W==='scattered'||W==='gusty'){const c=wxFt((CLD&&CLD.base||1500)-g0);
     o.sT='few clouds at '+c.toLocaleString('en-US');o.sC=['t_few_clouds_at'].concat(ftC(c));o.sP='cloud base '+c.toLocaleString('en-US')+' ft';}
-  else if(W==='haboob'){o.sT='blowing dust';o.sC=['t_blowing_dust'];o.sP='blowing dust';}
+  else if(W==='haboob'){const hf=hbFieldD();   // the wall's distance from the field (ahead of it: positive)
+    if(hf!==null&&hf<=500){o.vis=0.5;o.vT=o.vP='visibility one half mile in blowing dust';o.vC=['t_visibility','t_one_half_mile','t_blowing_dust'];o.sT='';o.sC=[];o.sP='';}
+    else{const i=dir8(HB.hdg+180);o.vis=5;o.vT=o.vP='visibility 5 miles';o.vC=['t_visibility','t_n_5','t_miles'];
+      o.sT='blowing dust '+DIR8[i]+' of the field';o.sC=['t_blowing_dust','t_dir_'+DIR8C[i],'t_of_the_field'];o.sP='blowing dust to the '+DIR8[i];}}
   return o;
 }
 const windTxtG=()=>windTxt()+(gustOn()?' gusting '+gustKt():'');
@@ -9654,9 +9663,9 @@ function atisWant(s){return RUNSTART.k==='free'&&!LES.on&&!TASK.on&&!ARC.on&&!DF
 function atisSay(B,gnd){
   const fld=B.twr.replace(/ Tower.*$/,''),fc='t_atis_'+B.twrClip.replace(/_tower$/,''),ph=ATIS_PH[Math.floor(Date.now()/3.6e6)%7],o=wxCond(),al=wxAltim(),ad=al.toFixed(2).replace('.','');
   const w=windNow(),wd=+w[0]%360;
-  const text=AC.csS+', '+fld+' information '+ph[0].toUpperCase()+ph.slice(1)+', '+windTxtG()+', '+o.vT+', '+o.sT+', altimeter '+al.toFixed(2)+'.';
+  const text=AC.csS+', '+fld+' information '+ph[0].toUpperCase()+ph.slice(1)+', '+windTxtG()+', '+o.vT+', '+(o.sT?o.sT+', ':'')+'altimeter '+al.toFixed(2)+'.';
   const clips=[csTs(),fc,'t_ph_'+ph].concat(windCG(),o.vC,o.sC,['t_altimeter'],ad.split('').map(d=>'t_n_'+d));
-  WXF.atis=text;WXF.plain='Weather: wind from the '+DIR8[dir8(wd)]+' at '+w[1]+(gustOn()?' gusting '+gustKt():'')+', '+o.vP+', '+o.sP+'.';
+  WXF.atis=text;WXF.plain='Weather: wind from the '+DIR8[dir8(wd)]+' at '+w[1]+(gustOn()?' gusting '+gustKt():'')+', '+o.vP+(o.sP?', '+o.sP:'')+'.';
   return say(gnd?B.gnd:B.twr,text,clips);
 }
 // the precompile queue's 'weather' job: everything this draws, once, at the first flight's pose: the streak programs,

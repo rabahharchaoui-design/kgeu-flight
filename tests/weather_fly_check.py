@@ -17,9 +17,9 @@ RANGE = {'clear': (2, 6, 0.1), 'scattered': (4, 9, 0.2), 'overcast': (5, 10, 0.1
          'storm': (10, 16, 0.6), 'fog': (0, 3, 0.05), 'gusty': (18, 24, 0.55)}
 VIS = {'clear': 'visibility 10 miles', 'scattered': 'visibility 10 miles', 'overcast': 'visibility 10 miles',
        'rain': 'visibility 3 miles in rain', 'storm': 'visibility 5 miles', 'fog': 'visibility one mile in fog',
-       'gusty': 'visibility 10 miles', 'haboob': 'visibility 10 miles'}
+       'gusty': 'visibility 10 miles', 'haboob': 'visibility 5 miles'}
 SKY = {'clear': 'sky clear', 'scattered': 'few clouds at', 'overcast': ' overcast', 'rain': ' overcast',
-       'storm': 'thunderstorms in the vicinity', 'fog': ' overcast', 'gusty': 'few clouds at', 'haboob': 'blowing dust'}
+       'storm': 'thunderstorms in the vicinity', 'fog': ' overcast', 'gusty': 'few clouds at', 'haboob': 'blowing dust south east of the field'}
 
 START = """([wx,skill])=>{const K=window.__kgeu;K.setSkill(skill);K.setTOD('day');K.setWX(wx);K.windSeed(7);
   K.pick('cessna');K.pickBase('kgeu');K.pickPos('runway');K.radioLog(true);K.start('runway');
@@ -69,6 +69,9 @@ async def main():
             if first:
                 miss = [c for c in first['clips'] if c not in CLIPS]
                 ok(f'{wx}: every ATIS clip is recorded ({len(first["clips"])} clips)', not miss, miss)
+        # the haboob's wall over the field: one half mile in blowing dust (the field 1 km inside the dust)
+        v = await pg.evaluate(f"()=>{{{K}.setWX('haboob');{K}.start('runway');{K}.stepFrame(1/60,false,true);{K}.haboobJump(-1000);return {K}.wxFly().vis;}}")
+        ok('haboob over the field: visibility one half mile', v == 0.5, v)
         gy = hard['gusty']
         off = abs(((gy['base'] - 26) + 180) % 360 - 180)
         ok('gusty: the wind 40 to 70 degrees off runway 1 (10 to 20 kt crosswind)', 35 <= off <= 75, (gy['base'], off))
