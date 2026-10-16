@@ -7470,12 +7470,9 @@ for(const k in TOD_SET){const T=TOD_SET[k],sd=solarDir(T.hour,T.doy||105),el=Mat
   T.sky=M.sky;T.disc=M.disc;T.discS=T.night?0:M.discS;T.env=M.env;}
 let TOD=TOD_SET.day;
 let starField=null,cloudMat=null;
-// the cumulus puffs (7 squashed icosahedra a cluster, 2,900 to 3,470 m): seen from above inside the dogfight's
-// 5,000 to 30,000 ft they read as flat white polygons on the ground, so dfStart hides them and dfStop brings them back
-var CLOUD_MESH=null;
-// cloud colour and self-glow per preset: white by day, warm at sunset, dark
-// blue-grey at night so they never read as flat grey cutouts on the night sky
-const CLOUD_TOD={day:[0xffffff,0x6f7780],sunset:[0xffe2c8,0x5e4a48],night:[0x232a38,0x0d1119],haboob:[0xf0e2d0,0x6a5c50]};
+// the clouds (weather item 1): one instanced mesh of sun lit billboard puffs (CLD, built with the world). The dogfight
+// hides them (dfStart) and dfStop brings them back. cloudMat is CLD's one material (setTOD's cloudsAuto fires on it).
+var CLOUD_MESH=null,CLD=null;
 const _skyTop=new THREE.Color(),_skyCol=new THREE.Color(),HB_DUST=new THREE.Color(0xb8722e),HB_CAVE=new THREE.Color(0x4e3220);
 const _skyHS=new THREE.Color(),_skyHA=new THREE.Color(),_skyG=new THREE.Color(),_skyB=new THREE.Color(),_skyS=new THREE.Vector3(),_skyH=new THREE.Color();
 // The dome's colour toward the unit direction (x,y,z), an analytic sky in the Preetham spirit: the air's in scatter at
@@ -7528,6 +7525,7 @@ function setTOD(id){TOD_N++;
   AL_MAT.uniforms.uLights.value=TOD.lights;
   for(const L of AL_LAYERS)if(L.pts)L.pts.visible=TOD.lights>0;
   EGG.lit=TOD.lights>0;EGG.litMat.emissiveIntensity=TOD.night?1:TOD.lights*0.6;EGG.mat.emissiveIntensity=TOD.night?0:0.3*(1-TOD.lights);   // @OhRabah signs: off by day, dim at sunset
+  if(CLD)CLD.dirty=false;   // the fog, haze and sun above are the clean TOD values again (a fly through's are stale)
   if(cloudMat)cloudsAuto();   // the flight's cloud preset and its colours (graphics item 6)
   for(const f of TOD_HOOKS)f();
   // the gunmetal drones: a faint lift at dusk and night so the airframe still reads against a dark sky
@@ -8806,95 +8804,269 @@ csmScan(CSM_N1);BOOT.mark('world');   // the stadium, the arena, Westgate, Luke'
   trunks.forEach((t,k)=>{p.set(t[0],0,t[1]);s.set(1,t[2],1);m.compose(p,q,s);tm.setMatrixAt(k,m);p.set(t[0],t[2]+0.4,t[1]);s.set(3.6,1.1,3.6);q.setFromAxisAngle(_yUp,hash(k,2)*6);m.compose(p,q,s);cm.setMatrixAt(k,m);q.identity();});
   shr.forEach((b,k)=>{p.set(b[0],groundHeight(b[0],b[1])+b[2]*0.35,b[1]);s.set(b[2]*1.3,b[2]*0.75,b[2]*1.3);q.setFromAxisAngle(_yUp,hash(k,3)*6);m.compose(p,q,s);sm.setMatrixAt(k,m);});
   tm.userData.heat=0.05;tm.userData.irVar=0;cm.userData.heat=0.05;cm.userData.irVar=0;sm.userData.heat=0.07;sm.userData.irVar=0;if(REGION.az)scene.add(tm,cm,sm);
-  cloudMat=new THREE.MeshLambertMaterial({color:0xffffff,emissive:0x6f7780});
-  const cl=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,1),cloudMat,200);let i=0;q.identity();
-  for(let k=0;k<28;k++){const cx=APC.x+(hash(k,201)-0.5)*40000,cz=APC.z+(hash(k,202)-0.5)*40000,cy=2900+hash(k,203)*500;
-    for(let j=0;j<7;j++){const r=160+hash(k*9+j,5)*200;s.set(r*1.7,r*0.5,r);p.set(cx+(hash(k*9+j,1)-0.5)*600,cy+hash(k*9+j,2)*70,cz+(hash(k*9+j,3)-0.5)*400);m.compose(p,q,s);cl.setMatrixAt(i++,m);}}
-  cl.count=i;cl.userData.heat=0.1;cl.userData.irVar=0;scene.add(cl);CLOUD_MESH=cl;
 })();
-// ---------- cloud presets (graphics item 6) ----------
-// CLOUDS.preset: 'clear' | 'scattered' | 'monsoon'. Low: today's puffs as they were (clear hides them, monsoon only
-// darkens them). Medium and High (GFX.FX.clouds): the same 196 puffs on CLOUD_HD, a Lambert whose colour is worked out
-// per vertex from the sun: bright sunlit tops, grey blue flat bases (each puff's underside pressed flat in the vertex
-// shader), orange tops at sunset; never a shadow caster. Monsoon adds six cumulonimbus 18 to 34 km south and east of the
-// field (CLOUDS.cb, one draw: 18 squashed icosahedra each, 1,440 triangles: a flat base, a leaning body of 10 overlapping
-// pieces +-25% in size, two side lumps, an overshooting top, an anvil of 4 offset canted slabs spread north east; two
-// of the six tower to 9 km), dark grey blue bases and bright tops, and the haze thickens and warms toward them (AIR.mon).
-// High (GFX.FX.cloudRim): a silver lining on the silhouettes facing the sun, per vertex. The pick per flight, from
-// setTOD (cloudsAuto): day 70% scattered and 30% clear, sunset scattered, haboob monsoon, night scattered (dim), from the
-// daily seed (todayKey) so a day's flights and the tests agree; window.__kgeu.setClouds(p) forces one (null: back to
-// the pick). The dogfight hides them all as before (dfStart, dfStop puts back CLOUDS.vis).
-const CLOUD_HD_TOD={day:[0x97a4b6,0xffffff,0xfff0dc],sunset:[0x6c6276,0xffb27c,0xff9a52],night:[0x141a26,0x2a3242,0x000000],haboob:[0x8c7e72,0xf2dec6,0xffcf9c]};
-const CLOUDS={preset:'scattered',forced:null,vis:true,hd:null,cb:null,
-  U:{base:new THREE.Color(),top:new THREE.Color(),sunC:new THREE.Color(),sun:new V3(0,1,0),rim:{value:0}}};
-// the per instance shade (aCl: 0 at a cloud's base to 1 at its top) on a puff geometry
-function cloudAttr(g,n,f){const a=new Float32Array(n);for(let i=0;i<n;i++)a[i]=f(i);g.setAttribute('aCl',new THREE.InstancedBufferAttribute(a,1));}
-if(CLOUD_MESH){cloudAttr(CLOUD_MESH.geometry,CLOUD_MESH.count,i=>0.45+0.2*hash(i,77));
-  // three r128 culls an InstancedMesh by its one icosahedron at the origin: a sphere round the whole field of puffs
-  CLOUD_MESH.geometry.boundingSphere=new THREE.Sphere(new V3(APC.x,3150,APC.z),30000);CLOUD_MESH.userData.noRecv=true;CLOUD_MESH.receiveShadow=false;}
-function cloudHD(){
-  if(CLOUDS.hd)return CLOUDS.hd;
-  const U=CLOUDS.U,m=new THREE.MeshLambertMaterial({color:0xffffff});
-  m.onBeforeCompile=sh=>{
-    Object.assign(sh.uniforms,{cBase:{value:U.base},cTop:{value:U.top},cSunC:{value:U.sunC},cSun:{value:U.sun},cRim:U.rim});
-    sh.vertexShader='attribute float aCl;\nuniform vec3 cBase;uniform vec3 cTop;uniform vec3 cSunC;uniform vec3 cSun;uniform float cRim;\nvarying vec3 vClC;\n'+sh.vertexShader
-      .replace('#include <beginnormal_vertex>','#include <beginnormal_vertex>\n\tif ( position.y < -0.35 ) objectNormal = vec3( 0.0, -1.0, 0.0 );')
-      .replace('#include <begin_vertex>','#include <begin_vertex>\n\ttransformed.y = max( transformed.y, -0.35 );')
-      .replace('#include <fog_vertex>',`#include <fog_vertex>
-	{mat3 im = mat3( instanceMatrix );
-	vec3 s2 = vec3( dot( im[ 0 ], im[ 0 ] ), dot( im[ 1 ], im[ 1 ] ), dot( im[ 2 ], im[ 2 ] ) );
-	vec3 nW = normalize( mat3( modelMatrix ) * im * ( objectNormal / s2 ) );
-	float k = clamp( 0.05 + 0.65 * aCl + 0.45 * nW.y, 0.0, 1.0 );
-	vClC = mix( cBase, cTop, k ) + cSunC * ( max( dot( nW, cSun ), 0.0 ) * ( 0.3 + 0.5 * k ) );
-	vec3 wp = ( modelMatrix * instanceMatrix * vec4( transformed, 1.0 ) ).xyz, vd = normalize( cameraPosition - wp );
-	float r = 1.0 - abs( dot( nW, vd ) );
-	vClC += cTop * ( cRim * r * r * r * ( 0.3 + 0.7 * max( dot( - vd, cSun ), 0.0 ) ) );}`);
-    sh.fragmentShader='varying vec3 vClC;\n'+sh.fragmentShader.replace('vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;',
-      'vec3 outgoingLight = pfsLin( vClC );');};
-  m.customProgramCacheKey=()=>'cloudHD';
-  return CLOUDS.hd=m;
+// ---------- clouds (weather item 1) ----------
+// The flight sim impostor: every cloud is a cluster of soft camera facing quads (one InstancedMesh, CLD.mesh, two
+// triangles a puff, one draw), lit in the shader from the sun model, so nothing reads as a faceted slab. Per instance:
+// aP centre and in plane rotation, aS width, height, shade (0 the cloud's base, 1 its top; below 0 a storm's dark
+// underside) and opacity, aO the unit offset from the cluster's centre (its sun side), aX the atlas slot (0 to 3 puffs,
+// 4 the wisp, 5 a rain shaft, locked to the world's up, 6 an anvil sheet) and the ground height under it.
+// Colour: mix(base, top, shade) plus the sun's colour on the cluster's sun side, a corner gradient toward the sun's
+// direction on each quad (+-0.15, the puff modelled) and a silver lining on the thin edges when the sun is behind it;
+// raw screen colours with a soft shoulder, like the haboob wall (custom ShaderMaterials skip the tone curve). The
+// aerial perspective is the terrain's own fog chunk (PFS_AIR, the same uniforms), the far ones also dissolve before
+// fog.far so no cut shows against the dome; a puff fades out as the camera comes within about half its radius (and
+// collapses to nothing, so a fly through never fills the screen with quads), and where it meets the ground (150 m).
+// Presets are data only (one material, one program): CLOUDS.preset 'clear' (6 to 10 high wisps), 'scattered' (34 fair
+// weather cumulus over the 40 km field on one cloud base a day, 1,350 to 1,900 m) and 'monsoon' (the six cells south
+// and east as towers with dark bases, anvils and rain shafts, the cumulus thinned to half; the haboob's). The pick per
+// flight from setTOD (cloudsAuto): day 70% scattered and 30% clear, sunset and night scattered, haboob monsoon, from
+// the daily seed; window.__kgeu.setClouds(p) forces one (null: back to the pick). Caps by tier (CLD_CAP; Low bigger
+// and fewer, CLD_LO skips the corner gradient and the rim); the buffers are made once at the High monsoon size.
+const CLD_CAP={low:[160,220],medium:[320,520],high:[480,700]},CLD_MAX=700,CLD_ST=13;
+// the mist inside a cloud by time of day
+const CLD_MIST={day:0xdcdfe4,sunset:0xb6a498,night:0x10131b,haboob:0xc2ae98};
+CLD={mesh:null,mat:null,U:null,n:0,cells:0,nE:0,E:new Float32Array(40*6),src:new Float32Array(CLD_MAX*CLD_ST),key:new Float32Array(CLD_MAX),
+  idx:new Uint16Array(CLD_MAX),prev:new Uint16Array(CLD_MAX),A:null,base:1600,tier:'',gk:'',sorts:0,sortT:0,sp:new V3(1e9,0,0),drift:new V3(),
+  inside:0,dirty:false,skyK:0,s0:{near:0,far:0,haze:0,sunI:0,airY:0,kw:0,ty:1,tz:1}};
+// the atlas, made once: a 512 x 256 RGBA data texture (no image file, no canvas premultiply on the soft edges). Left
+// cell: the four puff variants, one per channel (a few dome shaped lumps, the low ones big, roughened by value noise,
+// a soft flat base), stored as a soft height (the shader maps it to alpha and reads its slope toward the sun for the
+// relief); right cell, red: the wisp (streaks along x), green: the rain shaft, blue: the anvil sheet. Everything reaches zero well inside its cell.
+function cldAtlas(){
+  const S=256,W=512,D=new Uint8Array(W*S*4),sm=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
+  const lat=sd=>{const L=new Float32Array(64*64);for(let i=0;i<L.length;i++)L[i]=hash(i,sd);return L;};
+  const vn=(L,x,y)=>{const xi=Math.floor(x),yi=Math.floor(y),fx=x-xi,fy=y-yi,u=fx*fx*(3-2*fx),v=fy*fy*(3-2*fy);
+    const x0=xi&63,x1=(xi+1)&63,y0=(yi&63)*64,y1=((yi+1)&63)*64,a=L[y0+x0],b=L[y0+x1],c=L[y1+x0],d=L[y1+x1];
+    return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;};
+  const fbm=(L,x,y)=>0.5*vn(L,x,y)+0.27*vn(L,x*2.03+17,y*2.03+9)+0.15*vn(L,x*4.1+31,y*4.1+5)+0.08*vn(L,x*8.3+3,y*8.3+41);
+  for(let v=0;v<4;v++){const L=lat(900+v),nl=6+(v&1)*2+(v>>1),lu=[];
+    for(let i=0;i<nl;i++){const t=i/(nl-1);lu.push([(hash(i,910+v)-0.5)*0.36*(1-0.4*t),-0.14+t*0.3+(hash(i,920+v)-0.5)*0.06,0.24-0.1*t+hash(i,930+v)*0.03]);}
+    for(let j=0;j<S;j++)for(let i=0;i<S;i++){const x=(i+0.5)/S-0.5,y=(j+0.5)/S-0.5;
+      let f=0;for(let k=0;k<nl;k++){const l=lu[k],dx=x-l[0],dy=y-l[1],q=(dx*dx+dy*dy)/(l[2]*l[2]);if(q<1&&1-q>f)f=1-q;}
+      const n=fbm(L,(x+0.5)*6,(y+0.5)*6);
+      let d=sm(0,1.5,f*1.6+(n-0.5)*1.1-0.15)*sm(-0.36,-0.26,y+(n-0.5)*0.05)*(1-sm(0.42,0.5,Math.hypot(x,y)));
+      D[(j*W+i)*4+v]=Math.round(d*(0.84+0.16*n)*255);}}
+  {const L=lat(950);for(let j=0;j<S;j++)for(let i=0;i<S;i++){const x=(i+0.5)/S-0.5,y=(j+0.5)/S-0.5;
+    const n=fbm(L,(x+0.5)*3,(y+0.5)*14),e=1-sm(0.2,1,(x/0.46)*(x/0.46)+(y/0.4)*(y/0.4));
+    D[(j*W+S+i)*4]=Math.round(e*sm(0.32,0.72,n)*255);}}
+  // green: the rain shaft, a soft column with fine vertical streaks, alpha 0.5 under the base to 0.2 at its foot
+  // (stored through the shader's smoothstep(0, 0.45) so the alpha comes out as drawn)
+  {const L=lat(960);for(let j=0;j<S;j++)for(let i=0;i<S;i++){const x=(i+0.5)/S-0.5,y=(j+0.5)/S-0.5,n=fbm(L,(x+0.5)*16,(y+0.5)*1.2);
+    const A=0.5*(0.4+0.6*(y+0.5))*(1-sm(0.2,0.46,Math.abs(x)+(n-0.5)*0.08))*(1-sm(0.42,0.49,y))*sm(-0.49,-0.4,y)*(0.75+0.25*n);
+    D[(j*W+S+i)*4+1]=Math.round(0.45*(0.5-Math.sin(Math.asin(clamp(1-2*A,-1,1))/3))*255);}}
+  // blue: the anvil sheet, a fibrous lens filling the quad's height (a flat underside, a low domed top, ragged ends)
+  {const L=lat(970);for(let j=0;j<S;j++)for(let i=0;i<S;i++){const x=(i+0.5)/S-0.5,y=(j+0.5)/S-0.5,n=fbm(L,(x+0.5)*4,(y+0.5)*10),
+      tp=0.1+0.33*(1-4*x*x),e=(1-sm(0.3,0.48,Math.abs(x)+(n-0.5)*0.12))*sm(-0.44,-0.32,y+(n-0.5)*0.04)*(1-sm(tp-0.1,tp,y+(n-0.5)*0.08));
+    D[(j*W+S+i)*4+2]=Math.round(e*(0.55+0.45*sm(0.3,0.7,n))*255);}}
+  const t=new THREE.DataTexture(D,W,S,THREE.RGBAFormat);t.magFilter=THREE.LinearFilter;t.minFilter=THREE.LinearMipmapLinearFilter;
+  t.generateMipmaps=true;t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;t.needsUpdate=true;return t;
 }
-// the cumulonimbus: built the first time a monsoon is shown on Medium or High
-const _cbE=new THREE.Euler();
-function cloudCB(){
-  const g=new THREE.IcosahedronGeometry(1,1),M=[],A=[],m=new THREE.Matrix4(),q=new Q4(),p=new V3(),s=new V3();
-  const add=(x,y,z,sx,sy,sz,a,rot,tx,tz)=>{q.setFromEuler(_cbE.set(tx||0,rot||0,tz||0,'YXZ'));m.compose(p.set(x,y,z),q,s.set(sx,sy,sz));M.push(m.clone());A.push(a);};
-  const N=6,yb=1800;
-  for(let k=0;k<N;k++){
-    // two of the six (k 1 and 4) tower to 8.5 to 9 km, the rest 4.5 to 7
-    const h=j=>hash(k*31+j,304),tall=k===1||k===4,H=tall?8500+h(0)*500:4500+h(1)*2500,
-      br=(100+(k+0.2+hash(k,301)*0.6)*100/N)*Math.PI/180,dist=18000+hash(k,302)*16000,
-      cx=APC.x+Math.sin(br)*dist,cz=APC.z-Math.cos(br)*dist,W=1500+H*0.22,Y=y=>clamp((y-yb)/(H-yb),0,1),
-      la=0.6+(h(2)-0.5)*0.8,lx=Math.cos(la)*W*0.35,lz=-Math.sin(la)*W*0.35;   // the lean: the top drifts this far north east
-    add(cx,yb+200,cz,W*1.25,420,W*1.1,0,h(3)*6);   // the dark flat base
-    for(let j=0;j<10;j++){const t=j/9,y=yb+350+t*(H*0.84-yb-350),r=W*(1-0.25*t)*(0.78+0.5*h(j+10));   // the body: 10 pieces, sizes +-25%, overlapping
-      add(cx+lx*t+(h(j+20)-0.5)*W*0.55,y,cz+lz*t+(h(j+30)-0.5)*W*0.55,r,r*(0.7+0.2*h(j+40)),r*(0.85+0.3*h(j+45)),Y(y),h(j+50)*6,(h(j+55)-0.5)*0.4,(h(j+57)-0.5)*0.4);}
-    for(let j=0;j<2;j++){const t=0.3+0.35*j+0.1*h(j+60),y=yb+(H-yb)*t,a=h(j+61)*6.283,r=W*(0.5+0.15*h(j+62));   // cauliflower lumps
-      add(cx+lx*t+Math.cos(a)*W*0.75,y,cz+lz*t+Math.sin(a)*W*0.75,r,r*0.8,r,Y(y),a,0.2,-0.15);}
-    // the anvil: four flattened pieces of different sizes spread mostly downwind, each turned and canted a little so its
-    // outline is ragged, never one disc
-    for(let j=0;j<4;j++){const a=-0.5+(j-1.5)*0.75+(h(j+70)-0.5)*0.5,d=W*(0.35+0.55*h(j+71)),sw=W*(1.0+0.7*h(j+72));
-      add(cx+lx+Math.cos(a)*d+W*0.3,H-150-260*h(j+73),cz+lz-Math.sin(a)*d-W*0.2,sw,280+320*h(j+74),sw*(0.55+0.35*h(j+75)),1,h(j+76)*6.283,(h(j+77)-0.5)*0.12,(h(j+78)-0.5)*0.12);}
-    add(cx+lx,H*0.93,cz+lz,W*0.6,W*0.38,W*0.55,1,h(90)*6);}   // the overshooting top
-  const im=new THREE.InstancedMesh(g,cloudHD(),M.length);M.forEach((x,i)=>im.setMatrixAt(i,x));cloudAttr(g,M.length,i=>A[i]);
-  im.frustumCulled=false;im.userData.heat=0.1;im.userData.irVar=0;im.userData.noRecv=true;im.name='cumulonimbus';
-  CLOUD_MESH.add(im);CLOUDS.cb=im;CLOUDS.tris=M.length*80;
+(function cldBuild(){
+  const C=CLD,g=new THREE.PlaneGeometry(1,1),A=C.A={};
+  for(const [k,n] of [['aP',4],['aS',4],['aO',3],['aX',2]]){const a=new THREE.InstancedBufferAttribute(new Float32Array(CLD_MAX*n),n);a.setUsage(THREE.DynamicDrawUsage);g.setAttribute(k,a);A[k]=a;}
+  const U=C.U=THREE.UniformsUtils.merge([THREE.UniformsLib.fog,{uTex:{value:null},uDrift:{value:new V3()},uSun:{value:new V3(0,1,0)},
+    uBase:{value:new THREE.Color()},uTop:{value:new THREE.Color()},uSunC:{value:new THREE.Color()},uRimC:{value:new THREE.Color()},uRel:{value:1}}]);
+  U.uTex.value=cldAtlas();
+  // the terrain's air (pfsAirSetup): the same shared values, so a cloud fades exactly as the ground at its distance
+  Object.assign(U,{airK:{value:AIR_U.k},airSun:{value:AIR_U.sun},airS:{value:AIR_U.s},airA:{value:AIR_U.a},airT:{value:AIR_U.t},airM:{value:AIR_U.m},airMC:{value:AIR_U.mc}});
+  const vs=`#define PFS_AIR
+#include <common>
+#include <fog_pars_vertex>
+#include <logdepthbuf_pars_vertex>
+attribute vec4 aP;attribute vec4 aS;attribute vec3 aO;attribute vec2 aX;
+uniform vec3 uDrift,uSun,uBase,uTop,uSunC;
+varying vec2 vUv,vSd;varying vec4 vMask;varying vec3 vCol;varying float vA,vG,vRim,vWY,vGr;
+void main(){
+  vec3 c=aP.xyz+uDrift,D=c-cameraPosition;float dc=length(D);D/=max(dc,1e-3);
+  vec3 R=cross(D,vec3(0.0,1.0,0.0));float rl=length(R);R=rl>1e-3?R/rl:vec3(1.0,0.0,0.0);
+  float slot=aX.x,cell=step(3.5,slot);
+  vec3 Up=abs(slot-5.0)<0.5?vec3(0.0,1.0,0.0):cross(R,D);   // rain shafts hang plumb
+  vec2 q=position.xy*2.0,cs=vec2(cos(aP.w),sin(aP.w)),o=q*0.5*aS.xy;
+  vec2 qr=vec2(cs.x*q.x-cs.y*q.y,cs.y*q.x+cs.x*q.y);o=vec2(cs.x*o.x-cs.y*o.y,cs.y*o.x+cs.x*o.y);
+  vec3 wp=c+R*o.x+Up*o.y;
+  vUv=vec2((uv.x+cell)*0.5,uv.y);
+  vMask=vec4(equal(vec4(slot-4.0*cell),vec4(0.0,1.0,2.0,3.0)));
+  float sh=clamp(aS.z+qr.y*0.12,-0.45,1.0);
+  vCol=max(mix(uBase,uTop,sh),vec3(0.0))+uSunC*max(dot(aO,uSun),0.0)*(0.4+0.6*clamp(sh,0.0,1.0));
+#ifdef CLD_LO
+  vG=0.0;vRim=0.0;vSd=vec2(0.0);
+#else
+  vec2 sq=vec2(dot(uSun,R),dot(uSun,Up));
+  vG=0.15*0.7071*dot(qr,sq);
+  vRim=smoothstep(0.6,0.97,dot(D,uSun));
+  vSd=vec2(cs.x*sq.x+cs.y*sq.y,cs.x*sq.y-cs.y*sq.x);vSd*=vec2(0.5,1.0)*0.04;   // toward the sun in the atlas
+#endif
+  float r=0.5*max(aS.x,aS.y);vA=aS.w*smoothstep(0.5*r,1.4*r,dc);   // near fade: gone within half the radius
+  vWY=wp.y;vGr=aX.y;
+  vec4 mvPosition=viewMatrix*vec4(wp,1.0);gl_Position=projectionMatrix*mvPosition;
+  #include <logdepthbuf_vertex>
+  #include <fog_vertex>
+  if(vA<0.002)gl_Position=vec4(2.0,2.0,2.0,1.0);   // faded out: all four corners off screen, no fill
+}`;
+  const fs=`#define PFS_AIR
+#include <common>
+#include <fog_pars_fragment>
+#include <logdepthbuf_pars_fragment>
+uniform sampler2D uTex;uniform vec3 uRimC;uniform float uRel;
+varying vec2 vUv,vSd;varying vec4 vMask;varying vec3 vCol;varying float vA,vG,vRim,vWY,vGr;
+void main(){
+  #include <logdepthbuf_fragment>
+  float d=dot(texture2D(uTex,vUv),vMask),a=smoothstep(0.0,0.45,d);
+  vec3 c=vCol*(1.0+vG);
+#ifndef CLD_LO
+  // relief: the lumps' slope toward the sun (one more tap), lit on the sun side and shaded away from it; backlit,
+  // the thick middle goes grey and the thin edges glow (the silver lining)
+  float d2=dot(texture2D(uTex,vUv+vSd),vMask);
+  c*=1.0+uRel*(1.0-0.85*vRim)*clamp((d-d2)*1.8,-0.22,0.2)-0.15*vRim*smoothstep(0.4,1.0,a);   // light through a backlit cloud diffuses: no relief
+  c+=uRimC*(0.35*vRim*smoothstep(0.02,0.1,a)*(1.0-smoothstep(0.12,0.35,a)));
+#endif
+  vec3 k=max(c-0.9,0.0);c=min(c,vec3(0.9))+0.1*(1.0-exp(-k*10.0));   // a soft shoulder, never a blown flat white
+  gl_FragColor=vec4(c,a*vA*smoothstep(0.0,150.0,vWY-vGr));
+  #include <fog_fragment>
+#ifdef USE_FOG
+  gl_FragColor.a*=(1.0-fogFactor*fogFactor)*(1.0-smoothstep(0.7*fogFar,1.5*fogFar,length(vAirW.xyz)));   // far ones melt into the haze
+#endif
+}`;
+  const m=C.mat=new THREE.ShaderMaterial({uniforms:U,vertexShader:vs,fragmentShader:fs,transparent:true,depthWrite:false,depthTest:true,fog:true});
+  if(GFX.tier==='low')m.defines.CLD_LO='';
+  const im=C.mesh=new THREE.InstancedMesh(g,m,CLD_MAX);im.count=0;im.frustumCulled=false;im.renderOrder=0.5;   // after the dome and the sun disc, before the haboob's layers
+  im.castShadow=false;im.receiveShadow=false;im.userData.noRecv=true;im.userData.heat=0.1;im.userData.irVar=0;im.name='clouds';
+  scene.add(im);CLOUD_MESH=im;cloudMat=m;
+})();
+const CLOUDS={preset:'scattered',forced:null,vis:true,hd:true,cb:false,tris:0};
+// one puff into the source list (generation order; cldSort writes them back to front into the attributes)
+function cldPuff(x,y,z,rot,w,h,sh,op,ox,oy,oz,slot){
+  const C=CLD;if(C.n>=CLD_MAX)return;const S=C.src,o=C.n*CLD_ST,l=Math.hypot(ox,oy,oz)||1;
+  S[o]=x;S[o+1]=y;S[o+2]=z;S[o+3]=rot;S[o+4]=w;S[o+5]=h;S[o+6]=sh;S[o+7]=op;S[o+8]=ox/l;S[o+9]=oy/l;S[o+10]=oz/l;S[o+11]=slot;S[o+12]=groundHeight(x,z);C.n++;}
+// a cluster's ellipsoid for the fly through (centre, radii)
+function cldEll(x,y,z,rx,ry,rz){const C=CLD;if(C.nE>=40)return;const E=C.E,o=C.nE*6;E[o]=x;E[o+1]=y;E[o+2]=z;E[o+3]=1/(rx*rx);E[o+4]=1/(ry*ry);E[o+5]=1/(rz*rz);C.nE++;}
+// fair weather cumulus k: n puffs (f scales the count, sm the size), bottoms on the day's base, the biggest low, the
+// smaller ones stacked higher and inward; a quarter are merged pairs (two lobes)
+function cldCumulus(k,f,sm){
+  const C=CLD,h=(j,q)=>hash(k*61+j,211+(q||0)),B=C.base,cx=APC.x+(h(0,0)-0.5)*40000,cz=APC.z+(h(0,1)-0.5)*40000;
+  const n=Math.max(3,Math.round((6+Math.floor(h(0,2)*9))*f)),W=1500+h(0,3)*2000,Ht=W*(0.4+0.35*h(0,4));
+  const pr=h(0,5)<0.25,pa=h(0,6)*6.283,pd=W*(0.6+0.3*h(0,7)),mx=pr?Math.cos(pa)*pd:0,mz=pr?Math.sin(pa)*pd:0;
+  for(let j=0;j<n;j++){const t=n>1?j/(n-1):0,lob=pr&&(j&1)?1:0;
+    const w=sm*clamp((1400-800*t)*(0.8+0.4*h(j,10)),500,1400),hh=t<0.4?w/1.5:w*(0.6+0.7*h(j,20)),a=h(j,40)*6.283,r=W*0.5*(1-0.55*t)*Math.sqrt(h(j,30));
+    const x=cx+lob*mx+Math.cos(a)*r,z=cz+lob*mz+Math.sin(a)*r,y=B+0.3*hh+(t<0.4?0:(t-0.3)*Ht*1.1);
+    cldPuff(x,y,z,(h(j,50)-0.5)*0.35,w,hh,clamp((y-B)/Math.max(Ht,1),0,1),0.95,x-cx-lob*mx,(y-B-Ht*0.4)*1.3,z-cz-lob*mz,Math.floor(h(j,60)*4));}
+  cldEll(cx+mx/2,B+Ht*0.45,cz+mz/2,W*0.42+Math.abs(mx)/2,Ht*0.5,W*0.42+Math.abs(mz)/2);
+}
+// monsoon cell k (the old six bearings and distances), N puffs: a flat dark base row at 1,800 m (1.7:1, bottoms
+// aligned), a solid leaning column to 4.5 to 7 km (k 1 and 4 to 8.5 to 9) in layers of puffs 0.6 of a puff apart, a
+// soft overshooting dome, an anvil of three very wide thin fibrous quads (the wisp) in one 150 m band spreading north
+// east, thinner downwind, and 2 or 3 overlapping rain shafts slanted downwind under the base (sometimes one virga)
+function cldCell(k,N){
+  const C=CLD,h=(j,q)=>hash(k*131+j,304+(q||0)),yb=1800,tall=k===1||k===4,H=tall?8500+h(0,0)*500:4500+h(0,1)*2500;
+  const br=(100+(k+0.2+hash(k,301)*0.6)*100/6)*Math.PI/180,dist=18000+hash(k,302)*16000,cx=APC.x+Math.sin(br)*dist,cz=APC.z-Math.cos(br)*dist;
+  const W=2600+H*0.35,la=0.6+(h(0,2)-0.5)*0.8,lx=Math.cos(la)*W*0.35,lz=-Math.sin(la)*W*0.35,smc=clamp(Math.sqrt(60/N),0.85,1.6);
+  const S=2+(h(0,3)<0.5?1:0),Nr=Math.max(3,Math.round(N*0.16)),Nb=Math.max(4,N-S-Nr-4);
+  for(let j=0;j<Nr;j++){const a=(j+h(j,10)*0.6)/Nr*6.283,r=W*0.3*(0.7+0.3*h(j,20)),w=W*0.6*smc,hh=w/1.7;
+    cldPuff(cx+Math.cos(a)*r,yb+0.3*hh,cz+Math.sin(a)*r,(h(j,25)-0.5)*0.1,w,hh,0,1,Math.cos(a)*0.3,-1,Math.sin(a)*0.3,Math.floor(h(j,28)*4));}
+  // the column: Ly layers, each a centre puff and a ring, neighbours at most 0.6 of a puff apart across and up
+  const w0=W*0.55*smc,Ly=Math.max(2,Math.min(Nb,Math.round((H-yb-w0*0.9)/(0.54*w0))+1)),m=Math.max(1,Math.floor(Nb/Ly)),rc=W*0.22;
+  for(let l=0;l<Ly;l++){const t=l/(Ly-1);
+    for(let i=0;i<m;i++){const j=l*m+i,r=i?rc*(1-0.3*t)*(0.85+0.3*h(j,31)):0,a=(i+h(l,30))/Math.max(1,m-1)*6.283,
+        w=Math.max(w0*(1-0.15*t),i?2*r*Math.sin(Math.PI/Math.max(2,m-1))/0.6:0)*(0.92+0.16*h(j,35)),hh0=w*0.9,
+        y0=yb+0.3*hh0,dy=(H-0.35*hh0-y0)/(Ly-1),hh=Math.max(hh0,dy/0.6),y=y0+l*dy+(l?(h(j,33)-0.5)*0.5*dy:0),
+        x=cx+lx*t+Math.cos(a)*r,z=cz+lz*t+Math.sin(a)*r,sd=l?Math.max(w,hh):0;   // above the base row: square, turned on its side
+      cldPuff(x,y,z,l?(h(j,45)<0.5?1.571:-1.571)+(h(j,46)-0.5)*0.6:(h(j,45)-0.5)*0.1,sd||w,sd||hh,(y-yb)/(H-yb),1,Math.cos(a)*(r?1:0.2),(t-0.4)*1.6,Math.sin(a)*(r?1:0.2),Math.floor(h(j,55)*4));}}
+  {const w=W*0.5*smc,hh=w*0.75;cldPuff(cx+lx,H-0.1*hh,cz+lz,0,w,hh,1,1,0,1,0,Math.floor(h(0,70)*4));}   // the overshooting dome
+  for(let j=0;j<3;j++){const a=0.6+(h(j,60)-0.5)*0.6,w=W*(1.6+0.5*h(j,62)),d=w*(0.08+0.1*j),dx=Math.cos(a),dz=-Math.sin(a);
+    const hh=600+200*h(j,65);cldPuff(cx+lx+dx*d,H-0.25*hh+(h(j,63)-0.5)*150,cz+lz+dz*d,(h(j,64)-0.5)*0.03,w,hh,1,0.95-0.15*j,dx,0.6,dz,6);}   // 600 to 800 m: thinner reads as a contrail at 20 km
+  for(let j=0;j<S;j++){const x=cx+(j-(S-1)/2)*350+(h(j,80)-0.5)*300,z=cz+(h(j,81)-0.5)*500,g=groundHeight(x,z),top=yb+120,
+      bot=j===S-1&&h(j,82)<0.5?top-(top-g)*(0.4+0.15*h(j,83)):g-60;   // virga: gone 40 to 55% of the way down
+    cldPuff(x,(top+bot)/2,z,0.09+0.05*h(j,84),600+300*h(j,85),top-bot,0.19,1,0,-1,0,5);}
+  cldEll(cx+lx*0.5,(yb+H)/2,cz+lz*0.5,W*0.45,(H-yb)/2,W*0.45);
+  cldEll(cx+lx+Math.cos(0.6)*W*0.6,H-100,cz+lz-Math.sin(0.6)*W*0.6,W*1.2,250,W*1.2);
+}
+// the preset into the source list (only when the preset, the tier or the day changed)
+function cldGen(){
+  const C=CLD,p=CLOUDS.preset,t=CLD_CAP[GFX.tier]?GFX.tier:'medium',day=todayKey(),gk=p+t+day;
+  if(C.gk===gk)return;C.gk=gk;C.n=0;C.nE=0;C.cells=0;C.tier=t;
+  C.base=1350+dayRng(day*7+5)()*550;   // the day's cloud base (4,500 to 6,200 ft), all flights agree
+  if(p==='clear'){const r=dayRng(day*7+9),n=6+Math.floor(r()*5);
+    for(let i=0;i<n;i++){const w=4000+r()*5000,x=APC.x+(r()-0.5)*50000,z=APC.z+(r()-0.5)*50000;cldPuff(x,7000+r()*2000,z,(r()-0.5)*0.3,w,w*(0.1+0.08*r()),1,0.25,0,1,0,4);}
+    return;}
+  const f={low:0.45,medium:0.9,high:1.35}[t],sm=clamp(Math.sqrt(1/f),0.86,1.5),mon=p==='monsoon',cap=CLD_CAP[t][mon?1:0];
+  for(let k=0;k<34;k++)if(!mon||!(k&1))cldCumulus(k,f,sm);   // the monsoon: half the fair weather field
+  if(mon){C.cells=6;const N=Math.floor((cap-C.n)/6);for(let k=0;k<6;k++)cldCell(k,N);}
+  C.n=Math.min(C.n,cap);
+}
+// back to front from the camera through a permutation of the source list; uploaded only when the order changed
+function cldSort(force){
+  const C=CLD,n=C.n,cp=camera.position,dx=C.drift.x,dz=C.drift.z,S=C.src,K=C.key,I=C.idx;
+  for(let i=0;i<n;i++){const o=i*CLD_ST,x=S[o]+dx-cp.x,y=S[o+1]-cp.y,z=S[o+2]+dz-cp.z;K[i]=x*x+y*y+z*z;I[i]=i;}
+  I.subarray(0,n).sort((a,b)=>K[b]-K[a]);
+  C.sp.copy(cp);C.sortT=performance.now();
+  let same=!force;for(let i=0;same&&i<n;i++)if(I[i]!==C.prev[i])same=false;
+  if(same)return;C.prev.set(I.subarray(0,n));C.sorts++;
+  const A=C.A,P=A.aP.array,Z=A.aS.array,O=A.aO.array,X=A.aX.array;
+  for(let i=0;i<n;i++){const o=I[i]*CLD_ST,a=i*4,b=i*3,c=i*2;
+    P[a]=S[o];P[a+1]=S[o+1];P[a+2]=S[o+2];P[a+3]=S[o+3];Z[a]=S[o+4];Z[a+1]=S[o+5];Z[a+2]=S[o+6];Z[a+3]=S[o+7];
+    O[b]=S[o+8];O[b+1]=S[o+9];O[b+2]=S[o+10];X[c]=S[o+11];X[c+1]=S[o+12];}
+  for(const k in A){A[k].updateRange.offset=0;A[k].updateRange.count=n*A[k].itemSize;A[k].needsUpdate=true;}
+}
+const _cldA=new THREE.Color(),_cldM=new THREE.Color();
+// the colours from the time of day: white tops and grey blue bases by day, orange tops and purple grey bases at
+// sunset, dark blue grey at night (no sun, no rim), the haboob's dirty warm greys; a storm's base bluish and darker
+function cldColours(){
+  const U=CLD.U,T=TOD,id=T.id,b=U.uBase.value,tp=U.uTop.value,sc=U.uSunC.value,rc=U.uRimC.value;
+  U.uSun.value.copy(sun.position).normalize();U.uRel.value=T.night?0.25:1;
+  if(T.night){b.setHex(0x1a2030);tp.setHex(0x2a3444);sc.setRGB(0,0,0);rc.setRGB(0,0,0);}
+  else if(id==='sunset'){b.setHex(0x5c5470).lerp(_cldA.setHex(T.hemiSky),0.2);tp.setHex(0xfff0e2).lerp(_cldA.setHex(T.sun),0.5);sc.setHex(T.sun).multiplyScalar(0.35);rc.setHex(T.sun).multiplyScalar(0.9);}
+  else if(id==='haboob'){b.setHex(0x8c7e72);tp.setHex(0xf2dec6);sc.setHex(T.sun).multiplyScalar(0.2);rc.setHex(T.sun).multiplyScalar(0.6);}
+  else{b.setHex(T.hemiSky).lerp(_cldA.setHex(T.haze),0.3).multiplyScalar(0.66);tp.setHex(0xffffff);sc.setHex(T.sun).multiplyScalar(0.16);rc.setHex(T.sun).multiplyScalar(0.8);}
+  if(CLOUDS.preset==='monsoon'){b.r*=0.76;b.g*=0.78;b.b*=0.81;}   // a storm's dark blue grey base (0x6f7784 by day)
 }
 function cloudsPick(tod,key){
   if(tod==='sunset'||tod==='night')return 'scattered';if(tod==='haboob')return 'monsoon';
   return dayRng((key||todayKey())*7+3)()<0.7?'scattered':'clear';}
 function cloudsAuto(){CLOUDS.preset=CLOUDS.forced||cloudsPick(TOD.id);cloudsApply();}
+// the preset, the tier and the colours onto the mesh: data only, never a new program in flight (CLD_LO flips only
+// on a tier change, which runs in the menu and requeues the precompile)
 function cloudsApply(){
   if(!CLOUD_MESH)return;
-  const p=CLOUDS.preset,hd=GFX.on('clouds'),c=CLOUD_TOD[TOD.id]||CLOUD_TOD.day,H=CLOUDS.U,T=CLOUD_HD_TOD[TOD.id]||CLOUD_HD_TOD.day;
-  cloudMat.color.setHex(c[0]);cloudMat.emissive.setHex(c[1]);
-  if(p==='monsoon'&&!hd){cloudMat.color.multiplyScalar(0.8);cloudMat.emissive.multiplyScalar(0.75);}
-  CLOUD_MESH.material=hd?cloudHD():cloudMat;
-  H.base.setHex(T[0]);H.top.setHex(T[1]);H.sunC.setHex(T[2]);if(p==='monsoon'){H.base.r*=0.74;H.base.g*=0.8;H.base.b*=0.92;}   // a storm's base: bluish grey
-  H.sun.copy(sun.position).normalize();H.rim.value=GFX.on('cloudRim')?0.55:0;
-  CLOUDS.vis=p!=='clear';if(!DF.on)CLOUD_MESH.visible=CLOUDS.vis;
-  const mon=p==='monsoon'&&hd;if(mon&&!CLOUDS.cb)cloudCB();if(CLOUDS.cb)CLOUDS.cb.visible=mon;
-  if(AIR.mon!==(mon?1:0)){AIR.mon=mon?1:0;airSet();if(HB.on)HB.paintD=-1;else skyPaint();}
+  const C=CLD,p=CLOUDS.preset,lo=GFX.tier==='low',m=C.mat;
+  if(C.dirty)cldRestore();C.inside=0;
+  if(('CLD_LO' in m.defines)!==lo){if(lo)m.defines.CLD_LO='';else delete m.defines.CLD_LO;m.needsUpdate=true;}
+  cldGen();C.drift.set(0,0,0);C.U.uDrift.value.set(0,0,0);
+  CLOUD_MESH.count=C.n;cldSort(true);cldColours();
+  CLOUDS.vis=C.n>0;if(!DF.on)CLOUD_MESH.visible=CLOUDS.vis;
+  CLOUDS.hd=!lo;CLOUDS.cb=p==='monsoon';CLOUDS.tris=C.n*2;
+  const mon=p==='monsoon';if(AIR.mon!==(mon?1:0)){AIR.mon=mon?1:0;airSet();if(HB.on)HB.paintD=-1;else skyPaint();}
+}
+// per frame, right after hbUpdate: the drift with the surface wind (0.4 x windKt, a uniform), the sort (every 0.3 s or
+// 150 m), and the fly through: the cloud density at the camera from the cluster ellipsoids, smoothed over 0.6 s into
+// CLD.inside, pulls the fog to 60 / 400 m, the haze and the dome to the mist and dims the sun by up to 60%. The haboob
+// owns the air whenever its dust is up; setTOD and cloudsApply drop or undo a fly through's values (CLD.dirty).
+function cldFrame(dt){
+  const C=CLD;if(!C||!C.mesh)return;const m=C.mesh;
+  if(dt>0&&running&&!paused){const wd=st.windDir*Math.PI/180,v=0.4*st.windKt*0.5144*dt;C.drift.x-=Math.sin(wd)*v;C.drift.z+=Math.cos(wd)*v;C.U.uDrift.value.copy(C.drift);}
+  if(m.visible&&C.n&&(performance.now()-C.sortT>300||camera.position.distanceToSquared(C.sp)>22500))cldSort(false);
+  let den=0;
+  if(m.visible){const E=C.E,p=camera.position;
+    for(let i=0;i<C.nE;i++){const o=i*6,x=p.x-C.drift.x-E[o],y=p.y-E[o+1],z=p.z-C.drift.z-E[o+2],q=1-(x*x*E[o+3]+y*y*E[o+4]+z*z*E[o+5]);if(q>den)den=q;}}
+  const tgt=clamp(den/0.35,0,1);
+  if(dt>0)C.inside+=(tgt-C.inside)*Math.min(1,dt/0.6);if(tgt===0&&C.inside<0.004)C.inside=0;
+  if(HB.on&&HB.d>0){C.dirty=false;C.skyK=0;return;}
+  if(C.inside>0)cldMist(C.inside);else if(C.dirty)cldRestore();
+}
+function cldMist(k){
+  const C=CLD,s=C.s0;
+  if(!C.dirty){C.dirty=true;s.near=scene.fog.near;s.far=scene.fog.far;s.haze=HAZE.getHex();s.sunI=sun.intensity;s.airY=AIR_U.sun.y;s.kw=AIR_U.k.w;s.ty=AIR_U.t.y;s.tz=AIR_U.t.z;}
+  scene.fog.near=s.near+(60-s.near)*k;scene.fog.far=Math.exp(Math.log(s.far)+(Math.log(400)-Math.log(s.far))*k);
+  _cldM.setHex(CLD_MIST[TOD.id]||CLD_MIST.day);HAZE.setHex(s.haze).lerp(_cldM,k);scene.fog.color.copy(HAZE);
+  sun.intensity=s.sunI*(1-0.6*k);AIR_U.sun.y=s.airY*(1-k);AIR_U.k.w=s.kw+(4-s.kw)*k;   // denser air: the ground goes in a few hundred metres
+  AIR_U.t.y=s.ty+(1-s.ty)*k;AIR_U.t.z=s.tz+(1-s.tz)*k;   // no dust tint: the ground meets the dome in the one mist
+  if(Math.abs(k-C.skyK)>0.04){C.skyK=k;skyPaint();const c=sky.geometry.attributes.color,a=c.array,f=Math.min(1,k*1.25);
+    for(let i=0;i<a.length;i+=3){a[i]+=(_cldM.r-a[i])*f;a[i+1]+=(_cldM.g-a[i+1])*f;a[i+2]+=(_cldM.b-a[i+2])*f;}c.needsUpdate=true;}
+}
+function cldRestore(){
+  const C=CLD,s=C.s0;C.dirty=false;
+  scene.fog.near=s.near;scene.fog.far=s.far;HAZE.setHex(s.haze);scene.fog.color.copy(HAZE);sun.intensity=s.sunI;AIR_U.sun.y=s.airY;AIR_U.k.w=s.kw;AIR_U.t.y=s.ty;AIR_U.t.z=s.tz;
+  if(C.skyK>0){C.skyK=0;skyPaint(HB.on&&HB.paintD>0?HB.paintD:0);}
 }
 
 // ---------- C-130 mission area: drop zone and assault strip ----------
@@ -19223,7 +19395,7 @@ function irTag(){
       // r128 keeps one IR program for every instanced mesh, with or without instance colours;
       // give the plain ones white colours so the attribute is always there. Fix2 item 4: only for the IR pass (renderIR
       // puts them on and takes them off again): left on, the mesh's own material would need its USE_INSTANCING_COLOR
-      // program when drawn normally after the IR view (the cloud puffs' cloudHD linked in flight)
+      // program when drawn normally after the IR view (the old cloud puffs' material linked in flight)
       if(o.isInstancedMesh&&(!o.instanceColor||o.instanceColor===d.irIC)){
         if(!d.irIC)d.irIC=new THREE.InstancedBufferAttribute(new Float32Array(o.instanceMatrix.count*3).fill(1),3);
         IR.ic.push(o);}
@@ -19248,10 +19420,11 @@ function renderIR(){
   const bg=scene.background,skyV=sky.visible;_irFog.copy(scene.fog.color);
   scene.fog.color.setRGB(inv?1-sg-0.06:sg+0.06,inv?1-sg-0.06:sg+0.06,inv?1-sg-0.06:sg+0.06);
   scene.background=IR_BG;sky.visible=false;scene.overrideMaterial=IR_MAT;camera.layers.set(0);IR.pass=true;
+  const cldV=CLOUD_MESH?CLOUD_MESH.visible:false;if(CLOUD_MESH)CLOUD_MESH.visible=false;   // weather item 1: cold, and the override draws a billboard as a hard square
   const ic=IR.ic;for(let i=0;i<ic.length;i++)if(!ic[i].instanceColor)ic[i].instanceColor=ic[i].userData.irIC;
   try{pfxHold(()=>renderer.render(scene,camera));}   // fix2 item 9: resolved once, after the hot points
   finally{for(let i=0;i<ic.length;i++)if(ic[i].instanceColor===ic[i].userData.irIC)ic[i].instanceColor=null;}
-  IR.pass=false;scene.overrideMaterial=null;scene.background=null;scene.fog.color.copy(_irFog);
+  IR.pass=false;scene.overrideMaterial=null;scene.background=null;scene.fog.color.copy(_irFog);if(CLOUD_MESH)CLOUD_MESH.visible=cldV;
   // hot points: every airport light on, grey, over the frame
   const AU=AL_MAT.uniforms,lw=AU.uLights.value,bl=inv?THREE.MultiplyBlending:THREE.AdditiveBlending;
   AU.uLights.value=Math.max(lw,night?1:0.75);AU.uMono.value=inv?2:1;
@@ -19642,14 +19815,14 @@ function preAt(f){
   Q.cp.copy(camera.position);Q.cq.copy(camera.quaternion);Q.M=null;Q.cv=null;
   try{const M=getModel(savedType).g;Q.M=M;Q.mv=M.visible;Q.mp.copy(M.position);Q.mq.copy(M.quaternion);
     M.visible=true;M.position.set(P.x,P.y,P.z);M.quaternion.setFromEuler(new THREE.Euler(0,-P.h,0,'YXZ'));M.updateMatrixWorld(true);}catch(e){Q.M=null;}
-  // the monsoon's cumulonimbus (Medium and High; the haboob's clouds) and the haboob wall, up for the draw
-  if(CLOUD_MESH&&CLOUDS.cb){Q.cv=CLOUD_MESH.visible;CLOUD_MESH.visible=true;CLOUDS.cb.visible=true;}
+  // the clouds' one material (weather item 1: its final defines, every preset is data only) and the haboob wall, up for the draw
+  if(CLOUD_MESH){Q.cv=CLOUD_MESH.visible;CLOUD_MESH.visible=true;}
   if(HB.g){HB.g.visible=true;HB.sun.visible=true;}
   camera.position.set(P.x-fx*16,P.y+4.5,P.z-fz*16);camera.lookAt(P.x+fx*80,P.y+1,P.z+fz*80);camera.updateMatrixWorld();
   rebuildTerrain(camera.position.x,camera.position.z);
   try{f(Q.M);}
   finally{r.setRenderTarget(prevT);r.autoClear=ac;camera.layers.mask=lm;if(HB.g){HB.g.visible=false;HB.sun.visible=false;}
-    if(Q.cv!==null){CLOUD_MESH.visible=Q.cv;CLOUDS.cb.visible=CLOUDS.preset==='monsoon';}
+    if(Q.cv!==null)CLOUD_MESH.visible=Q.cv;
     if(Q.M){Q.M.visible=Q.mv;Q.M.position.copy(Q.mp);Q.M.quaternion.copy(Q.mq);Q.M.updateMatrixWorld(true);}
     camera.position.copy(Q.cp);camera.quaternion.copy(Q.cq);camera.updateMatrixWorld();rebuildTerrain(camera.position.x,camera.position.z);}
 }
@@ -19700,7 +19873,7 @@ function preJobs(){
   const Q=PREQ,r=renderer;Q.A=pfxRT(16,16,true,pfxSamples());Q.B=pfxRT(16,16,false);Q.C=pfxRT(16,16,false);Q.D=pfxRT(16,16,false);Q.E=Q.A.isWebGLMultisampleRenderTarget?pfxRT(16,16,true):null;
   const A=Q.A,B=Q.B,C=Q.C,D=Q.D,E=Q.E||Q.A;
   return [
-    ['build',()=>{hbBuild();if(CLOUD_MESH&&GFX.on('clouds')&&!CLOUDS.cb)cloudCB();if(!DZ.built)dzBuild();dfWarmBuild();}],
+    ['build',()=>{hbBuild();if(!DZ.built)dzBuild();dfWarmBuild();}],
     ['compile',()=>preAt(()=>{r.compile(scene,camera);preSwap(()=>r.compile(scene,camera));})],
     ['frame',()=>preAt(M=>preFrame(M,A))],
     ['post chain',()=>{if(!GFX.post)return;preAt(M=>{
@@ -21642,7 +21815,7 @@ function tick(t,skipRender){
     sensorHudUpdate();}
   if(camBump>0){camBump=Math.max(0,camBump-dt*2.4);const k=camBump*camBump*1.3;
     camera.position.x+=(Math.random()-0.5)*k;camera.position.y+=(Math.random()-0.5)*k*1.5;camera.position.z+=(Math.random()-0.5)*k;}
-  camera.updateProjectionMatrix();sky.position.copy(camera.position);hbUpdate(paused?0:dt);dustFxUpdate(paused?0:dt);fxLightFeed();sunDiscUpdate();farUpdate();
+  camera.updateProjectionMatrix();sky.position.copy(camera.position);hbUpdate(paused?0:dt);cldFrame(paused?0:dt);dustFxUpdate(paused?0:dt);fxLightFeed();sunDiscUpdate();farUpdate();
   if(sensOn){tgtMarkUpdate(dt);sensorGateUpdate(dt);}else if(TM.shown)tgtMarkHide();
   dfHudUpdate();hogUI();fdTick();
   // PAPI
@@ -22350,11 +22523,13 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
       out.push({kind:names[g.kind.getX(i)],lx:lx,x:r.left+(v.x+1)/2*r.width,y:r.top+(1-v.y)/2*r.height,front:v.z<1,
         col:[g.aCol.getX(i),g.aCol.getY(i),g.aCol.getZ(i)]});}
     return out;},
-  cloudMat:()=>({color:cloudMat.color.getHex(),emissive:cloudMat.emissive.getHex()}),
+  cloudMat:()=>({color:CLD.U.uTop.value.getHex(),emissive:CLD.U.uBase.value.getHex()}),   // weather item 1: the tops and the base
   // graphics item 6: the cloud preset (setClouds(null) hands it back to the per flight pick), the cascades and the air
   setClouds:p=>{CLOUDS.forced=/^(clear|scattered|monsoon)$/.test(p)?p:null;cloudsAuto();return CLOUDS.preset;},
-  clouds:()=>({preset:CLOUDS.preset,forced:CLOUDS.forced,visible:!!(CLOUD_MESH&&CLOUD_MESH.visible),hd:!!(CLOUD_MESH&&CLOUD_MESH.material===CLOUDS.hd),
-    cb:!!(CLOUDS.cb&&CLOUDS.cb.visible),cbTris:CLOUDS.tris||0,cbN:CLOUDS.cb?CLOUDS.cb.count:0,puffs:CLOUD_MESH?CLOUD_MESH.count:0,pick:(t,k)=>cloudsPick(t,k)}),
+  clouds:()=>({preset:CLOUDS.preset,forced:CLOUDS.forced,visible:!!(CLOUD_MESH&&CLOUD_MESH.visible),hd:CLOUDS.hd,
+    cb:CLOUDS.cb,cells:CLD.cells,inside:CLD.inside,tris:CLOUDS.tris,puffs:CLOUD_MESH?CLOUD_MESH.count:0,pick:(t,k)=>cloudsPick(t,k)}),
+  cld:()=>({puffs:CLD.n,cells:CLD.cells,inside:CLD.inside,base:CLD.base,tier:CLD.tier,sorted:CLD.sorts,drift:[CLD.drift.x,CLD.drift.z],ell:CLD.nE,dirty:CLD.dirty}),
+  cldEll:i=>{const E=CLD.E,o=i*6;return i<CLD.nE?[E[o]+CLD.drift.x,E[o+1],E[o+2]+CLD.drift.z,1/Math.sqrt(E[o+3]),1/Math.sqrt(E[o+4])]:null;},   // a cluster's centre and radii (the fly through tests)
   cloudsPick:cloudsPick,
   csm:()=>({n:CSM.n,recvMs:CSM.recvMs,lights:CSM.lights.length,inScene:CSM.lights.filter(l=>l.parent===scene).length,enabled:renderer.shadowMap.enabled,
     sizes:CSM.lights.map(l=>l.shadow.mapSize.x),act:CSM.act,renders:CSM.renders,skips:CSM.skips,recv:CSM.recv,strength:CSM_U.a.w,stat:CSM.stat.length,

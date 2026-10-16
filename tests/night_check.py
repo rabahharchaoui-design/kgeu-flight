@@ -9,7 +9,7 @@ import asyncio, sys
 from playwright.async_api import async_playwright
 from harness import serve, launch, page, IPHONE_15, Checks
 
-DAY_CLOUD = (0xffffff, 0x6f7780)
+DAY_CLOUD = (0xffffff, 0x9198a3)   # weather item 1: the day tops and base (cloudMat hook)
 AC_COUNT = {'cessna': 10, 'archer': 9, 'alpha': 8, 'f16': 13, 'a10': 9, 'b737': 14, 'a320': 13, 'b747': 14, 'reaper': 9, 'mq9b': 9, 'c130': 20}   # incl. the 2 wingtip glows (3.11); fix2 item 10: 737 and 747 wingtip aft whites + tail strobe, A320 tail strobe
 # put the aircraft `agl` metres above the ground where it is, then run one frame
 AT_AGL = """(agl)=>{const K=window.__kgeu,s=K.state();s.pos.y=K.groundHeight(s.pos.x,s.pos.z)+1.5+agl;
