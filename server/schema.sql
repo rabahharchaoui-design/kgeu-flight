@@ -86,7 +86,8 @@ CREATE TABLE IF NOT EXISTS reports(
   issue     INTEGER,                       -- the GitHub issue number, null if none was opened
   status    TEXT NOT NULL DEFAULT 'open',  -- 'open', 'fixed' (closed with a 'Fixed in' comment) or 'closed'
   fixed_in  TEXT,                          -- the version named in the 'Fixed in' comment
-  checked   INTEGER NOT NULL DEFAULT 0     -- ms of the last GitHub status refresh
+  checked   INTEGER NOT NULL DEFAULT 0,    -- ms of the last GitHub status refresh
+  ntfy      TEXT                           -- the phone push's outcome: 'ok 200, 1 attempt', 'http 429, 4 attempts: ...', 'timeout', 'error <name>'; null: no push tried (added by migrations/0001)
 );
 CREATE INDEX IF NOT EXISTS reports_d ON reports(device, created);
 CREATE TABLE IF NOT EXISTS shots(
