@@ -91,8 +91,9 @@ async def main():
         await fly_layout(pg, 'az 667x375', 'az')
         await pg.screenshot(path=os.path.join(ROOT, 'overnight-screenshots', 'world_ui_fly_az_667.png'))
         await pg.set_viewport_size(IPHONE_15); await pg.wait_for_timeout(300)
-        r = await pg.evaluate("()=>[document.querySelector('#sFly .pick[data-b=kgeu]').classList.contains('sel'),getComputedStyle(document.querySelector('#sFly .pick[data-tod=haboob]')).display]")
-        ok('Arizona: Glendale selected, Haboob chip shows', r[0] and r[1] != 'none', r)
+        # weather item 2: the haboob is a tile on the weather sheet now
+        r = await pg.evaluate(f"()=>{{{K}.wxOpen();const t=document.querySelector('#wxOv .wxT[data-wx=haboob]'),r=[document.querySelector('#sFly .pick[data-b=kgeu]').classList.contains('sel'),t.classList.contains('off')];{K}.wxClose(true);return r;}}")
+        ok('Arizona: Glendale selected, the Haboob weather tile open', r[0] and not r[1], r)
         # (b) tap Tokyo Haneda: scrolled into view, then a real finger
         await pg.evaluate(f"()=>{{{K}.pick('cessna');{K}.setTOD('sunset');{K}.pickPos('ramp');const c=document.querySelector('#sFly .pick[data-b=rjtt]'),L=c.closest('.locs');L.scrollLeft=c.closest('.lgrp').offsetLeft;}}")
         await pg.wait_for_timeout(200)
@@ -152,11 +153,11 @@ async def main():
         await pg.evaluate(STUB)
         await fly_layout(pg, 'rjtt 844x390', 'rjtt')
         r = await pg.evaluate(f"""()=>({{sel:[...document.querySelectorAll('#sFly .pick.sel[data-b]')].map(c=>c.dataset.b),sum:document.getElementById('sumLine').textContent,
-          hb:getComputedStyle(document.querySelector('#sFly .pick[data-tod=haboob]')).display,hbP:getComputedStyle(document.querySelector('#pauseOv .pick[data-tod=haboob]')).display,
-          tod:{K}.TOD().id,saved:localStorage.getItem('kgeuTOD'),sub:{K}.flySub('cessna'),cardVis:(()=>{{const c=document.querySelector('#sFly .pick[data-b=rjtt]'),L=c.closest('.locs'),a=c.getBoundingClientRect(),q=L.getBoundingClientRect();return a.left>=q.left-1&&a.right<=q.right+1;}})()}})""")
+          hb:({K}.wxOpen(),document.querySelector('#wxOv .wxT[data-wx=haboob]').className),hbT:document.querySelector('#wxOv .wxT[data-wx=haboob] span').textContent,wx:{K}.WX().id,c:{K}.wxClose(true),
+          tod:{K}.TOD().id,saved:localStorage.getItem('kgeuWX'),sub:{K}.flySub('cessna'),cardVis:(()=>{{const c=document.querySelector('#sFly .pick[data-b=rjtt]'),L=c.closest('.locs'),a=c.getBoundingClientRect(),q=L.getBoundingClientRect();return a.left>=q.left-1&&a.right<=q.right+1;}})()}})""")
         ok('rjtt: the Tokyo Haneda card is the selected one and in view', r['sel'] == ['rjtt'] and r['cardVis'], r)
         ok('rjtt: the summary line names Tokyo Haneda', 'at Tokyo Haneda' in r['sum'], r['sum'])
-        ok('rjtt: no Haboob chip on FLY or the pause sheet; a saved Haboob flies as day and stays saved', r['hb'] == 'none' and r['hbP'] == 'none' and r['tod'] == 'day' and r['saved'] == 'haboob', r)
+        ok('rjtt: the Haboob tile greyed (Arizona only); an old saved Haboob time flies as day, clear, the haboob weather kept saved', 'off' in r['hb'] and r['hbT'] == 'Arizona only' and r['wx'] == 'clear' and r['tod'] == 'day' and r['saved'] == 'haboob', r)
         ok('rjtt: the aircraft story names Tokyo Haneda and runway 34R, not Glendale', 'runway 34R' in r['sub'] and 'Tokyo Haneda' in r['sub'] and 'Glendale' not in r['sub'] and 'N8401L' in r['sub'], r['sub'])
         await finger(pg, '#carMain .story'); await pg.wait_for_timeout(300)
         t = await pg.evaluate("()=>document.getElementById('storyT').textContent")

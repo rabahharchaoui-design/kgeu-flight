@@ -631,6 +631,60 @@ body.dfOn #dfSub{ display:flex; }
 @media (max-width:700px) and (orientation:landscape){ .plH input{ width:84px; } #plOv #plBack{ min-width:70px; } #plOv #plGo{ min-width:120px; font-size:18px; padding:0 14px; } }   /* 568: hours, day one, Back and CONTINUE on one line */
 @media (orientation:portrait){ .plOpts{ grid-template-columns:repeat(2,minmax(0,1fr)); } #plOv #plGo{ flex:1 1 60%; } }
 @media (prefers-reduced-motion:reduce){ #plOv.on .sheet{ animation-name:plFade; } #plOv .plO{ transition:none; } }
+/* weather item 2: the WEATHER sheet. The placement intake's glass and entrance (plFade + plIn, 200 ms), out faster (150 ms);
+   eight tiles (4 x 2 landscape, 2 x 5 portrait) and the Random tile, the current one ringed like .pick.sel */
+#wxOv{ z-index:34; }
+#wxOv.on{ animation:plFade 200ms ease-out both; } #wxOv.on .sheet{ animation:plIn 200ms cubic-bezier(.23,1,.32,1) both; }
+#wxOv.out{ animation:plOut 150ms ease-out both; pointer-events:none; }
+#wxOv .sheet{ position:relative; max-width:640px; padding:12px 16px 14px; background:rgba(18,13,9,.95); text-align:left; max-height:calc(var(--vvh) - 16px); overflow-y:auto; overscroll-behavior:contain; }
+#wxOv h3{ margin:0; min-height:44px; display:flex; align-items:center; justify-content:center; font:800 20px/1 var(--font); letter-spacing:.08em; color:var(--sand); }
+#wxOv .wxX{ position:absolute; right:8px; top:8px; width:44px; height:44px; padding:0; margin:0; border:0; border-radius:12px; background:transparent; color:var(--soft); font:700 20px/1 var(--font); }
+.wxGrid{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-top:6px; }
+#wxOv button{ -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:manipulation; }
+#wxOv .wxT{ position:relative; min-width:0; min-height:68px; display:grid; grid-template-columns:auto minmax(0,1fr); grid-template-rows:auto auto; column-gap:8px; row-gap:2px; align-items:center;
+  padding:7px 10px; text-align:left; border-radius:12px; background:rgba(246,193,119,.1); color:var(--sand); border:2px solid rgba(246,193,119,.22); transition:transform 140ms ease-out; }
+#wxOv .wxT i{ grid-row:1 / span 2; font-style:normal; font-size:24px; line-height:1; }
+#wxOv .wxT b{ font-size:15px; font-weight:800; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#wxOv .wxT span{ font-size:11px; font-weight:600; line-height:1.2; color:var(--soft); display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+#wxOv .wxT:active{ transform:scale(.97); }
+#wxOv .wxT.sel{ border-color:var(--caution); box-shadow:inset 0 0 0 2px var(--caution); background:rgba(246,193,119,.16); }
+#wxOv .wxT.off{ opacity:.38; }
+#wxOv .wxT.rnd{ grid-column:1 / -1; min-height:48px; grid-template-columns:auto auto; justify-content:center; }
+#wxOv .wxT.rnd i{ grid-row:auto; font-size:20px; }
+#wxOv .wxT.rnd span{ display:none; }
+@media (hover:hover) and (pointer:fine){ #wxOv .wxT:hover{ border-color:rgba(246,193,119,.5); } }
+@media (max-height:360px){ #wxOv .sheet{ padding:6px 12px 10px; } #wxOv .wxX{ top:4px; right:6px; } #wxOv h3{ font-size:18px; min-height:40px; }
+  .wxGrid{ gap:6px; margin-top:2px; } #wxOv .wxT{ min-height:60px; padding:5px 8px; } #wxOv .wxT.rnd{ min-height:44px; } #wxOv .wxT i{ font-size:22px; } }
+/* 568 wide: three by three (Random the ninth tile), so the longest name has its room */
+@media (max-width:620px) and (orientation:landscape){ .wxGrid{ grid-template-columns:repeat(3,minmax(0,1fr)); } #wxOv .wxT.rnd{ grid-column:auto; grid-template-columns:auto minmax(0,1fr); justify-content:stretch; } #wxOv .wxT.rnd i{ grid-row:1 / span 2; } }
+@media (orientation:portrait){ .wxGrid{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (prefers-reduced-motion:reduce){ #wxOv.on .sheet{ animation-name:plFade; } #wxOv .wxT, .wxPill, .wxRnd{ transition:none; } }
+/* what the dice rolled: a small sand pill clear of the controls (wxToast places it), in with a fade and a 6 px rise */
+#wxToast{ position:fixed; z-index:36; left:50%; top:50%; max-width:calc(100vw - 32px); padding:8px 16px; border-radius:20px; background:var(--sand); color:var(--night);
+  border:2px solid rgba(42,22,8,.25); box-shadow:0 4px 14px rgba(0,0,0,.28); font:800 15px/1.2 var(--font); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none;
+  opacity:0; transform:translate(-50%,calc(-100% + 6px)); transition:opacity 200ms ease-out, transform 200ms cubic-bezier(.23,1,.32,1); }   /* left, top: its bottom centre (wxToast) */
+#wxToast.on{ opacity:1; transform:translate(-50%,-100%); }
+@media (prefers-reduced-motion:reduce){ #wxToast{ transform:translate(-50%,-100%); transition:opacity 200ms ease-out; } }
+/* the pill and the dice (Fly tab and pause sheet): one line, the icon then the name; on Random a tiny tag under the name */
+.frows .chip.wxPill{ display:flex; align-items:center; justify-content:center; gap:5px; padding:0 6px; transition:transform 140ms ease-out; }
+.frows .chip.wxPill b{ font-size:clamp(13px,1.9vw,16px); letter-spacing:-.01em; }
+.wxPill i{ flex:none; font-style:normal; font-size:18px; line-height:1; }
+.wxPill .wxN{ display:flex; flex-direction:column; align-items:flex-start; min-width:0; }
+.frows .chip.wxPill b{ max-width:100%; }
+/* the pills show the short name (Storm, Gusty; the sheet has the full ones), so the airports keep their room */
+.wxPill b .lg{ display:none; }
+.wxPill small{ font-size:8.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; line-height:1; margin-top:1px; opacity:.75; }
+.frows .chip.wxRnd{ flex:none; width:44px; min-width:44px; padding:0; font-size:20px; line-height:1; transition:transform 140ms ease-out; }
+.frows .chip.wxPill:active, .frows .chip.wxRnd:active{ transform:scale(.97); }
+/* 568 to 667 wide. FLY: the time chips the width their names need, the pill its short name (Storm, Gusty), the airports the rest
+   (they scroll). The pause row (the old Haboob chip's 46 px): the pill is the icon alone (RANDOM under it), the dice
+   steps out there (the sheet's Random tile is one tap further) */
+@media (max-width:700px) and (orientation:landscape){
+  #sFly .frow.locRow .grp.g4.cap, #sFly .frow.locRow .grp.wxG{ flex:0 0 auto; }
+  #sFly .frow.locRow .grp.g4.cap .chip{ flex:0 0 auto; min-width:54px; padding:0 6px; }
+  #sFly .frow.locRow .grp.locG{ flex:1 1 0; } #sFly .chip.wxPill{ flex:0 0 auto; width:auto; padding:0 8px; gap:5px; }
+  #pauseOv .frow.locRow .grp.g4 .chip.wxPill{ flex:none; width:44px; padding:0; flex-direction:column; gap:1px; } #pauseOv .wxPill .wxN{ align-items:center; } #pauseOv .wxPill .wxN b{ display:none; }
+  #pauseOv .wxPill small{ font-size:7.5px; letter-spacing:0; } #pauseOv .frow.locRow .chip.wxRnd{ display:none; } }
 /* school2 item 5: the oral exam over the flight school screen. The placement intake's entrance (fade, 8 px rise, no scale),
    the briefing quiz's answers, a question at a time */
 #orOv{ z-index:32; }
@@ -2099,6 +2153,10 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 .frow.locRow{ align-items:flex-end; }
 .grp.locG{ flex:2.2 1 0; min-width:0; }
 .frow.locRow .grp.g4.cap{ flex:1.9 1 0; }
+/* weather item 2: the airports keep the width they had beside the four time chips (2.2 of 4.1 of the row less its gap),
+   the weather group takes what the pill and the dice need, the time chips the rest */
+@media (min-width:701px){ #sFly .frow.locRow .grp.locG{ flex:0 0 calc((100% - 10px) * 2.2 / 4.1); }
+  #sFly .frow.locRow .grp.g4.cap{ flex:1 1 0; } #sFly .frow.locRow .grp.wxG{ flex:0 0 auto; } #sFly .chip.wxPill{ flex:none; width:clamp(100px,13.6vw,124px); } }
 .locs{ position:relative; flex:1; min-width:0; display:flex; gap:12px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; touch-action:pan-x; overscroll-behavior-x:contain; }
 .locs::-webkit-scrollbar{ display:none; }
 /* more cards past an edge: that edge fades out (locFade) */
@@ -2119,6 +2177,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 /* the pause sheet's time chips take the width their names need (44 px at least), the airports the rest */
 #pauseOv .frow.locRow .grp.locG{ flex:1 1 0; } #pauseOv .frow.locRow .grp.g4{ flex:0 1 auto; }
 #pauseOv .frow.locRow .grp.g4 .chip{ flex:1 0 auto; min-width:44px; padding:0 8px; }
+#pauseOv .frow.locRow .grp.g4 .chip.wxPill{ flex:1.6 0 auto; padding:0 8px; } #pauseOv .frow.locRow .grp.g4 .chip.wxRnd{ flex:none; padding:0; }
 @media (max-width:620px) and (orientation:landscape){ #pauseOv .lgrp .gchips{ gap:8px; } #pauseOv .frow .chip.loc{ padding:0 7px; } }
 /* Arizona only cards seen from a world region */
 .azTag{ display:inline-block; margin-left:6px; padding:1px 5px; border-radius:5px; font-style:normal; font-size:9px; font-weight:800; letter-spacing:.08em; line-height:1.3;
@@ -2325,8 +2384,10 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
   <div class="carx" id="carMain"></div>
   <div class="frows">
    <div class="frow locRow"><div class="grp locG"><div class="locs" id="locFly" role="radiogroup" aria-label="Location"></div></div>
-    <div class="grp g4 cap"><span class="gcap">Time</span><div class="gchips">
-     <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><button class="pick chip" data-tod="haboob"><b>Haboob</b></button></div></div></div>
+    <div class="grp g4 cap tGrp"><span class="gcap">Time</span><div class="gchips">
+     <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button></div></div>
+    <div class="grp cap wxG"><span class="gcap">Weather</span><div class="gchips">
+     <button class="chip wxPill" id="wxPill" aria-haspopup="dialog"><i aria-hidden="true"></i><span class="wxN"><b><span class="lg"></span><span class="sm"></span></b><small hidden>random</small></span></button><button class="chip wxRnd" id="wxRnd" aria-label="Random weather">🎲</button></div></div></div>
    <div class="frow starts"><div class="grp g2 cap" title="Do anything. A brief grade card on any landing."><span class="gcap">Free flight</span><div class="gchips">
      <button class="pick chip" data-pos="runway"><b>Runway</b></button><button class="pick chip" data-pos="ramp"><b>Ramp</b></button></div></div>
     <div class="grp g2 cap" title="Short scored starts. Each one ends in the results card."><span class="gcap">Segments</span><div class="gchips">
@@ -2493,7 +2554,7 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
     <div class="frows">
     <div class="frow locRow"><div class="grp locG"><div class="locs" id="locPz" role="radiogroup" aria-label="Location"></div></div>
      <div class="grp g4">
-      <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><button class="pick chip" data-tod="haboob"><b>Haboob</b></button></div></div>
+      <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><button class="chip wxPill" id="wxPillP" aria-haspopup="dialog"><i aria-hidden="true"></i><span class="wxN"><b><span class="lg"></span><span class="sm"></span></b><small hidden>random</small></span></button><button class="chip wxRnd" id="wxRndP" aria-label="Random weather">🎲</button></div></div>
     <div class="frow starts"><div class="grp g2 cap"><span class="gcap">Free flight</span><div class="gchips">
       <button class="pick chip" data-pos="runway"><b>Runway</b></button><button class="pick chip" data-pos="ramp"><b>Ramp</b></button></div></div>
      <div class="grp g2 cap"><span class="gcap">Segments</span><div class="gchips">
@@ -2571,6 +2632,12 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
   <div class="brDots" id="brDots" aria-hidden="true"></div>
   <div class="brBtns"><button id="brBack">Back</button><button class="primary" id="brNext">NEXT</button></div>
 </div></div>
+<!-- weather item 2: the WEATHER sheet (the Fly tab's and the pause sheet's weather pill); the tiles are dealt by wxSheetBuild -->
+<div class="overlay" id="wxOv" role="dialog" aria-modal="true" aria-labelledby="wxT"><div class="sheet">
+  <h3 id="wxT">WEATHER</h3><button class="wxX" id="wxX" aria-label="Close">✕</button>
+  <div class="wxGrid" id="wxGrid" role="radiogroup" aria-labelledby="wxT"></div>
+</div></div>
+<div id="wxToast" role="status" aria-live="polite"></div>
 <div class="overlay" id="plOv" role="dialog" aria-modal="true" aria-labelledby="plT"><div class="sheet">
   <p class="plK">FLIGHT SCHOOL</p>
   <h3 id="plT">Where are you in training?</h3>
@@ -7338,7 +7405,7 @@ function airSet(){
   AIR.r0=T.night?0:0.6*(1-0.6*dust);// desert air is dry: by day and at sunset a thin air term (12% of the haze) and 1.4 at fog.far, so the White Tanks
   // keep their rock under a 25 to 35% blue veil at 10 to 16 km and stand blue grey off the sky at 24; the night's dark
   // haze and the haboob's dust as they were
-  A.k.w=T.night?1.9:T.id==='haboob'?2.3:1.4;A.k.x=T.night||T.id==='haboob'?0.35:0.12;
+  A.k.w=T.night?1.9:T.hb?2.3:1.4;A.k.x=T.night||T.hb?0.35:0.12;
   _airR.setHex(T.haze).lerp(_airQ.setHex(T.top),0.32*(1-band)).lerp(_airQ.setHex(T.sky.hA),band);set(A.a,_airR);
   _airR.setHex(T.haze).lerp(_airQ.setHex(T.sky.glow),0.35).lerp(_airQ.setHex(T.sky.hS),band);set(A.s,_airR);
   const wt=T.night?0:(1-band)*(1-dust);A.t.x=1;A.t.y=1-0.05*wt;A.t.z=1-0.12*wt;
@@ -7469,6 +7536,61 @@ for(const k in TOD_SET){const T=TOD_SET[k],sd=solarDir(T.hour,T.doy||105),el=Mat
   T.haze=M.haze;T.top=M.top;T.sun=M.sun;T.sunI=M.sunI;T.hemiSky=M.hemiSky;T.hemiGnd=M.hemiGnd;T.hemiI=M.hemiI;
   T.sky=M.sky;T.disc=M.disc;T.discS=T.night?0:M.discS;T.env=M.env;}
 let TOD=TOD_SET.day;
+// ---------- weather (weather item 2): the weather is its own choice, any weather at any time of day ----------
+// TOD is the light (Day, Sunset, Night); WX the weather: WX_SET entries with the sheet's icon, name and one line on how it
+// flies; clouds: the CLD preset it shows for now (the overcast deck, rain and fog come in the next item); wind: kt
+// [min,max] and gust, stored only (the next item wires it into the physics; the haboob keeps its own wind in hbUpdate).
+// The haboob is Arizona's (wxOK). Its light: by day the dusty 17:15 sun of TOD_SET.haboob, as TOD_HBDAY (that profile
+// with id 'day' and hb set, so TOD.id still reads day and the Day chip stays lit; TOD.hb is what the tone, the air, the
+// clouds and the effects read where they used TOD.id==='haboob'); at sunset and at night the plain sunset or night light
+// with the wall and its dust darkened to match (hbTint): the simplest that looks right, no extra light presets.
+const TOD_HBDAY=Object.assign({},TOD_SET.haboob,{id:'day',name:'Day',hb:true});
+const todKey=()=>TOD.hb?'haboob':TOD.id;   // the light profile's key (PFS_EXP, CLD_MIST)
+const WX_SET={};
+[['clear','Clear','☀️','Calm air, unlimited visibility','clear',3,8,0],
+ ['scattered','Scattered','⛅','Puffy cumulus, light bumps','scattered',5,10,0],
+ ['overcast','Overcast','☁️','Grey deck at 3,000 ft, flat light','scattered',6,12,0],
+ ['rain','Rain','🌧️','Low cloud, wet runway','scattered',8,14,0],
+ ['storm','Thunderstorm','⛈️','Towering cells, gusts, lightning','monsoon',10,18,30],
+ ['fog','Fog','🌫️','Half a mile, lights glow','clear',0,3,0],
+ ['gusty','Gusty winds','💨','20 knots gusting 35, crosswind','scattered',18,24,35],
+ ['haboob','Haboob','🌪️','Dust wall from the south east','monsoon',8,35,50]
+].forEach(([id,name,icon,hint,clouds,k0,k1,g])=>{WX_SET[id]={id:id,name:name,icon:icon,hint:hint,clouds:clouds,wind:{kt:[k0,k1],gust:g}};});
+let WX=Object.assign({random:false},WX_SET.scattered);
+const wxOv=document.getElementById('wxOv'),WX_SHORT={storm:'Storm',gusty:'Gusty'};   // the sheet (markup above), the pause pill's short names
+const WX_HOOKS=[];   // fns() the next item's rain, fog and wind push, run at the end of setWX (like TOD_HOOKS)
+const wxOK=id=>!!WX_SET[id]&&(id!=='haboob'||REGION.az);
+// o.random: the pill is on Random (the next start() rolls again); o.keep: for this run only, the saved choice stays
+// (the daily, the dogfight, a tasking, the night lesson); o.noLight: the caller sets the time of day right after
+function setWX(id,o){o=o||{};if(!WX_SET[id])id='scattered';
+  // the dust storm is Arizona's: clear in a world region, the saved Haboob kept for coming back
+  const fb=!wxOK(id),hb0=WX.id==='haboob',cl0=WX.clouds;
+  WX=Object.assign({random:!!o.random},WX_SET[fb?'clear':id]);
+  if(!fb&&!o.keep)try{localStorage.setItem('kgeuWX',WX.id);localStorage.setItem('kgeuWXR',WX.random?'1':'0');}catch(e){}
+  if(!o.noLight){if(hb0!==(WX.id==='haboob'))setTOD(TOD.id);   // the haboob's own light by day, its wall on or off
+    else if(cl0!==WX.clouds&&cloudMat)cloudsAuto();}
+  if(typeof wxUI==='function')wxUI();
+  for(const f of WX_HOOKS)f();
+}
+// the old Time row's Haboob (saved kgeuTOD, a resume, the test hooks): day and the haboob weather
+function todLegacy(id){if(id==='haboob'){setWX('haboob',{noLight:true});setTOD('day');}else setTOD(id);}
+// Random: a believable weather for the region and the time of day (percent); never the haboob outside Arizona
+const WX_ODDS={
+  az_day:{clear:30,scattered:35,gusty:10,overcast:5,storm:10,rain:5,haboob:5},
+  az_sunset:{clear:24,scattered:31,gusty:10,overcast:5,storm:15,rain:5,haboob:10},
+  az_night:{clear:35,scattered:27,gusty:5,overcast:10,storm:10,rain:5,fog:8},
+  rjtt:{overcast:30,rain:25,fog:10,clear:15,scattered:15,gusty:5},
+  sbrj:{scattered:35,rain:25,clear:20,storm:10,overcast:10}};
+WX_ODDS.lfpg=WX_ODDS.rjtt;
+function wxOdds(reg,tod){return reg==='az'?WX_ODDS['az_'+tod]||WX_ODDS.az_day:WX_ODDS[reg]||WX_ODDS.rjtt;}
+function wxRoll(o){o=o||{};
+  const reg=!o.start&&FLY_LOC&&REGIONS[FLY_LOC.reg]?FLY_LOC.reg:REGION_ID,P=wxOdds(reg,TOD.id);
+  let n=0;for(const k in P)if(k!=='haboob'||reg==='az')n+=P[k];
+  let r=Math.random()*n,id='scattered';for(const k in P){if(k==='haboob'&&reg!=='az')continue;r-=P[k];if(r<0){id=k;break;}}
+  setWX(id,{random:true,noLight:o.noLight});
+  if(!o.quiet)wxToast('Rolled: '+WX_SET[id].icon+' '+WX_SET[id].name);
+  return id;
+}
 let starField=null,cloudMat=null;
 // the clouds (weather item 1): one instanced mesh of sun lit billboard puffs (CLD, built with the world). The dogfight
 // hides them (dfStart) and dfStop brings them back. cloudMat is CLD's one material (setTOD's cloudsAuto fires on it).
@@ -7505,14 +7627,15 @@ function skyPaint(k){
 // things built later (the world regions) that change with the time of day: called at the end of setTOD
 const TOD_HOOKS=[];var TOD_N=0;   // setTOD calls, STALL's 'tod' tag
 function setTOD(id){TOD_N++;
-  // the dust storm is Arizona's: day in a world region, the saved Haboob kept for coming back
-  const fb=id==='haboob'&&!REGION.az;if(fb)id='day';
-  TOD=TOD_SET[id]||TOD_SET.day;
-  if(!fb)try{localStorage.setItem('kgeuTOD',TOD.id);}catch(e){}
+  // the light only (weather item 2): Day, Sunset or Night; the haboob is a weather now (todLegacy maps the old 'haboob'),
+  // and by day it lights the scene with its own dusty profile (TOD_HBDAY, still id 'day'; wxOK keeps it Arizona's)
+  if(!TOD_SET[id]||id==='haboob')id='day';
+  TOD=id==='day'&&WX.id==='haboob'?TOD_HBDAY:TOD_SET[id];
+  try{localStorage.setItem('kgeuTOD',TOD.id);}catch(e){}
   HAZE.setHex(TOD.haze);
   scene.fog.color.copy(HAZE);scene.fog.near=TOD.fog[0];scene.fog.far=TOD.fog[1];
   scene.background=HAZE;
-  pfsTone(TOD.id);
+  pfsTone(todKey());
   sun.color.setHex(TOD.sun);sun.intensity=TOD.sunI;
   sun.position.set(TOD.sunPos[0],TOD.sunPos[1],TOD.sunPos[2]);
   hemi.color.setHex(TOD.hemiSky);hemi.groundColor.setHex(TOD.hemiGnd);hemi.intensity=TOD.hemiI;
@@ -7729,7 +7852,7 @@ void main(){
 // the wall's centre goes m metres upwind of the player (the front m metres ahead of them)
 function hbPlace(m){HB.C.copy(st.pos).addScaledVector(HB.T,-m);HB.C.y=0;HB.snap=true;}
 function hbSpawn(){
-  hbBuild();
+  hbBuild();hbTint();
   const h=HB.hdg*Math.PI/180;HB.T.set(Math.sin(h),0,-Math.cos(h));HB.Lat.set(Math.cos(h),0,Math.sin(h));
   HB.g.rotation.y=-h;
   HB.on=true;HB.st=st;HB.called=false;HB.t6=false;HB.d=0;HB.paintD=-1;HB.surge=0;HB.pd=1e9;
@@ -7749,9 +7872,17 @@ function hbClear(){
   if(HB.built){HB.g.visible=false;HB.sun.visible=false;}
   hbRestore();
 }
+// weather item 2: the haboob flies at any time of day; at sunset and at night its wall and dust take the darker light
+// (the day's colours scaled, data only: no new program)
+const HB_DUST0=HB_DUST.clone(),HB_CAVE0=HB_CAVE.clone();
+function hbTint(){const k=TOD.night?0.16:TOD.id==='sunset'?0.78:1;
+  HB_DUST.copy(HB_DUST0).multiplyScalar(k);HB_CAVE.copy(HB_CAVE0).multiplyScalar(k);
+  if(HB.built)for(const m of HB.mats){const U=m.uniforms,c=m.userData.c0||(m.userData.c0=[U.uLit.value.clone(),U.uMid.value.clone(),U.uDark.value.clone()]);
+    U.uLit.value.copy(c[0]).multiplyScalar(k);U.uMid.value.copy(c[1]).multiplyScalar(k);U.uDark.value.copy(c[2]).multiplyScalar(k);}}
 function hbSync(force){
   // the dust storm is Arizona's: never in a world region
-  const want=TOD.id==='haboob'&&running&&REGION.az;HB.paintD=-1;if(!force)HB.dirty=false;   // setTOD has just put the clear values back
+  const want=WX.id==='haboob'&&running&&REGION.az;HB.paintD=-1;if(!force)HB.dirty=false;   // setTOD has just put the clear values back
+  if(want)hbTint();
   if(want&&(force||!HB.on||HB.st!==st))hbSpawn();
   else if(!want&&HB.on)hbClear();
 }
@@ -9012,7 +9143,7 @@ const _cldA=new THREE.Color(),_cldM=new THREE.Color();
 // the colours from the time of day: white tops and grey blue bases by day, orange tops and purple grey bases at
 // sunset, dark blue grey at night (no sun, no rim), the haboob's dirty warm greys; a storm's base bluish and darker
 function cldColours(){
-  const U=CLD.U,T=TOD,id=T.id,b=U.uBase.value,tp=U.uTop.value,sc=U.uSunC.value,rc=U.uRimC.value;
+  const U=CLD.U,T=TOD,id=todKey(),b=U.uBase.value,tp=U.uTop.value,sc=U.uSunC.value,rc=U.uRimC.value;
   U.uSun.value.copy(sun.position).normalize();U.uRel.value=T.night?0.25:1;
   if(T.night){b.setHex(0x1a2030);tp.setHex(0x2a3444);sc.setRGB(0,0,0);rc.setRGB(0,0,0);}
   else if(id==='sunset'){b.setHex(0x5c5470).lerp(_cldA.setHex(T.hemiSky),0.2);tp.setHex(0xfff0e2).lerp(_cldA.setHex(T.sun),0.5);sc.setHex(T.sun).multiplyScalar(0.35);rc.setHex(T.sun).multiplyScalar(0.9);}
@@ -9023,7 +9154,8 @@ function cldColours(){
 function cloudsPick(tod,key){
   if(tod==='sunset'||tod==='night')return 'scattered';if(tod==='haboob')return 'monsoon';
   return dayRng((key||todayKey())*7+3)()<0.7?'scattered':'clear';}
-function cloudsAuto(){CLOUDS.preset=CLOUDS.forced||cloudsPick(TOD.id);cloudsApply();}
+// weather item 2: the weather's preset (WX.clouds); cloudsPick stays for the tools and the shots
+function cloudsAuto(){CLOUDS.preset=CLOUDS.forced||WX.clouds;cloudsApply();}
 // the preset, the tier and the colours onto the mesh: data only, never a new program in flight (CLD_LO flips only
 // on a tier change, which runs in the menu and requeues the precompile)
 function cloudsApply(){
@@ -9057,7 +9189,7 @@ function cldMist(k){
   const C=CLD,s=C.s0;
   if(!C.dirty){C.dirty=true;s.near=scene.fog.near;s.far=scene.fog.far;s.haze=HAZE.getHex();s.sunI=sun.intensity;s.airY=AIR_U.sun.y;s.kw=AIR_U.k.w;s.ty=AIR_U.t.y;s.tz=AIR_U.t.z;}
   scene.fog.near=s.near+(60-s.near)*k;scene.fog.far=Math.exp(Math.log(s.far)+(Math.log(400)-Math.log(s.far))*k);
-  _cldM.setHex(CLD_MIST[TOD.id]||CLD_MIST.day);HAZE.setHex(s.haze).lerp(_cldM,k);scene.fog.color.copy(HAZE);
+  _cldM.setHex(CLD_MIST[todKey()]||CLD_MIST.day);HAZE.setHex(s.haze).lerp(_cldM,k);scene.fog.color.copy(HAZE);
   sun.intensity=s.sunI*(1-0.6*k);AIR_U.sun.y=s.airY*(1-k);AIR_U.k.w=s.kw+(4-s.kw)*k;   // denser air: the ground goes in a few hundred metres
   AIR_U.t.y=s.ty+(1-s.ty)*k;AIR_U.t.z=s.tz+(1-s.tz)*k;   // no dust tint: the ground meets the dome in the one mist
   if(Math.abs(k-C.skyK)>0.04){C.skyK=k;skyPaint();const c=sky.geometry.attributes.color,a=c.array,f=Math.min(1,k*1.25);
@@ -13921,7 +14053,7 @@ function dayRng(k){let s=(k*2654435761)>>>0;return ()=>{s=(s+0x6D2B79F5)>>>0;let
 // ARC.dailyKind (tests only, __kgeu.dailyKind) forces the kind.
 function dailySpec(){const r=dayRng(todayKey()),d0=DAILY_REGIONS[Math.floor(r()*DAILY_REGIONS.length)],region=ARC.dailyRegion&&REGIONS[ARC.dailyRegion]?ARC.dailyRegion:d0,T=region==='az'?ARC_TARGETS():[aptEnd(region)];
   const o={region:region,type:DAILY_TYPES[Math.floor(r()*DAILY_TYPES.length)],end:T[Math.floor(r()*T.length)],dist:6500+r()*4000,off:(r()*2-1)*1.3,alt:1800+r()*1600};
-  o.tod=['day','sunset','night'][Math.floor(r()*3)];o.wdir=10*(1+Math.floor(r()*36));o.wkt=2+Math.floor(r()*11);o.day=todayKey();
+  o.tod=['day','sunset','night'][Math.floor(r()*3)];o.wdir=10*(1+Math.floor(r()*36));o.wkt=2+Math.floor(r()*11);o.day=todayKey();o.wx='clear';
   o.kind=ARC.dailyKind||(ARC.dailyRegion?'landing':dfDayOf(o.day)?'dogfight':'landing');return o;}
 // a dogfight day for the Daily challenge (the Worker has the same rule, boards.js dfDay): the UTC day number % 5 === 3
 const dfDayOf=k=>Math.floor(Date.UTC(Math.floor(k/10000),Math.floor(k/100)%100-1,k%100)/864e5)%5===3;
@@ -13943,9 +14075,10 @@ function arcStart(kind){
     :{type:savedType,end:kind==='apt'?aptEnd(REGION.id):g1,dist:9000,off:0.9,alt:2500};
   if(sp.end&&sp.end.region)sp.end=sp.end.end;   // a world region's home runway end, by name: the end itself
   if(!sp.end)return;
-  const keepTod=kind==='daily'?(ARC.prevTod||TOD.id):null;
+  const keepTod=kind==='daily'?(ARC.prevTod||TOD.id):null,keepWX=kind==='daily'?(ARC.prevWX||{id:WX.id,random:WX.random}):null;
   pickType(sp.type,1);start('runway',!REGION.az?BASE0:sp.end.rwy.code==='KLUF'?'luke':sp.end.rwy.code==='KPHX'?'phx':'kgeu');
-  if(kind==='daily'){setTOD(sp.tod);try{localStorage.setItem('kgeuTOD',keepTod);}catch(e){}ARC.prevTod=keepTod;hbSync(true);
+  // the daily's own time and (weather item 2, for now) clear weather; the player's both come back on the next start()
+  if(kind==='daily'){setWX(sp.wx||'clear',{keep:true,noLight:true});setTOD(sp.tod);try{localStorage.setItem('kgeuTOD',keepTod);}catch(e){}ARC.prevTod=keepTod;ARC.prevWX=keepWX;hbSync(true);
     st.windBase=st.windDir=sp.wdir;st.windKt=sp.wkt;st.windPh=0;}
   const e=sp.end,back=Math.atan2(-Math.sin(e.h),Math.cos(e.h))+sp.off;         // bearing from the threshold out along the approach, swung aside
   const x=e.x+Math.sin(back)*sp.dist,z=e.z-Math.cos(back)*sp.dist,h=Math.atan2(e.x-x,-(e.z-z));
@@ -14251,8 +14384,8 @@ function dfStart(o){
   if(!REGION.az){pickRegion('az',{resume:{df:1,daily:daily?1:0,region:'az',type:'f16',tod:TOD.id}});return;}
   if(!WORLD.ready){toast('Loading '+REGION.city+'…');return;}
   pickType('f16',1);start('runway','luke');RUNSTART={k:'df',daily:daily};
-  // no haboob over the range: the day sky for this run, the saved choice comes back on the next start()
-  if(TOD.id==='haboob'){const p=TOD.id;setTOD('day');try{localStorage.setItem('kgeuTOD',p);}catch(e){}ARC.prevTod=p;hbSync(true);}
+  // no haboob over the range: clear weather for this run (weather item 2: the time of day stays), the saved choice comes back on the next start()
+  if(WX.id==='haboob'){ARC.prevWX=ARC.prevWX||{id:WX.id,random:WX.random};setWX('clear',{keep:true});hbSync(true);}
   dfBuild();
   // in over the range from the Luke side, 7 nm out from the centre, heading in
   const ux=LUKE.x-DF.C.x,uz=LUKE.z-DF.C.z,ul=Math.hypot(ux,uz),x=DF.C.x+ux/ul*13000,z=DF.C.z+uz/ul*13000,h=Math.atan2(DF.C.x-x,-(DF.C.z-z));
@@ -15525,7 +15658,7 @@ function taskStart(id,o){const D=TASKS[id];if(!D)return;
   pickType(D.ac,1);
   start('runway',D.base||'luke');RUNSTART={k:'task',id:id};
   // no haboob for a tasking: the day sky for this run, the saved choice comes back on the next start() (as the dogfight)
-  if(TOD.id==='haboob'){const p=TOD.id;setTOD('day');try{localStorage.setItem('kgeuTOD',p);}catch(e){}ARC.prevTod=p;hbSync(true);}
+  if(WX.id==='haboob'){ARC.prevWX=ARC.prevWX||{id:WX.id,random:WX.random};setWX('clear',{keep:true});hbSync(true);}
   Object.assign(TASK,{on:true,id:id,def:D,seed:seed,R:tqRng(seed),si:0,stage:null,t:0,brief:false,ask:null,quiet:null,later:[],done:false,res:null,sens:false,log:[]});
   tqClear();
   const d=TASK.d={id:id,seed:seed,mode:runMode(),t0:0,replies:0,replyT:0,missed:0};
@@ -16187,7 +16320,11 @@ function start(mode,base){
   // gfxfix item 3: the battery guard's drop if a restart skipped the menu, and the precompile queue drained before the
   // first flight frame (it runs again after a tier change; normally the menu's frames have drained it already)
   GFX.pendingApply();gfxDrain();
-  if(ARC.prevTod){const p=ARC.prevTod;ARC.prevTod=null;setTOD(p);}
+  // the player's time and weather back after a daily, a dogfight, a tasking or the night lesson; Random rolls again
+  {const pw=ARC.prevWX,pt=ARC.prevTod,hb0=WX.id==='haboob';ARC.prevWX=ARC.prevTod=null;
+    if(pw)setWX(pw.id,{random:pw.random,noLight:true});
+    if(WX.random)wxRoll({start:true,quiet:true,noLight:true});
+    if(pt||hb0!==(WX.id==='haboob'))setTOD(pt||TOD.id);else if(cloudMat&&CLOUDS.preset!==(CLOUDS.forced||WX.clouds))cloudsAuto();}
   setType(acType);useModel(acType);sizeShadow();vqReset();radioHush();radioFadeTok++;radioVolApply();chatT=9;atcT=0;TK.paused=false;
   const spawn=mode;if(mode==='final1')mode='final';RUNSTART={k:'free',mode:spawn,base:base||SPAWN_BASE,type:acType};
   st=createState(mode,base||SPAWN_BASE,spawn==='final1'?1852:0);st.type=acType;st.spawn=spawn;
@@ -16263,7 +16400,7 @@ function togglePause(){if(DF.brief||TASK.brief||LES.brief)return;   // the dogfi
 $('pResume').onclick=()=>pzResume();   // fix2 item 3: waits while a tier change applies
 // Restart and Apply are one button: it restarts this flight (same start, mission or range) until
 // an aircraft, base or start is changed on the sheet, then it reads Apply and flies the new picks.
-// Time of day needs neither, it changes the sky at once.
+// Time of day and the weather need neither, they change the sky at once.
 var PZ0=null;
 function pzChanged(){return !!PZ_LOC||!!PZ0&&(PZ0.t!==savedType||PZ0.b!==SPAWN_BASE||PZ0.p!==SPAWN_POS);}
 function pzApplyUI(){const b=$('pApply');if(b)b.textContent=pzChanged()?'Apply':'Restart';}
@@ -18003,11 +18140,15 @@ function hoodOn(){if(!HOOD.on){HOOD.on=true;HOOD.cam=camMode;}camMode=1;snapCame
 function lesRestore(){if(HOOD.on){HOOD.on=false;document.body.classList.remove('hoodOn');camMode=HOOD.cam;snapCamera=true;}
   if(LES_W){if(st){st.windBase=st.windDir=LES_W.base;st.windKt=LES_W.kt;st.windPh=LES_W.ph;st.gustAmp=LES_W.gust;st.windHold=0;}LES_W=null;}
   LES_FIELD=null;divClose();document.body.classList.remove('navMapOff');
-  if(LES_TOD){const p=LES_TOD;LES_TOD=null;if(ARC.prevTod===p)ARC.prevTod=null;if(TOD.id==='night')setTOD(p);}}   // the night lesson: the player's time of day back
+  const lw=LES_WX;if(lw){LES_WX=null;if(ARC.prevWX===lw)ARC.prevWX=null;setWX(lw.id,{random:lw.random,noLight:true});}
+  if(LES_TOD){const p=LES_TOD;LES_TOD=null;if(ARC.prevTod===p)ARC.prevTod=null;if(TOD.id==='night')setTOD(p);else if(lw)setTOD(TOD.id);}else if(lw)setTOD(TOD.id);}   // the night lesson: the player's time of day back
 // the night lesson's sky without saving it as the player's choice (as the daily does): the kept one stays in kgeuTOD and
 // ARC.prevTod (the next start() puts it back: a restart sets night again), LES_TOD for lesRestore
-let LES_TOD=null;
-function lesNight(){const k=LES_TOD||TOD.id;setTOD('night');try{localStorage.setItem('kgeuTOD',k);}catch(e){}ARC.prevTod=k;LES_TOD=k;hbSync(true);}
+// weather item 2: no haboob on the night lesson either (it was the old Time row's fourth chip): LES_WX, ARC.prevWX as the tod
+let LES_TOD=null,LES_WX=null;
+function lesNight(){const k=LES_TOD||TOD.id;
+  if(WX.id==='haboob'&&!LES_WX){LES_WX={id:WX.id,random:WX.random};ARC.prevWX=LES_WX;setWX('clear',{keep:true,noLight:true});}
+  setTOD('night');try{localStorage.setItem('kgeuTOD',k);}catch(e){}ARC.prevTod=k;LES_TOD=k;hbSync(true);}
 // the forced landing field: 600 by 150 m of flat open ground 1.5 to 2.5 nm downwind of us, its long side along the wind;
 // the first spot that is flat (under 5 m across it), dry, unpaved, clear of obstacles, the runway and the mission sites
 function emOK(cx,cz,ax,az){let lo=1e9,hi=-1e9;
@@ -18213,9 +18354,47 @@ document.querySelectorAll('.locs').forEach(L=>L.addEventListener('scroll',()=>lo
 addEventListener('resize',()=>requestAnimationFrame(()=>document.querySelectorAll('.locs').forEach(locFade)));
 function pickBase(id){SPAWN_BASE=BASES[id]?id:HOME(acType);try{localStorage.setItem('kgeuBase',SPAWN_BASE);}catch(e){}
   locSel();sumUI();}
-// the haboob is Arizona's: no Haboob chip in a world region (setTOD falls back to day there)
-if(!REGION.az)document.querySelectorAll('.pick[data-tod="haboob"]').forEach(b=>{b.style.display='none';});
 document.querySelectorAll('.pick[data-tod]').forEach(b=>b.addEventListener('click',()=>{setTOD(b.dataset.tod);sumUI();}));
+// ---- weather item 2: the WEATHER pill (Fly tab #wxPill, pause sheet #wxPillP), the dice and the sheet (#wxOv) ----
+
+function wxSheetBuild(){const G=$('wxGrid');if(!G||G.childElementCount)return;
+  for(const id of [...Object.keys(WX_SET),'random']){const W=WX_SET[id],b=document.createElement('button');b.className='wxT'+(W?'':' rnd');b.dataset.wx=id;
+    b.setAttribute('role','radio');b.innerHTML='<i aria-hidden="true"></i><b></b><span></span>';
+    b.children[0].textContent=W?W.icon:'🎲';b.children[1].textContent=W?W.name:'Random';b.children[2].textContent=W?W.hint:'';
+    b.addEventListener('click',()=>wxTile(id));G.appendChild(b);}}
+function wxUI(){
+  for(const id of ['wxPill','wxPillP']){const b=$(id);if(!b)continue;
+    b.querySelector('i').textContent=WX.icon;b.querySelector('.lg').textContent=WX.name;b.querySelector('.sm').textContent=WX_SHORT[WX.id]||WX.name;
+    b.querySelector('small').hidden=!WX.random;
+    b.setAttribute('aria-label','Weather: '+WX.name+(WX.random?', random':'')+'. Change the weather');b.classList.toggle('rndOn',WX.random);}
+  wxOv.querySelectorAll('.wxT').forEach(b=>{const id=b.dataset.wx,on=id==='random'?WX.random:!WX.random&&id===WX.id,off=!!WX_SET[id]&&!wxOK(id);
+    b.classList.toggle('sel',on);b.setAttribute('aria-checked',String(on));b.classList.toggle('off',off);b.setAttribute('aria-disabled',String(off));
+    if(id==='haboob')b.children[2].textContent=off?'Arizona only':WX_SET.haboob.hint;});
+}
+function wxOpen(){wxSheetBuild();wxUI();clearTimeout(wxClose.t);clearTimeout(wxTile.t);$('wxT').textContent='WEATHER';wxOv.classList.remove('out');wxOv.classList.add('on');}
+function wxClose(now){clearTimeout(wxClose.t);if(!wxOv.classList.contains('on'))return;if(now){wxOv.classList.remove('on','out');return;}
+  wxOv.classList.add('out');wxClose.t=setTimeout(()=>wxOv.classList.remove('on','out'),150);}
+function wxTile(id){
+  // the sheet's Random tile: what it rolled in the sheet's title and ringed, then the sheet goes (no toast over the controls)
+  if(id==='random'){const r=wxRoll({quiet:true});sumUI();$('wxT').textContent='Rolled: '+WX_SET[r].icon+' '+WX_SET[r].name;
+    wxOv.querySelectorAll('.wxT').forEach(b=>b.classList.toggle('sel',b.dataset.wx===r||b.dataset.wx==='random'));
+    clearTimeout(wxTile.t);wxTile.t=setTimeout(()=>wxClose(),900);return;}
+  if(!wxOK(id)){wxToast('The haboob is Arizona only');return;}
+  setWX(id);sumUI();wxClose();}
+// what the dice rolled, where it covers no control: on the Fly tab its bottom just above the chip rows (over the
+// aircraft card's words), in the pause sheet at the foot of the left panel (under the music), 2 s
+function wxToast(msg){const t=$('wxToast');if(!t)return;t.textContent=msg;
+  let x=innerWidth/2,y=innerHeight/2,mw=innerWidth-32;
+  const L=pauseOv.classList.contains('on')&&pauseOv.querySelector('.pzL'),F=menu.classList.contains('on')&&$('sFly').querySelector('.frows');
+  if(L&&L.offsetWidth){const r=L.getBoundingClientRect();x=r.left+r.width/2;y=r.bottom-8;mw=r.width-16;}
+  else if(F&&F.offsetWidth){const r=F.getBoundingClientRect();y=r.top-6;}
+  t.style.left=Math.round(x)+'px';t.style.top=Math.round(y)+'px';t.style.maxWidth=Math.round(mw)+'px';
+  t.classList.add('on');clearTimeout(wxToast.t);wxToast.t=setTimeout(()=>t.classList.remove('on'),2000);}
+for(const id of ['wxPill','wxPillP'])$(id).addEventListener('click',wxOpen);
+for(const id of ['wxRnd','wxRndP'])$(id).addEventListener('click',()=>{wxRoll();sumUI();});
+$('wxX').addEventListener('click',()=>wxClose());
+wxOv.addEventListener('click',e=>{if(e.target===wxOv)wxClose();});
+wxUI();
 const POS_OK=['runway','ramp','final1','final'];
 let SPAWN_POS='runway';try{const v=localStorage.getItem('kgeuPos');if(POS_OK.includes(v))SPAWN_POS=v;}catch(e){}
 function pickPos(id){SPAWN_POS=POS_OK.includes(id)?id:'runway';try{localStorage.setItem('kgeuPos',SPAWN_POS);}catch(e){}
@@ -18264,7 +18443,7 @@ function navBack(){
   if(fromPause&&!NAV.length){fromPause=false;menuClose();pauseOv.classList.add('on');CARP.sync();return;}
   showScr(NAV.pop()||'sHome');
 }
-function menuClose(){plClose(true);fromPause=false;menu.classList.remove('on','see3d');SHOW.on=false;document.body.classList.remove('menuOn');}
+function menuClose(){plClose(true);wxClose(true);fromPause=false;menu.classList.remove('on','see3d');SHOW.on=false;document.body.classList.remove('menuOn');}
 document.querySelectorAll('#menu .back').forEach(b=>b.onclick=navBack);
 $('hFly').onclick=()=>tabGo('sFly');$('hSch').onclick=()=>tabGo('sSchool');$('hChal').onclick=()=>tabGo('sArc');
 $('hRec').onclick=()=>recOpen();$('bHelp').onclick=()=>nav('sHelp');
@@ -18378,7 +18557,7 @@ function showRender(dt,c){
   const x=c.pos*D;cam.aspect=r.width/r.height;cam.position.set(x,dist*Math.sin(el)-lift,dist*Math.cos(el));cam.lookAt(x,-lift,0);cam.updateProjectionMatrix();
   if(!SHOW.scene.environment)SHOW.scene.environment=envDay();   // before the scissor: a first build renders to its own targets
   renderer.setScissorTest(true);renderer.setScissor(r.left,H-r.bottom,r.width,r.height);renderer.setViewport(r.left,H-r.bottom,r.width,r.height);
-  pfsTone('show');renderer.render(SHOW.scene,cam);pfsTone(TOD.id);
+  pfsTone('show');renderer.render(SHOW.scene,cam);pfsTone(todKey());
   renderer.setScissorTest(false);renderer.setViewport(0,0,innerWidth,H);
 }
 
@@ -19411,7 +19590,7 @@ function renderIR(){
   if(irDirty||performance.now()-IR.t>1000)irTag();
   const inv=SENSOR.mode==='irb',u=IR_MAT.uniforms,night=TOD.night;
   u.uInvert.value=inv?1:0;u.uTime.value=(performance.now()/1000)%97;
-  u.uAmb.value=night?0.06:TOD.id==='sunset'||TOD.id==='haboob'?0.1:0.13;u.uShade.value=night?0.05:0.14;u.uHot.value=0.8;
+  u.uAmb.value=night?0.06:TOD.id==='sunset'||TOD.hb?0.1:0.13;u.uShade.value=night?0.05:0.14;u.uHot.value=0.8;
   if(SENSOR.mode==='nir'){u.uInvert.value=0;u.uAmb.value=0.3;u.uShade.value=0.2;u.uHot.value=0.12;}   // sensor item 3: NIR at night
   camera.updateMatrixWorld();
   _irSun.copy(sun.position).normalize().transformDirection(camera.matrixWorldInverse);u.uSun.value.copy(_irSun);
@@ -19975,7 +20154,7 @@ function gfxBusyUI(){const ap=gfxApplying(),w=ap&&GFX.resumeWait,g=$('gfxBusy'),
   g.hidden=!ap;b.classList.toggle('busy',ap);g.dataset.w=String(w);gs.hidden=!ap;
   g.firstChild.textContent=w?'Applying graphics\u2026 resuming':'Applying graphics\u2026';}
 // the pause sheet's way back to the flight (Resume, the pause toggle); true if it resumed now
-function pzResume(){
+function pzResume(){wxClose(true);
   if(gfxApplying()){GFX.resumeWait=true;gfxBusyUI();return false;}   // taps while applying are idempotent
   GFX.resumeWait=false;gfxDrain();paused=false;pauseOv.classList.remove('on');initAudio();radioVolApply();gfxBusyUI();return true;}
 // each frame (tick): the wait, then the resume the player asked for; the pause sheet still up and no menu over it
@@ -20431,7 +20610,7 @@ function fxPack(){
 // how lit unlit smoke should look: full by day, dim at dusk, dark at night; flat grey in IR
 // 0 on the camera, 1 from 20 m out: fire and smoke never render on top of the lens
 function fxNearP(p){return clamp((p.distanceTo(camera.position)-8)/12,0,1);}
-function fxLit(){return camMode===2&&sensorIRPass()?-1:TOD.night?0.16:TOD.id==='sunset'||TOD.id==='haboob'?0.6:1;}
+function fxLit(){return camMode===2&&sensorIRPass()?-1:TOD.night?0.16:TOD.id==='sunset'||TOD.hb?0.6:1;}
 // fireball colour as it cools: white, yellow, orange, dark red, black smoke
 const FX_RAMP=[[1,1,0.95],[1,0.86,0.5],[1,0.5,0.16],[0.48,0.14,0.05],[0.08,0.07,0.065]];
 function fxRamp(u,c){u=clamp(u,0,1)*4;const i=Math.min(3,u|0),f=u-i,a=FX_RAMP[i],b=FX_RAMP[i+1];
@@ -21792,7 +21971,7 @@ function tick(t,skipRender){
    turretShow(!sv);
    // NIR: the composite turns it monochrome on Medium and High (uNir); Low has no post chain, so a CSS grey; at night it
    // goes through the IR pass instead (sensorIRPass), a little brighter at sunset and in the haboob
-   const nir=sv&&SENSOR.mode==='nir'&&!TOD.night,flt=sv&&SENSOR.mode==='tv'?'saturate(0.75) contrast(1.05)':nir?(GFX.post?'':'grayscale(1) contrast(1.4) brightness(0.9) ')+(TOD.id==='sunset'||TOD.id==='haboob'?'brightness(1.25)':''):'';
+   const nir=sv&&SENSOR.mode==='nir'&&!TOD.night,flt=sv&&SENSOR.mode==='tv'?'saturate(0.75) contrast(1.05)':nir?(GFX.post?'':'grayscale(1) contrast(1.4) brightness(0.9) ')+(TOD.id==='sunset'||TOD.hb?'brightness(1.25)':''):'';
    if(glc.style.filter!==flt.trim())glc.style.filter=flt.trim();
    sensorFxUpdate(sv,ts);strikeUI();}
   if(camMode!==0||PHOTO.on||FREECAM||DF.kc>0)DCAM.chLive=false;
@@ -22538,7 +22717,11 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
     aglS:CSM.aglS,F:CSM.F.slice(0,CSM.n),R:CSM.R.slice(0,CSM.n),NB:CSM.NB.slice(0,CSM.n),thr:Object.assign({},CSM.THR),fadeN:CSM.fadeN,
     cascades:CSM.lights.map((l,i)=>({drawn:CSM.drawn[i],pos:CSM.pos[i].slice(),lpos:[l.position.x,l.position.y,l.position.z]}))}),
   AIR:()=>({k:AIR_U.k,sun:AIR_U.sun,s:AIR_U.s,a:AIR_U.a,t:AIR_U.t,m:AIR_U.m,mon:AIR.mon,r0:AIR.r0}),
-  setTOD:setTOD,isNight:isNight,TOD:()=>TOD,
+  // weather item 2: setTOD('haboob') is day plus the haboob weather (haboob_check and the shots run unchanged), and the
+  // other times leave a haboob for the default weather the way the old Time row did; setWX(id[,random]) the weather itself
+  setTOD:id=>{if(id!=='haboob'&&WX.id==='haboob')setWX('scattered',{noLight:true});todLegacy(id);},isNight:isNight,TOD:()=>TOD,
+  setWX:(id,r)=>{setWX(id,{random:!!r});return WX.id;},WX:()=>({id:WX.id,name:WX.name,icon:WX.icon,clouds:WX.clouds,wind:WX.wind,random:WX.random}),
+  wxRoll:o=>wxRoll(o),wxOdds:wxOdds,WX_SET:WX_SET,wxOpen:wxOpen,wxClose:wxClose,
   haboob:()=>({on:HB.on,dist:HB.on?HB.dist:null,d:HB.d,windKt:st.windKt,gustAmp:st.gustAmp,fogNear:scene.fog.near,called:HB.called,
     wallVisible:!!(HB.g&&HB.g.visible),C:[HB.C.x,HB.C.z],T:[HB.T.x,HB.T.z],sunDisc:!!(HB.sun&&HB.sun.visible),dustDir:st.dustDir,windDir:st.windDir}),
   haboobJump:(m)=>{if(HB.on){hbPlace(m);hbUpdate(0);}},drawSixPack:drawSixPack,SP_CELL:SP_CELL,
@@ -22546,7 +22729,7 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
   RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,ticker:()=>{const e=document.getElementById('tk'),c=document.getElementById('tkCtl');return {on:e.classList.contains('on'),paused:e.classList.contains('paused'),anim:getComputedStyle(document.getElementById('tkT')).animationName,scroll:e.classList.contains('scroll'),open:c.classList.contains('on'),text:e.querySelector('#tkT i').textContent,vis:e.offsetParent!==null&&getComputedStyle(e).display!=='none',ctlVis:c.offsetParent!==null};},tickerForce:n=>{TK.force=n||null;tkUI();},tickerOpen:()=>tkOpen(),tickerClose:()=>{TK.open=false;tkUI();},musicTick:musicTick,MUSIC:MUSIC,actx:()=>actx,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,VQ:VQ,vqLog:clear=>{const r=VQ.log.map(e=>Object.assign({},e));if(clear)VQ.log.length=0;return r;},vqAdd:(who,kind,text,clips,o)=>vqAdd(L(who,kind,text,clips),o),coach2:coach2,chatNow:()=>chatNow(),atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),bannerShow:(k,t)=>bannerShow(k,t),badgeHide:()=>badgeHide(),auto:()=>autoSmart(),mission:k=>{if(k==='gunrun'){pickType('a10',1);start('range');return;}pickType(k==='range'?'reaper':'c130',1);start(k);},HOG:HOG,strikeScore:()=>strikeScore(),CRASH_FX:CRASH_FX,baseOK:baseOK,rwyLenOf:rwyLenOf,FD:FD,BASES:BASES,setThr:setThr,setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
-  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day,kind:d.kind}},dfDayOf:k=>dfDayOf(k),aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,NAV:NV,navPlan:navPlan,DIV:DIV,divSet:divSet,LES:LES,events:events,rwyFrame:()=>({thr:THR01,rh:RH*180/Math.PI,aim:AIM,field:FIELD_FT,gear:GEAR}),grSite:()=>grSite(),lesObjs:()=>LES_OBJ.map(o=>({name:o.name,type:o.geometry&&o.geometry.type,tri:o.geometry?(o.geometry.index?o.geometry.index.count:o.geometry.attributes.position.count)/3:0,col:o.material&&o.material.color&&o.material.color.getHex(),x:o.position.x,z:o.position.z,inScene:!!o.parent})),get lesBrief(){return {on:!!LES.brief,slide:BR.slide,quiz:LES.quiz};},lesBriefNext:()=>brNextTap(),lesBriefSkip:lesBriefSkip,lesBriefBack:lesBriefBack,lesBriefAnswer:k=>brAnswer(k),get ORAL(){return OR.draw;},ORAL_Q:ORAL_Q,oralSeed:oralSeed,rideSeed:rideSeed,rideDraw:rideDraw,rideName:rideName,get RIDE(){return RIDE;},certGet:certGet,dpe:dpe,oralStart:oralStart,oralAnswer:oralAnswer,oralNext:oralNext,get oral(){return {on:orOv.classList.contains('on'),n:OR.n,ans:OR.ans,right:OR.right,res:OR.res};},get G(){return G;},gBegin:gBegin,gHold:gHold,gHoldEnd:gHoldEnd,gTick:gTick,gRange:gRange,gEvent:gEvent,gEnd:gEnd,dbTip:dbTip,dbSay:dbSay,cfi:cfi,cfiCue:cfiCue,cfiSp:cfiSp,cfiVoice:cfiVoice,endorsements:endorsements,get LOGB(){return LOGB;},logbookAdd:logbookAdd,logSummary:logSummary,tqAnswer:tqAnswer,ezSet:ezSet,SCHOOL:SCHOOL,get PLACE(){return PLACE;},setPlace:(l,h)=>{setPlace(l,h);if(curScr==='sSchool')schoolList(true);},lessonOpen:lessonOpen,stageOpen:stageOpen,get schSel(){return SCH_SEL;},schSelect:schSelect,lessonDef:lessonDef,stageOf:stageOf,tolOf:tolOf,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day,kind:d.kind}},dfDayOf:k=>dfDayOf(k),aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,NAV:NV,navPlan:navPlan,DIV:DIV,divSet:divSet,LES:LES,events:events,rwyFrame:()=>({thr:THR01,rh:RH*180/Math.PI,aim:AIM,field:FIELD_FT,gear:GEAR}),grSite:()=>grSite(),lesObjs:()=>LES_OBJ.map(o=>({name:o.name,type:o.geometry&&o.geometry.type,tri:o.geometry?(o.geometry.index?o.geometry.index.count:o.geometry.attributes.position.count)/3:0,col:o.material&&o.material.color&&o.material.color.getHex(),x:o.position.x,z:o.position.z,inScene:!!o.parent})),get lesBrief(){return {on:!!LES.brief,slide:BR.slide,quiz:LES.quiz};},lesBriefNext:()=>brNextTap(),lesBriefSkip:lesBriefSkip,lesBriefBack:lesBriefBack,lesBriefAnswer:k=>brAnswer(k),get ORAL(){return OR.draw;},ORAL_Q:ORAL_Q,oralSeed:oralSeed,rideSeed:rideSeed,rideDraw:rideDraw,rideName:rideName,get RIDE(){return RIDE;},certGet:certGet,dpe:dpe,oralStart:oralStart,oralAnswer:oralAnswer,oralNext:oralNext,get oral(){return {on:orOv.classList.contains('on'),n:OR.n,ans:OR.ans,right:OR.right,res:OR.res};},get G(){return G;},gBegin:gBegin,gHold:gHold,gHoldEnd:gHoldEnd,gTick:gTick,gRange:gRange,gEvent:gEvent,gEnd:gEnd,dbTip:dbTip,dbSay:dbSay,cfi:cfi,cfiCue:cfiCue,cfiSp:cfiSp,cfiVoice:cfiVoice,endorsements:endorsements,get LOGB(){return LOGB;},logbookAdd:logbookAdd,logSummary:logSummary,tqAnswer:tqAnswer,ezSet:ezSet,SCHOOL:SCHOOL,get PLACE(){return PLACE;},setPlace:(l,h)=>{setPlace(l,h);if(curScr==='sSchool')schoolList(true);},lessonOpen:lessonOpen,stageOpen:stageOpen,get schSel(){return SCH_SEL;},schSelect:schSelect,lessonDef:lessonDef,stageOf:stageOf,tolOf:tolOf,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,wx:WX.id,wxRandom:WX.random,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   // @OhRabah easter eggs (3.10): where each one is, whether its lights are on, and the tow banner
   eggs:()=>EGG.list.map(o=>{const p=o.getWorldPosition(new V3()),r={name:o.name,x:p.x,y:p.y,z:p.z,ry:o.rotation.y,lit:(o.name==='egg_billboard'||o.name==='egg_rooftop')&&EGG.lit,visible:o.visible};
     if(o.name==='egg_tow'){const b=EGG.tow.ban.getWorldPosition(new V3()),f=new V3(0,0,-1).applyQuaternion(o.quaternion);r.banner={x:b.x,y:b.y,z:b.z};r.fwd=[f.x,f.y,f.z];}return r;}),
@@ -22623,7 +22806,12 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
     transparent:true,opacity:0,depthWrite:false,fog:false}));
   starField.visible=false;starField.renderOrder=-1;scene.add(starField);
 })();
-(function(){let t='day';try{const v=localStorage.getItem('kgeuTOD');if(v&&TOD_SET[v])t=v;}catch(e){}setTOD(t);})();
+// the time of day and (weather item 2) the weather; an old install's Haboob time (kgeuTOD 'haboob') reads as Day with the
+// haboob weather, both saved back
+(function(){let t='day',w='scattered',r=false;try{const v=localStorage.getItem('kgeuTOD'),x=localStorage.getItem('kgeuWX');
+  if(v==='haboob'){w='haboob';localStorage.setItem('kgeuWX','haboob');localStorage.setItem('kgeuWXR','0');localStorage.setItem('kgeuTOD','day');}
+  else{if(v&&TOD_SET[v])t=v;if(x&&WX_SET[x])w=x;r=localStorage.getItem('kgeuWXR')==='1';}}catch(e){}
+  setWX(w,{random:r,noLight:true});setTOD(t);})();
 window.__kgeu.dailyRegion=id=>{ARC.dailyRegion=id||null;return dailySpec().region;};window.__kgeu.dailyKind=k=>{ARC.dailyKind=k==='dogfight'||k==='landing'?k:null;return dailySpec().kind;};window.__kgeu.TFC=TFC;window.__kgeu.tfcList=tfcList;window.__kgeu.tfcSpawn=tfcSpawn;window.__kgeu.tfcClear=tfcClear;
 window.__kgeu.TCAS={levels:tcasLevels,state:()=>({ta:TCAS.list.some(o=>tcasLvl(o)>=2),ra:!!TCAS.ra,sense:TCAS.ra?(TCAS.sense>0?'climb':'descend'):null,clear:TCAS.clear,inhibit:TCAS.inhibit,
   shown:TCAS.shown,on:TCAS.on,raT:TCAS.raT}),tcasConflict:tcasConflict,setTcas:setTcas,T:TCAS,tcasVoiceLog:TCAS.voiceLog};
@@ -22844,7 +23032,7 @@ worldLoad();
 (function(){let r=null;try{r=JSON.parse(sessionStorage.getItem('kgeuResume')||'null');sessionStorage.removeItem('kgeuResume');}catch(e){}
   if(!r)return;
   const go=()=>{const sp=$('splash');if(!WORLD.ready||(sp&&!sp.classList.contains('done'))){if(!WORLD.err)setTimeout(go,200);return;}
-    if(r.start){const S=r.start;if(S.skill&&S.skill!==SKILL)setSkill(S.skill);if(S.tod&&TOD_SET[S.tod])setTOD(S.tod);
+    if(r.start){const S=r.start;if(S.skill&&S.skill!==SKILL)setSkill(S.skill);if(S.tod&&TOD_SET[S.tod])todLegacy(S.tod);
       if(S.df)dfStart(S.daily?{daily:1}:null);
       else if(S.task)taskStart(S.task);
       else if(S.arc){if(S.type&&TYPES[S.type])pickType(S.type);arcStart(S.arc);}

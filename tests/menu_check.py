@@ -75,8 +75,8 @@ async def main():
                 await pg.evaluate("()=>{window.__kgeu.pick('cessna');window.__kgeu.pickBase('kgeu');window.__kgeu.setTOD('day');window.__kgeu.pickPos('runway');window.__kgeu.nav('sHome',true)}"); await pg.wait_for_timeout(200)
                 await finger(pg, '#hFly'); await pg.wait_for_timeout(600)
                 ok('FLY goes straight to the one fly screen', await pg.evaluate("()=>window.__kgeu.curScr()") == 'sFly')
-                one = await pg.evaluate("()=>{const s=document.getElementById('sFly');return [!!s.querySelector('#carMain .cwin'),s.querySelectorAll('.pick[data-b]').length,s.querySelectorAll('.pick[data-tod]').length,s.querySelectorAll('.pick[data-pos]').length,!!s.querySelector('#bGo')]}")
-                ok('carousel, location (six airports: 4.6b plus Sky Harbor), time, start and GO are all on that one screen', one == [True, 6, 4, 4, True], one)   # start: runway, ramp, 1 mi final, 3 mi final
+                one = await pg.evaluate("()=>{const s=document.getElementById('sFly');return [!!s.querySelector('#carMain .cwin'),s.querySelectorAll('.pick[data-b]').length,s.querySelectorAll('.pick[data-tod]').length+s.querySelectorAll('#wxPill').length,s.querySelectorAll('.pick[data-pos]').length,!!s.querySelector('#bGo')]}")
+                ok('carousel, location (six airports: 4.6b plus Sky Harbor), time (three chips and, weather item 2, the weather pill), start and GO are all on that one screen', one == [True, 6, 4, 4, True], one)   # start: runway, ramp, 1 mi final, 3 mi final
                 await finger(pg, '#bGo'); await pg.wait_for_timeout(1400)
                 s1 = await pg.evaluate("()=>{const s=window.__kgeu.state();return [s.type,s.base,s.mode,document.getElementById('menu').classList.contains('on')]}")
                 ok('GO flies the saved picks (2 taps from home)', s1 == ['cessna', 'kgeu', 'runway', False], s1)

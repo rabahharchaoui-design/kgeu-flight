@@ -39,7 +39,8 @@ async def main():
         await ev(f"{K}.setTOD('haboob');{K}.pick('cessna');{K}.pickBase('kgeu');{K}.start('runway')")
         await pg.wait_for_timeout(800); await frames(3)
         h = await hb()
-        ok('haboob chip persisted', await pg.evaluate("()=>localStorage.getItem('kgeuTOD')") == 'haboob')
+        # weather item 2: the haboob is a weather now (setTOD('haboob') is day plus the haboob weather)
+        ok('haboob weather persisted, time day', await pg.evaluate("()=>[localStorage.getItem('kgeuWX'),localStorage.getItem('kgeuTOD')]") == ['haboob', 'day'])
         ok('cessna at Glendale: wall on, front about 4.5 km out, no dust', h['on'] and h['wallVisible'] and 4200 < h['dist'] < 4600 and h['d'] == 0, h)
         # one wind: the tower's clearance, the HUD and the physics all read the ambient 8 kt out here
         await frames(60, True)
@@ -87,18 +88,18 @@ async def main():
             await camw([s[0], s[1] + 5, s[2]], [C[0] + Lx * 2000, s[1] - 300, C[1] + Lz * 2000], 62)
             await shot('wall_along_6000ft')
             await ev(f"{K}.freeCam(null)")
-        # switching to day in the pause menu mid-flight removes the storm
+        # switching to Clear in the pause menu's weather sheet mid-flight removes the storm
         await ev(f"{K}.togglePause()")
-        await ev("document.querySelector('#pauseOv .pick[data-tod=\"day\"]').click()")
+        await ev("document.getElementById('wxPillP').click();document.querySelector('#wxOv .wxT[data-wx=\"clear\"]').click()")
         await ev(f"{K}.togglePause()"); await frames(3)
         h = await hb()
-        ok('pause menu Day: wall gone, no dust, clear fog back', not h['on'] and not h['wallVisible'] and h['d'] == 0 and h['fogNear'] == 5000 and h['gustAmp'] == 0.35, h)
+        ok('pause menu Clear: wall gone, no dust, clear fog back', not h['on'] and not h['wallVisible'] and h['d'] == 0 and h['fogNear'] == 5000 and h['gustAmp'] == 0.35, h)
         await ev(f"{K}.start('runway')"); await frames(3)
         h = await hb()
         ok('F-16 at Luke in day: no wall, no dust', not h['on'] and not h['wallVisible'] and h['d'] == 0, h)
         # and switching to haboob mid-flight spawns it 4.5 km out
         await ev(f"{K}.togglePause()")
-        await ev("document.querySelector('#pauseOv .pick[data-tod=\"haboob\"]').click()")
+        await ev("document.getElementById('wxPillP').click();document.querySelector('#wxOv .wxT[data-wx=\"haboob\"]').click()")
         await ev(f"{K}.togglePause()"); await frames(3)
         h = await hb()
         ok('pause menu Haboob mid-flight: wall 4.5 km out', h['on'] and 4200 < h['dist'] < 4600, h)
