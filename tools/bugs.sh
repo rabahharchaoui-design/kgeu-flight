@@ -2,7 +2,8 @@
 # Pocket Flight Sim bug tickets (the private repo rabahharchaoui-design/pocketsim-bugs).
 # The token lives in ~/.pocketsim-bugs-token (Issues read and write only, mode 600); it is never printed.
 #   tools/bugs.sh                 open issues: number, labels, title, created
-#   tools/bugs.sh show <n>        one issue in full (title, labels, state, body, comments)
+#   tools/bugs.sh show <n>        one issue in full (title, labels, state, body, comments) and its report's
+#                                 phone push outcome from D1 (reports.ntfy; needs wrangler logged in)
 #   tools/bugs.sh close <n> "<comment>"   comment, then close (the game reads "Fixed in <version>" from the comment)
 #   tools/bugs.sh json            the open issues as raw JSON (for scripts)
 set -e
@@ -40,7 +41,15 @@ print("state:",d["state"],"  labels:",", ".join(l["name"] for l in d.get("labels
 print(); print(d.get("body") or "(no body)")'
     echo; echo "--- comments"
     py "$(api GET "/issues/$n/comments?per_page=100")" '
-for c in d: print("[%s] %s: %s" % (c["created_at"][:16], c["user"]["login"], c["body"]))' ;;
+for c in d: print("[%s] %s: %s" % (c["created_at"][:16], c["user"]["login"], c["body"]))'
+    echo; echo "--- phone push"
+    [[ $n == <-> ]] || { echo "(not a number)"; exit 0; }
+    out=$(cd "${0:A:h}/../server" && npx wrangler d1 execute pfs-scores --remote --json --command "SELECT id, ntfy FROM reports WHERE issue=$n" 2>/dev/null) || out=''
+    py "${out:-null}" '
+if not isinstance(d,list): print("(D1 not reachable: is wrangler logged in?)"); sys.exit(0)
+rows=d[0].get("results",[]) if d else []
+if not rows: print("(no report row has this issue)")
+for r in rows: print("report #%s: %s" % (r["id"], r["ntfy"] or "not recorded (before ntfyfix, or no NTFY_TOPIC)"))' ;;
   close)
     n=$2; msg=$3; [[ -n $n && -n $msg ]] || { echo "usage: tools/bugs.sh close <n> \"<comment>\"" >&2; exit 2; }
     body=$(M="$msg" python3 -c 'import json,os; print(json.dumps({"body":os.environ["M"]}))')

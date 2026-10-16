@@ -16,7 +16,7 @@ const POOL_PER_DAY = 12;              // offline pool tokens a player can draw p
 const RENAME_EVERY = 30 * DAY;
 
 export default {
-  async fetch(req, env) {
+  async fetch(req, env, ec) {
     const origin = req.headers.get('Origin') || '';
     const cors = ORIGINS.includes(origin) ? {
       'Access-Control-Allow-Origin': origin,
@@ -27,7 +27,9 @@ export default {
     } : { 'Vary': 'Origin' };
     if (req.method === 'OPTIONS') return new Response(null, { status: ORIGINS.includes(origin) ? 204 : 403, headers: cors });
     const url = new URL(req.url);
-    const ctx = { env, req, url, ip: req.headers.get('CF-Connecting-IP') || 'local', now: Date.now(), origin };
+    // later: work that outlives the response (ec.waitUntil), awaited in place when there is no execution context
+    const later = p => ec && ec.waitUntil ? ec.waitUntil(p) : p;
+    const ctx = { env, req, url, ip: req.headers.get('CF-Connecting-IP') || 'local', now: Date.now(), origin, later };
     let res;
     try {
       // writes only from the game's own pages; reads are public but still CORS locked
@@ -490,8 +492,9 @@ async function fame(c) {
 }
 
 // ---------------------------------------------------------------- bug reports
-// A ticket from the game: stored first, then mirrored to a private GitHub issue and an ntfy push,
-// both best effort (no secret set, a timeout or an error never loses the report). The game's
+// A ticket from the game: stored first, then an ntfy push and a private GitHub issue, both best
+// effort (no secret set, a timeout or an error never loses the report). The push runs after the
+// response (waitUntil) with retries, and its outcome is kept on the row (reports.ntfy). The game's
 // "My reports" list reads the status back, refreshed from the issue when it is closed with
 // a "Fixed in <version>" comment.
 const BUG_REPO = 'rabahharchaoui-design/pocketsim-bugs';
@@ -584,7 +587,7 @@ async function report(c) {
   const r = { id: ins[0].meta.last_row_id, created: c.now, callsign: cs, category: cat, severity: sev, text };
 
   // everything below is best effort: the report is already stored
-  let shotId = B.shot != null && !jpg ? 'rejected' : null, issue = null, url = null;
+  let shotId = B.shot != null && !jpg ? 'rejected' : null, issue = null;
   if (jpg) {
     try {
       const id = randHex(16);
@@ -595,25 +598,59 @@ async function report(c) {
       shotId = id;
     } catch (e) { shotId = null; }
   }
+  // the push first, so a slow GitHub never delays it; it taps through to the issues list
+  if (c.env.NTFY_TOPIC) c.later(ntfyPush(c, r.id, {
+    topic: c.env.NTFY_TOPIC, title: '🐞 #' + r.id + ' ' + BUG_SEVS[sev] + ' · ' + BUG_CATS[cat],
+    message: cs + ': ' + firstLine(text).trim().slice(0, 120), click: 'https://github.com/' + BUG_REPO + '/issues', tags: ['bug'] }));
   if (c.env.GITHUB_TOKEN) {
     try {
       const title = '#' + r.id + ' ' + BUG_SEVS[sev] + ' · ' + BUG_CATS[cat] + ' · ' + cs + ': ' + firstLine(text).trim().slice(0, 60);
       const res = await gh(c, '', 'POST', { title, body: issueBody(c, r, ctxObj, shotId !== 'rejected' ? shotId : null), labels: [cat, sev] });
       if (res.status === 201) {
         const j = await res.json();
-        issue = j.number | 0 || null; url = j.html_url || null;
+        issue = j.number | 0 || null;
         if (issue) await c.env.DB.prepare('UPDATE reports SET issue=?, checked=? WHERE id=?').bind(issue, c.now, r.id).run();
       }
     } catch (e) { }
   }
-  if (c.env.NTFY_TOPIC) {
-    try {
-      await fetchT('https://ntfy.sh/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-        topic: c.env.NTFY_TOPIC, title: '🐞 #' + r.id + ' ' + BUG_SEVS[sev] + ' · ' + BUG_CATS[cat],
-        message: cs + ': ' + firstLine(text).trim().slice(0, 120), click: url || 'https://github.com/' + BUG_REPO + '/issues', tags: ['bug'] }) }, 5000);
-    } catch (e) { }
-  }
   return json({ ok: true, id: r.id, issue, shot: shotId });
+}
+
+// The ntfy push for report id: up to 4 attempts, retrying a 429, a 5xx, a timeout or a network
+// error after 1, 3 and 8 s. Each attempt's outcome ('ok 200', 'http 429', 'timeout', 'error <name>')
+// is written to reports.ntfy as it happens, so a push cut off midway still shows how far it got;
+// the topic is never stored or logged. NTFY_TOKEN (optional) is an ntfy.sh access token: sent as a
+// bearer token the push counts against that account's limits instead of the shared Worker IP's.
+// NTFY_URL, NTFY_TIMEOUT_MS and NTFY_BACKOFF_SCALE exist for the local test's mock server only.
+const NTFY_BACKOFF = [1000, 3000, 8000], NTFY_TIMEOUT = 4000;   // 4 x 4 s + 12 s stays inside waitUntil's 30 s
+async function ntfyPush(c, id, msg) {
+  const E = c.env, url = E.NTFY_URL || 'https://ntfy.sh/';
+  const ms = +E.NTFY_TIMEOUT_MS || NTFY_TIMEOUT, scale = E.NTFY_BACKOFF_SCALE != null ? +E.NTFY_BACKOFF_SCALE : 1;
+  const headers = { 'Content-Type': 'application/json' };
+  if (E.NTFY_TOKEN) headers.Authorization = 'Bearer ' + E.NTFY_TOKEN;
+  const seen = [];
+  const save = retrying => {
+    const n = seen.length, head = seen[n - 1] + ', ' + n + (n === 1 ? ' attempt' : ' attempts');
+    const v = (n > 1 ? head + ': ' + seen.join(', ') : head) + (retrying ? ', retrying' : '');
+    return E.DB.prepare('UPDATE reports SET ntfy=? WHERE id=?').bind(v.slice(0, 200), id).run().catch(() => { });
+  };
+  for (let i = 0; ; i++) {
+    let out, again;
+    try {
+      const res = await fetchT(url, { method: 'POST', headers, body: JSON.stringify(msg) }, ms);
+      out = (res.ok ? 'ok ' : 'http ') + res.status;
+      again = res.status === 429 || res.status >= 500;
+      try { await res.body?.cancel(); } catch (e) { }
+    } catch (e) {
+      out = e && e.name === 'AbortError' ? 'timeout' : 'error ' + (e && e.name || 'unknown');
+      again = true;
+    }
+    seen.push(out);
+    const retry = again && i < NTFY_BACKOFF.length;
+    await save(retry);
+    if (!retry) return;
+    await new Promise(r => setTimeout(r, NTFY_BACKOFF[i] * scale));
+  }
 }
 
 // a stored screenshot, public: its id is 128 random bits

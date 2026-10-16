@@ -357,19 +357,51 @@ GitHub error never loses a report, the answer is still 200).
   "Fixed in <version>" becomes `fixed` with `fixed_in`, a closed one without becomes `closed`.
   60 calls per IP an hour (hits kind `mine`).
 - Tables `reports` (id, created, callsign, device, ip, category, severity, text, context, shot, issue,
-  status, fixed_in, checked) and `shots` (id, report_id, created, mime, data BLOB).
+  status, fixed_in, checked, ntfy) and `shots` (id, report_id, created, mime, data BLOB). `ntfy` was
+  added by `server/migrations/0001_reports_ntfy.sql` (applied to the live database on 2026-10-15; a
+  database built fresh from schema.sql already has it).
+- The phone push (ntfy.sh) is sent first, before the GitHub call, and runs after the answer
+  (`waitUntil`), so it never slows the game and is never cut off. Each attempt has 4 s; a 429, a 5xx,
+  a timeout or a network error is retried after 1, 3 and 8 s (4 attempts at most). Every attempt's
+  outcome is written to `reports.ntfy`: `ok 200, 1 attempt`, `ok 200, 2 attempts: http 429, ok 200`,
+  `http 429, 4 attempts: ...`, `timeout, ...`, `error <name>, ...` (a trailing `, retrying` means the
+  Worker was stopped mid retry). Null means no push was tried (before this column, or no
+  `NTFY_TOPIC`). The topic itself is never stored, logged or printed. `tools/bugs.sh show <n>` prints
+  it for issue `n`.
 - Secrets (both optional, `npx wrangler secret put NAME`): `GITHUB_TOKEN`, a fine grained token with
   **Issues read and write only** on `rabahharchaoui-design/pocketsim-bugs` (one issue per report, labels
   `<category>` and `<severity>`, the screenshot linked from the Worker); `NTFY_TOPIC`, the ntfy.sh topic
-  for the push (tapping it opens the issue).
+  for the push (tapping it opens the issues list); `NTFY_TOKEN` (optional, see below).
 - `npm test` covers all of this locally; `npm run test:live` skips it (a live report opens a real issue).
 
 ```sh
 # the last 20 reports
 npx wrangler d1 execute pfs-scores --remote --command "SELECT id, datetime(created/1000,'unixepoch') at, callsign, category, severity, status, issue, fixed_in, shot, substr(text,1,80) text FROM reports ORDER BY id DESC LIMIT 20"
+# the phone push outcome of the last 20 reports
+npx wrangler d1 execute pfs-scores --remote --command "SELECT id, issue, datetime(created/1000,'unixepoch') at, ntfy FROM reports ORDER BY id DESC LIMIT 20"
 # delete a report's screenshot (its id from the query above)
 npx wrangler d1 execute pfs-scores --remote --command "DELETE FROM shots WHERE id='<shot id>'; UPDATE reports SET shot=NULL WHERE shot='<shot id>'"
 ```
+
+### If pushes keep failing with `http 429` (NTFY_TOKEN)
+
+Without a token every push counts against ntfy.sh's limit for the Worker's IP address, and Cloudflare
+shares that address with many other Workers, so ntfy.sh can refuse a push with 429 (too many
+requests) even though this game sent only one. A free ntfy.sh account token makes the limit count
+against that account instead. Only do this if `reports.ntfy` keeps showing `http 429, 4 attempts`:
+
+1. Open https://ntfy.sh/signup and create a free account (user name and password, no card).
+2. Signed in, open https://ntfy.sh/account, find **Access tokens**, press **Create access token**,
+   give it a label such as `pfs-scores`, expiry **never**, and copy the token (it starts with `tk_`).
+3. In a terminal:
+   ```sh
+   cd ~/Developer/cc-test/kgeu/server
+   npx wrangler secret put NTFY_TOKEN     # paste the tk_... token when asked, then Enter
+   ```
+   The secret takes effect at once (no deploy needed). The phone's ntfy app needs no change: it keeps
+   its subscription to the same topic. The token is never written to any file in the repo.
+4. Check: send one report from the game, then run the "phone push outcome" query above; the new row
+   should read `ok 200, 1 attempt`. To undo: `npx wrangler secret delete NTFY_TOKEN`.
 
 ## Updating the app
 
