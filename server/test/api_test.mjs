@@ -6,6 +6,7 @@
 import { spawn, execSync } from 'node:child_process';
 import { rmSync, readFileSync, existsSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
+import { createServer } from 'node:http';
 
 const LIVE = process.argv[2] || '';
 const BASE = LIVE || 'http://127.0.0.1:8787';
@@ -45,11 +46,45 @@ const line = (secs, v) => Array.from({ length: Math.round(secs * 5) + 1 }, (_, i
 async function startDev() {
   rmSync(here + '.wrangler/state', { recursive: true, force: true });
   execSync('npx wrangler d1 execute pfs-scores --local --file=schema.sql', { cwd: here, stdio: 'ignore' });
-  dev = spawn('npx', ['wrangler', 'dev', '--port', '8787', '--ip', '127.0.0.1', '--var', 'DEV_DFDAY:1'], { cwd: here, stdio: 'ignore', detached: true });
+  await startNtfyMock();
+  // the report pushes go to the mock: 3 s attempts, the 1/3/8 s backoff at a tenth
+  dev = spawn('npx', ['wrangler', 'dev', '--port', '8787', '--ip', '127.0.0.1', '--var', 'DEV_DFDAY:1', '--var', 'NTFY_TOPIC:' + NTFY_TOPIC,
+    '--var', 'NTFY_URL:http://127.0.0.1:' + NTFY_PORT + '/', '--var', 'NTFY_TOKEN:tk_mocktoken', '--var', 'NTFY_TIMEOUT_MS:3000', '--var', 'NTFY_BACKOFF_SCALE:0.1'],
+    { cwd: here, stdio: 'ignore', detached: true });
   for (let i = 0; i < 60; i++) { try { const r = await fetch(BASE + '/health'); if (r.ok) return; } catch (e) { } await sleep(500); }
   throw new Error('wrangler dev did not start');
 }
-function stopDev() { if (dev) { try { process.kill(-dev.pid, 'SIGTERM'); } catch (e) { } dev = null; } }
+function stopDev() { if (dev) { try { process.kill(-dev.pid, 'SIGTERM'); } catch (e) { } dev = null; } if (ntfyMock) { ntfyMock.closeAllConnections?.(); ntfyMock.close(); ntfyMock = null; } }
+// a stand in for ntfy.sh: a report text holding 'ntfy:<plan>' (say ntfy:429,200 or ntfy:hang) gets those answers
+// attempt by attempt (the last one repeats), anything else 200; every push is kept in ntfyGot
+const NTFY_PORT = 8799, NTFY_TOPIC = 'pfs-mock-topic-' + randomBytes(4).toString('hex');
+let ntfyMock = null;
+const ntfyGot = [];
+function startNtfyMock() {
+  ntfyMock = createServer((q, res) => {
+    let b = '';
+    q.on('data', d => b += d);
+    q.on('end', () => {
+      let m = {}; try { m = JSON.parse(b); } catch (e) { }
+      ntfyGot.push({ m, auth: q.headers.authorization || '', at: Date.now() });
+      const plan = (/ntfy:([a-z0-9,]+)/.exec(m.message || '') || [, '200'])[1].split(',');
+      const n = ntfyGot.filter(g => g.m.title === m.title).length;
+      const a = plan[Math.min(n, plan.length) - 1];
+      if (a === 'hang') return;   // never answers: the Worker's attempt times out
+      res.writeHead(+a || 200, { 'Content-Type': 'application/json' }); res.end('{}');
+    });
+  });
+  return new Promise(r => ntfyMock.listen(NTFY_PORT, '127.0.0.1', r));
+}
+// the row's ntfy column once every push has finished. sql() blocks this process (and so the mock) while it runs,
+// so wait for the mock to go quiet first: no push for 4.5 s is longer than an attempt's 3 s timeout and a backoff
+async function ntfyOf(id) {
+  for (const t0 = Date.now(); Date.now() - t0 < 60000; await sleep(250)) {
+    const last = ntfyGot.length ? ntfyGot[ntfyGot.length - 1].at : 0;
+    if (Date.now() - last > 4500) break;
+  }
+  return (sql(`SELECT ntfy FROM reports WHERE id=${id | 0}`)[0] || {}).ntfy;
+}
 function sql(q) {
   const out = execSync(`npx wrangler d1 execute pfs-scores ${LIVE ? '--remote' : '--local'} --json --command ${JSON.stringify(q)}`, { cwd: here, encoding: 'utf8' });
   return JSON.parse(out)[0].results;
@@ -347,6 +382,28 @@ async function main() {
     for (let i = 0; i < 3; i++) await rep(key());
     const ip11 = await rep(key());
     ok('report: the 11th from one IP in a day is 429', ip11.s === 429 && ip11.j.error === 'rate', JSON.stringify(ip11.j));
+
+    // ---- the phone push (ntfy, here the mock): sent after the answer, retried, its outcome on the row
+    const g1n = await ntfyOf(g1.j.id);
+    ok('push: a report\'s push is stored "ok 200, 1 attempt"', g1n === 'ok 200, 1 attempt', g1n);
+    const g1p = ntfyGot.find(g => g.m.title && g.m.title.startsWith('🐞 #' + g1.j.id + ' '));
+    ok('push: it carries the topic, the bearer NTFY_TOKEN and the issues list link, the stored status no topic',
+      g1p && g1p.m.topic === NTFY_TOPIC && g1p.auth === 'Bearer tk_mocktoken' && g1p.m.click === 'https://github.com/rabahharchaoui-design/pocketsim-bugs/issues'
+      && !sql('SELECT ntfy FROM reports').some(r => String(r.ntfy).includes(NTFY_TOPIC)), JSON.stringify(g1p));
+    sql("DELETE FROM hits WHERE kind='report'");   // the rate tests above used up today's reports
+    const nt = async plan => { const t0 = Date.now(); const r = await rep(key(), { text: 'Push test ntfy:' + plan }); return Object.assign(r, { ms: Date.now() - t0 }); };
+    const p1 = await nt('429,200'), p2 = await nt('429'), p3 = await nt('hang'), p4 = await nt('503,200');
+    ok('push: the answer never waits for the push (a hanging ntfy, answered in ' + p3.ms + ' ms)', p3.s === 200 && p3.j.id > 0 && p3.ms < 2500, JSON.stringify(p3.j));
+    const n1 = await ntfyOf(p1.j.id), n2 = await ntfyOf(p2.j.id), n3 = await ntfyOf(p3.j.id), n4 = await ntfyOf(p4.j.id);
+    ok('push: 429 then 200 is retried and stored ok after 2 attempts', n1 === 'ok 200, 2 attempts: http 429, ok 200', n1);
+    ok('push: 429 every time gives up after 4 attempts, stored http 429', n2 === 'http 429, 4 attempts: http 429, http 429, http 429, http 429', n2);
+    ok('push: a hang times out each attempt, 4 attempts, stored timeout', n3 === 'timeout, 4 attempts: timeout, timeout, timeout, timeout', n3);
+    ok('push: a 503 is retried too', n4 === 'ok 200, 2 attempts: http 503, ok 200', n4);
+    const at = ntfyGot.filter(g => g.m.title && g.m.title.startsWith('🐞 #' + p2.j.id + ' ')).map(g => g.at);
+    const gaps = at.slice(1).map((t, i) => t - at[i]);
+    ok('push: retries back off 1, 3 and 8 s (a tenth here)', at.length === 4 && gaps[0] >= 90 && gaps[1] >= 290 && gaps[2] >= 790 && gaps[2] > gaps[1] && gaps[1] > gaps[0], gaps.join(' '));
+    const n400 = await nt('400'); const v400 = await ntfyOf(n400.j.id);
+    ok('push: a 400 is not retried, stored http 400 after 1 attempt', v400 === 'http 400, 1 attempt', v400);
   }
 
   // ---- every refusal is on record
