@@ -8,10 +8,12 @@ from harness import serve, launch, page, IPHONE_15, Checks
 
 TYPE = sys.argv[sys.argv.index('--type') + 1] if '--type' in sys.argv else 'reaper'
 K = 'window.__kgeu'
+# calm air: the weather's random wind steers the orbit autopilot's roll inside each frame, which moves a far spot's
+# range by several hundred metres either way
 PLACE = """()=>{const K=window.__kgeu,s=K.state();const x=-7679-6000,z=-1855+4000,hdg=0.3,V=80;
   s.pos.set(x,4570+K.groundHeight(x,z),z);s.vel.set(Math.sin(hdg)*V,0,-Math.cos(hdg)*V);
   s.quat.setFromEuler(new THREE.Euler(0,-hdg,0,'YXZ'));s.w.set(0,0,0);
-  s.onGround=false;s.airTime=30;s.flapIdx=0;s.throttle=s.power=0.7;s.gearDown=false;s.gearPos=0;s.ap=null;
+  s.windKt=0;s.gustAmp=0;s.gust=s.gustTarget=0;s.turb=0;s.onGround=false;s.airTime=30;s.flapIdx=0;s.throttle=s.power=0.7;s.gearDown=false;s.gearPos=0;s.ap=null;
   K.touchIn.active=false;K.snapCam();K.stepFrame(1/60,false,true);
   while(K.camMode()!==2)K.cycleCam();K.stepFrame(1/60,false,true);return K.sensorMode();}"""
 # hold the aircraft still between frames (the orbit autopilot would turn it): the test turns it by hand
@@ -99,7 +101,8 @@ async def main():
         vis = await pg.evaluate(f"()=>{{const g={K}.plane().g;let n=0,v=0;g.traverse(o=>{{if(o.userData.turret){{n++;if(o.visible)v++;}}}});return [n,v];}}")
         c('turret meshes tagged and hidden in the sensor view', vis[0] == 3 and vis[1] == 0, vis)
         # 7. a track breaks when the airframe masks it
-        await pg.evaluate(SET, [60, -30]); await pg.evaluate(STEP, 2)
+        # el -34: the spot about 15 km away (at -30 it sat 19.6 km out, a hair inside the 20 km track range)
+        await pg.evaluate(SET, [60, -34]); await pg.evaluate(STEP, 2)
         await pg.evaluate(f"()=>{K}.trackHere()"); s0 = await pg.evaluate(f"()=>{K}.sensor()"); s = await pg.evaluate(STEP, 2)
         c('area track on', s['kind'] == 'ar', (s0['kind'], s['kind'], s['cue'], s0['valid'], s0['az'], s0['el']))
         await pg.evaluate("()=>{const q=window.__q0;q.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),2.0));}")

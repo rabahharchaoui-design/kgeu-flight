@@ -39,8 +39,8 @@ async def main():
         b = await launch(p)
         pg = await page(b, url, vp={'width': 844, 'height': 390}, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'})
         await pg.evaluate(f"()=>{K}.taskStart('shepherd',{{seed:3}})"); await pg.wait_for_timeout(500)
-        br = await pg.evaluate("()=>({k:document.getElementById('tkbK').textContent,ac:document.getElementById('tkbAc').textContent,sit:document.getElementById('tkbSit').textContent,f:[...document.querySelectorAll('#tkbF span b')].map(e=>e.textContent),n:document.querySelectorAll('#tkbSt li').length})")
-        ok('the briefing: Escort, the F-16 2 miles behind the package, the corridor, par, altitude, wind aloft; no weapons', br['k'] == 'TASKING · ESCORT' and 'F-16C' in br['ac'] and br['n'] == 3 and br['f'] == ['CORRIDOR', 'PAR', 'ALTITUDE', 'WIND ALOFT'] and 'No weapons' in br['sit'], br)
+        br = await pg.evaluate("()=>({k:document.getElementById('tkbK').textContent,ac:document.getElementById('tkbAc').textContent,sit:document.getElementById('tkbSit').textContent,f:[...document.querySelectorAll('#tkbF span b')].map(e=>e.textContent),wx:(document.querySelector('#tkbF span:last-child i')||{textContent:''}).textContent,n:document.querySelectorAll('#tkbSt li').length})")
+        ok('the briefing: Escort, the F-16 2 miles behind the package, the corridor, par, altitude, wind aloft, the weather (clear); no weapons', br['k'] == 'TASKING · ESCORT' and 'F-16C' in br['ac'] and br['n'] == 3 and br['f'] == ['CORRIDOR', 'PAR', 'ALTITUDE', 'WIND ALOFT', 'WEATHER'] and br['wx'].endswith('Clear') and 'No weapons' in br['sit'], br)
         s = await pg.evaluate(f"""()=>{{const K={K},d=K.TASK.d,L=d.L,s=K.state();let props=0,gear=null;
           return {{type:s.type,air:!s.onGround,dist:Math.round(Math.hypot(s.pos.x-L.x,s.pos.z-L.z)),alt:d.alt,lead:!!(L.Lm&&L.Lm.g.parent),props:L.Lm.ps.length,discs:L.Lm.ds.length,legs:d.W.length-1,len:Math.round(d.len)}}}}""")
         ok('the F-16 in the air about 2 miles behind; the lead is the C-130H model with its four props; a three leg corridor of 25 to 35 km',

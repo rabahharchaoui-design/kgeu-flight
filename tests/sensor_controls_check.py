@@ -53,7 +53,12 @@ async def main():
         await finger(pg, '#bDclt'); await finger(pg, '#bDclt'); await pg.wait_for_timeout(250)
         c('DCLT round to off', (await pg.evaluate(S))['dclt'] == 0)
         await pg.evaluate(f"()=>{{const S={K}.SENSOR;S.az=2.4;S.el=-0.3;}}"); await pg.wait_for_timeout(200)
-        await finger(pg, '#bNose'); await pg.wait_for_timeout(1500); s = await pg.evaluate(S)
+        # the swing takes about a second of flight time; at the harness's few frames a second (dt capped at 0.1) that is
+        # several seconds of wall time, so wait for it rather than a fixed 1.5 s
+        await finger(pg, '#bNose')
+        try: await pg.wait_for_function("()=>{const s=window.__kgeu.sensor();return Math.abs(s.az)<2&&Math.abs(s.el+15)<2;}", timeout=8000)
+        except Exception: pass
+        s = await pg.evaluate(S)
         c('NOSE by touch: back to the nose', abs(s['az']) < 2 and abs(s['el'] + 15) < 2, (s['az'], s['el']))
         # taps on the picture
         await pg.evaluate(f"()=>{K}.sensorLook(60,35)"); await pg.wait_for_timeout(200)

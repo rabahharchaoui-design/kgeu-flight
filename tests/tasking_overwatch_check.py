@@ -29,9 +29,9 @@ async def main():
         pg = await page(b, url, vp={'width': 844, 'height': 390}, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'})
         await pg.evaluate(f"()=>{K}.taskStart('overwatch',{{seed:42}})"); await pg.wait_for_timeout(500)
         br = await pg.evaluate("()=>({k:document.getElementById('tkbK').textContent,t:document.getElementById('tkbT').textContent,ac:document.getElementById('tkbAc').textContent,sit:document.getElementById('tkbSit').textContent,f:[...document.querySelectorAll('#tkbF span')].map(e=>e.innerText.replace(/\\n/,' ')),n:document.querySelectorAll('#tkbSt li').length})")
-        ok('the briefing: Surveillance, OVERWATCH, the MQ-9B at Luke 3L, five objectives, par, on station, wind and the target in nm (Hard)',
+        ok('the briefing: Surveillance, OVERWATCH, the MQ-9B at Luke 3L, five objectives, par, on station, wind, the target in nm (Hard) and the weather (clear)',
            br['k'] == 'TASKING · SURVEILLANCE' and br['t'].startswith('OVERWATCH') and 'MQ-9B' in br['ac'] and 'Luke' in br['ac'] and br['n'] == 5
-           and [f.split(' ')[0] for f in br['f']] == ['PAR', 'ON', 'WIND', 'TARGET'] and ' nm ' in br['f'][3], br)
+           and [f.split(' ')[0] for f in br['f']] == ['PAR', 'ON', 'WIND', 'TARGET', 'WEATHER'] and ' nm ' in br['f'][3] and br['f'][4].endswith('Clear'), br)
         s = await pg.evaluate(f"()=>{{const K={K},d=K.TASK.d,s=K.state();return {{type:s.type,on:s.onGround,base:s.base,dist:d.dist,brg:d.brg,objs:K.TASK.objs.length,tg:K.TASK.tgts.map(t=>t.name),dest:K.dest&&K.dest()}}}}")
         ok('on the runway at Luke in the MQ-9B; the compound 6 to 8.5 km west of Luke with its building and pickup as targets',
            s['type'] == 'mq9b' and s['on'] and 6000 <= s['dist'] <= 8500 and 190 <= s['brg'] <= 345 and s['objs'] == 2 and s['tg'] == ['the white building', 'the white pickup'], s)

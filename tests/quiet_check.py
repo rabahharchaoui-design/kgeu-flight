@@ -80,9 +80,12 @@ async def main():
         await pg.wait_for_timeout(400)
         s = await pg.evaluate(ST)
         ok('resume: gain is back to the radio volume', s['live'] and abs(s['gain'] - s['vol']) < 0.05, s)
-        await step(pg, 5)
+        # the rest of the queue (the conditions report comes before the clearance): step until the clearance airs
+        for _ in range(40):
+            await step(pg, 1)
+            log = await pg.evaluate("()=>window.__kgeu.radioLog().slice(-3).map(l=>l.text)")
+            if any('Cleared for takeoff' in t for t in log): break
         n = await pg.evaluate(LOGN)
-        log = await pg.evaluate("()=>window.__kgeu.radioLog().slice(-3).map(l=>l.text)")
         ok('resume: the queue keeps playing (readback)', n > n1 and any('Cleared for takeoff' in t for t in log), log)
         await release(pg)
 

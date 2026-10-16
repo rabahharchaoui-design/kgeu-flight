@@ -9606,7 +9606,9 @@ function wxFrontGo(c){const F=WXF.front,s=st;if(F.on)return;
   if(ez)toast('Gust front!',2.5);}
 function wxFly(dt){
   const s=st;if(!s||s.crashed||DF.on)return;
-  const W=WX.id,F=WXF.front,live=s.wxW&&!s.windHold&&!LES.on;
+  // live: a free flight's weather. A run on a fixed weather (ARC.prevWX: the taskings, missions, lessons, challenges,
+  // the daily, the dogfight) flies as it did before the weather: no turbulence, no gust fronts, its own wind and gusts
+  const W=WX.id,F=WXF.front,live=s.wxW&&!s.windHold&&!LES.on&&!ARC.prevWX;
   // the storm's fronts: 15 s (3 in, 7 held, 5 out) of 15 to 25 kt more, the wind swung up to 40 degrees toward the cell
   if(F.on){const t=s.time-F.t0,e=t<3?t/3:t<10?1:t<15?(15-t)/5:0;
     if(t>=15||!live||W!=='storm'){s.windKt=F.k0;s.windOff=0;F.on=0;}else{s.windKt=F.k0+F.kt*e;s.windOff=F.sw*e;}}
@@ -14410,6 +14412,14 @@ function readback(kind){
            tfc:['Looking for the traffic, ','p_rb_traffic']}[kind];
   vqAdd(L(AC.cs,'pilot',T[0]+AC.cs+'.',[T[1],csP()]),{dep:VQ.lastSay});   // dropped with the call it answers
 }
+// the conditions report (A.atis) still waiting in the queue or on the air
+function atisPending(){const l=A.atis;return !!l&&!l.dead&&(radioQ.indexOf(l)>=0||!!VQ.cur&&VQ.cur.line===l);}
+// a tower call queued behind the one on the air, never cutting it (the first clearance behind the conditions report);
+// the queue's clock stops while paused, so a long ttl only covers the report and a call that comes in meanwhile
+function sayAfter(who,text,clips,o){o=o||{};
+  for(let i=radioQ.length-1;i>=0;i--)if(radioQ[i].pri>=3){radioQ[i].dead=true;radioQ.splice(i,1);}
+  return VQ.lastSay=vqAdd({who:who,text:text,clips:clips},{ok:o.ok,ttl:o.ttl||90});
+}
 function atcUpdate(){
   const s=st,u=toU(s.pos.x,s.pos.z),v=toV(s.pos.x,s.pos.z);
   if(s.onGround) A.ground=1;
@@ -14417,19 +14427,22 @@ function atcUpdate(){
   const twrC='t_'+B.twrClip, gndC='t_'+B.gndClip, rwyC='t_'+B.rwyClip;
   // weather item 4: a free flight's conditions, ATIS style, before its first clearance (which waits for it to end)
   if(A.atis===undefined&&s.time>0.3)A.atis=atisWant(s)?atisSay(B,s.mode==='ramp'):0;
-  // (and then for the air: a tower call that came in meanwhile, the haboob's, is not cut by it)
-  const ao=A.atis!==undefined&&(!A.atis||(A.atis.dead||A.atis.aired)&&(!VQ.cur||VQ.cur.pri>2)||s.time>40);
-  if(s.mode==='runway'&&!A.tko&&s.time>0.6&&ao){A.tko=1;
-    say(B.twr,AC.cs+', '+B.twr.split(' ').slice(0,2).join(' ')+', '+windTxtG()+', runway '+B.rwy+', cleared for takeoff.',
+  // While the report is queued or on the air the clearance goes into the queue behind it, at once (twrSay: no cut, so
+  // it waits for the report to end, and a pause keeps it queued and silent until Resume); once the report is done, a tower
+  // call that came in meanwhile (the haboob's) is not cut by it
+  const ap=atisPending(),ao=A.atis!==undefined&&(ap||!A.atis||(A.atis.dead||A.atis.aired)&&(!VQ.cur||VQ.cur.pri>2)||s.time>40);
+  const twrSay=ap?sayAfter:say;
+  if(s.mode==='runway'&&!A.tko&&(s.time>0.6||ap)&&ao){A.tko=1;
+    twrSay(B.twr,AC.cs+', '+B.twr.split(' ').slice(0,2).join(' ')+', '+windTxtG()+', runway '+B.rwy+', cleared for takeoff.',
         [csT(),twrC].concat(windCG(),[rwyC,'t_cleared_to']),{ok:onGnd});readback('to');}
-  if(s.mode==='ramp'&&!A.taxi&&s.time>0.6&&ao){A.taxi=1;
-    say(B.gnd,AC.cs+', '+B.gnd.split(' ').slice(0,2).join(' ')+', runway '+B.rwy+', taxi to the active via Alpha.',
+  if(s.mode==='ramp'&&!A.taxi&&(s.time>0.6||ap)&&ao){A.taxi=1;
+    twrSay(B.gnd,AC.cs+', '+B.gnd.split(' ').slice(0,2).join(' ')+', runway '+B.rwy+', taxi to the active via Alpha.',
         [csT(),gndC,rwyC,'t_taxi_alpha']);readback('wilco');}
   // at the holding point: Glendale's runway 1 end of the parallel taxiway; a world region, near the home runway's first third
   if(s.mode==='ramp'&&A.taxi&&!A.tko&&s.onGround&&(s.base==='kgeu'?v>-70&&v<-20&&u<560:!REGION.az&&Math.abs(v)<120&&u<RWY_LEN/3)){A.tko=1;
     say(B.twr,AC.cs+', runway '+B.rwy+', cleared for takeoff.',[csT(),rwyC,'t_cleared_to'],{ok:onGnd});readback('to');}
-  if(s.mode==='final'&&!A.land&&s.time>0.6&&ao){A.land=1;
-    say(B.twr,AC.cs+', '+B.twr.split(' ').slice(0,2).join(' ')+', '+windTxtG()+', runway '+B.rwy+', cleared to land.',
+  if(s.mode==='final'&&!A.land&&(s.time>0.6||ap)&&ao){A.land=1;
+    twrSay(B.twr,AC.cs+', '+B.twr.split(' ').slice(0,2).join(' ')+', '+windTxtG()+', runway '+B.rwy+', cleared to land.',
         [csT(),twrC].concat(windCG(),[rwyC,'t_cleared_land']),{ok:inAir});readback('land');}
   // the storm's nearest cell from the field, once, when the first clearance is done
   if(WX.id==='storm'&&!A.ts&&(A.tko||A.taxi||A.land)&&!VQ.cur&&!radioQ.length&&atisWant(s)){A.ts=1;const c=wxCell(APC.x,APC.z);
@@ -16842,7 +16855,7 @@ function start(mode,base){
   if(mode==='drop')dzStart();
   // the missions' fixed weather (WX_FIX: the drop scattered, the strike range, the gun run and the short field clear),
   // after hudClear (a lesson's end puts the player's back)
-  if(mode==='range'||mode==='drop'||mode==='short')wxFix(mode==='range'&&acType==='a10'?'gunrun':mode);
+  if(mode==='range'||mode==='drop'||mode==='short'){wxFix(mode==='range'&&acType==='a10'?'gunrun':mode);wxWindOff();}   // and the plain wind dice, as before the weather
   hbSync(true);
   csmRecv();   // the receivers once a flight, here at the tap rather than on its first frame
   if(LB){LB.reset();if(mode==='range'||mode==='drop'||mode==='short')LB.runStart(mode==='range'?(acType==='a10'?'arc:gunrun':'arc:strike'):mode==='drop'?'arc:drop':'mission:short');}
