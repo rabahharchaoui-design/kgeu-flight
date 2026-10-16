@@ -25,6 +25,9 @@ async def main():
         lab = await pg.evaluate("()=>['lIas','lAlt','lVs','lHdg'].map(i=>document.getElementById(i).textContent)")
         ok('pilot labels are KIAS ALT VS HDG', lab == ['KIAS', 'ALT', 'VS', 'HDG'], lab)
         ok('pilot flight has no easy flight assists', await pg.evaluate(f"()=>{K}.state().easy") is False)
+        # weather item 4: a free flight reads the conditions (ATIS style) first; the clearance follows it
+        try: await pg.wait_for_function("()=>/cleared for takeoff/.test(document.getElementById('atc').innerText)", timeout=120000)
+        except Exception: pass
         atc = await pg.evaluate("()=>document.getElementById('atc').innerText")
         ok('pilot radio is full phraseology with no plain line', 'cleared for takeoff' in atc and 'says:' not in atc, atc)
         await pg.evaluate(f"()=>{{{K}.state().elev=0.6;}}"); await pg.wait_for_timeout(400)
@@ -43,6 +46,8 @@ async def main():
         ok('rookie labels are Speed Height Climbing Direction', lab == ['Speed', 'Height', 'Climbing', 'Direction'], lab)
         hdg = await pg.evaluate("()=>document.getElementById('hHdg').textContent")
         ok('direction reads as a compass point', hdg in ['N','NE','E','SE','S','SW','W','NW'], hdg)
+        try: await pg.wait_for_function("()=>/cleared for takeoff/.test(document.getElementById('atc').innerText)", timeout=120000)
+        except Exception: pass
         atc = await pg.evaluate("()=>document.getElementById('atc').innerText")
         ok('rookie radio has a plain English subtitle', 'Tower says: you can take off now.' in atc, atc)
         ok('rookie flight has easy flight on', await pg.evaluate(f"()=>{K}.state().easy") is True)

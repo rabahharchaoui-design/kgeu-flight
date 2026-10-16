@@ -244,7 +244,7 @@ async def region_radio_map(pg, rid):
     """(e) the tower on a 3 nm final, region chatter, (f) the map. The page is in region rid."""
     await pg.evaluate(f"()=>{{const K={K};K.RADIO.log.length=0;K.pick('cessna');K.start('final');}}")
     line = None
-    for _ in range(40):
+    for _ in range(400):   # weather item 4: the conditions (ATIS style) come first, the clearance after them
         await pg.wait_for_timeout(300)
         log = await pg.evaluate(f"()=>{K}.radioLog()")
         line = next((l for l in log if 'cleared to land' in (l['text'] or '')), None)

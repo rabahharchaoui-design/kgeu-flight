@@ -73,7 +73,8 @@ async def main():
     await pg.evaluate("()=>{window.__kgeu.pick('c130');window.__kgeu.pickBase('luke');window.__kgeu.start('runway');}")
     # the tower calls at 0.6 s of sim time; this harness runs at ~3 fps with dt capped
     # at 0.1 s, so that is about 2-3 s of wall time. Wait for the call, not a fixed 2.5 s.
-    try: await pg.wait_for_function("()=>/cleared for takeoff/.test(document.getElementById('atc').textContent)", timeout=15000)
+    # weather item 4: a free flight's runway start reads the conditions (ATIS style) first, the clearance waits for it
+    try: await pg.wait_for_function("()=>/cleared for takeoff/.test(document.getElementById('atc').textContent)", timeout=120000)
     except Exception: pass
     line=await pg.evaluate("()=>{const e=document.getElementById('atc'),r=e.getBoundingClientRect(),c=e.querySelector('b');return {on:e.classList.contains('on'),txt:e.textContent,in:e.parentNode.id,top:r.top,H:innerHeight,col:c?getComputedStyle(c).color:''};}")
     # fix2 item 11: the subtitle is the bottom caption (#cap), below 80% of the height, the station tinted
