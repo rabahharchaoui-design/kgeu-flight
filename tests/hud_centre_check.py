@@ -123,6 +123,9 @@ async def case_airdrop(b, url):
         ok(f'{w}x{h}: the one minute call came', st['c1'], st)
         for name, sa in insets(w, h):
             await pg.evaluate(SETSAFE, list(sa))
+            try:   # the caption's 0.35 s fade in (the harness draws at a few frames a second under load)
+                await pg.wait_for_function("()=>{const a=document.getElementById('atc');return !a.classList.contains('on')||parseFloat(getComputedStyle(a).opacity)>0.9}", timeout=8000)
+            except Exception: pass
             tag = f'airdrop {w}x{h} {name}'
             a = await audit(pg, tag)
             ok(f'{tag}: the pill reads ONE MINUTE while the call is on', a['pill'] == 'ONE MINUTE', a['pill'])
@@ -211,11 +214,11 @@ async def case_lesson(b, url):
             await pg.evaluate(DRAW, 3)
         await pg.evaluate(DRAW, 2)
         L = await pg.evaluate("""()=>{const l=document.getElementById('lesson'),c=document.getElementById('lesCap'),b=c.querySelector('b'),r=l.getBoundingClientRect();
-          return {lc:l.classList.contains('lc'),call:l.classList.contains('call'),who:b?b.textContent:'',col:b?getComputedStyle(b).color:'',txt:c.textContent,
+          return {lc:l.classList.contains('lc'),call:l.classList.contains('call'),who:b?b.textContent.replace(/:\s*$/,''):'',sp:b?/: $/.test(b.textContent):false,col:b?getComputedStyle(b).color:'',txt:c.textContent,
             capShown:c.getBoundingClientRect().height>0,top:Math.round(r.top),frac:+(r.top/innerHeight).toFixed(3),bottom:Math.round(r.bottom),
             atcShown:getComputedStyle(document.getElementById('atc')).display!=='none'&&document.getElementById('atc').getBoundingClientRect().height>0}}""")
         print(f'  info lesson {w}x{h}: the panel spans y {L["top"]}..{L["bottom"]} (top at {L["frac"]} of the height)')
-        ok(f'lesson {w}x{h}: the CFI line is in the lesson panel, Dana tinted sand, no separate caption', L['lc'] and L['call'] and L['capShown'] and L['who'] == 'Dana' and L['col'] == 'rgb(246, 193, 119)' and not L['atcShown'], L)
+        ok(f'lesson {w}x{h}: the CFI line is in the lesson panel, Dana tinted sand, no separate caption', L['lc'] and L['call'] and L['capShown'] and L['who'] == 'Dana' and L['sp'] and L['col'] == 'rgb(246, 193, 119)' and not L['atcShown'], L)
         ok(f'lesson {w}x{h}: the panel top below {0.72 if w < 600 else 0.80} of the height', L['frac'] >= (0.72 if w < 600 else 0.80), L['frac'])
         L2 = await pg.evaluate(f"""()=>{{const K={K},a=document.getElementById('atc'),l=document.getElementById('lesson');
           for(let i=0;i<30*45;i++){{K.stepFrame(1/30,false,true);if(!a.classList.contains('on'))break;}}
@@ -230,11 +233,11 @@ async def case_free(b, url):
     pg = await new(b, url, 844, 390)
     # Settings, Radio row: the captions toggle
     await pg.evaluate(f"()=>{K}.nav('sSet',true)"); await pg.wait_for_timeout(400)
-    t = await pg.evaluate("()=>{const b=document.getElementById('oCap'),r=b.getBoundingClientRect(),row=b.closest('.srow');return {txt:b.textContent,row:row&&row.firstElementChild.textContent,top:document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===b}}")
-    ok('Settings: Captions: On in the Radio row, tappable', t['txt'] == 'Captions: On' and t['row'] == 'Radio' and t['top'], t)
+    t = await pg.evaluate("()=>{const b=document.getElementById('oCap'),r=b.getBoundingClientRect(),row=b.closest('.srow');return {txt:b.innerText.trim(),row:row&&row.firstElementChild.textContent,top:document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===b}}")
+    ok('Settings: Captions: On (Cap: On under 900 px wide) in the Radio row, tappable', t['txt'] in ('Captions: On', 'Cap: On') and t['row'] == 'Radio' and t['top'], t)
     await pg.evaluate("()=>document.getElementById('oCap').click()")
-    t2 = await pg.evaluate("()=>({txt:document.getElementById('oCap').textContent,ls:localStorage.getItem('kgeuCap'),aria:document.getElementById('oCap').getAttribute('aria-label')})")
-    ok('Captions: Off is saved (kgeuCap 0)', t2['txt'] == 'Captions: Off' and t2['ls'] == '0' and t2['aria'] == 'Radio captions: Off', t2)
+    t2 = await pg.evaluate("()=>({txt:document.getElementById('oCap').innerText.trim(),ls:localStorage.getItem('kgeuCap'),aria:document.getElementById('oCap').getAttribute('aria-label')})")
+    ok('Captions: Off is saved (kgeuCap 0)', t2['txt'] in ('Captions: Off', 'Cap: Off') and t2['ls'] == '0' and t2['aria'] == 'Radio captions: Off', t2)
     if SHOT:
         os.makedirs(SHOT, exist_ok=True); await pg.screenshot(path=os.path.join(SHOT, 'hud_settings_captions_844.png'))
     await pg.evaluate(f"()=>{{const K={K};K.pick('cessna');K.pickBase('kgeu');K.start('runway')}}"); await pg.wait_for_timeout(500)

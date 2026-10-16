@@ -26,8 +26,14 @@ async def main():
         pg = await page(b, url, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1'})
         await pg.route('https://www.youtube.com/**', lambda r: r.fulfill(body='<title>yt</title>', content_type='text/html'))
         await pg.evaluate("()=>window.__kgeu.nav('sSet',true)"); await pg.wait_for_timeout(200)
-        r = await pg.evaluate("()=>{const a=document.querySelector('#sSet .credit'),r=a.getBoundingClientRect(),s=document.getElementById('sSet');return {y:r.bottom,H:innerHeight,h:r.height,scroll:s.scrollHeight>s.clientHeight+1}}")
-        ok('Settings has it at the bottom, 44 px tall, no scrolling', r['y'] > r['H'] - 60 and r['h'] >= 44 and not r['scroll'], r)
+        # fix2 item 7: the footer scrolls with the Settings rows, under the last one (two columns of six
+        # 44 px rows leave no room for a fixed footer at 667x375), so the credit is the last thing in the
+        # rows' scroll box: swipe to the end and it sits at the bottom of the screen, 44 px, tappable
+        r = await pg.evaluate("""()=>{const a=document.querySelector('#sSet .credit'),g=document.querySelector('#sSet .setGrid'),s=document.getElementById('sSet');
+          g.scrollTop=1e4;const r=a.getBoundingClientRect(),G=g.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+          return {y:Math.round(r.bottom),H:innerHeight,h:r.height,gridBottom:Math.round(G.bottom),scroll:s.scrollHeight>s.clientHeight+1,hit:!!hit&&a.contains(hit)}}""")
+        ok('Settings has it at the bottom (end of the rows), 44 px tall, the screen itself does not scroll, a tap reaches it',
+           r['y'] > r['H'] - 60 and r['y'] <= r['gridBottom'] + 1 and r['h'] >= 44 and not r['scroll'] and r['hit'], r)
         async with pg.context.expect_page() as newp:
             await finger(pg, '#sSet .credit')
         np = await newp.value

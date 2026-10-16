@@ -1,7 +1,7 @@
 # ui1 items 5 to 8: the XP pop and where it fires.
-#  (a) xpPop(amount, reason): a centre screen burst that counts up to the amount, the reason under it, inside the safe
-#      area (a 47 px notch stood in), never takes a touch (the stick under it still gets the finger), two close together
-#      stack (the older one steps up), gone after about 2.5 s; 568x320 and 844x390.
+#  (a) xpPop(amount, reason) in flight (fix2 item 11): a one line pill under the pause button, centred across, above 26%
+#      of the height, that counts up to the amount with the reason beside it, inside the safe area (a 47 px notch stood
+#      in), never takes a touch, one at a time (a new grant replaces it), gone after about 1.2 s; 568x320 and 844x390.
 #  (b) the pops fire only when the (mocked) Worker grants XP, with its number: a free flight landing, a lesson, a
 #      challenge, the daily, a school1 lesson (lesson: family) and a tasking (task: family); none with no callsign,
 #      for a practice daily, a refused run or no connection; nothing banked locally (kgeuTaskXP retired, bugs1).
@@ -37,32 +37,29 @@ async def main():
             a = await pg.evaluate(POP)
             ok(f'{tag} (a) one pop shows at once, the reason under it', len(a) == 1 and a[0]['r'] == 'Landing graded', a)
             W, H = vp['width'], vp['height']
-            ok(f'{tag} (a) centre screen: centred across, in the middle band, inside the safe area',
-               a and abs(a[0]['cx'] - W / 2) < 6 and H * 0.2 < a[0]['cy'] < H * 0.62 and a[0]['x'] >= 47 - 0.5 and a[0]['x'] + a[0]['w'] <= W - 47 + 0.5, a)
+            # fix2 item 11: in flight the pop is a one line pill under the pause button, centred across, above 26% of the height
+            pb = await pg.evaluate("()=>document.getElementById('bPause').getBoundingClientRect().bottom")
+            ok(f'{tag} (a) in flight: a pill under the pause button, centred across, above 0.26H, inside the safe area',
+               a and abs(a[0]['cx'] - W / 2) < 6 and a[0]['y'] >= pb - 0.5 and a[0]['y'] + a[0]['h'] <= H * 0.26 + 0.5 and a[0]['x'] >= 47 - 0.5 and a[0]['x'] + a[0]['w'] <= W - 47 + 0.5, (a, pb))
             ok(f'{tag} (a) it never takes a touch (pointer-events none all the way down)', a and a[0]['pe'], a)
             # a finger on the pop lands on what is under it
             hit = await pg.evaluate("()=>{const r=document.querySelector('#xpPops .xpIn').getBoundingClientRect();const e=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return e&&!e.closest('#xpPops')}")
             ok(f'{tag} (a) a tap on it goes through to the game', hit)
-            await pg.wait_for_timeout(900)
-            a = await pg.evaluate(POP)
+            for _ in range(16):   # the count up is rAF paced: at 3 fps under load it takes a few seconds of wall time
+                await pg.wait_for_timeout(250); a = await pg.evaluate(POP)
+                if a and a[0]['done'] and a[0]['n'] == '37': break
             ok(f'{tag} (a) the number counted up to 37 and glows', a and a[0]['n'] == '37' and a[0]['done'], a)
-            await pg.evaluate(f"()=>{K}.xpPop(15,'Personal best')")
-            for _ in range(12):   # the step up is a 260 ms transition: at 3 fps under load it can take a few frames
-                await pg.wait_for_timeout(250); a = await pg.evaluate(POP)   # DOM order: the older pop first
-                if len(a) == 2 and a[0]['cy'] < a[1]['cy'] - 30: break
-            ok(f'{tag} (a) a second pop stacks: the new one in the centre, the older one stepped up and smaller', len(a) == 2 and a[0]['cy'] < a[1]['cy'] - 30 and 'translateY' in a[0]['tr'] and abs(a[1]['cx'] - W / 2) < 6, a)
-            await pg.screenshot(path=os.path.join(SHOTS, f'xp_stack_{tag}.png'))
-            await pg.wait_for_timeout(2600)
-            await pg.evaluate(f"()=>{{{K}.xpPop(37,'Landing graded',{{hold:6000}})}}"); await pg.wait_for_timeout(1300)
+            await pg.evaluate(f"()=>{K}.xpPop(15,'Personal best',{{hold:5000}})"); await pg.wait_for_timeout(300)
+            a = await pg.evaluate(POP)
+            ok(f'{tag} (a) one at a time in flight: a second grant replaces the first', len(a) == 1 and a[0]['r'] == 'Personal best' and abs(a[0]['cx'] - W / 2) < 6, a)
             await pg.screenshot(path=os.path.join(SHOTS, f'xp_pop_{tag}.png'))
-            await pg.wait_for_timeout(5200)
             await pg.evaluate(f"()=>{{const K={K};K.xpPop(1,'a');K.xpPop(2,'b');K.xpPop(3,'c');}}"); await pg.wait_for_timeout(200)
-            n = await pg.evaluate("()=>document.querySelectorAll('#xpPops .xpPop').length")
-            ok(f'{tag} (a) never more than three on screen', n == 3, n)
+            a = await pg.evaluate(POP)
+            ok(f'{tag} (a) never more than one on screen in flight, the latest', len(a) == 1 and a[0]['r'] == 'c', a)
             ok(f'{tag} (a) nothing for zero or a negative amount', await pg.evaluate(f"()=>{K}.xpPop(0,'x')===null&&{K}.xpPop(-5,'x')===null"))
-            await pg.wait_for_timeout(2800)
+            await pg.wait_for_timeout(2200)
             n = await pg.evaluate("()=>document.querySelectorAll('#xpPops .xpPop').length")
-            ok(f'{tag} (a) gone after about 2.5 s', n == 0, n)
+            ok(f'{tag} (a) gone after about 1.2 s', n == 0, n)
             ok(f'{tag} (a) the light haptic was asked for', await pg.evaluate(f"()=>{K}.HAP?{K}.HAP.log.some(x=>x.n==='xp'):true"))
             ok(f'{tag} no page errors', not pg.errs, pg.errs[:3])
             await pg.context.close()

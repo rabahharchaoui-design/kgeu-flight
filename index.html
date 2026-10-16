@@ -240,7 +240,8 @@ body.capOff #uiroot > #cap, body.crashOn #uiroot > #cap{ display:none; }
 #topCol > #atc, #uiroot > #atc{ font-size:12px; line-height:1.3; }
 #topCol > #atc .tx, #uiroot > #atc .tx{ -webkit-line-clamp:3; } #topCol > #atc .plain, #uiroot > #atc .plain{ -webkit-line-clamp:2; font-size:14px; line-height:1.3; }
 #topCol > #atc.hasPlain .tx, #uiroot > #atc.hasPlain .tx{ font-size:11px; }
-#topCol.short > #atc .tx{ -webkit-line-clamp:1; }
+#topCol.short > #warn{ font-size:16px; padding:1px 10px; }
+#topCol.short > #atc .tx, #topCol.short > #atc .plain{ -webkit-line-clamp:1; } #topCol.short > #atc.hasPlain .tx{ display:none; }   /* one line above 26% */
 /* the drop zone hint shares the caption's place, and gives it up to a call */
 #dzHint{ display:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font:800 14px/18px var(--font); letter-spacing:.04em; padding:2px 10px; text-shadow:0 0 3px #000; }
 #dzHint.on{ display:block; animation:dzPulse 1.6s ease-in-out infinite; }
@@ -1149,14 +1150,26 @@ body #uiroot > #lesson.lc.on{ display:grid; }
 #uiroot > #lesson.lc #lesCue{ grid-column:1; grid-row:3; flex-direction:row; gap:8px; margin:0; }
 #uiroot > #lesson.lc #lesCue .cue{ height:14px; gap:3px; } #uiroot > #lesson.lc #lesCue .cue i{ width:36px; } #uiroot > #lesson.lc #lesCue .cue b{ width:auto; font-size:10px; }
 #uiroot > #lesson.lc #lesCue .cue span{ display:none; }
+/* graded holds: the cue strip is the panel's bottom row (14 px, the numbers live in it), the instruction one line above it */
+body #uiroot > #lesson.lc.cueOn #lesRow{ -webkit-line-clamp:1; }
+#uiroot > #lesson.lc #lesCue.on{ display:flex; height:14px; align-items:center; overflow:hidden; }
 #uiroot > #lesson.lc.call #lesI, #uiroot > #lesson.lc.call #lesM{ display:none; }
-#uiroot > #lesson.lc.call #lesCap{ display:inline; font-size:13px; line-height:15px; font-weight:600; }
+#uiroot > #lesson.lc.call #lesCap{ display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; font-size:13px; line-height:15px; font-weight:600; }
+body #uiroot > #lesson.lc.cueOn.call #lesCap{ -webkit-line-clamp:1; }
 /* under 700 px wide: the title a 10 px label, the panel from the stick ring to the buttons (hudFit), End 56 px wide */
 @media (max-width:699px){ #uiroot > #lesson.lc #lesT{ font-size:10px; line-height:12px; letter-spacing:.06em; }
   #uiroot > #lesson.lc #lesQuit{ min-width:56px; width:56px; } }
 /* under 600 px wide the band between the stick zone and the buttons is about 134 px (as the old card's): three lines there */
-@media (max-width:599px){ #uiroot > #lesson.lc #lesRow{ -webkit-line-clamp:3; } }
-#lesCap b{ color:var(--radio); font-weight:700; margin-right:5px; } #lesCap.cfi b{ color:var(--sand); }
+@media (max-width:599px){ #uiroot > #lesson.lc #lesRow{ -webkit-line-clamp:3; }
+  /* the title its own row across the panel (a Checkride task's name in full), End beside the instruction under it */
+  #uiroot > #lesson.lc #lesT{ grid-column:1 / -1; font-size:11px; line-height:13px; letter-spacing:.04em; }
+  #uiroot > #lesson.lc .lesBtns{ grid-row:2 / span 1; } #uiroot > #lesson.lc.cueOn .lesBtns{ grid-row:2 / span 2; }
+  /* the worst case (three cue rows and a call): the cues three compact chips, the label alone in its band colour, End 44 wide */
+  #uiroot > #lesson.lc.cueOn #lesQuit{ min-width:44px; width:44px; padding:0 4px; }
+  #uiroot > #lesson.lc #lesCue{ gap:5px; } #uiroot > #lesson.lc #lesCue .cue{ flex:0 1 auto; min-width:0; }
+  #uiroot > #lesson.lc #lesCue .cue i{ display:none; } #uiroot > #lesson.lc #lesCue .cue b{ font-size:10px; letter-spacing:0; }
+  #uiroot > #lesson.lc #lesCue .near b{ color:var(--caution); } }
+#lesCap b{ color:var(--radio); font-weight:700; } #lesCap.cfi b{ color:var(--sand); }
 body.lesLc #uiroot > #cap > #atc{ display:none; }
 /* crash: a one line reason at the top, then a compact card at the bottom (3.9) */
 /* WASTED (phone3 item 7): slow motion, the picture to black and white under a vignette, then the word,
@@ -1640,6 +1653,11 @@ body.menuOn #tutArrow, body.pauseOn #tutArrow{ display:none !important; }
 #menu label.sens input[type=range]{ flex:1; width:auto; min-width:56px; max-width:150px; height:44px; accent-color:var(--rust); }
 #menu .srow .chips{ flex:1; min-width:0; }
 #menu .srow .chips > button{ flex:none; padding-left:10px; padding-right:10px; }
+/* fix2 item 11: the Radio row holds Radio, Captions and the volume on one line; Cap under 700 px wide, a shorter slider */
+#oCap i{ font-style:normal; } #oCap .cS{ display:none; }
+#menu #oRadio ~ label.sens input[type=range]{ max-width:110px; } #menu #oRadio ~ label.sens{ flex:0 1 auto; }   /* no wider than the row was before the toggle */
+@media (max-width:899px){ #oCap .cL{ display:none; } #oCap .cS{ display:inline; }
+  #menu #oRadio ~ label.sens b{ min-width:34px; } #menu #oRadio ~ label.sens input[type=range]{ min-width:44px; max-width:84px; } #menu #oRadio ~ label.sens{ gap:4px; } }
 .setGrid{ overflow:hidden; }
 /* graphics item 2: the Graphics row makes the left column six rows, one more than a 390 px tall phone holds, so the
    grid scrolls inside itself (the footer and the tabs stay put) and the last row (Callsign) is a short swipe away */
@@ -2277,7 +2295,7 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
    <div class="setCol">
     <div class="srow"><span>Mode</span><div class="chips modeSeg" role="radiogroup" aria-label="Mode"><button class="pick chip sk" data-skill="rookie" role="radio"><b>Easy</b></button><button class="pick chip sk" data-skill="pilot" role="radio"><b>Hard</b></button><p class="modeDesc"></p></div></div>
     <div class="srow"><span>Graphics</span><div class="chips gfxSeg" role="radiogroup" aria-label="Graphics quality"><button class="chip gt" data-tier="auto" role="radio"><b>Auto</b><small class="gtA">(Medium)</small></button><button class="chip gt" data-tier="low" role="radio"><b>Low</b></button><button class="chip gt" data-tier="medium" role="radio"><b>Medium</b></button><button class="chip gt" data-tier="high" role="radio"><b>High</b></button><span class="gfxBusy" id="gfxBusyS" role="status" hidden>Applying graphics…</span></div></div>
-    <div class="srow"><span>Radio</span><div class="chips"><button class="tog" id="oRadio">Radio: On</button><button class="tog" id="oCap" aria-label="Radio captions: On">Captions: On</button>
+    <div class="srow"><span>Radio</span><div class="chips"><button class="tog" id="oRadio">Radio: On</button><button class="tog" id="oCap" aria-label="Radio captions: On"><span class="cL">Captions</span><span class="cS">Cap</span>: <i>On</i></button>
       <label class="sens"><input type="range" id="oRvol" min="0" max="10" step="1" value="7" aria-label="Radio volume"><b id="oRvolV">70%</b></label></div></div>
     <div class="srow"><span>Music</span><div class="chips"><button class="tog oMusic" id="oMusic">Music: On</button>
       <label class="sens"><input type="range" class="oMvol" id="oMvol" min="0" max="10" step="1" value="6" aria-label="Music volume"><b class="oMvolV" id="oMvolV">60%</b></label></div></div>
@@ -11356,13 +11374,14 @@ const sideEl=$('sideToast');
 // it and left of the dock, for about 2 s. Flaps, gear, trim and the autopilot all come here;
 // nothing of theirs goes to the centre of the screen. kind: what changed, for the haptics.
 function sideCfg(t,sub,kind){
+  if(running)hudFit();   // fix2 item 11: the top column settles first (two at most, one row beside pause), then the readout picks its place
   sideEl.textContent=t;if(sub){const s=document.createElement('small');s.textContent=sub;sideEl.appendChild(s);}
   sideEl.style.maxWidth='';
   const thr=$('thr'),dock=$('dock'),ui=$('uiroot').getBoundingClientRect(),tr=thr.getBoundingClientRect(),dr=dock.getBoundingClientRect();
   const W3=ui.left+ui.width/3,W23=ui.left+ui.width*2/3,H3=ui.top+ui.height/3,H23=ui.top+ui.height*2/3;
   // what it may not cover: the controls, the stick zone, the ticker, the badges, the look pad, the lesson
   // panel, the centre column; nor the centre third of the screen (phone3 item 4)
-  const block=[];for(const e of document.querySelectorAll('#dock button,#thr,#stickZone,#tk.on,#tkCtl.on,#badges .badge.on,#lookPad,#lesson.on,#divCard.on,#topCol > .on,#cap > .on,#hDest,#tcas.on,#dfW')){
+  const block=[];for(const e of document.querySelectorAll('#dock button,#thr,#stickZone,#tk.on,#tkCtl.on,#badges .badge.on,#lookPad,#lesson.on,#divCard.on,#topCol > .on,'+(innerHeight>innerWidth?'#cap > .on,':'')+'#hDest,#tcas.on,#dfW')){
     const r=e.getBoundingClientRect();if(r.width&&r.height&&getComputedStyle(e).display!=='none')block.push(r);}
   const lr=$('lesson').classList.contains('on')?$('lesson').getBoundingClientRect():null;
   // the edge of the buttons actually beside a band of the screen (the dock's box has gaps)
@@ -11379,15 +11398,18 @@ function sideCfg(t,sub,kind){
   if(lr&&lr.height){const e=btnEdge(low,low+h0);C.push([e,low,e-lr.right-8]);}
   {const e=btnEdge(mid,mid+h0*2);C.push([e,mid,e-W23]);}
   const tc=$('tcas'),tcr=tc&&tc.classList.contains('on')?tc.getBoundingClientRect():null;
-  // fix2 item 11: in portrait the bottom caption sits above the throttle; the readout goes above it
-  const cpe=document.querySelector('#cap > .on'),cpr=cpe&&getComputedStyle($('cap')).display!=='none'?cpe.getBoundingClientRect():null;
-  const above=h=>Math.min(tr.top,dr.width?dr.top:tr.top,lr&&lr.height&&lr.top>H3?lr.top:1e9,tcr&&tcr.height&&tcr.right>W23?tcr.top:1e9,cpr&&cpr.height&&cpr.right>W23?cpr.top:1e9)-8-h;
+  // fix2 item 11: in portrait the bottom caption sits above the throttle; the readout goes above it. In landscape the readout
+  // keeps its place and the caption yields (below)
+  const cpe=document.querySelector('#cap > .on'),cpr=cpe&&getComputedStyle($('cap')).display!=='none'?cpe.getBoundingClientRect():null,por=innerHeight>innerWidth;
+  const above=h=>Math.min(tr.top,dr.width?dr.top:tr.top,lr&&lr.height&&lr.top>H3?lr.top:1e9,tcr&&tcr.height&&tcr.right>W23?tcr.top:1e9,por&&cpr&&cpr.height&&cpr.right>W23?cpr.top:1e9)-8-h;
   C.push([tr.right,above,0],[tr.right,above,tr.right-W23]);
   let pick=null;for(const c of C){if(c[2]&&c[2]<60)continue;if(fits(c[0],c[1],c[2])){pick=c;break;}}
   if(!pick){pick=C[0];sideEl.style.maxWidth='';}
   const top=typeof pick[1]==='function'?pick[1](sideEl.offsetHeight):pick[1];
   sideEl.style.right=Math.round(ui.right-pick[0])+'px';
   sideEl.style.top=Math.round(top-ui.top)+'px';
+  // landscape: the caption under the readout goes up to the top column while the readout shows (HF.sideT, capHome)
+  if(!por&&cpr&&cpr.height){const s=sideEl.getBoundingClientRect();if(s.left<cpr.right&&cpr.left<s.right&&s.top<cpr.bottom&&cpr.top<s.bottom){HF.sideT=performance.now()+2600;capHome();}}
   sideEl.classList.add('on');cfgT=2;sideEl.dataset.kind=kind||'';
   if(kind)hapCfg(kind);
 }
@@ -12011,13 +12033,13 @@ function capHome(){
   const lc=lesLow&&!HOOD.on&&!L.classList.contains('tut')&&innerWidth>innerHeight;
   if(lc!==L.classList.contains('lc'))L.classList.toggle('lc',lc);if(lc!==document.body.classList.contains('lesLc'))document.body.classList.toggle('lesLc',lc);
   const call=lc&&atcEl.classList.contains('on');if(call!==L.classList.contains('call')){if(call)capFill();L.classList.toggle('call',call);}
-  const home=nar?T.parentNode:(HOOD.on||(lesLow&&!lc))?T:cap;
+  const home=nar?T.parentNode:(HOOD.on||(lesLow&&!lc)||((HF.capTop||HF.sideT>performance.now())&&!lc&&innerWidth>innerHeight))?T:cap;
   if(atcEl.parentNode!==home){if(home===cap)cap.insertBefore(atcEl,cap.firstChild);else home.appendChild(atcEl);}
 }
 // the call on the air copied into the lesson strip's instruction line: the speaker tinted, the plain line in Easy
 function capMirror(){capFill();capHome();}
 function capFill(){const c=$('lesCap'),b=atcEl.querySelector('b'),pl=atcEl.querySelector('.plain'),tx=atcEl.querySelector('.tx');if(!c)return;
-  c.textContent='';if(b){const e=document.createElement('b');e.textContent=b.textContent;c.appendChild(e);}
+  c.textContent='';if(b){const e=document.createElement('b');e.textContent=b.textContent+': ';c.appendChild(e);}
   c.appendChild(document.createTextNode(pl?pl.textContent:tx?[...tx.childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join(''):''));
   c.classList.toggle('cfi',atcEl.classList.contains('cfi'));}
 // ---- fix2 item 11: the middle of the screen is the view ----
@@ -12042,27 +12064,29 @@ function hudFit(){
   if(topR!==HF.topR){HF.topR=topR;rs.setProperty('--topR',topR+'px');}
   // (2) two at most, above 26% of the height and clear of the buttons; where even one row will not fit under the pause
   // button (a short screen with a top inset) or it is under 100 px wide, the column moves up beside the pause button
-  const lim=U.top+H*0.26,body=document.body,kids=[...T.children],bug=R(document.querySelector('#bugAsk.on'));
+  const lim=U.top+H*0.26,body=document.body,kids=[...T.children],bug=R(document.querySelector('#bugAsk.on')),hood=HOOD.on;
   // "Something broke. Report it?" (bugs1) heads the column while it is up: the column starts under it (or all of it waits)
   const bh=bug?Math.ceil(bug.height)+3+'px':'0px';if(T.style.getPropertyValue('--bugH')!==bh)T.style.setProperty('--bugH',bh);
   const obs=[...document.querySelectorAll('#dock button,#dfW button,#lookPad,#badges .badge.on,#tk.on,#tkCtl.on,#tkReply.on,#divCard.on,#hud .card,#bPause')].map(R).filter(Boolean);
   const bad=r=>r.bottom>lim+0.5||obs.some(o=>r.left<o.right&&o.left<r.right&&r.top<o.bottom&&o.top<r.bottom);
-  const fit=()=>{for(const k of kids)if(k.classList.contains('hold'))k.classList.remove('hold');
+  const fit=(mx=2)=>{for(const k of kids)if(k.classList.contains('hold'))k.classList.remove('hold');
     const on=kids.filter(k=>k.id!=='lesson'&&k.classList.contains('on')&&R(k)).sort((x,y)=>(HF_PRI[x.id]||9)-(HF_PRI[y.id]||9));
-    // the subtitle in the column (a lesson, the hood) is held only by the count: it is the instructor talking
+    // the subtitle in the column in a lesson or under the hood is held only by the count: it is the instructor talking
     for(let i=on.length-1;i>(bug?-1:0);i--){const vis=on.filter(k=>!k.classList.contains('hold'));
-      if(vis.length<=2&&!vis.some(k=>k.id!=='atc'&&bad(k.getBoundingClientRect())))break;
+      if(vis.length<=mx&&!vis.some(k=>(k.id!=='atc'||!(LES.on||HOOD.on))&&bad(k.getBoundingClientRect())))break;   // a TCAS-crowded subtitle (HF.capTop) obeys the 26% line
       on[i].classList.add('hold');}
-    const f=on[0]&&on[0].getBoundingClientRect();return f?{w:f.width,bad:bad(f)}:null;};
-  if(!portrait){
+    const f=on[0]&&on[0].getBoundingClientRect();return f?{w:T.getBoundingClientRect().width,bad:bad(f)}:null;};   // w: the column's room, not a short message's
+  if(hood){   // under the hood the lesson card and the subtitle keep their own layout (school1 item 7)
+    if(body.classList.contains('topRow'))body.classList.remove('topRow');T.classList.remove('short');for(const k of kids)k.classList.remove('hold');}
+  else if(!portrait){
     if(body.classList.contains('topRow')){body.classList.remove('topRow');HF.row=0;}
+    T.classList.toggle('short',lim-T.getBoundingClientRect().top<60);   // one line messages (a 16 px warning) before measuring
     const f=fit();
     if(!bug&&f&&(f.bad||f.w<100)){const p=R($('bPause'));
       if(p){const x0=p.right-U.left+8,yT=p.top,yB=p.bottom;let x1=W-(thr?W-(thr.right-U.left):10);
         for(const o of obs)if(o.top<yB&&o.bottom>yT&&o.left-U.left>=x0-1)x1=Math.min(x1,o.left-U.left-6);
-        if(x1-x0>=100){rs.setProperty('--rowW',Math.floor(Math.min(x1-x0,420))+'px');body.classList.add('topRow');fit();}}}}
-  else fit();
-  T.classList.toggle('short',lim-T.getBoundingClientRect().top<40);
+        if(x1-x0>=100){rs.setProperty('--rowW',Math.floor(Math.min(x1-x0,420))+'px');body.classList.add('topRow');fit(1);}}}}   // one row there: the corner under it stays the side readout's
+  else{T.classList.toggle('short',lim-T.getBoundingClientRect().top<60);fit();}
   // (3) the bottom caption
   const cap=$('cap'),dk=R($('dock'));let L,Rt,B;
   const padR=thr?W-(thr.right-U.left):10;
@@ -12077,7 +12101,11 @@ function hudFit(){
     // 120 px; else over the TCAS panel (a few seconds) rather than under the thumb; else from the stick ring. The
     // dogfight's weapons crowd the bottom, so its line starts at the stick ring as before.
     const df=document.body.classList.contains('dfOn');
-    if(!df&&Ra-Lz>=120){L=Lz;Rt=Ra;}else if(!df&&Rd-Lz>=120){L=Lz;Rt=Rd;}else if(Ra-Lh>=120){L=Lh;Rt=Ra;}else{L=Lh;Rt=Rd;}
+    // (rule d) never over the TCAS panel: where the panel leaves under 120 px beside the stick zone, the subtitle goes up to
+    // the top column for the call (HF.capTop, capHome), where it takes the mission pill's row while it is on
+    let up=false;
+    if(!df&&Ra-Lz>=120){L=Lz;Rt=Ra;}else if(Ra<Rd&&!df){up=true;L=Lz;Rt=Rd;}else if(Ra-Lh>=120){L=Lh;Rt=Ra;}else{L=Lh;Rt=Rd;}
+    if(up!==HF.capTop){HF.capTop=up;capHome();}
     if(sv){const r=R($('shBL'));if(r&&r.top-U.top<y1&&r.bottom-U.top>y0&&r.right-U.left<Rt)L=Math.max(L,r.right-U.left+12);}
     // the lesson strip (round 2): the same band, clear of the stick zone when that leaves 200 px, centred, min(60vw, 480)
     // (round 4) always clear of the stick's whole touch zone (#stickZone, 36% wide): from its right edge + 8 px to the buttons
@@ -12091,7 +12119,7 @@ function hudFit(){
 // Settings, Radio row: Captions On/Off (kgeuCap); Off hides the bottom caption, the radio plays on
 const CAPS={on:true};try{CAPS.on=localStorage.getItem('kgeuCap')!=='0';}catch(e){}
 function capUI(){document.body.classList.toggle('capOff',!CAPS.on);const b=document.getElementById('oCap');
-  if(b){b.textContent='Captions: '+(CAPS.on?'On':'Off');b.classList.toggle('on',CAPS.on);b.setAttribute('aria-label','Radio captions: '+(CAPS.on?'On':'Off'));}}
+  if(b){b.querySelector('i').textContent=CAPS.on?'On':'Off';b.classList.toggle('on',CAPS.on);b.setAttribute('aria-label','Radio captions: '+(CAPS.on?'On':'Off'));}}
 function setCap(v){CAPS.on=!!v;try{localStorage.setItem('kgeuCap',CAPS.on?'1':'0');}catch(e){}capUI();}
 capUI();
 function missReset(){
@@ -19352,12 +19380,13 @@ function pfxLayer(W,H){
   // the additive parts (lights' glows, the burner) add their colour but no coverage, so they never darken the world
   let ad=g.userData.layAdd;if(!ad){ad=g.userData.layAdd=[];g.traverse(o=>{const ms=o.material?(Array.isArray(o.material)?o.material:[o.material]):[];
     for(const m of ms)if(m.blending===THREE.AdditiveBlending&&ad.indexOf(m)<0)ad.push(m);});}
-  for(const m of ad){m.blending=THREE.CustomBlending;m.blendSrc=THREE.SrcAlphaFactor;m.blendDst=THREE.OneFactor;m.blendSrcAlpha=THREE.ZeroFactor;m.blendDstAlpha=THREE.OneFactor;}
+  // (pfsColorSetup's toneMapped reads the blending: held as it was by hand, or the swap is a new program key)
+  for(const m of ad){m.userData.layTm=m._pfsTmOff;m._pfsTmOff=!m.toneMapped;m.blending=THREE.CustomBlending;m.blendSrc=THREE.SrcAlphaFactor;m.blendDst=THREE.OneFactor;m.blendSrcAlpha=THREE.ZeroFactor;m.blendDstAlpha=THREE.OneFactor;}
   scene.background=null;scene.autoUpdate=false;GFX.rs=1;
   // r128 resolves the whole target's width and height: the box's corner only, while it draws
   L.viewport.set(0,0,w,h);L.width=w;L.height=h;camera.setViewOffset(W,H,x,H-y-h,w,h);
   try{r.setRenderTarget(L);r.setClearColor(0x000000,0);r.clear(true,true,false);r.autoClear=false;r.render(scene,camera);pfxInv(L);}
-  finally{camera.clearViewOffset();L.width=lw;L.height=lh;for(const m of ad)m.blending=THREE.AdditiveBlending;
+  finally{camera.clearViewOffset();L.width=lw;L.height=lh;for(const m of ad){m.blending=THREE.AdditiveBlending;m._pfsTmOff=m.userData.layTm;}
     for(let i=0;i<PFX_HID.length;i++)PFX_HID[i].visible=true;PFX_HID.length=0;scene.background=bg;scene.autoUpdate=au;r.autoClear=true;}
 }
 function pfxRender(ir){
@@ -19391,11 +19420,14 @@ function pfxRender(ir){
   r.autoClear=true;r.setClearColor(0x000000,0);
   // the bloom points keep their screen pixel size in b1 (bk times their share of it), so the blur makes a halo a few
   // times the light's own disc rather than a faint smudge
+  // fix2 item 9: the layer before the bloom. A flame's lights:false materials keep the program of their first draw;
+  // with the aircraft out of the world pass that first draw was the bloom's (layer PFX_BLOOM, no lights), a key the
+  // precompile never made (3 programs linked on the first burner in flight); the layer draws them with the scene's lights
+  if(layer)pfxLayer(W,H);
   if(bloom){GFX.rs=s;pfxBloom();}
   GFX.rs=1;PFX.bloomed=bloom;
   let src=PFX.rt;
   if(layer){
-    pfxLayer(W,H);
     if(s<1){   // the scaled world upscaled into FULL (no sharpening, dust or bloom), the layer over it there
       if(!PFX.full){PFX.full=pfxRT(W,H,false);PFX.allocN++;}
       const u=PFX_CMP.uniforms;u.tColor.value=PFX.rt.texture;u.tBloom.value=PFX_BLACK;u.uStr.value=0;u.uSharp.value=0;u.uDust.value.set(0,0,0,0);
