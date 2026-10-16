@@ -1,7 +1,7 @@
 # sensor items 3 and 8: the MQ-9 sensor at every field of view (WFOV to UNFOV EZ 4X) in every mode (DTV, NIR, IR WHT,
 # IR BLK), held on a parked target on the strike range (or the Luke runway with --luke), iPhone landscape.
 # Usage: [PFS_TIER=medium] .venv/bin/python tests/sensor_fov_shots.py <outdir> [--modes tv,nir,irw,irb] [--zooms 0,1,..]
-#        [--type reaper|mq9b] [--tod day|night|haboob] [--size 844x390] [--dclt 0|1|2] [--skill pilot|rookie] [--sheet]
+#        [--mission range|gunrun] [--type reaper|mq9b] [--tod day|night|haboob] [--size 844x390] [--dclt 0|1|2] [--skill pilot|rookie] [--sheet]
 import asyncio, os, sys
 from playwright.async_api import async_playwright
 from harness import serve, launch, page
@@ -13,7 +13,7 @@ OUT = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].start
 MODES = arg('--modes', 'tv,nir,irw,irb').split(',')
 ZOOMS = [int(z) for z in arg('--zooms', '0,1,2,3,4,5,6,7').split(',')]
 TYPE = arg('--type', 'reaper'); TOD = arg('--tod', 'day'); W, H = [int(v) for v in arg('--size', '844x390').split('x')]
-DCLT = int(arg('--dclt', '0')); SKILL = arg('--skill', 'pilot')
+DCLT = int(arg('--dclt', '0')); MISSION = arg('--mission', 'range'); SKILL = arg('--skill', 'pilot')
 K = 'window.__kgeu'
 
 
@@ -31,7 +31,7 @@ async def main():
         b = await launch(p)
         pg = await page(b, url, vp={'width': W, 'height': H}, storage=st)
         if H > W: await pg.evaluate("()=>document.body.classList.add('portraitok')")
-        await pg.evaluate(f"()=>{{const K={K};K.setTOD('{TOD}');K.pick('{TYPE}');K.mission('range');}}")
+        await pg.evaluate(f"()=>{{const K={K};K.setTOD('{TOD}');K.pick('{TYPE}');K.mission('{MISSION}');}}")
         await pg.wait_for_timeout(1500)
         await settle(pg, 60)
         # a parked truck under the crosshair, point tracked

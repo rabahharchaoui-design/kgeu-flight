@@ -385,7 +385,7 @@ body.sensorOn #hud{ display:none; }
 /* sensor item 7: the autopilot flies in the ball view, so the throttle steps out and the sensor buttons take the right
    edge, up to three columns for the right thumb */
 body.sensorOn #thrCol{ display:none; }
-body.sensorOn #uiroot > #dock{ right:var(--padR); }
+body.sensorOn #uiroot > #dock{ right:var(--padR); z-index:3; }
 
 /* ---------- touch controls ---------- */
 #touch{ display:none; position:absolute; inset:0; pointer-events:none; }
@@ -19996,7 +19996,8 @@ function tgtMarkUpdate(dt){
     TM.L=48;TM.T=dw.height?Math.max(40,dw.bottom-hr.top+14):40;
     // a block reaching past 38 percent of the width (portrait): the frame starts under it instead of right of it
     if(tg.width){if(tg.right-hr.left<TM.W*0.38)TM.L=Math.max(48,tg.right-hr.left+34);else TM.T=Math.max(TM.T,tg.bottom-hr.top+14);}
-    TM.B=bl.height?Math.min(TM.H-54,bl.top-hr.top-36):TM.H-54;}
+    TM.B=bl.height?Math.min(TM.H-54,bl.top-hr.top-36):TM.H-54;
+    TM.tg=tg.width?[tg.left-hr.left-6,tg.top-hr.top-6,tg.right-hr.left+6,tg.bottom-hr.top+6]:null;}
   const W=TM.W,H=TM.H,L=TM.L||48,T=TM.T||40,R=TM.R,B=TM.B||H-54,cx=W/2,cy=H/2,r=rookie();
   camera.updateMatrixWorld();sensorOrigin(_so);
   const tY=Math.tan(camera.fov*Math.PI/360),tX=tY*camera.aspect;
@@ -20011,7 +20012,7 @@ function tgtMarkUpdate(dt){
       if(t.dead){tmPut(TM.mk[mi++],'dead',sx,sy,'');continue;}
       const nm=r?t.name:t.name.toUpperCase(),lk=SENSOR.tgt===t,ds=fmtDist(_so.distanceTo(_tmv.set(t.x,t.y,t.z)));
       // label box: about 90 px wide, from 8 to 36 px under the diamond
-      const M=TM.mid,hit=sx+45>M[0]&&sx-45<M[2]&&sy+36>M[1]&&sy+8<M[3];
+      const M=TM.mid,G=TM.tg,hit=(sx+45>M[0]&&sx-45<M[2]&&sy+36>M[1]&&sy+8<M[3])||!!(G&&sx+45>G[0]&&sx-45<G[2]&&sy+36>G[1]&&sy+8<G[3]);
       // the tracked one: the gate marks it (sensor item 4), so no diamond and no label of its own
       tmPut(TM.mk[mi++],lk?'lk nl':(hit?'nl':''),sx,sy,(lk?'LOCK ':'')+nm+'\n'+ds);
     } else if(!t.dead&&ai<8){
@@ -20983,7 +20984,7 @@ function maskMeshes(){const g=plane.g;if(g.userData.maskM)return g.userData.mask
   return g.userData.maskM=L;}
 function shownUp(o){for(;o;o=o.parent)if(!o.visible)return false;return true;}
 function sensorMasked(origin,dir){
-  if(!plane||!plane.g||!plane.g.visible)return false;
+  if(!plane||!plane.g||!plane.g.visible||!plane.g.userData.ballAt)return false;
   if(SENSOR.el<-25*Math.PI/180&&!(st.gearPos>0.03))return false;
   plane.g.updateMatrixWorld();
   _mrc.set(origin,dir);_mrc.near=0.02;_mrc.far=60;_mrc.camera=camera;
@@ -21337,8 +21338,10 @@ function sensorAP(){
 function resize(){const w=window.innerWidth,h=window.innerHeight;VP.w=w;VP.h=h;renderer.setSize(w,h,false);glcH=glc.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();csmRadii();sizeMap();fmSize();FM.prepT=0;if(FM.on){lblUI();fmDraw();}}
 window.addEventListener('resize',()=>{resize();relayoutSoon();});window.__glReady=1;resize();
 // sensor item 2: the view is from inside the ball, so the turret (neck, ball, window) hides while it is up
+// The A-10's pod (no turret on the model, and not the MTS-B this models): its airframe hides whole in the sensor view,
+// so a steep gun-run bank never lays its own wing across the picture, and it never masks the tracker
 function turretShow(v){const g=plane&&plane.g;if(!g||g.userData.turretV===v)return;g.userData.turretV=v;
-  let L=g.userData.turretM;if(!L){L=g.userData.turretM=[];g.traverse(o=>{if(o.userData.turret)L.push(o);});}
+  let L=g.userData.turretM;if(!L){L=g.userData.turretM=[];if(g.userData.ballAt)g.traverse(o=>{if(o.userData.turret)L.push(o);});else for(const o of g.children)if(o.visible)L.push(o);}
   for(const o of L)o.visible=v;}
 const hudSens=$('sensorHud');let sensOn=false;const hIas=$('hIas'),hAlt=$('hAlt'),hWindT=$('hWindT'),hWindA=$('hWindA'),hAp=$('hAp'),bAuto=$('bAuto'),bAutoT=$('bAutoT'),warnEl=$('warn'),hVs=$('hVs'),hHdg=$('hHdg');
 const APN={to:'AUTO T/O',hold:'ALT HOLD',land:'AUTOLAND',orbit:'ORBIT'},APP={climb:'CLIMB',nav:'NAV',loc:'FINAL',orb:'DESCEND'};
