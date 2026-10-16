@@ -114,7 +114,7 @@ async def main():
         c('DCLT again: everything back', all([await pg.evaluate(VIS, i) for i in ('shTL', 'shTR', 'shTgt', 'shDialW')]))
         # Easy
         await pg.evaluate(f"()=>{{{K}.setSkill('rookie');}}"); await pg.evaluate(STEP, 2); t = await pg.evaluate(TXT)
-        c('Easy: plain words (camera, zoom n of 5, the spot in miles or metres, feet above sea level)', t['TL'].startswith('Day camera') and 'Zoom 2 of 5' in t['TL'] and 'away' in t['TG'] and 'ft above sea level' in t['TG'], (t['TL'], t['TG']))
+        c('Easy: plain words (camera, zoom n/5, the spot in miles or metres, feet above sea level)', t['TL'].startswith('Day camera') and 'zoom 2/5' in t['TL'] and 'away' in t['TG'] and 'ft above sea level' in t['TG'], (t['TL'], t['TG']))
         await pg.evaluate(f"()=>{{{K}.setSkill('pilot');}}")
         if pg.errs: c('no console errors', False, pg.errs[:3])
         await pg.close()
