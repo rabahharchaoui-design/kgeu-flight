@@ -36,11 +36,11 @@ async def main():
 
         s0 = await enter('reaper')
         # the overlay
-        hud = await pg.evaluate("()=>['shTL','shTR','shBL','shBR'].map(i=>document.getElementById(i).textContent)")
-        ok('overlay: mode and zoom top left', hud[0].startswith('DAY TV') and 'x1' in hud[0], hud[0])
-        ok('overlay: camera bearing, side of the nose and EL top right', hud[1].startswith('CAM ') and '°T  ' in hud[1] and ' EL ' in hud[1], hud[1])
-        ok('overlay: ALT and HDG bottom left', hud[2].startswith('ALT ') and 'HDG ' in hud[2], hud[2])
-        ok('overlay: AUTOPILOT tag bottom right', hud[3] == 'AUTOPILOT', hud[3])
+        # sensor item 4: the symbology (tests/sensor_overlay_check.py checks every value)
+        hud = await pg.evaluate("()=>['shTL','shTR','shTgt'].map(i=>document.getElementById(i).textContent)")
+        ok('overlay: sensor and field of view top left', hud[0].startswith('DTV') and 'WFOV' in hud[0], hud[0])
+        ok('overlay: UTC, AZ / EL / DEP and the laser top right', hud[1].endswith('Z\nAZ R000 EL -34 DEP 34\nLSR SAFE  CODE 1688') or (' EL ' in hud[1] and 'DEP' in hud[1] and 'LSR SAFE' in hud[1]), hud[1])
+        ok('overlay: point of interest and the aircraft (ALT, HDG) under the map', 'MGRS' not in hud[2] and '12S ' in hud[2] and 'ALT ' in hud[2] and 'HDG ' in hud[2], hud[2])
         ok('flight cards step aside in the ball view', not await pg.is_visible('#hud'))
         vis = await pg.evaluate("()=>['bMode','bZoom','bLock','bFire','bGear','bBrake'].filter(i=>{const e=document.getElementById(i);return e.offsetParent!==null})")
         ok('MODE, ZOOM and LOCK shown; FIRE, GEAR and BRAKE not', vis == ['bMode', 'bZoom', 'bLock'], vis)
@@ -55,19 +55,26 @@ async def main():
         ok('a drag on the canvas moves az and el', abs(s1['az']-s0['az']) > 0.5 and abs(s1['el']-s0['el']) > 0.3, f"{s0['az']},{s0['el']} -> {s1['az']},{s1['el']}")
         ok('a drag does not lock', not s1['lock'])
 
+        # sensor item 3: the MTS-B ladder (docs/mtsb.md), ZOOM IN to the narrow end, ZOOM OUT back
         fovs = []
-        for _ in range(4):
+        for _ in range(8):
             fovs.append((await sensor(pg))['fov']); await click(pg, '#bZoom')
-        ok('ZOOM cycles four fields of view', fovs == [14, 7, 3.5, 1.75] and (await sensor(pg))['fov'] == 14, fovs)
-        await click(pg, '#bZoom'); await click(pg, '#bZoom')
-        zl = await pg.inner_text('#bZoomT')
-        ok('ZOOM label shows x4', zl == 'ZOOM x4', zl)
-        await click(pg, '#bZoom'); await click(pg, '#bZoom')
+        ok('ZOOM IN walks WFOV to UNFOV EZ 4X and stops there', fovs == [34, 17, 5.7, 2.8, 0.47, 0.08, 0.04, 0.02] and (await sensor(pg))['fov'] == 0.02, fovs)
+        ok('ZOOM IN dims at the narrow end', await pg.evaluate("()=>document.getElementById('bZoom').classList.contains('dim')"))
+        for _ in range(5): await click(pg, '#bWide')
+        zl = await pg.inner_text('#fovInd')
+        ok('ZOOM OUT steps back, the field of view named between them', zl == 'MFOV' and (await sensor(pg))['fov'] == 5.7, zl)
+        for _ in range(3): await click(pg, '#bWide')
+        ok('ZOOM OUT stops at WFOV, dimmed', (await sensor(pg))['fov'] == 34 and await pg.evaluate("()=>document.getElementById('bWide').classList.contains('dim')"))
+        await pg.evaluate(f"()=>{K}.setSensorMode('irw')")
+        await pg.evaluate(f"()=>{{{K}.SENSOR.zoom=5;}}")
+        ok('IR UNFOV is 0.23 degrees', (await sensor(pg))['fov'] == 0.23, (await sensor(pg))['fov'])
+        await pg.evaluate(f"()=>{{{K}.SENSOR.zoom=0;{K}.setSensorMode('tv');}}")
 
         modes = []
-        for _ in range(4):
+        for _ in range(5):
             modes.append((await sensor(pg))['mode']); await click(pg, '#bMode')
-        ok('MODE cycles tv, irw, irb, tv', modes == ['tv', 'irw', 'irb', 'tv'], modes)
+        ok('MODE cycles tv, nir, irw, irb, tv', modes == ['tv', 'nir', 'irw', 'irb', 'tv'], modes)
         await pg.evaluate(f"()=>{K}.setSensorMode('irw')"); await pg.wait_for_timeout(400)
         ok('IR white overlay reads IR WHT', (await pg.inner_text('#shTL')).startswith('IR WHT'))
         await pg.evaluate(f"()=>{K}.setSensorMode('tv')")
@@ -83,8 +90,10 @@ async def main():
         ok('L key toggles the lock off', not (await sensor(pg))['lock'])
         await pg.keyboard.press('z'); await pg.wait_for_timeout(100)
         ok('Z key steps the zoom', (await sensor(pg))['zoomIdx'] == 1)
+        await pg.keyboard.press('x'); await pg.wait_for_timeout(100)
+        ok('X key zooms back out', (await sensor(pg))['zoomIdx'] == 0)
         await pg.keyboard.press('m'); await pg.wait_for_timeout(100)
-        ok('M key steps the mode, not the sound', (await sensor(pg))['mode'] == 'irw')
+        ok('M key steps the mode, not the sound', (await sensor(pg))['mode'] == 'nir')
         await pg.evaluate(f"()=>{{{K}.setSensorMode('tv');}}")
 
         # throttle while the sensor autopilot flies: stays on
@@ -131,7 +140,10 @@ async def main():
         m2 = (await sensor(pg))['mode']
         ok('Rookie labels read Day camera / Heat camera', l0.lower() == 'day camera' and l1.lower() == 'heat camera' and h0.startswith('Day camera') and h1.startswith('Heat camera'), f'{l0!r} {l1!r} {h0!r} {h1!r}')
         ok('Rookie MODE has two entries', m2 == 'tv', m2)
-        bl = await pg.inner_text('#shBL')
+        for _ in range(6): await click(pg, '#bZoom')
+        z = await sensor(pg); zl = await pg.inner_text('#fovInd')
+        ok('Easy: five zoom steps, WFOV to NFOV, named 5 of 5', z['zoomIdx'] == 4 and z['fov'] == 0.47 and zl == '5 of 5', (z['zoomIdx'], zl))
+        bl = await pg.inner_text('#shTgt')
         ok('Rookie overlay uses feet and compass words', ' ft' in bl and 'HDG ' in bl, bl)
 
         ok('no page errors', not pg.errs, pg.errs[:3])

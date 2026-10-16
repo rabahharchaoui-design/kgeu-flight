@@ -704,6 +704,16 @@ async def part_sensor(pg):
         h = await pg.query_selector('#bZoom')
         for _ in range(4):
             await check_tap(pg, table, f'sensor:{t}', h, expect_fn=zoom_expect)
+        # sensor item 7: ZOOM OUT, NOSE, LASE, GEO, DCLT (each changes the sensor state K.sensor() reports)
+        h = await pg.query_selector('#bWide')
+        for _ in range(2):
+            await check_tap(pg, table, f'sensor:{t}', h, expect_fn=zoom_expect)
+        for sel, fld in (('#bNose', 'slewTo'), ('#bLase', 'lrf'), ('#bGeo', 'kind'), ('#bDclt', 'dclt')):
+            h = await pg.query_selector(sel)
+            def fexp(bf, af, fld=fld):
+                return (af['sens'][fld] != bf['sens'][fld]), f"{fld} {bf['sens'] and bf['sens'][fld]}->{af['sens'] and af['sens'][fld]}"
+            await check_tap(pg, table, f'sensor:{t}', h, expect_fn=fexp)
+        await pg.evaluate(f"()=>{{const S={K}.SENSOR;S.geo=null;S.dclt=0;}}")
 
         # drag on the canvas to slew, then LOCK (no guaranteed target under the crosshair in free
         # flight, so this is allowed to be a no-op -- see ALLOW)

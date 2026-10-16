@@ -11,7 +11,7 @@ for t in test t3 t6 dubins_test orbit_test; do
 done
 for t in prefs_check landing_check touch_check ui_check menu_check skill_check school_check map_check arcade_check photo_check splash_check credit_check \
          base_check desktop_check score_check sixpack_check strike_check mission_check radio_check a2hs_check \
-         multitouch_check roll_check night_check sensor_check sensor_az_check dropcam_check strike_fx_check prop_check \
+         multitouch_check roll_check night_check sensor_check sensor_az_check sensor_gimbal_check sensor_overlay_check sensor_track_check sensor_controls_check dropcam_check strike_fx_check prop_check \
          haboob_check callsign_check crash_check egg_check navlight_check quiet_check music_check map2_check modes_check dz_check onemile_check scores_check lb_merge_check upgrade_check \
          warm_console_check map_open_check scorch_check music_start_check music_pause_check ticker_check voice_queue_check \
          steer_check units_check trim_check easy_land_check clearance_check taps_check results_check segments_check overlay_check sidetoast_check music_menu_check pause_layout_check haptics_check \
@@ -40,6 +40,12 @@ for sz in 568x320 390x844; do
   out=$($PY tests/tasking_break_check.py --size $sz 2>&1); code=$?
   echo "== tasking_break_check $sz (exit $code)"; echo "$out" | grep -E "FAIL|passed" | tail -4
   [[ $code -ne 0 ]] && fail+=("tasking_break_check $sz")
+done
+# sensor item 8: break-ui on the sensor view at three sizes (the full eight: tests/sensor_break_check.py alone)
+for sz in 568x320,844x390,390x844; do
+  out=$($PY tests/sensor_break_check.py --sizes $sz --cases hard_worst,easy_worst,strike_dc2 2>&1); code=$?
+  echo "== sensor_break_check $sz (exit $code)"; echo "$out" | grep -E "FAIL|passed" | tail -4
+  [[ $code -ne 0 ]] && fail+=("sensor_break_check")
 done
 for t in ab_check; do
   out=$($PY tests/$t.py --noshots 2>&1); code=$?

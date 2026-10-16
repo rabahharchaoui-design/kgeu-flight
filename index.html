@@ -306,24 +306,49 @@ body.hasDest #stickZone{ top:calc(var(--padT) + max(178px, var(--hudH) + 60px));
 #mapOv .mt{ position:absolute; top:var(--padT); left:var(--padL); font:800 18px var(--font); letter-spacing:.14em; text-transform:uppercase; color:#f4f1ea; background:rgba(14,16,20,.9); border:1px solid rgba(255,255,255,.12); padding:9px 14px; border-radius:10px; }
 
 /* ---------- sensor ball overlay: thin mono readouts in the four corners of the view ---------- */
-#sensorHud{ position:absolute; inset:0; display:none; font:500 12px/1.35 ui-monospace,Menlo,"SF Mono",monospace; color:rgba(238,242,236,.85); letter-spacing:.03em; text-shadow:0 0 1px #000,0 0 3px rgba(0,0,0,.85),0 1px 4px rgba(0,0,0,.6); white-space:pre; }
+#sensorHud{ position:absolute; inset:0; display:none; font:600 12px/1.35 ui-monospace,Menlo,"SF Mono",monospace; color:rgba(238,242,236,.85); letter-spacing:.03em; white-space:pre;
+  /* break-ui: a crisp black outline, so the light symbology reads on a white black-hot sky as on dark ground */
+  text-shadow:1px 0 0 #000,-1px 0 0 #000,0 1px 0 #000,0 -1px 0 #000,0 0 3px rgba(0,0,0,.75); }
 #sensorHud.on{ display:block; }
-#sensorHud .ch{ position:absolute; background:rgba(238,242,236,.85); box-shadow:0 0 1px 1px rgba(0,0,0,.45); }
+#sensorHud .ch{ position:absolute; background:rgba(238,242,236,.9); box-shadow:0 0 0 1px rgba(0,0,0,.7); }
 #sensorHud .chL,#sensorHud .chR{ top:50%; width:34px; height:1px; }
 #sensorHud .chL{ left:calc(50% - 46px); } #sensorHud .chR{ left:calc(50% + 12px); }
 #sensorHud .chT,#sensorHud .chB{ left:50%; width:1px; height:34px; }
 #sensorHud .chT{ top:calc(50% - 46px); } #sensorHud .chB{ top:calc(50% + 12px); }
-#sensorHud .bk{ position:absolute; width:18px; height:18px; border:0 solid rgba(238,242,236,.55); }
-#sensorHud .bk.a{ left:calc(50% - 30vh); top:calc(50% - 22vh); border-width:1px 0 0 1px; }
-#sensorHud .bk.b{ right:calc(50% - 30vh); top:calc(50% - 22vh); border-width:1px 1px 0 0; }
-#sensorHud .bk.c{ left:calc(50% - 30vh); bottom:calc(50% - 22vh); border-width:0 0 1px 1px; }
-#sensorHud .bk.d{ right:calc(50% - 30vh); bottom:calc(50% - 22vh); border-width:0 1px 1px 0; }
+/* sensor item 4: end ticks on the crosshair arms */
+#sensorHud .ck{ position:absolute; background:rgba(238,242,236,.9); box-shadow:0 0 0 1px rgba(0,0,0,.7); }
+#sensorHud .kL,#sensorHud .kR{ top:calc(50% - 4px); width:1px; height:9px; } #sensorHud .kL{ left:calc(50% - 46px); } #sensorHud .kR{ left:calc(50% + 45px); }
+#sensorHud .kT,#sensorHud .kB{ left:calc(50% - 4px); width:9px; height:1px; } #sensorHud .kT{ top:calc(50% - 46px); } #sensorHud .kB{ top:calc(50% + 45px); }
+/* the corners of what the next narrower field of view will frame (--bx, --by: half its size), none at the narrow end */
+#sensorHud .bk{ position:absolute; width:14px; height:14px; border:0 solid rgba(238,242,236,.6); }
+#sensorHud .bk.a{ left:calc(50% - var(--bx,30vh)); top:calc(50% - var(--by,22vh)); border-width:1px 0 0 1px; }
+#sensorHud .bk.b{ right:calc(50% - var(--bx,30vh)); top:calc(50% - var(--by,22vh)); border-width:1px 1px 0 0; }
+#sensorHud .bk.c{ left:calc(50% - var(--bx,30vh)); bottom:calc(50% - var(--by,22vh)); border-width:0 0 1px 1px; }
+#sensorHud .bk.d{ right:calc(50% - var(--bx,30vh)); bottom:calc(50% - var(--by,22vh)); border-width:0 1px 1px 0; }
+#sensorHud.nobk .bk{ display:none; }
+/* the track gate: a box on a point track, a dashed box on an area track, a diamond on a geo stare; amber and blinking
+   for a moment where a track was lost */
+#shGate{ position:absolute; left:0; top:0; display:none; border:1.5px solid rgba(238,242,236,.95); box-shadow:0 0 0 1px rgba(0,0,0,.35),inset 0 0 0 1px rgba(0,0,0,.25); pointer-events:none; }
+#shGate.on{ display:block; }
+#shGate.ar{ border-style:dashed; }
+#shGate.geo{ border-width:1.5px; transform-origin:center; }
+#shGate.lost{ border-color:var(--caution); animation:shBlink .2s steps(1) 3; }
+@keyframes shBlink{ 50%{ opacity:0; } }
+#shCue{ position:absolute; left:50%; top:calc(50% - 76px); transform:translateX(-50%); color:var(--caution); font-weight:800; letter-spacing:.08em; opacity:0; transition:opacity .15s ease-out; }
+#shCue.on{ opacity:1; }
+#shTgt{ left:var(--padL); top:calc(var(--padT) + var(--map) + 10px); font-size:11px; }
+#shDialW{ position:absolute; left:calc(var(--padL) + var(--map) + 10px); top:calc(var(--padT) + 40px); display:flex; align-items:flex-start; gap:4px; color:rgba(238,242,236,.95); filter:drop-shadow(0 0 .6px #000) drop-shadow(0 0 1px #000); }
+#shDial{ width:46px; height:46px; } #shN{ width:20px; height:20px; } #shNT{ font-size:10px; margin:2px 0 0 -3px; }
+/* declutter: 1 keeps the crosshair, gate, sensor and field of view, the range and the track state; 2 the crosshair and gate */
+#sensorHud.dc1 #shTR,#sensorHud.dc1 #shBL,#sensorHud.dc1 #shBR,#sensorHud.dc1 #shDialW,#sensorHud.dc1 .bk,#sensorHud.dc1 #shTgt .x{ display:none; }
+#sensorHud.dc2 #shTL,#sensorHud.dc2 #shTgt,#sensorHud.dc2 #tgtMarks{ display:none; }
+#sensorHud.dc2:not(.stk) #shMid{ display:none; }
 #sensorHud .tx{ position:absolute; }
 /* strike target markers: diamonds on targets in view, edge arrows for the rest, a brief x on a kill */
 #sensorHud .tgtMark,#sensorHud .tgtArrow{ position:absolute; left:0; top:0; display:none; font-size:10px; line-height:1.2; text-align:center; }
 #sensorHud .tgtMark.on,#sensorHud .tgtArrow.on{ display:block; }
 #sensorHud .tgtMark .dm{ position:relative; display:block; width:11px; height:11px; margin:3px auto 5px; border:1.5px solid rgba(238,242,236,.9); transform:rotate(45deg); box-shadow:0 0 2px rgba(0,0,0,.8); }
-#sensorHud .tgtMark.lk{ color:#ffd66b; }
+#sensorHud .tgtMark.lk{ color:#ffd66b; } #sensorHud .tgtMark.lk .dm{ visibility:hidden; }
 #sensorHud .tgtMark.lk .dm{ width:15px; height:15px; margin:1px auto 3px; border:2px solid #ffd66b; background:rgba(255,214,107,.45); }
 #sensorHud .tgtMark.nl span{ display:none; }
 #sensorHud .tgtMark.dead .dm{ border:0; box-shadow:none; }
@@ -336,19 +361,35 @@ body.hasDest #stickZone{ top:calc(var(--padT) + max(178px, var(--hudH) + 60px));
 body:not(.touch) #shTR{ top:calc(var(--padT) + var(--icon) + 8px); }
 /* the camera's azimuth: tight on the smallest phones so it clears the pause button; in portrait under the map */
 @media (max-width:620px) and (orientation:landscape){ #shTR{ letter-spacing:0; } }
-@media (orientation:portrait){ #shTR{ left:var(--padL); right:auto; top:calc(var(--padT) + var(--map) + 8px); text-align:left; } }
+@media (orientation:portrait){ #shTR{ left:var(--padL); right:auto; top:calc(var(--padT) + var(--map) + 8px); text-align:left; }
+  #shTgt{ top:calc(var(--padT) + var(--map) + 44px); }   /* a row left for the top column (toasts, the mission pill) */
+  /* sensor item 4: under the pause button, clear of the top column (which takes the left of the screen in portrait) */
+  body.sensorOn #shTR{ left:auto; right:var(--padR); top:calc(var(--padT) + var(--icon) + 8px); text-align:right; font-size:10.5px; letter-spacing:0; }
+  /* break-ui: the buttons start just under the middle in portrait, so the strike block sits above the crosshair and the cue under it */
+  body.sensorOn #shMid{ top:calc(50% - 50px); transform:translate(-50%,-100%); font-size:11px; } body.sensorOn #shCue{ top:calc(50% + 52px); } }
 #shBL{ left:calc(var(--padL) + 124px); bottom:var(--padB); }
-#shBR{ right:calc(var(--padR) + var(--col) + 146px); bottom:var(--padB); border:1px solid rgba(238,242,236,.6); padding:0 5px; }
-#shBR:empty{ display:none; }
+#shBR{ right:calc(var(--padR) + var(--col) + 146px); bottom:var(--padB); padding:0 5px; border:1px solid transparent; }
+#shBR.hot{ border-color:rgba(238,242,236,.6); }
+#shBR:empty,#shBL:empty{ display:none; }
+/* sensor item 4: the ticker and the throttle are gone in the ball view, so the top right block sits in the corner and
+   the buttons start under it; smaller type on small phones */
+body.sensorOn #shTR{ right:calc(var(--padR) + 10px); }
+body.sensorOn #uiroot > #dock{ top:calc(var(--padT) + 58px); }
+@media (max-height:360px),(max-width:700px){ #sensorHud{ font-size:11px; } #shTgt{ font-size:10px; } body.sensorOn #uiroot > #dock{ top:calc(var(--padT) + 52px); } }
 #shMid{ left:50%; top:calc(50% + 54px); transform:translateX(-50%); text-align:center; }
 /* day TV grain, a faint 8 px block pattern and a vignette, over the scene and under the HUD */
 #sensorFx{ position:fixed; inset:0; pointer-events:none; display:none; }
 #sensorFx.on{ display:block; }
 #sensorFx .gr{ position:absolute; inset:0; opacity:.07; background-size:128px 128px; }
 #sensorFx.ir .gr{ display:none; }
+#sensorFx.nir .gr{ opacity:.11; }   /* sensor item 3: the NIR channel is noisier than the day camera */
 #sensorFx .vg{ position:absolute; inset:0; background:radial-gradient(ellipse at center,rgba(0,0,0,0) 58%,rgba(0,0,0,.42) 100%); }
 /* the ball view has its own readouts, so the flight cards step aside */
 body.sensorOn #hud{ display:none; }
+/* sensor item 7: the autopilot flies in the ball view, so the throttle steps out and the sensor buttons take the right
+   edge, up to three columns for the right thumb */
+body.sensorOn #thrCol{ display:none; }
+body.sensorOn #uiroot > #dock{ right:var(--padR); z-index:3; }
 
 /* ---------- touch controls ---------- */
 #touch{ display:none; position:absolute; inset:0; pointer-events:none; }
@@ -379,9 +420,14 @@ body.touch #touch{ display:block; }
 .ccol button i{ font-style:normal; font-size:9px; font-weight:800; letter-spacing:.04em; color:var(--soft); white-space:nowrap; }
 .ccol button.lit{ border-color:var(--caution); } .ccol button.lit i{ color:var(--caution); }
 .ccol button.on i{ color:#15110a; }
+/* sensor item 7: the sensor buttons answer the press (mobile: no grey flash, a small scale on the press itself) */
+body.sensorOn .ccol button{ -webkit-tap-highlight-color:transparent; transition:transform 120ms cubic-bezier(.23,1,.32,1); }
+body.sensorOn .ccol button:active{ transform:scale(.96); }
+/* the smallest phones (568 wide): three slimmer columns keep clear of the middle third */
+@media (max-width:620px) and (orientation:landscape){ body.sensorOn #uiroot > #dock{ gap:6px; } body.sensorOn .ccol button{ width:54px; } body.sensorOn .ccol button i{ font-size:8.5px; letter-spacing:0; } body.sensorOn #fovInd{ min-width:54px; } }
 .ccol button.dim{ opacity:.38; }
-#flapGrp{ display:flex; flex-direction:column; align-items:center; gap:4px; }
-#flapInd{ height:16px; min-width:60px; border-radius:6px; background:rgba(12,16,22,.7); border:1px solid rgba(255,255,255,.14); font:800 11px var(--font); line-height:14px; text-align:center; color:var(--ink); pointer-events:none; }
+#flapGrp,#fovGrp{ display:flex; flex-direction:column; align-items:center; gap:4px; }
+#flapInd,#fovInd{ height:16px; min-width:60px; border-radius:6px; background:rgba(12,16,22,.7); border:1px solid rgba(255,255,255,.14); font:800 11px var(--font); line-height:14px; text-align:center; color:var(--ink); pointer-events:none; }
 #bBrake.held{ background:var(--caution); color:#15110a; } #bBrake.held i{ color:#15110a; }
 #bDrop{ border-color:var(--caution); } #bDrop i{ color:var(--caution); }
 #bFire{ border-color:var(--caution); } #bFire i{ color:var(--caution); }
@@ -2041,7 +2087,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
     top:calc(var(--padT) + max(var(--map), var(--hudH)) + 8px); }
   body.appr #topCol{ max-height:calc(var(--vvh) / 3 - var(--padT) - max(var(--map), var(--hudH)) - 12px); }
   body.appr #hDest{ max-width:calc(33vw - var(--padL) - 4px); }
-  #thrCol, #uiroot > #dock, #stickZone, #hDest, #navLog{ top:var(--ctlTop); }
+  #thrCol, #uiroot > #dock, #stickZone, #hDest, #navLog, body.sensorOn #uiroot > #dock{ top:var(--ctlTop); }
   body.hasDest #stickZone{ top:calc(var(--ctlTop) + 54px); }
   #uiroot > #tcas, body.dock2 #uiroot > #tcas{ right:var(--padR); bottom:calc(var(--vvh) - var(--ctlTop) + 8px); }
   /* the lesson panel sits on the top edge of the controls, full width, growing up */
@@ -2148,9 +2194,17 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
       <button id="bCam" title="Camera (C)" aria-label="Camera"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg><i>VIEW</i></button>
       <button id="bLookBack" hidden title="Look back from the ramp" aria-label="Look back from the cargo ramp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M3 5h11l7 14H3z"/><path d="M9 13l-3 3 3 3"/><path d="M6 16h7"/></svg><i>LOOK BACK</i></button>
       <button id="bSensor" hidden title="Sensor ball" aria-label="Sensor ball view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg><i>SENSOR</i></button>
+      <button id="bNose" hidden title="Slew to nose (H)" aria-label="Slew the ball to the nose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M12 3l3.5 6h-7z" fill="currentColor"/><path d="M12 9v5"/><circle cx="12" cy="18" r="3"/></svg><i>NOSE</i></button>
       <button id="bMode" hidden title="Sensor mode (M)" aria-label="Sensor mode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg><i id="bModeT">DAY TV</i></button>
-      <button id="bZoom" hidden title="Sensor zoom (Z)" aria-label="Sensor zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="10" r="6"/><path d="M14.5 14.5L20 20M10 7.5v5M7.5 10h5"/></svg><i id="bZoomT">ZOOM x1</i></button>
-      <button id="bLock" hidden title="Lock the point under the crosshair (L)" aria-label="Sensor lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg><i>LOCK</i></button>
+      <div id="fovGrp" hidden>
+        <button id="bZoom" title="Zoom in, a narrower field of view (Z)" aria-label="Zoom in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="10" r="6"/><path d="M14.5 14.5L20 20M10 7.5v5M7.5 10h5"/></svg><i id="bZoomT">ZOOM IN</i></button>
+        <div id="fovInd" aria-live="polite">WFOV</div>
+        <button id="bWide" title="Zoom out, a wider field of view (X)" aria-label="Zoom out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="10" r="6"/><path d="M14.5 14.5L20 20M7.5 10h5"/></svg><i>ZOOM OUT</i></button>
+      </div>
+      <button id="bDclt" hidden title="Declutter the readouts (V)" aria-label="Declutter the sensor readouts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h6"/></svg><i id="bDcltT">DCLT</i></button>
+      <button id="bGeo" hidden title="Geo stare on the point under the crosshair (G)" aria-label="Geo stare: hold the ball on this coordinate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 21s-6-5.6-6-10.5a6 6 0 0 1 12 0C18 15.4 12 21 12 21z"/><path d="M12 7.5l3 3-3 3-3-3z" fill="currentColor"/></svg><i>GEO</i></button>
+      <button id="bLase" hidden title="Laser range the point under the crosshair (R)" aria-label="Laser rangefinder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="2.5" fill="currentColor"/><path d="M8.5 12H21M17 8l4 4-4 4"/></svg><i id="bLaseT">LASE</i></button>
+      <button id="bLock" hidden title="Track what is under the crosshair (L), or a double tap on the picture" aria-label="Sensor track"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg><i id="bLockT">TRACK</i></button>
       <button id="bNext" hidden title="Next target (N)" aria-label="Next target"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M9 5l5 5-5 5-5-5z"/><path d="M15 16h6M18 13l3 3-3 3"/></svg><i>NEXT TARGET</i></button>
       <button id="bFire" hidden title="Fire (Space)" aria-label="Fire"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2l3 5v9l-3 2-3-2V7z"/><path d="M9 16l-3 4M15 16l3 4"/></svg><i>FIRE</i></button>
       <button id="bDrop" hidden title="Drop the load" aria-label="Drop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 9a8 6 0 0 1 16 0z"/><path d="M5 9l6 8M19 9l-6 8"/><rect x="9.5" y="16" width="5" height="5"/></svg><i>DROP</i></button>
@@ -2163,6 +2217,7 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
       <button id="bBrake" aria-label="Brake, hold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="6"/><path d="M4 6a11 11 0 0 0 0 12M20 6a11 11 0 0 1 0 12"/></svg><i>BRAKE</i></button>
     </div>
     <div id="ctlB" class="ccol" hidden></div>
+    <div id="ctlC" class="ccol" hidden></div>
   </div>
   <!-- Red Flag Dogfight: the weapons, the target boxes, edge arrows, seeker,
        pipper and the incoming missile arrow, and the one subtitle line in the bottom strip -->
@@ -2185,9 +2240,21 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
   <div id="sideToast" role="status"></div>
   <canvas id="tcas" width="220" height="220" aria-hidden="true"></canvas>
   <div id="tcasRA" aria-live="assertive"><svg viewBox="0 0 80 80" aria-hidden="true"><path d="M40 4 L74 42 H53 V76 H27 V42 H6 Z" fill="#2ee66b" stroke="#06210f" stroke-width="3" stroke-linejoin="round"/></svg><b>CLIMB NOW</b></div>
+  <!-- sensor item 4: generic symbology in the style of public MQ-9 video. Crosshair with a gap and end ticks, the next
+       narrower field of view's corners (.bk), the track gate, the break cue, the four corner blocks, the point of
+       interest block under the map, the ball azimuth dial and the picture's north arrow -->
   <div id="sensorHud" class="anch"><div class="ch chL"></div><div class="ch chR"></div><div class="ch chT"></div><div class="ch chB"></div>
+    <div class="ck kL"></div><div class="ck kR"></div><div class="ck kT"></div><div class="ck kB"></div>
     <div class="bk a"></div><div class="bk b"></div><div class="bk c"></div><div class="bk d"></div>
-    <div class="tx" id="shTL"></div><div class="tx" id="shTR"></div><div class="tx" id="shBL"></div><div class="tx" id="shBR"></div><div class="tx" id="shMid"></div><div id="tgtMarks"></div></div>
+    <div id="shGate"></div><div id="shCue" role="status"></div>
+    <div class="tx" id="shTL"></div><div class="tx" id="shTR"></div><div class="tx" id="shBL"></div><div class="tx" id="shBR"></div><div class="tx" id="shMid"></div><div class="tx" id="shTgt"></div>
+    <div id="shDialW"><svg id="shDial" viewBox="-24 -24 48 48" aria-hidden="true"><circle r="21.5" fill="rgba(0,0,0,.28)" stroke="currentColor" stroke-width="1"/>
+      <path d="M0-21.5v3M21.5 0h-3M0 21.5v-3M-21.5 0h3" stroke="currentColor" stroke-width="1"/>
+      <g id="shDialN"><path d="M0-21.5l-2.6-4.4h5.2z" fill="currentColor"/></g>
+      <path id="shDialW2" d="M0 0L-3 -19L3 -19Z" fill="rgba(238,242,236,.35)"/><path id="shDialP" d="M0 0V-19" stroke="currentColor" stroke-width="1.6"/>
+      <path d="M0-6l1.2 3.2 5 2.2v1.3l-5-.9-.4 3.6 1.9 1.3v1l-2.7-.6-2.7.6v-1l1.9-1.3-.4-3.6-5 .9v-1.3l5-2.2z" fill="currentColor"/></svg>
+      <svg id="shN" viewBox="-12 -12 24 24" aria-hidden="true"><g id="shNA"><path d="M0-10l4.5 9h-9z" fill="currentColor"/><path d="M0-1v9" stroke="currentColor" stroke-width="1.5"/></g></svg><b id="shNT">N</b></div>
+    <div id="tgtMarks"></div></div>
   <div id="touch">
     <div id="stickZone"></div>
     <div id="stickHint">STICK</div>
@@ -5026,6 +5093,8 @@ function buildMQ9HD(opt){
     const win=new THREE.SphereGeometry(0.248,16,12,0,Math.PI*0.62,Math.PI*0.30,Math.PI*0.44);
     const wm=mesh(win,MAT.glassDark,g);
     wm.position.set(0,-0.54,Z(1.45)); wm.rotation.y=-1.25;
+    // sensor item 2: the view is taken from the ball's centre; the turret hides in the sensor view
+    nm.userData.turret=bm.userData.turret=wm.userData.turret=1;g.userData.ballAt=bm.position.clone();
   }
   // ---- engine inlet on the spine and exhaust stubs ---------------------
   {
@@ -5596,6 +5665,7 @@ function buildMQ9BHD(opt){
     const win=new THREE.SphereGeometry(0.258,16,12,0,Math.PI*0.62,Math.PI*0.30,Math.PI*0.44);
     const wm=mesh(win,MAT.glassDark,g);
     wm.position.set(0,-0.58,Z(1.55)); wm.rotation.y=-1.25;
+    nm.userData.turret=bm.userData.turret=wm.userData.turret=1;g.userData.ballAt=bm.position.clone();
   }
   // ---- engine inlet on the spine, exhaust stubs, blade antennas --------
   {
@@ -11489,20 +11559,21 @@ function trackAtScreen(cx,cy){
   _nd.set(((cx-r.left)/r.width)*2-1,-((cy-r.top)/r.height)*2+1);
   _rc.setFromCamera(_nd,camera);
   if(!groundHit(_rc.ray.origin,_rc.ray.direction,_sp)){toast('Nothing to lock on there');return;}
-  const t=targetUnder(_sp,60);
-  if(t){SENSOR.tgt=t;SENSOR.track=null;toast('Tracking '+t.name);}
-  else{SENSOR.tgt=null;SENSOR.track=_sp.clone();toast('Tracking ground point');}
+  sensorTrackAt(_sp);
 }
 // sensor view: one finger (or the mouse) drags the ball, two fingers pinch the zoom.
-// A touch never locks; that is the LOCK button's job, so a drag cannot lock by accident.
+// sensor item 7: a double tap (two taps inside 320 ms and 30 px, neither moving) tracks what is under the finger;
+// a single tap or a drag never does, so a slew cannot lock by accident. The mouse: one click.
+let stap={t:0,x:0,y:0};
 const spts=new Map();let spinch=0;
-function sensorDragK(){return (SENSOR_FOV[SENSOR.zoom]*Math.PI/180)/Math.max(200,glc.clientHeight)*1.6;}
+// sensor item 2: the finger grabs the picture (it follows the finger, one to one), a flick glides on and settles
+function sensorDragK(){return (sensorFovV()*Math.PI/180)/Math.max(200,glc.clientHeight);}
 glc.addEventListener('pointerdown',e=>{
   if(sensorMode){
-    if(e.pointerType==='mouse'){sdrag={id:e.pointerId,x:e.clientX,y:e.clientY,moved:false,mouse:true};
+    if(e.pointerType==='mouse'){sdrag={id:e.pointerId,x:e.clientX,y:e.clientY,moved:false,mouse:true,vx:0,vy:0,t:e.timeStamp};
       try{glc.setPointerCapture(e.pointerId);}catch(_){}}
     else{spts.set(e.pointerId,{x:e.clientX,y:e.clientY});try{glc.setPointerCapture(e.pointerId);}catch(_){}
-      if(spts.size===1)sdrag={id:e.pointerId,x:e.clientX,y:e.clientY,moved:false,mouse:false};
+      if(spts.size===1){sdrag={id:e.pointerId,x:e.clientX,y:e.clientY,moved:false,mouse:false,vx:0,vy:0,t:e.timeStamp};SENSOR.rx=SENSOR.ry=0;}
       else if(spts.size===2){sdrag=null;const [a,b]=[...spts.values()];spinch=Math.hypot(a.x-b.x,a.y-b.y)||1;}}
     return;}
   if(e.pointerType!=='mouse'||e.button!==0||!running)return;yoke.on=true;yoke.id=e.pointerId;yoke.x0=e.clientX;yoke.y0=e.clientY;yoke.x=yoke.y=0;
@@ -11514,14 +11585,22 @@ glc.addEventListener('pointermove',e=>{
   if(sdrag&&e.pointerId===sdrag.id){
     const dx=e.clientX-sdrag.x,dy=e.clientY-sdrag.y,k=sensorDragK();
     if(Math.abs(dx)>3||Math.abs(dy)>3){sdrag.moved=true;sensorBreak(null);}
-    if(sdrag.moved&&sensorMode){SENSOR.az=clamp(SENSOR.az+dx*k,-GIM_AZ,GIM_AZ);
-      SENSOR.el=clamp(SENSOR.el-dy*k,GIM_EL_LO,GIM_EL_HI);}
-    sdrag.x=e.clientX;sdrag.y=e.clientY;return;}
+    if(sdrag.moved&&sensorMode){SENSOR.dragX-=dx*k;SENSOR.dragY+=dy*k;SENSOR.slewTo=null;
+      // the finger's speed (px/s), smoothed, for the glide on release
+      const ft=Math.max(1,e.timeStamp-sdrag.t),a=Math.min(1,ft/60);sdrag.vx+=(dx/ft*1000-sdrag.vx)*a;sdrag.vy+=(dy/ft*1000-sdrag.vy)*a;}
+    sdrag.x=e.clientX;sdrag.y=e.clientY;sdrag.t=e.timeStamp;return;}
   if(!yoke.on||e.pointerId!==yoke.id)return;const R=Math.min(innerWidth,innerHeight)*0.16;
   yoke.x=clamp((e.clientX-yoke.x0)/R,-1,1);yoke.y=clamp((e.clientY-yoke.y0)/R,-1,1);yokeK.style.transform=`translate(${yoke.x*44}px,${yoke.y*44}px)`;});
 const yokeUp=e=>{
   if(spts.delete(e.pointerId)&&spts.size<2)spinch=0;
-  if(sdrag&&e.pointerId===sdrag.id){if(sdrag.mouse&&!sdrag.moved&&sensorMode){trackAtScreen(e.clientX,e.clientY);sensorRecentre();}sdrag=null;return;}
+  if(sdrag&&e.pointerId===sdrag.id){if(sdrag.mouse&&!sdrag.moved&&sensorMode){trackAtScreen(e.clientX,e.clientY);sensorRecentre();}
+    else if(!sdrag.moved&&sensorMode&&!spinch){const now=e.timeStamp;
+      if(now-stap.t<320&&Math.hypot(e.clientX-stap.x,e.clientY-stap.y)<30){stap.t=0;trackAtScreen(e.clientX,e.clientY);sensorRecentre();hapPattern('detent');if(typeof updateCtx==='function')updateCtx();}
+      else stap={t:now,x:e.clientX,y:e.clientY};}
+    // a flick: the ball glides on at the finger's last speed and settles (still for 80 ms first: no glide)
+    else if(sdrag.moved&&sensorMode&&e.timeStamp-sdrag.t<80){const k=sensorDragK(),w=sensorRateMax();
+      SENSOR.rx=clamp(-sdrag.vx*k/w,-1.5,1.5);SENSOR.ry=clamp(-sdrag.vy*k/w,-1.5,1.5);SENSOR.fling=true;}
+    sdrag=null;return;}
   if(e.pointerId!==yoke.id)return;yoke.on=false;yoke.x=yoke.y=0;yokeEl.classList.remove('on');};
 glc.addEventListener('pointerup',yokeUp);glc.addEventListener('pointercancel',yokeUp);
 glc.addEventListener('wheel',e=>{if(!running)return;e.preventDefault();apOffThr();st.throttle=clamp(st.throttle-e.deltaY*0.0012,0,1);},{passive:false});
@@ -11562,7 +11641,12 @@ window.addEventListener('keydown',e=>{
   if(k===']') setFlaps(st.flapIdx+1);
   if(k===' '&&sensorMode){fireMissile();return;}
   if(sensorMode&&k==='n'&&STRIKE.active){nextTarget();return;}
-  if(sensorMode&&(k==='z'||k==='m'||k==='l')){if(k==='z')sensorZoomStep(0);else if(k==='m')sensorModeStep();else sensorLock();return;}
+  if(sensorMode&&k==='h'){sensorNose();return;}
+  if(sensorMode&&k==='r'){sensorLase();return;}
+  if(sensorMode&&k==='v'){sensorDclt();return;}
+  if(sensorMode&&k==='g'){sensorGeo();return;}
+  if(sensorMode&&k==='x'){sensorZoomStep(-1);return;}
+  if(sensorMode&&(k==='z'||k==='m'||k==='l')){if(k==='z')sensorZoomStep(1);else if(k==='m')sensorModeStep();else sensorLock();return;}
   if(k==='o') autoSmart();
   if(k==='l') apToggle('land');
   if(k==='1') setThr(0);
@@ -12694,10 +12778,15 @@ function dcCamera(q,dp,cf,dt){
   // ---- sensor view buttons: labels follow the ball state; layoutCtl decides which show ----
   window.updateCtx=function(){
     if(sensorMode){
-      const zt='ZOOM x'+(1<<SENSOR.zoom),mt=sensorModeName(true).toUpperCase();
-      if($('bZoomT').textContent!==zt)$('bZoomT').textContent=zt;
+      // sensor item 3: the field of view between ZOOM IN and ZOOM OUT; the ends of the ladder dim the button
+      const L=MTSB_FOV[SENSOR.zoom]||MTSB_FOV[0],zt=rookie()?(Math.min(SENSOR.zoom,MTSB_EASY_MAX)+1)+' of '+(MTSB_EASY_MAX+1):L.ez?'EZ '+L.ez+'X':L.k,mt=sensorModeName(true).toUpperCase();
+      if($('fovInd').textContent!==zt)$('fovInd').textContent=zt;
+      $('bZoom').classList.toggle('dim',SENSOR.zoom>=sensorZoomMax());$('bWide').classList.toggle('dim',SENSOR.zoom<=0);
       if($('bModeT').textContent!==mt)$('bModeT').textContent=mt;
-      $('bLock').classList.toggle('lit',!!(SENSOR.tgt||SENSOR.track));}
+      $('bLock').classList.toggle('lit',!!(SENSOR.tgt||SENSOR.track));$('bGeo').classList.toggle('lit',!!SENSOR.geo);
+      $('bLase').classList.toggle('lit',SENSOR.lrfT>0);$('bDclt').classList.toggle('lit',!!SENSOR.dclt);
+      const dt=SENSOR.dclt?'DCLT '+SENSOR.dclt:'DCLT';if($('bDcltT').textContent!==dt)$('bDcltT').textContent=dt;
+      const lt=rookie()?'LOCK':'TRACK';if($('bLockT').textContent!==lt)$('bLockT').textContent=lt;}
     layoutCtl();
   };
 })();
@@ -12740,16 +12829,21 @@ function sensorView(){if(!running||st.crashed||!hasBall())return;
   tapBtn($('bDrop'),()=>missDrop(),true);
   tapBtn($('bLookBack'),()=>lookBack());
   tapBtn($('bMode'),()=>sensorModeStep());
-  tapBtn($('bZoom'),()=>sensorZoomStep(0));
+  tapBtn($('bNose'),()=>sensorNose());
+  tapBtn($('bZoom'),()=>sensorZoomStep(1));
+  tapBtn($('bWide'),()=>sensorZoomStep(-1));
   tapBtn($('bLock'),()=>sensorLock());
   tapBtn($('bFire'),()=>strikeBtnPress('fire'),true);
   tapBtn($('bNext'),()=>nextTarget());
   tapBtn($('bFlapUp'),()=>{if(running&&!st.crashed)setFlaps(st.flapIdx-1);});
   tapBtn($('bFlapDn'),()=>{if(running&&!st.crashed)setFlaps(st.flapIdx+1);});
-  const dock=$('dock'),A=$('ctlA'),B=$('ctlB');
+  tapBtn($('bDclt'),()=>sensorDclt());
+  tapBtn($('bGeo'),()=>sensorGeo());
+  tapBtn($('bLase'),()=>sensorLase());
+  const dock=$('dock'),A=$('ctlA'),B=$('ctlB'),Cc=$('ctlC');
   // top to bottom; BRAKE is always last, nearest the thumb
-  const ORDER=['bAuto','bCam','bLookBack','bSensor','bMode','bZoom','bLock','bNext','bFire','bDrop','bGear','flapGrp','bBrake'].map(id=>$(id));
-  const HT={flapGrp:112},GAP=6;
+  const ORDER=['bAuto','bCam','bLookBack','bSensor','bNose','bDclt','bMode','fovGrp','bGeo','bLase','bLock','bNext','bFire','bDrop','bGear','flapGrp','bBrake'].map(id=>$(id));
+  const HT={flapGrp:112,fovGrp:112},GAP=6;
   let lkey='',dockH=0;
   const reH=()=>{dockH=0;};window.addEventListener('resize',reH);if(window.visualViewport)visualViewport.addEventListener('resize',reH);
   window.layoutCtl=function(remeasure){
@@ -12759,9 +12853,10 @@ function sensorView(){if(!running||st.crashed||!hasBall())return;
     const sv=sensorMode,lo=dcOn()&&!MISS.result;
     if(lo!==document.body.classList.contains('lookOn')){document.body.classList.toggle('lookOn',lo);if(!lo&&DCAM.drag){DCAM.drag=null;$('lookPad').classList.remove('held');}}
     $('bLookBack').classList.toggle('lit',DCAM.mode==='ramp');
+    {const ht=sv?'SLEW':'STICK',he=$('stickHint');if(he.textContent!==ht)he.textContent=ht;}   // sensor item 7: the pad slews the ball
     // the Red Flag Dogfight: the weapon buttons take the lower right, AUTO, GEAR and BRAKE step out (VIEW stays)
     const df=DF.live&&running;
-    const show={bAuto:!df,bCam:1,bLookBack:lo,bSensor:hasBall(),bMode:sv,bZoom:sv,bLock:sv,bNext:sv&&STRIKE.active,bFire:sv&&STRIKE.active,bDrop:dropOn,
+    const show={bAuto:!df&&!sv,bCam:!sv,bLookBack:lo,bSensor:hasBall(),bNose:sv,bDclt:sv,bMode:sv,fovGrp:sv,bGeo:sv&&!rookie(),bLase:sv&&!rookie(),bLock:sv,bNext:sv&&STRIKE.active,bFire:sv&&STRIKE.active,bDrop:dropOn,
       bGear:P&&!!AC.retract&&!sv&&!df,flapGrp:P&&AC.id!=='f16'&&!sv,bBrake:isTouch&&!sv&&!df};
     const H=dockH||(dockH=dock.clientHeight);
     const key=Object.keys(show).map(k=>show[k]?1:0).join('')+'|'+H;
@@ -12769,12 +12864,13 @@ function sensorView(){if(!running||st.crashed||!hasBall())return;
     ORDER.forEach(el=>el.hidden=!show[el.id]);
     if(!H)return false;                             // not on screen yet: the frame loop deals them out once it is
     lkey=key;
-    // fill column A from the bottom up; whatever does not fit goes to column B, same order
-    const vis=ORDER.filter(el=>show[el.id]);let h=0,cut=vis.length;
-    for(let i=vis.length-1;i>=0;i--){const eh=(HT[vis[i].id]||44)+(h?GAP:0);if(h+eh>H){cut=i+1;break;}h+=eh;cut=i;}
+    // fill column A from the bottom up; whatever does not fit goes to column B, then C (the sensor view), same order
+    const vis=ORDER.filter(el=>show[el.id]),fill=(end)=>{let h=0,cut=end;
+      for(let i=end-1;i>=0;i--){const eh=(HT[vis[i].id]||44)+(h?GAP:0);if(h+eh>H){cut=i+1;break;}h+=eh;cut=i;}return cut;};
+    const cA=fill(vis.length),cB=cA>0?fill(cA):0;
     ORDER.forEach(el=>{if(!show[el.id]&&el.parentNode!==A)A.appendChild(el);});
-    vis.forEach((el,i)=>(i<cut?B:A).appendChild(el));
-    B.hidden=cut===0;document.body.classList.toggle('dock2',!B.hidden);   // the TCAS panel steps left of a second column
+    vis.forEach((el,i)=>(i>=cA?A:i>=cB?B:Cc).appendChild(el));
+    B.hidden=cA===0;Cc.hidden=cB===0;document.body.classList.toggle('dock2',!B.hidden);   // the TCAS panel steps left of a second column
     return true;
   };
   let key='';
@@ -15913,6 +16009,8 @@ function start(mode,base){
   if(!WORLD.ready){toast('Loading '+REGION.city+'\u2026');return;}
   if(!baseOK(acType,base||SPAWN_BASE)){const hb=HOME(acType);if(!REGION.az){pickRegion('az',{resume:{mode:mode,base:hb,type:acType,tod:TOD.id}});return;}base=hb;SPAWN_BASE=hb;locSel();}
   if(FM.on)fmClose();
+  // sensor item 2: every flight starts with the ball at its rest look, nothing tracked (it can now look up at the sky)
+  SENSOR.az=0;SENSOR.el=-0.6;SENSOR.tgt=SENSOR.track=SENSOR.geo=SENSOR.slewTo=null;SENSOR.losOK=false;SENSOR.rx=SENSOR.ry=0;SENSOR.cueT=0;
   initAudio();
   // gfxfix item 3: the battery guard's drop if a restart skipped the menu, and the precompile queue drained before the
   // first flight frame (it runs again after a tier change; normally the menu's frames have drained it already)
@@ -15986,7 +16084,7 @@ function bugGrab(){BUG.want=0;
     return BUG.shot;}catch(e){return null;}}
 // Settings, a flight running and no recent pause frame: draw one frame now and take it (the menu covers the canvas)
 function bugFresh(){if(!running)return null;
-  try{pfxRender(camMode===2&&SENSOR.mode!=='tv'&&!PHOTO.on&&!FREECAM);}catch(e){return null;}
+  try{pfxRender(camMode===2&&sensorIRPass()&&!PHOTO.on&&!FREECAM);}catch(e){return null;}
   return bugGrab();}
 function togglePause(){if(DF.brief||TASK.brief||LES.brief)return;   // the dogfight briefing holds the sim itself; FIGHT'S ON is the way on
   if(RES.brief)resClose(RES.brief);if(paused){pzResume();return;}paused=true;pauseOv.classList.add('on');{BUG.want=running?1:0;radioFade(120);CARP.sync();PZ0={t:savedType,b:SPAWN_BASE,p:SPAWN_POS};PZ_LOC=null;locSel();pzApplyUI();requestAnimationFrame(locShow);if(window.stickReset)stickReset();musicUI();}}
@@ -16058,7 +16156,8 @@ const HAP_PAT={
   crash:[[0,'h'],[80,'h'],[170,'h'],[280,'h'],[420,'h'],[580,'h']],       // long heavy burst
   launch:[[0,'m'],[90,'m']],                                             // Hellfire away, FOX 2: sharp double
   launch3:[[0,'h'],[120,'m'],[240,'m'],[360,'l']],                        // FOX 3 (arsenal): the big motor, a heavy kick rolling off
-  impact:[[0,'h'],[70,'h']],                                             // Hellfire impact: heavy thump (delayed by the time of flight)
+  impact:[[0,'h'],[70,'h']],
+  trk:[[0,'m'],[110,'l']],                                               // sensor: a track lost (sensor item 5)                                             // Hellfire impact: heavy thump (delayed by the time of flight)
   gun:[[0,'l'],[45,'l'],[90,'l'],[135,'l'],[180,'l']],                   // gun or cannon: rapid ticks
   tdLight:[[0,'l']],tdFirm:[[0,'m'],[90,'m']],tdHard:[[0,'h'],[80,'h']],  // touchdown by how hard
   detent:[[0,'l']],ap:[[0,'m']],trim:[[0,'l']],                          // gear, flaps, throttle detents, trim, autopilot
@@ -18507,8 +18606,9 @@ const SCONE={on:false,brgT:0,rel:0,half:0,len:0};
 function sensorCone(){
   SCONE.on=sensOn;if(!sensOn)return SCONE;
   const D=180/Math.PI;_eu.setFromQuaternion(st.quat,'YXZ');
-  SCONE.rel=SENSOR.az*D;SCONE.brgT=((-_eu.y*D+SCONE.rel)%360+360)%360;
-  SCONE.half=Math.max(4,SENSOR_FOV[SENSOR.zoom]/2);
+  // sensor item 2: the bearing of the line of sight itself (past straight down it points behind the azimuth)
+  const L=SENSOR.los;SCONE.rel=SENSOR.az*D;SCONE.brgT=Math.hypot(L.x,L.z)>1e-4?((Math.atan2(L.x,-L.z)*D)%360+360)%360:((-_eu.y*D+SCONE.rel)%360+360)%360;
+  SCONE.half=Math.max(4,sensorFovV()/2);
   SCONE.len=SENSOR.valid?clamp(Math.hypot(SENSOR.spot.x-st.pos.x,SENSOR.spot.z-st.pos.z),2000,5500):3000;   // at least 2 km, so a steep look still reads past the aircraft icon
   return SCONE;
 }
@@ -19007,9 +19107,30 @@ function destUI(force){
 
 // ================= Reaper strike: live range =================
 // Game tuned throughout. Nothing here models real weapon performance.
-// zoom: index into SENSOR_FOV. mode: 'tv' day colour, 'irw' white hot, 'irb' black hot
-const SENSOR={az:0,el:-0.6,zoom:0,mode:'tv',track:null,tgt:null,slewTo:null,spot:new V3(),valid:false,slant:0,gimbal:false};
-const SENSOR_FOV=[14,7,3.5,1.75];
+// zoom: index into MTSB_FOV. mode: 'tv' day colour, 'nir' near infrared, 'irw' white hot, 'irb' black hot
+// sensor item 2: los, the line of sight in the world (inertially held); geo, a geo stare's coordinate; rx/ry the smoothed
+// thumb rate (fraction of sensorRateMax), cmdX/cmdY this frame's command, dragX/dragY a finger's pan (radians);
+// mask: the airframe in the way (ray test), masked: that or terrain hiding the track, maskT how long; cue/cueT the break cue
+const SENSOR={az:0,el:-0.6,zoom:0,mode:'tv',track:null,tgt:null,geo:null,slewTo:null,spot:new V3(),valid:false,slant:0,gimbal:false,
+  los:new V3(0,-0.56,-0.83),losOK:false,_az:0,_el:-0.6,_t:0,rx:0,ry:0,cmdX:0,cmdY:0,dragX:0,dragY:0,fling:false,
+  mask:false,masked:false,maskT:0,maskChk:0,cue:'',cueT:0,lrfT:0,dclt:0};
+// sensor item 3: the MTS-B fields of view (docs/mtsb.md): published vertical angles in degrees, TV and IR, from the
+// brochure copy. NIR shares the TV set (approximation, not published). ez: the 2:1 and 4:1 electronic zoom, offered at
+// the narrow end of one ladder (the brochure also allows it in NFOV; one ladder keeps the thumb simple). Easy keeps the
+// five wider steps. zoom: index into MTSB_FOV.
+const MTSB_FOV=[{k:'WFOV',tv:34,ir:34},{k:'MWFOV',tv:17,ir:17},{k:'MFOV',tv:5.7,ir:5.7},{k:'MNFOV',tv:2.8,ir:2.8},
+  {k:'NFOV',tv:0.47,ir:0.47},{k:'UNFOV',tv:0.08,ir:0.23},{k:'UNFOV',tv:0.08,ir:0.23,ez:2},{k:'UNFOV',tv:0.08,ir:0.23,ez:4}];
+const MTSB_EASY_MAX=4;
+const sensorIR=()=>SENSOR.mode==='irw'||SENSOR.mode==='irb';
+// NIR at night: the scene's own night light is too dark to amplify, so it is drawn through the IR pass with the heat
+// turned down: grey texture and shading, the way a low light near infrared channel shows terrain (approximation)
+const sensorIRPass=()=>sensorIR()||(SENSOR.mode==='nir'&&TOD.night);
+function sensorZoomMax(){return rookie()?MTSB_EASY_MAX:MTSB_FOV.length-1;}
+function sensorFovV(){const L=MTSB_FOV[clamp(SENSOR.zoom,0,MTSB_FOV.length-1)];return (sensorIR()?L.ir:L.tv)/(L.ez||1);}
+// 'WFOV 34°', 'UNFOV 0.08° EZ 2X'; Easy: 'Zoom 3 of 5'
+function sensorFovName(){const z=clamp(SENSOR.zoom,0,MTSB_FOV.length-1),L=MTSB_FOV[z];
+  if(rookie())return 'Zoom '+(Math.min(z,MTSB_EASY_MAX)+1)+' of '+(MTSB_EASY_MAX+1);
+  const a=sensorIR()?L.ir:L.tv;return L.k+' '+(a>=1?a.toFixed(a%1?1:0):String(a))+'°'+(L.ez?' EZ '+L.ez+'X':'');}
 
 // ---- IR sensor look ----
 // The scene is drawn once with scene.overrideMaterial=IR_MAT: grey from a per-object heat
@@ -19118,7 +19239,8 @@ function renderIR(){
   if(irDirty||performance.now()-IR.t>1000)irTag();
   const inv=SENSOR.mode==='irb',u=IR_MAT.uniforms,night=TOD.night;
   u.uInvert.value=inv?1:0;u.uTime.value=(performance.now()/1000)%97;
-  u.uAmb.value=night?0.06:TOD.id==='sunset'||TOD.id==='haboob'?0.1:0.13;u.uShade.value=night?0.05:0.14;
+  u.uAmb.value=night?0.06:TOD.id==='sunset'||TOD.id==='haboob'?0.1:0.13;u.uShade.value=night?0.05:0.14;u.uHot.value=0.8;
+  if(SENSOR.mode==='nir'){u.uInvert.value=0;u.uAmb.value=0.3;u.uShade.value=0.2;u.uHot.value=0.12;}   // sensor item 3: NIR at night
   camera.updateMatrixWorld();
   _irSun.copy(sun.position).normalize().transformDirection(camera.matrixWorldInverse);u.uSun.value.copy(_irSun);
   // the sky is cold; the haze fades to it
@@ -19213,12 +19335,13 @@ const PFX_DU=()=>({tDust:{value:DUSTFX.tex},uDust:{value:new THREE.Vector4()},uD
 // fix2 item 4: the sensor view's light unsharp mask, uniforms only (uSharp 0 is the plain composite): the centre less
 // the mean of its four neighbours (uTexel apart, held inside the drawn uUvS rectangle), times uSharp, the difference
 // clamped to 0.1 so an edge gains at most a one pixel lift, no halo or ringing
-const PFX_CMP=pfxMat({uniforms:Object.assign({tColor:{value:null},tBloom:{value:PFX_BLACK},uStr:{value:0},uSharp:{value:0},uTexel:{value:new THREE.Vector2(1,1)},uUvS:PFX_UVS,uUvB:PFX_UVB},PFX_DU()),vertexShader:PFX_VS2,fragmentShader:`uniform sampler2D tColor,tBloom;uniform float uStr,uSharp;uniform vec2 uTexel,uUvS;varying vec2 vUv;
+const PFX_CMP=pfxMat({uniforms:Object.assign({tColor:{value:null},tBloom:{value:PFX_BLACK},uStr:{value:0},uSharp:{value:0},uNir:{value:0},uTexel:{value:new THREE.Vector2(1,1)},uUvS:PFX_UVS,uUvB:PFX_UVB},PFX_DU()),vertexShader:PFX_VS2,fragmentShader:`uniform sampler2D tColor,tBloom;uniform float uStr,uSharp,uNir;uniform vec2 uTexel,uUvS;varying vec2 vUv;
 ${PFX_ADD}${PFX_DUST}vec3 pfxSh(){vec3 c=texture2D(tColor,vUv).rgb;if(uSharp<=0.0)return c;
   vec2 lo=uTexel*0.5,hi=uUvS-uTexel*0.5,dx=vec2(uTexel.x,0.0),dy=vec2(0.0,uTexel.y);
   vec3 n=texture2D(tColor,clamp(vUv+dx,lo,hi)).rgb+texture2D(tColor,clamp(vUv-dx,lo,hi)).rgb+texture2D(tColor,clamp(vUv+dy,lo,hi)).rgb+texture2D(tColor,clamp(vUv-dy,lo,hi)).rgb;
   return clamp(c+clamp((c-n*0.25)*uSharp,-0.1,0.1),0.0,1.0);}
-void main(){gl_FragColor=vec4(pfxDust(pfxBl(pfxSh())),1.0);}`});
+// sensor item 3, NIR: reflected near infrared as a grey picture, green (leaves, fields) bright, blue (sky, water) dark
+void main(){vec3 c=pfxDust(pfxBl(pfxSh()));if(uNir>0.0){float l=clamp((dot(c,vec3(0.26,0.80,-0.16))-0.5)*1.45+0.44,0.0,1.0);c=mix(c,vec3(l),uNir);}gl_FragColor=vec4(c,1.0);}`});
 // SMAA 1x medium with colour edge detection: three r128 examples/js SMAAShader and SMAAPass, compacted (WebGL port notes kept in the maths)
 const PFX_EDGE=pfxMat({defines:{SMAA_THRESHOLD:'0.1'},uniforms:{tDiffuse:{value:null},resolution:{value:new THREE.Vector2()},uUvS:PFX_UVS},
   vertexShader:`uniform vec2 resolution,uUvS;varying vec2 vUv;varying vec4 vOffset[3];
@@ -19430,7 +19553,7 @@ function pfxRender(ir){
   if(layer){
     if(s<1){   // the scaled world upscaled into FULL (no sharpening, dust or bloom), the layer over it there
       if(!PFX.full){PFX.full=pfxRT(W,H,false);PFX.allocN++;}
-      const u=PFX_CMP.uniforms;u.tColor.value=PFX.rt.texture;u.tBloom.value=PFX_BLACK;u.uStr.value=0;u.uSharp.value=0;u.uDust.value.set(0,0,0,0);
+      const u=PFX_CMP.uniforms;u.tColor.value=PFX.rt.texture;u.tBloom.value=PFX_BLACK;u.uStr.value=0;u.uSharp.value=0;u.uNir.value=0;u.uDust.value.set(0,0,0,0);
       pfxPass(PFX_CMP,PFX.full);src=PFX.full;
       PFX_UVS.value.set(1,1);for(const t of [PFX.ed,PFX.wt])t.viewport.set(0,0,W,H);}
     const L=PFX.lay,[x,y,w2,h2]=PFX_BOX,vp=src.viewport,v0=vp.clone();
@@ -19446,7 +19569,7 @@ function pfxRender(ir){
     PFX_EDGE.uniforms.tDiffuse.value=src.texture;pfxPass(PFX_EDGE,PFX.ed);
     PFX_WGT.uniforms.tDiffuse.value=PFX.ed.texture;pfxPass(PFX_WGT,PFX.wt);
     const u=PFX_FIN.uniforms;u.tDiffuse.value=PFX.wt.texture;u.tColor.value=src.texture;u.tBloom.value=tb;u.uStr.value=st;pfxPass(PFX_FIN,null);}
-  else{const u=PFX_CMP.uniforms;u.tColor.value=src.texture;u.tBloom.value=tb;u.uStr.value=st;u.uSharp.value=shp;u.uTexel.value.set(1/W,1/H);pfxPass(PFX_CMP,null);}
+  else{const u=PFX_CMP.uniforms;u.tColor.value=src.texture;u.tBloom.value=tb;u.uStr.value=st;u.uSharp.value=shp;u.uNir.value=sv&&!ir&&SENSOR.mode==='nir'?1:0;u.uTexel.value.set(1/W,1/H);pfxPass(PFX_CMP,null);}
   PFX.last={w:W,h:H,sw:w,sh:h,bloomed:bloom,smaa:smaa,sharp:shp,rs:s,samples:PFX.ms,layer:layer,box:layer?PFX_BOX.slice():null,split:layer&&s<1,full:layer&&s<1?[PFX.full.width,PFX.full.height]:null};
   r.setClearColor(_pfxC,ca);r.autoClear=ac;PFX.frames++;
 }
@@ -19590,7 +19713,7 @@ function preJobs(){
       PFX_EDGE.uniforms.tDiffuse.value=A.texture;pfxPass(PFX_EDGE,B);
       PFX_WGT.uniforms.tDiffuse.value=B.texture;pfxPass(PFX_WGT,C);
       for(const m of [PFX_FIN,PFX_CMP]){const f=m.uniforms;if(f.tDiffuse)f.tDiffuse.value=C.texture;f.tColor.value=A.texture;f.tBloom.value=B.texture;f.uStr.value=PFX_STR;pfxPass(m,D);}
-      PFX_CMP.uniforms.uSharp.value=PFX_SHARP.tv;PFX_CMP.uniforms.uTexel.value.set(1/16,1/16);pfxPass(PFX_CMP,D);PFX_CMP.uniforms.uSharp.value=0;   // fix2 item 4: the sensor view's sharpened composite
+      PFX_CMP.uniforms.uSharp.value=PFX_SHARP.tv;PFX_CMP.uniforms.uNir.value=0;PFX_CMP.uniforms.uTexel.value.set(1/16,1/16);pfxPass(PFX_CMP,D);PFX_CMP.uniforms.uSharp.value=0;   // fix2 item 4: the sensor view's sharpened composite
       // fix2 item 9: the aircraft layer: the scene into a multisampled target of its kind, laid over a plain one
       // fix2 item 9: the aircraft layer's composite (its aircraft draw: pfxLayWarm)
       PFX_LAY.uniforms.tLay.value=B.texture;r.autoClear=false;pfxPass(PFX_LAY,D);r.autoClear=true;PFX_LAY.uniforms.tLay.value=null;
@@ -19706,24 +19829,108 @@ const sensorFx=$('sensorFx'),sensorGr=sensorFx.firstChild;let sfxT=0;
   if(c.toBlob)c.toBlob(b=>set(b?URL.createObjectURL(b):c.toDataURL()));else set(c.toDataURL());})();
 function sensorFxUpdate(on,ts){
   sensorFx.classList.toggle('on',on);if(!on)return;
-  sensorFx.classList.toggle('ir',SENSOR.mode!=='tv');
-  if(SENSOR.mode==='tv'&&ts-sfxT>0.08){sfxT=ts;sensorGr.style.backgroundPosition=(Math.random()*128|0)+'px '+(Math.random()*128|0)+'px';}
+  sensorFx.classList.toggle('ir',sensorIR());sensorFx.classList.toggle('nir',SENSOR.mode==='nir');
+  if(!sensorIR()&&ts-sfxT>0.08){sfxT=ts;sensorGr.style.backgroundPosition=(Math.random()*128|0)+'px '+(Math.random()*128|0)+'px';}
 }
-// ---- the overlay text ----
-const shEl={TL:$('shTL'),TR:$('shTR'),BL:$('shBL'),BR:$('shBR'),Mid:$('shMid')};
+// ---- the overlay (sensor item 4: generic symbology in the style of public MQ-9 video, docs/mtsb.md) ----
+const shEl={TL:$('shTL'),TR:$('shTR'),BL:$('shBL'),BR:$('shBR'),Mid:$('shMid'),Tgt:$('shTgt')};
 function shSet(k,t){if(shEl[k].textContent!==t)shEl[k].textContent=t;}
+// a world point's latitude and longitude (degrees, signed). Arizona: anchored on Luke AFB as the taskings read it
+// (tqLL); a world region: its airport at the origin
+function geoLL(x,z){if(REGION.az)return [33.5350-(z-LUKE.z)/110950,-(112.3831-(x-LUKE.x)/92530)];
+  const la=REGION.lat-z/110950;return [la,REGION.lon+x/(111320*Math.cos(REGION.lat*Math.PI/180))];}
+// 'N33°31.21′ W112°22.48′'
+function fmtLL(la,lo){const f=(v,w)=>{v=Math.abs(v);const d=Math.floor(v),m=(v-d)*60;return String(d).padStart(w,'0')+'°'+m.toFixed(2).padStart(5,'0')+'′';};
+  return (la<0?'S':'N')+f(la,2)+' '+(lo<0?'W':'E')+f(lo,3);}
+// MGRS from WGS84 latitude and longitude at 1 m (UTM by the standard series; no Norway or Svalbard zone exceptions,
+// none in the game's regions). Checked against the mgrs library: Luke 12S UC 71577 11456
+function toMGRS(lat,lon){
+  const R=Math.PI/180,a=6378137,f=1/298.257223563,k0=0.9996,e2=f*(2-f),ep2=e2/(1-e2);
+  const zone=Math.min(60,Math.floor((lon+180)/6)+1),l0=((zone-1)*6-177)*R,p=lat*R,sp=Math.sin(p),cp=Math.cos(p),tp=Math.tan(p);
+  const N=a/Math.sqrt(1-e2*sp*sp),T=tp*tp,C=ep2*cp*cp,A=cp*(lon*R-l0),e4=e2*e2,e6=e4*e2;
+  const M=a*((1-e2/4-3*e4/64-5*e6/256)*p-(3*e2/8+3*e4/32+45*e6/1024)*Math.sin(2*p)+(15*e4/256+45*e6/1024)*Math.sin(4*p)-(35*e6/3072)*Math.sin(6*p));
+  const E=k0*N*(A+(1-T+C)*A**3/6+(5-18*T+T*T+72*C-58*ep2)*A**5/120)+500000;
+  let No=k0*(M+N*tp*(A*A/2+(5-T+9*C+4*C*C)*A**4/24+(61-58*T+T*T+600*C-330*ep2)*A**6/720));if(lat<0)No+=1e7;
+  const band='CDEFGHJKLMNPQRSTUVWXX'[clamp(Math.floor((lat+80)/8),0,20)];
+  const set=((zone-1)%6)+1,col=['ABCDEFGH','JKLMNPQR','STUVWXYZ'][(set-1)%3][Math.floor(E/1e5)-1];
+  const row='ABCDEFGHJKLMNPQRSTUV'[(Math.floor(No/1e5)+(set%2===0?5:0))%20];
+  const p5=v=>String(Math.floor(v%1e5)).padStart(5,'0');
+  return zone+band+' '+col+row+' '+p5(E)+' '+p5(No);}
+// the overlay's UTC clock: today's date, the hour from the scene's time of day (TOD.hour plus the flight's time) and
+// the region's offset from UTC in October (approximation: the scene's sun sets the hour, not the phone's clock)
+const SB_TZ={az:-7,rjtt:9,lfpg:2,sbrj:-3},SB_MON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+function sensorUTC(){const d=new Date(),loc=(TOD.hour||12)+(st.time||0)/3600;let h=loc-(SB_TZ[REGION_ID]!=null?SB_TZ[REGION_ID]:0),day=0;
+  while(h<0){h+=24;day--;}while(h>=24){h-=24;day++;}
+  const u=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()+day)),sec=Math.floor(h*3600),p2=v=>String(v).padStart(2,'0');
+  return p2(u.getUTCDate())+SB_MON[u.getUTCMonth()]+String(u.getUTCFullYear()).slice(2)+' '+p2(Math.floor(sec/3600))+':'+p2(Math.floor(sec/60)%60)+':'+p2(sec%60)+'Z';}
+// the laser (sensor item 4): LASE ranges for 10 s (L), the designator lases on its own while a missile is guided.
+// CODE 1688 is a generic four digit code (approximation, nothing real is published or modelled)
+const SB_CODE='1688',SB_LRF_T=10;
+function sensorLase(){if(!sensorMode)return;
+  if(!SENSOR.valid){SENSOR.lrfT=0;toast(rookie()?'Nothing for the laser to hit':'LRF  NO RETURN',1.5);return;}
+  SENSOR.lrfT=SB_LRF_T;toast(rookie()?'Laser range: '+fmtDist(SENSOR.slant):'LASE  '+(SENSOR.slant/1852).toFixed(2)+' NM',1.5);if(typeof updateCtx==='function')updateCtx();}
+const sensorLTD=()=>STRIKE.active&&STRIKE.missiles.some(m=>m.guided);
+// declutter: 0 full, 1 and 2 (the DCLT button steps round)
+function sensorDclt(){SENSOR.dclt=((SENSOR.dclt||0)+1)%3;TM.mt=0;toast(SENSOR.dclt?(rookie()?'Fewer readouts':'DCLT '+SENSOR.dclt):(rookie()?'All readouts':'DCLT OFF'),1.2);if(typeof updateCtx==='function')updateCtx();}
+const SHV={dc:-1,stk:null,bk:'',dialA:null,dialL:null,dialW:null,dialN:null,nA:null,tgt:null,cue:'',bro:null};
+const _shV=new V3(),_shV2=new V3(),_shP=new V3();
+// a world point on the overlay (CSS px in #sensorHud), z<0 behind the camera
+function shProj(p,out){out.copy(p).project(camera);return out;}
 function sensorHudUpdate(){
-  const r=rookie(),D=180/Math.PI;
-  shSet('TL',sensorModeName()+'   x'+(1<<SENSOR.zoom));
+  const r=rookie(),D=180/Math.PI,S=SENSOR;
+  // declutter level and the strike flag (the strike's centre block stays at level 2)
+  const dc=S.dclt||0;if(dc!==SHV.dc){SHV.dc=dc;hudSens.classList.toggle('dc1',dc>=1);hudSens.classList.toggle('dc2',dc>=2);}
+  if(STRIKE.active!==SHV.stk){SHV.stk=STRIKE.active;hudSens.classList.toggle('stk',STRIKE.active);}
+  // the next narrower field of view's corners
+  {const z=S.zoom,nx=z<sensorZoomMax()?z+1:-1;let bk='';
+   if(nx>=0){const L=MTSB_FOV[nx],nf=(sensorIR()?L.ir:L.tv)/(L.ez||1),cf=sensorFovV(),k=Math.tan(nf*Math.PI/360)/Math.tan(cf*Math.PI/360);
+     bk=Math.round(hudSens.clientWidth*k/2)+'|'+Math.round(hudSens.clientHeight*k/2);}
+   if(bk!==SHV.bk){SHV.bk=bk;hudSens.classList.toggle('nobk',!bk);if(bk){const [a,b]=bk.split('|');hudSens.style.setProperty('--bx',a+'px');hudSens.style.setProperty('--by',b+'px');}}}
   _eu.setFromQuaternion(st.quat,'YXZ');const hT=((-_eu.y*D)%360+360)%360,hM=(hT-MAGVAR+360)%360;
-  // where the ball looks: true bearing, and left or right of the nose (SENSOR.az is relative, + is right)
-  const rel=Math.round(SENSOR.az*D),brg=(Math.round(hT+SENSOR.az*D)%360+360)%360,el=Math.round(SENSOR.el*D);
-  shSet('TR',r?`Camera ${brg}°\n${rel?Math.abs(rel)+'° '+(rel>0?'right':'left')+' of the nose':'straight ahead'}\n${-el}° down`
-    :`CAM ${String(brg).padStart(3,'0')}°T  ${rel<0?'L':'R'}${String(Math.abs(rel)).padStart(3,'0')}  EL ${el}`);
-  if(r)shSet('BL',`ALT ${Math.max(0,Math.round(st.agl*M2FT/10)*10).toLocaleString('en-US')} ft   HDG ${['N','NE','E','SE','S','SW','W','NW'][Math.round(hT/45)%8]}`);
-  else shSet('BL',`ALT ${(Math.round((st.pos.y*M2FT+FIELD_FT-GEAR*M2FT)/10)*10).toLocaleString('en-US')}   HDG ${String(Math.round(hM)%360||360).padStart(3,'0')}`);
-  shSet('BR',st.ap?'AUTOPILOT':'');
-  const lock=SENSOR.tgt?'LOCK '+SENSOR.tgt.name.toUpperCase():SENSOR.track?'LOCK':'';
+  const rel=Math.round(S.az*D),brg=Math.round(sensorCone().brgT)%360,el=Math.round(S.el*D),dep=Math.round(-Math.asin(clamp(S.los.y,-1,1))*D);
+  const kind=S.tgt?'pt':S.track?'ar':S.geo?'geo':'',lrf=S.lrfT>0&&S.valid,ltd=sensorLTD();
+  if(r){
+    const trk=kind==='pt'?'Following the '+S.tgt.name.replace(/^the /,'').toLowerCase():kind==='ar'?'Holding that spot':kind==='geo'?'Holding the spot':'';
+    // two lines at most (break-ui: a third ran into the dial): the blocked note takes the track line's place
+    const zN=Math.min(S.zoom,MTSB_EASY_MAX)+1,l2=(S.masked||S.mask)&&kind?'View blocked':trk;
+    shSet('TL',sensorModeName()+'  zoom '+zN+'/'+(MTSB_EASY_MAX+1)+(l2?'\n'+l2:''));
+    shSet('TR',`Camera ${brg}°\n${rel?Math.abs(rel)+'° '+(rel>0?'right':'left')+' of the nose':'straight ahead'}\n${Math.abs(dep)}° ${dep>=0?'down':'up'}`);
+    shSet('BL','');shSet('BR','');
+    // the left block: the spot, then the aircraft (sensor item 4: nothing along the bottom, the radio caption lives there)
+    const tg='<span class="x">'+resEsc(`ALT ${Math.max(0,Math.round(st.agl*M2FT/10)*10).toLocaleString('en-US')} ft   HDG ${['N','NE','E','SE','S','SW','W','NW'][Math.round(hT/45)%8]}`)+'\n</span>'
+      +resEsc(S.valid?'Spot '+fmtDist(S.slant)+' away'+(lrf?' (laser)':'')+'\n'+Math.round(S.spot.y*M2FT+FIELD_FT).toLocaleString('en-US')+' ft above sea level':'Spot: sky, no ground there')+(ltd?'\nLaser on the target':'');
+    if(SHV.tgt!==tg){SHV.tgt=tg;shEl.Tgt.innerHTML=tg;}
+  } else {
+    const L=MTSB_FOV[S.zoom]||MTSB_FOV[0],ang=sensorIR()?L.ir:L.tv,an=ang>=1?ang.toFixed(ang%1?1:0):String(ang);
+    const trk=kind==='pt'?'PT TRK':kind==='ar'?'AR TRK':kind==='geo'?'GEO':'INR';
+    // MASK on the first line: the second is the longer one (break-ui: 0.23° EZ 4X  AR TRK  MASK reached pause at 568)
+    shSet('TL',(sensorModeName().replace('DAY TV','DTV'))+'  '+L.k+(S.masked||S.mask?'  MASK':'')+'\n'+an+'°'+(L.ez?' EZ '+L.ez+'X':'')+'  '+trk);
+    shSet('TR',sensorUTC()+'\nAZ '+(rel<0?'L':'R')+String(Math.abs(rel)).padStart(3,'0')+' EL '+el+' DEP '+dep+'\n'+(ltd?'LTD ON':lrf?'LRF ON':'LSR SAFE')+'  CODE '+SB_CODE);
+    shSet('BL','');shSet('BR','');
+    // the left block: the point of interest (lat/long, MGRS, elevation), the slant range, then the aircraft
+    const ac='\n'+resEsc(`ALT ${(Math.round((st.pos.y*M2FT+FIELD_FT-GEAR*M2FT)/10)*10).toLocaleString('en-US')}  HDG ${String(Math.round(hM)%360||360).padStart(3,'0')}  ${Math.round(st.ias*MS2KT)} KIAS`);
+    let tg;
+    if(S.valid){const [la,lo]=geoLL(S.spot.x,S.spot.z),ft=Math.round(S.spot.y*M2FT+FIELD_FT);
+      tg='<span class="x">'+resEsc(fmtLL(la,lo))+'\n'+resEsc(toMGRS(la,lo))+'\nELEV '+ft.toLocaleString('en-US')+' FT MSL\n</span>SLT '+(S.slant/1852).toFixed(2)+' NM '+(lrf?'L':'C')+'<span class="x">'+ac+'</span>';}
+    else tg='<span class="x">SPI ---\n\n\n</span>SLT --- '+(S.lrfT>0?'NO RTN':'C')+'<span class="x">'+ac+'</span>';
+    if(SHV.tgt!==tg){SHV.tgt=tg;shEl.Tgt.innerHTML=tg;}
+  }
+  // the dial: the ball's azimuth from the nose, the wedge its field of view, the pointer shorter the steeper it looks
+  // (past straight down it points the other way: where the line of sight goes); the ring's tick is north
+  {const a=Math.round(S.az*D),len=Math.round(clamp(Math.cos(S.el),-1,1)*16),w=Math.round(clamp(sensorFovV(),3,40));
+   if(a!==SHV.dialA||len!==SHV.dialL||w!==SHV.dialW){SHV.dialA=a;SHV.dialL=len;SHV.dialW=w;
+     const L=Math.abs(len)+3,sg=len<0?180:0,t=Math.tan(w*Math.PI/360)*L;
+     $('shDialP').setAttribute('d','M0 0V'+(-L));$('shDialP').setAttribute('transform','rotate('+(a+sg)+')');
+     $('shDialW2').setAttribute('d','M0 0L'+(-t).toFixed(1)+' '+(-L)+'L'+t.toFixed(1)+' '+(-L)+'Z');$('shDialW2').setAttribute('transform','rotate('+(a+sg)+')');}
+   const n=Math.round(-hT);if(n!==SHV.dialN){SHV.dialN=n;$('shDialN').setAttribute('transform','rotate('+n+')');}}
+  // north in the picture: a point 1 km out along the line of sight and one 50 m north of it, projected
+  {_shV.copy(S.los).multiplyScalar(1000).add(camera.position);_shV2.copy(_shV);_shV2.z-=50;
+   shProj(_shV,_shV);shProj(_shV2,_shV2);const ar=hudSens.clientWidth/Math.max(1,hudSens.clientHeight);
+   const na=Math.round(Math.atan2((_shV2.x-_shV.x)*ar,(_shV2.y-_shV.y))*D);
+   if(na!==SHV.nA){SHV.nA=na;$('shNA').setAttribute('transform','rotate('+na+')');}}
+  // the break cue (TRK LOST, MASK, GIMBAL)
+  {const c=S.cueT>0?S.cue:'';if(c!==SHV.cue){SHV.cue=c;const e=$('shCue');if(c)e.textContent=r?(c==='MASK'?'View blocked':c==='GIMBAL'?'Too far round':'Lost it'):c;e.classList.toggle('on',!!c);}}
+  const lock=SENSOR.tgt?'LOCK '+SENSOR.tgt.name.toUpperCase():SENSOR.track?'LOCK':SENSOR.geo?'GEO':'';
   let mid=lock;
   if(STRIKE.active){
     const inr=SENSOR.valid&&SENSOR.slant>=RNG_MIN&&SENSOR.slant<=RNG_MAX;
@@ -19741,6 +19948,28 @@ function sensorHudUpdate(){
   if(SENSOR.gimbal)mid+=(mid?'\n':'')+'GIMBAL';
   if(SH_MID!==null){SH_MID=null;shEl.Mid.textContent='';}
   shSet('Mid',mid);
+}
+// the track gate on the tracked point (sensor item 4): its size from the target's angular size (a vehicle about 5 m,
+// an area track's patch about 30 m), at least 22 px; a geo stare's diamond; where a track was just lost, the last gate
+// blinks amber for 0.6 s
+const GATE={el:null,kind:'',x:0,y:0,w:0,lost:0,c:'',tr:''};const _gtP=new V3();
+function sensorGateUpdate(dt){
+  const g=GATE.el||(GATE.el=$('shGate')),S=SENSOR,W=hudSens.clientWidth,H=hudSens.clientHeight;
+  const kind=S.tgt?'pt':S.track?'ar':S.geo?'geo':'';let show=false,x=0,y=0,w=0;
+  if(kind){
+    if(kind==='pt')_gtP.set(S.tgt.x,S.tgt.y+1.5,S.tgt.z);else _gtP.copy(kind==='ar'?S.track:S.geo);
+    const d=camera.position.distanceTo(_gtP);shProj(_gtP,_gtP);
+    if(_gtP.z<1&&Math.abs(_gtP.x)<1.2&&Math.abs(_gtP.y)<1.2){show=true;x=(_gtP.x+1)/2*W;y=(1-_gtP.y)/2*H;
+      const fr=sensorFovV()*Math.PI/180,m=kind==='pt'?5:30;
+      w=kind==='geo'?16:clamp(2*Math.atan(m/Math.max(d,1))/fr*H,kind==='ar'?40:26,H*(kind==='ar'?0.5:0.6));}
+    GATE.kind=kind;GATE.x=x;GATE.y=y;GATE.w=w;GATE.lost=0;
+  } else if(GATE.kind){GATE.kind='';GATE.lost=S.cueT>0?0.6:0;}
+  let cls=kind;
+  if(!show&&GATE.lost>0){GATE.lost-=dt;show=true;x=GATE.x;y=GATE.y;w=Math.max(22,GATE.w);cls='lost';}
+  const c=show?'on '+cls:'';if(c!==GATE.c){GATE.c=c;g.className=c;}
+  if(!show)return;
+  const tr='translate('+Math.round(x-w/2)+'px,'+Math.round(y-w/2)+'px)'+(cls==='geo'?' rotate(45deg)':''),sz=Math.round(w)+'px';
+  if(tr!==GATE.tr){GATE.tr=tr;g.style.transform=tr;}if(g.style.width!==sz){g.style.width=sz;g.style.height=sz;}
 }
 let SH_MID=null;   // the strike's centre block, written as html (the range clock is a span); null: plain text
 // 'RANGE 9:58', seconds left on the range, rounded up; lo under a minute
@@ -19782,8 +20011,16 @@ function tgtMarkUpdate(dt){
   TM.mt-=dt;if(!TM.W||TM.mt<=0){TM.mt=1;TM.W=hudSens.clientWidth;TM.H=hudSens.clientHeight;
     const dk=$('dock').getBoundingClientRect(),hr=hudSens.getBoundingClientRect();TM.R=Math.min(TM.W-44,(dk.width?dk.left-hr.left:TM.W)-18);
     // the centre text block, padded: labels that would land on it are dropped
-    const mr=shEl.Mid.getBoundingClientRect();TM.mid=[mr.left-hr.left-12,mr.top-hr.top-10,mr.right-hr.left+12,mr.bottom-hr.top+8];}
-  const W=TM.W,H=TM.H,L=48,T=40,R=TM.R,B=H-54,cx=W/2,cy=H/2,r=rookie();
+    const mr=shEl.Mid.getBoundingClientRect();TM.mid=[mr.left-hr.left-12,mr.top-hr.top-10,mr.right-hr.left+12,mr.bottom-hr.top+8];
+    // sensor item 4: the edge arrows keep inside the corner readouts (the point of interest block, the dial, the
+    // aircraft line), so a frame inset past them; at declutter 1 and 2 those are gone and the frame opens out again
+    const tg=shEl.Tgt.getBoundingClientRect(),dw=$('shDialW').getBoundingClientRect(),bl=shEl.BL.getBoundingClientRect();
+    TM.L=48;TM.T=dw.height?Math.max(40,dw.bottom-hr.top+14):40;
+    // a block reaching past 38 percent of the width (portrait): the frame starts under it instead of right of it
+    if(tg.width){if(tg.right-hr.left<TM.W*0.38)TM.L=Math.max(48,tg.right-hr.left+34);else TM.T=Math.max(TM.T,tg.bottom-hr.top+14);}
+    TM.B=bl.height?Math.min(TM.H-54,bl.top-hr.top-36):TM.H-54;
+    TM.tg=tg.width?[tg.left-hr.left-6,tg.top-hr.top-6,tg.right-hr.left+6,tg.bottom-hr.top+6]:null;}
+  const W=TM.W,H=TM.H,L=TM.L||48,T=TM.T||40,R=TM.R,B=TM.B||H-54,cx=W/2,cy=H/2,r=rookie();
   camera.updateMatrixWorld();sensorOrigin(_so);
   const tY=Math.tan(camera.fov*Math.PI/360),tX=tY*camera.aspect;
   let mi=0,ai=0;
@@ -19797,8 +20034,9 @@ function tgtMarkUpdate(dt){
       if(t.dead){tmPut(TM.mk[mi++],'dead',sx,sy,'');continue;}
       const nm=r?t.name:t.name.toUpperCase(),lk=SENSOR.tgt===t,ds=fmtDist(_so.distanceTo(_tmv.set(t.x,t.y,t.z)));
       // label box: about 90 px wide, from 8 to 36 px under the diamond
-      const M=TM.mid,hit=sx+45>M[0]&&sx-45<M[2]&&sy+36>M[1]&&sy+8<M[3];
-      tmPut(TM.mk[mi++],(lk?'lk':'')+(hit?' nl':''),sx,sy,(lk?'LOCK ':'')+nm+'\n'+ds);
+      const M=TM.mid,G=TM.tg,hit=(sx+45>M[0]&&sx-45<M[2]&&sy+36>M[1]&&sy+8<M[3])||!!(G&&sx+45>G[0]&&sx-45<G[2]&&sy+36>G[1]&&sy+8<G[3]);
+      // the tracked one: the gate marks it (sensor item 4), so no diamond and no label of its own
+      tmPut(TM.mk[mi++],lk?'lk nl':(hit?'nl':''),sx,sy,(lk?'LOCK ':'')+nm+'\n'+ds);
     } else if(!t.dead&&ai<8){
       let dx=nx,dy=-ny;if(Math.abs(dx)+Math.abs(dy)<1e-6)dy=1;
       dx*=W/2;dy*=H/2;
@@ -19810,7 +20048,9 @@ function tgtMarkUpdate(dt){
   }
   while(mi<8)tmPut(TM.mk[mi++],null);while(ai<8)tmPut(TM.ar[ai++],null);
 }
-const GIM_AZ=2.6,GIM_EL_LO=-1.48,GIM_EL_HI=-0.06;     // ball limits, radians
+// sensor item 2: the MTS-B gimbal, docs/mtsb.md. Azimuth: 360 degrees continuous, no stop. Elevation from the belly
+// plane: +40 up to -135 down, 45 past straight down (secondary: the MTS-B brochure copy)
+const GIM_EL_LO=-135*Math.PI/180,GIM_EL_HI=40*Math.PI/180;
 const RNG_MIN=700,RNG_MAX=8200;                        // in range window, metres
 // clock: range time used since 'cleared hot' (sim time, so it stops with pause), limit: the range time;
 // imp: missiles that came down (hit, miss or lost), the average miss is over these; ended: why the run graded
@@ -20018,7 +20258,7 @@ function fxPack(){
 // how lit unlit smoke should look: full by day, dim at dusk, dark at night; flat grey in IR
 // 0 on the camera, 1 from 20 m out: fire and smoke never render on top of the lens
 function fxNearP(p){return clamp((p.distanceTo(camera.position)-8)/12,0,1);}
-function fxLit(){return camMode===2&&SENSOR.mode!=='tv'?-1:TOD.night?0.16:TOD.id==='sunset'||TOD.id==='haboob'?0.6:1;}
+function fxLit(){return camMode===2&&sensorIRPass()?-1:TOD.night?0.16:TOD.id==='sunset'||TOD.id==='haboob'?0.6:1;}
 // fireball colour as it cools: white, yellow, orange, dark red, black smoke
 const FX_RAMP=[[1,1,0.95],[1,0.86,0.5],[1,0.5,0.16],[0.48,0.14,0.05],[0.08,0.07,0.065]];
 function fxRamp(u,c){u=clamp(u,0,1)*4;const i=Math.min(3,u|0),f=u-i,a=FX_RAMP[i],b=FX_RAMP[i+1];
@@ -20638,13 +20878,36 @@ function killTarget(t){
   t.mesh.rotation.z+=(Math.random()-0.5)*0.35;t.deadT=0;
 }
 
-// ---- sensor ball ----
-const _sd=new V3(),_so=new V3(),_sp=new V3(),_st2=new V3();
-function sensorOrigin(out){return out.set(0,plane.hd?-0.80:-0.66,plane.hd?-3.45:-4.35).applyQuaternion(st.quat).add(st.pos);}
-function sensorDir(az,el,out){
-  _eu.setFromQuaternion(st.quat,'YXZ');
-  const yaw=-_eu.y+az,ce=Math.cos(el);
-  return out.set(Math.sin(yaw)*ce,Math.sin(el),-Math.cos(yaw)*ce);
+// ---- sensor ball (sensor item 2: the MTS-B gimbal, docs/mtsb.md) ----
+// SENSOR.az / SENSOR.el are the gimbal angles against the airframe: az + right of the nose, wrapped to +-pi with no
+// stop; el from the belly plane, GIM_EL_HI up to GIM_EL_LO down (past straight down: the picture keeps moving the way
+// the thumb pushes, upside down as on a two axis ball). SENSOR.los is the line of sight in the world. The ball is
+// inertially stabilised: with no input the line of sight holds still and the gimbal angles follow the aircraft's
+// turns. Angles written from outside (a test hook, Easy's NEXT TARGET) or a view picked up again after a gap lead.
+const _sd=new V3(),_so=new V3(),_sp=new V3(),_st2=new V3(),_gbq=new THREE.Quaternion(),_gbv=new V3(),_gbu=new V3(),_gbr=new V3();
+const SB_DEF=new V3(0,-0.66,-4.35),SB_HD=new V3(0,-0.80,-3.45);   // the A-10's pod, and any model without a turret
+// the ball's centre in the airframe: the turret's own spot on the MQ-9 models (makeHD), else the old offsets
+function ballAt(){const g=plane.g,b=g&&g.userData.ballAt;return b||(plane.hd?SB_HD:SB_DEF);}
+function sensorOrigin(out){return out.copy(ballAt()).applyQuaternion(st.quat).add(st.pos);}
+// body frame (forward -z, up +y, right +x): the line of sight, and the picture's up, for gimbal angles az, el
+function gimDirB(az,el,out){const ce=Math.cos(el);return out.set(Math.sin(az)*ce,Math.sin(el),-Math.cos(az)*ce);}
+function gimUpB(az,el,out){const se=Math.sin(el);return out.set(-Math.sin(az)*se,Math.cos(el),Math.cos(az)*se);}
+function sensorDir(az,el,out,q){return gimDirB(az,el,out).applyQuaternion(q||st.quat);}
+function sensorUp(az,el,out,q){return gimUpB(az,el,out).applyQuaternion(q||st.quat);}
+// gimbal angles for a world direction. Past straight down two pairs point the same way (azimuth half a turn round,
+// elevation folded); the one nearest the angles the ball is at (pa, pe) wins, so it never flips on its own, then
+// the elevation is held inside the limits. reach (aiming at a point, a track): a pair inside the limits wins over a
+// nearer one past them. Straight down the azimuth is free: it stays where it was.
+const GIM_OUT={az:0,el:0,clamped:false};
+function gimAngles(dw,pa,pe,reach){
+  _gbv.copy(dw).applyQuaternion(_gbq.copy(st.quat).invert());
+  const e0=Math.asin(clamp(_gbv.y,-1,1)),hz=Math.hypot(_gbv.x,_gbv.z),a0=hz<1e-5?pa:Math.atan2(_gbv.x,-_gbv.z);
+  const a1=wrapPi(a0+Math.PI),e1=-Math.PI-e0,ce=Math.max(0.15,Math.abs(Math.cos(pe)));
+  const d0=Math.abs(wrapPi(a0-pa))*ce+Math.abs(e0-pe),d1=Math.abs(wrapPi(a1-pa))*ce+Math.abs(e1-pe);
+  let a=a0,e=e0;const in1=e1>=GIM_EL_LO&&e1<=GIM_EL_HI,in0=e0>=GIM_EL_LO&&e0<=GIM_EL_HI;
+  if(reach&&in1!==in0){if(in1){a=a1;e=e1;}}else if(d1<d0){a=a1;e=e1;}
+  const ec=clamp(e,GIM_EL_LO,GIM_EL_HI);GIM_OUT.clamped=ec!==e;
+  GIM_OUT.az=a;GIM_OUT.el=ec;return GIM_OUT;
 }
 // where the line of sight meets the ground
 function groundHit(origin,dir,out){
@@ -20666,22 +20929,39 @@ function targetUnder(p,maxD){
     const d=Math.hypot(t.x-p.x,t.z-p.z);if(d<bd){bd=d;best=t;}}
   // a tasking's targets (Overwatch's building and pickup): LOCK takes them a little wider, Easy wider still
   if(TASK.on)for(const t of TASK.tgts){if(t.dead)continue;const d=Math.hypot(t.x-p.x,t.z-p.z),lim=Math.max(maxD,rookie()?200:110);if(d<lim&&d<(best?bd:lim)){bd=d;best=t;}}
+  // sensor item 5: in free flight the freeway traffic can be point tracked (a car within 30 m, Easy 50 m)
+  if(!best&&!STRIKE.active&&!TASK.on&&cars.length){const lim=rookie()?50:30;let bk=-1,bc=lim;
+    for(let k=0;k<cars.length;k++){const c=cars[k],x=c.r===0?FWY_X+c.off:c.s,z=c.r===0?c.s:I10_Z+c.off,d=Math.hypot(x-p.x,z-p.z);if(d<bc){bc=d;bk=k;}}
+    if(bk>=0)best=carTgt(bk);}
   return best;
 }
+// a stand-in for freeway car k whose position follows the car (the instanced cars have no objects of their own)
+const CAR_TGT=[];
+function carTgt(k){let o=CAR_TGT[k];if(o)return o;const c=cars[k];
+  o={name:'Vehicle',dead:false,car:k,y:0.4,get x(){return c.r===0?FWY_X+c.off:c.s;},get z(){return c.r===0?c.s:I10_Z+c.off;}};return CAR_TGT[k]=o;}
+// a track at ground point p: a point track on the target there, else an area track on the patch (sensor item 5)
+function sensorTrackAt(p){
+  const t=targetUnder(p,60);SENSOR.geo=null;SENSOR.slewTo=null;SENSOR.maskT=0;
+  if(t){SENSOR.tgt=t;SENSOR.track=null;toast('Tracking '+t.name);}
+  else{SENSOR.tgt=null;SENSOR.track=p.clone();toast(rookie()?'Holding that spot':'Tracking ground point');}
+}
+// geo stare (sensor item 5): the ball held on the coordinate under the crosshair by navigation, no video lock; GEO
+// again lets go
+function sensorGeo(){if(!sensorMode)return;
+  if(SENSOR.geo){sensorBreak(rookie()?'Let go of the spot':'GEO OFF');return;}
+  if(!SENSOR.valid){toast(rookie()?'Point the camera at the ground first':'GEO: NO GROUND');return;}
+  SENSOR.tgt=SENSOR.track=SENSOR.slewTo=null;SENSOR.geo=SENSOR.spot.clone();SENSOR.maskT=0;
+  toast(rookie()?'Holding this spot':'GEO STARE  '+toMGRS(...geoLL(SENSOR.geo.x,SENSOR.geo.z)),1.6);sensorRecentre();if(typeof updateCtx==='function')updateCtx();}
 function sensorTrackHere(){
   if(!SENSOR.valid){toast('Nothing to lock on down there');return;}
-  const t=targetUnder(SENSOR.spot,60);
-  if(t){SENSOR.tgt=t;SENSOR.track=null;toast('Tracking '+t.name);}
-  else{SENSOR.tgt=null;SENSOR.track=SENSOR.spot.clone();toast('Tracking ground point');}
+  sensorTrackAt(SENSOR.spot);
 }
-// ball angles that put target t under the crosshair; false past the gimbal limits
+// ball angles that put target t under the crosshair (SENSOR_AIM); false past the gimbal limits
 const SENSOR_AIM={az:0,el:0};
 function sensorAim(t){
-  sensorOrigin(_so);const dx=t.x-_so.x,dy=(t.y+1.5)-_so.y,dz=t.z-_so.z,hz=Math.hypot(dx,dz);
-  _eu.setFromQuaternion(st.quat,'YXZ');
-  let az=Math.atan2(dx,-dz)-(-_eu.y);az=Math.atan2(Math.sin(az),Math.cos(az));const el=Math.atan2(dy,hz);
-  SENSOR_AIM.az=az;SENSOR_AIM.el=el;
-  return Math.abs(az)<=GIM_AZ&&el>=GIM_EL_LO&&el<=GIM_EL_HI;
+  sensorOrigin(_so);_gbr.set(t.x-_so.x,(t.y+1.5)-_so.y,t.z-_so.z).normalize();
+  const g=gimAngles(_gbr,SENSOR.az,SENSOR.el,true);SENSOR_AIM.az=g.az;SENSOR_AIM.el=g.el;
+  return !g.clamped;
 }
 // NEXT TARGET: live targets nearest first, one on from the one under the crosshair.
 // Pilot: the ball slews there. Rookie: it snaps there and locks.
@@ -20690,59 +20970,122 @@ function nextTarget(){
   sensorOrigin(_so);const ox=_so.x,oz=_so.z;
   const live=STRIKE.targets.filter(t=>!t.dead).sort((a,b)=>Math.hypot(a.x-ox,a.z-oz)-Math.hypot(b.x-ox,b.z-oz));
   if(!live.length){toast('No targets left');return;}
-  const cur=SENSOR.tgt||SENSOR.slewTo||(SENSOR.valid?targetUnder(SENSOR.spot,60):null);
+  const cur=SENSOR.tgt||(SENSOR.slewTo&&SENSOR.slewTo.x!=null?SENSOR.slewTo:null)||(SENSOR.valid?targetUnder(SENSOR.spot,60):null);
   const i0=cur?live.indexOf(cur):-1;let t=null;
   for(let j=1;j<=live.length;j++){const c=live[(i0+j)%live.length];if(sensorAim(c)){t=c;break;}}
   if(!t){toast(rookie()?'Targets are behind us, wait for the turn':'GIMBAL LIMIT');return;}
   const d=Math.hypot(t.x-ox,t.z-oz);
   if(rookie()){
-    SENSOR.slewTo=null;SENSOR.track=null;SENSOR.az=SENSOR_AIM.az;SENSOR.el=SENSOR_AIM.el;sensorUpdate(0);
+    SENSOR.slewTo=null;SENSOR.track=null;SENSOR.geo=null;SENSOR.az=SENSOR_AIM.az;SENSOR.el=SENSOR_AIM.el;sensorUpdate(0);
     SENSOR.tgt=t;toast('Tracking '+t.name+'. Tap FIRE');
   } else {
-    if(SENSOR.tgt||SENSOR.track){SENSOR.tgt=null;SENSOR.track=null;}
+    if(SENSOR.tgt||SENSOR.track||SENSOR.geo){SENSOR.tgt=null;SENSOR.track=null;SENSOR.geo=null;}
     SENSOR.slewTo=t;toast(t.name.toUpperCase()+'  '+fmtDist(d),1.5);
   }
   updateCtx();
 }
 const fmtDist=d=>d<1000?(Math.round(d/10)*10)+' m':(d/1000).toFixed(1)+' km';
-function sensorBreak(why){
-  if(!SENSOR.track&&!SENSOR.tgt)return;
-  SENSOR.track=null;SENSOR.tgt=null;if(why)toast(why);
+// why: the toast; cue: the overlay's break cue (TRK LOST, MASK, GIMBAL), shown 2.5 s in the centre (sensor item 5)
+function sensorBreak(why,cue){
+  if(!SENSOR.track&&!SENSOR.tgt&&!SENSOR.geo)return;
+  SENSOR.track=null;SENSOR.tgt=null;SENSOR.geo=null;SENSOR.maskT=0;if(why)toast(why);
+  if(cue){SENSOR.cue=cue;SENSOR.cueT=2.5;hapPattern('trk');}
+  if(typeof updateCtx==='function')updateCtx();
 }
+// slew to nose: the ball swings back to the boresight preset (approximation: az 0, el -15 degrees, about 0.6 s)
+const SB_NOSE={az:0,el:-15*Math.PI/180,nose:true};
+function sensorNose(){if(!sensorMode&&camMode!==2)return;sensorBreak(null);SENSOR.slewTo=SB_NOSE;SENSOR.rx=SENSOR.ry=0;toast(rookie()?'Camera to the nose':'SLEW TO NOSE',1.2);}
+// the airframe between the ball and the line of sight (sensor item 2). The aircraft is drawn in the sensor view, so
+// the picture shows it where it blocks; this ray test against its visible meshes (not the turret, not glows or
+// see-through parts) is what the tracker reads. Run at most ten times a second, and only where the airframe can be:
+// above 25 degrees down from the belly plane, or the gear down.
+const _mrc=new THREE.Raycaster(),_mhits=[];
+function maskMeshes(){const g=plane.g;if(g.userData.maskM)return g.userData.maskM;const L=[];
+  g.traverse(o=>{if(!o.isMesh||o.isInstancedMesh||o.userData.turret)return;const m=Array.isArray(o.material)?o.material[0]:o.material;
+    if(!m||(m.transparent&&m.opacity<0.7)||m.blending===THREE.AdditiveBlending||m.depthWrite===false)return;L.push(o);});
+  return g.userData.maskM=L;}
+function shownUp(o){for(;o;o=o.parent)if(!o.visible)return false;return true;}
+function sensorMasked(origin,dir){
+  if(!plane||!plane.g||!plane.g.visible||!plane.g.userData.ballAt)return false;
+  if(SENSOR.el<-25*Math.PI/180&&!(st.gearPos>0.03))return false;
+  plane.g.updateMatrixWorld();
+  _mrc.set(origin,dir);_mrc.near=0.02;_mrc.far=60;_mrc.camera=camera;
+  for(const m of maskMeshes()){if(!shownUp(m))continue;_mhits.length=0;m.raycast(_mrc,_mhits);if(_mhits.length)return true;}
+  return false;
+}
+// the thumb: proportional rate with an expo, smoothed in and out (approximation: full deflection 1.5 fields of view
+// a second up to 60 deg/s; 0.12 s to speed up, 0.10 s to stop, a little longer gliding after a flick)
+const SB_RATE_K=1.5,SB_RATE_MAX=60*Math.PI/180,SB_TAU_UP=0.12,SB_TAU_DN=0.10,SB_TAU_FLING=0.22,SB_TRK_RATE=60*Math.PI/180,SB_TRK_RANGE=20000;
+function sensorRateMax(){return Math.min(SB_RATE_MAX,SB_RATE_K*sensorFovV()*Math.PI/180);}
+const sbExpo=x=>{const a=Math.abs(x);return Math.sign(x)*(0.3*a+0.7*a*a*a);};
+function sbSmooth(v,c,dt,fl){if(!(dt>0))return v;const tau=Math.abs(c)>Math.abs(v)+1e-6?SB_TAU_UP:fl?SB_TAU_FLING:SB_TAU_DN;
+  const n=v+(c-v)*(1-Math.exp(-dt/tau));return Math.abs(n)<0.004&&!c?0:n;}
 function sensorUpdate(dt){
-  // a locked track drives the gimbal, so it holds as the aircraft circles
-  if(SENSOR.tgt&&SENSOR.tgt.dead){SENSOR.tgt=null;}
-  const lock=SENSOR.tgt?_st2.set(SENSOR.tgt.x,SENSOR.tgt.y+1.5,SENSOR.tgt.z):SENSOR.track;
+  const S=SENSOR,now=performance.now();
+  // a point track on a target that died: the tracker has nothing left to follow
+  if(S.tgt&&S.tgt.dead)sensorBreak(null,'TRK LOST');
   sensorOrigin(_so);
+  if(!S.losOK||S.az!==S._az||S.el!==S._el||now-S._t>1500){sensorDir(S.az,S.el,S.los);S.losOK=true;}
+  S._t=now;
+  const lock=S.tgt?_st2.set(S.tgt.x,S.tgt.y+1.5,S.tgt.z):S.track||S.geo;
+  if(S.cueT>0)S.cueT-=dt;
+  if(S.lrfT>0)S.lrfT-=dt;
+  if(!lock){S._lk=null;S.acq=false;}
   if(lock){
-    _sd.copy(lock).sub(_so);
-    const hz=Math.hypot(_sd.x,_sd.z);
-    _eu.setFromQuaternion(st.quat,'YXZ');
-    let az=Math.atan2(_sd.x,-_sd.z)-(-_eu.y);az=Math.atan2(Math.sin(az),Math.cos(az));
-    const el=Math.atan2(_sd.y,hz);
-    if(Math.abs(az)>GIM_AZ||el<GIM_EL_LO||el>GIM_EL_HI){
-      SENSOR.gimbal=true;sensorBreak('Track lost, gimbal limit');
-    } else {SENSOR.gimbal=false;SENSOR.az=az;SENSOR.el=el;}
-  } else {SENSOR.gimbal=false;
-    // NEXT TARGET: swing the ball over, quick then settling
-    const g=SENSOR.slewTo;
-    if(g&&(g.dead||!sensorAim(g))){SENSOR.slewTo=null;}
-    else if(g){const k=dt>0?1-Math.exp(-dt*7):0;
-      let da=SENSOR_AIM.az-SENSOR.az;da=Math.atan2(Math.sin(da),Math.cos(da));const de=SENSOR_AIM.el-SENSOR.el;
-      SENSOR.az+=da*k;SENSOR.el+=de*k;if(Math.abs(da)<0.0015&&Math.abs(de)<0.0015)SENSOR.slewTo=null;}}
-  SENSOR.az=clamp(SENSOR.az,-GIM_AZ,GIM_AZ);
-  SENSOR.el=clamp(SENSOR.el,GIM_EL_LO,GIM_EL_HI);
-  sensorDir(SENSOR.az,SENSOR.el,_sd);
-  SENSOR.valid=groundHit(_so,_sd,_sp);
-  if(SENSOR.valid){SENSOR.spot.copy(_sp);SENSOR.slant=_so.distanceTo(_sp);}
-  else SENSOR.slant=0;
+    // the track drives the ball, at most SB_TRK_RATE: a target that outruns it leaves the picture and is lost
+    _gbr.copy(lock).sub(_so);const dist=_gbr.length();_gbr.divideScalar(Math.max(dist,1e-3));
+    const ang=Math.acos(clamp(S.los.dot(_gbr),-1,1)),mx=SB_TRK_RATE*dt;
+    if(!(dt>0)||ang<=mx)S.los.copy(_gbr);else S.los.lerp(_gbr,mx/ang).normalize();
+    S.rx=S.ry=0;
+    // a new lock first swings the ball over (acquiring); only a target that was in the picture can be lost from it
+    const lk=S.tgt||S.track||S.geo;if(lk!==S._lk){S._lk=lk;S.acq=false;}
+    const half=sensorFovV()*Math.PI/360,err=Math.max(0,ang-mx);if(err<=half*0.5)S.acq=true;
+    if(!S.geo&&S.acq&&err>half)sensorBreak(rookie()?'Lost it':'TRACK LOST',S.tgt?'TRK LOST':'TRK LOST');
+    else if(!S.geo&&dist>SB_TRK_RANGE)sensorBreak(rookie()?'Too far to hold':'TRACK LOST, RANGE','TRK LOST');
+  } else if(S.slewTo){
+    // NEXT TARGET or slew to nose: swing over, quick then settling
+    const g=S.slewTo;let ta,te;
+    if(g.nose){ta=g.az;te=g.el;}else if(g.dead||!sensorAim(g)){S.slewTo=null;}else{ta=SENSOR_AIM.az;te=SENSOR_AIM.el;}
+    if(S.slewTo){const k=dt>0?1-Math.exp(-dt*7):0;
+      const da=wrapPi(ta-S.az),de=te-S.el;
+      S.az=wrapPi(S.az+da*k);S.el+=de*k;
+      // arrived: a slew onto a target ends in a geo stare on its spot, so the inertially held ball stays on it as the
+      // aircraft circles (slew to nose just stops)
+      if(Math.abs(da)<0.0015&&Math.abs(de)<0.0015){if(!g.nose){S.geo=new V3(g.x,g.y+1.5,g.z);S.maskT=0;}S.slewTo=null;}
+      sensorDir(S.az,S.el,S.los);}
+  } else {
+    // the thumb (slewSensor's command, this frame) and the finger on the picture (dragX/dragY, radians)
+    const cx=S.cmdX,cy=S.cmdY;S.cmdX=S.cmdY=0;if(cx||cy)S.fling=false;
+    S.rx=sbSmooth(S.rx,cx,dt,S.fling);S.ry=sbSmooth(S.ry,cy,dt,S.fling);if(!S.rx&&!S.ry)S.fling=false;
+    const w=sensorRateMax(),pan=S.rx*w*dt+S.dragX,rise=-S.ry*w*dt+S.dragY;S.dragX=S.dragY=0;
+    if(pan||rise){
+      sensorUp(S.az,S.el,_gbu);_gbr.crossVectors(S.los,_gbu);
+      S.los.addScaledVector(_gbr,Math.tan(clamp(pan,-0.5,0.5))).addScaledVector(_gbu,Math.tan(clamp(rise,-0.5,0.5))).normalize();}
+  }
+  const g=gimAngles(S.los,S.az,S.el,!!lock);
+  S.az=g.az;S.el=g.el;S.gimbal=g.clamped;
+  if(g.clamped){sensorDir(S.az,S.el,S.los);if(lock&&!S.geo)sensorBreak(rookie()?'Lost it, the camera cannot turn that far':'Track lost, gimbal limit','GIMBAL');}
+  S._az=S.az;S._el=S.el;
+  _sd.copy(S.los);
+  S.valid=groundHit(_so,_sd,_sp);
+  if(S.valid){S.spot.copy(_sp);S.slant=_so.distanceTo(_sp);}
+  else S.slant=0;
+  // masking: the airframe (ray test), or for a track the terrain between the ball and the target
+  S.maskChk-=dt;if(S.maskChk<=0||!(dt>0)){S.maskChk=0.1;S.mask=sensorMasked(_so,_sd);}
+  let masked=S.mask;
+  if(!masked&&(S.tgt||S.track)&&S.acq&&terrainBlocks(_so,S.tgt?_st2.set(S.tgt.x,S.tgt.y+1.5,S.tgt.z):S.track))masked=true;
+  S.masked=masked;
+  if(masked&&(S.tgt||S.track)&&S.acq){S.maskT+=dt;if(S.maskT>0.3)sensorBreak(rookie()?'Lost it, something is in the way':'TRACK LOST, MASKED','MASK');}
+  else S.maskT=0;
 }
+// terrain between the ball and point p (twelve samples along the line, the last 3 percent left out)
+function terrainBlocks(o,p){for(let i=1;i<=12;i++){const f=i/12*0.97,x=o.x+(p.x-o.x)*f,y=o.y+(p.y-o.y)*f,z=o.z+(p.z-o.z)*f;if(groundHeight(x,z)>y+2)return true;}return false;}
+// the stick or keys: a rate command for this frame (x right, y down), smoothed in sensorUpdate
 function slewSensor(x,y,dt){
   if(!x&&!y)return;
-  const k=Math.max(0.09,0.75*SENSOR_FOV[SENSOR.zoom]/14);   // narrow field slews slower, as it should
   if(Math.abs(x)>0.02||Math.abs(y)>0.02){sensorBreak(null);SENSOR.slewTo=null;}
-  SENSOR.az=clamp(SENSOR.az+x*k*dt,-GIM_AZ,GIM_AZ);
-  SENSOR.el=clamp(SENSOR.el-y*k*dt,GIM_EL_LO,GIM_EL_HI);
+  const dz=v=>Math.abs(v)<0.06?0:(v-Math.sign(v)*0.06)/0.94;
+  SENSOR.cmdX=sbExpo(clamp(dz(x),-1,1));SENSOR.cmdY=sbExpo(clamp(dz(y),-1,1));
 }
 
 // ---- missiles ----
@@ -20787,7 +21130,7 @@ function missileUpdate(dt){
     // the laser spot keeps feeding the missile only while a track is held. If it breaks,
     // the missile flies on to the last spot it was given and misses.
     if(m.guided){
-      if((SENSOR.tgt||SENSOR.track)&&SENSOR.valid)m.aim.copy(SENSOR.spot);
+      if((SENSOR.tgt||SENSOR.track||SENSOR.geo)&&SENSOR.valid)m.aim.copy(SENSOR.spot);
       else{m.guided=false;m.trackLost=true;}
     }
     if(m.phase==='delay'){
@@ -20945,7 +21288,7 @@ function strikeStart(){
     if(t.dead){t.dead=false;t.mesh.rotation.z=0;t.deadT=0;t.mesh.userData.heat=t.kind==='bunker'?0.7:0.9;irDirty=true;
       t.mesh.traverse(o=>{if(o.isMesh&&o.userData.m0)o.material=o.userData.m0;});}
     if(t.kind==='truck'&&t.ang!==undefined)t.moving=true;}
-  SENSOR.az=0;SENSOR.el=-0.6;SENSOR.zoom=0;SENSOR.track=null;SENSOR.tgt=null;SENSOR.slewTo=null;
+  SENSOR.az=0;SENSOR.el=-0.6;SENSOR.zoom=0;SENSOR.track=null;SENSOR.tgt=null;SENSOR.geo=null;SENSOR.slewTo=null;SENSOR.losOK=false;SENSOR.rx=SENSOR.ry=0;
   for(const m of MSL){m.g.visible=false;m.glow.material.opacity=0;}
   if(plane.pylons)plane.pylons.forEach(p=>p.visible=true);
   fireClear();fxClear();
@@ -20971,22 +21314,24 @@ function orbitHere(){
 }
 // ---- sensor view controls ----
 function sensorModeName(btn){const r=rookie(),m=SENSOR.mode;
-  if(r)return m==='tv'?'Day camera':(m==='irb'?'Heat camera (black)':'Heat camera');
-  return m==='tv'?'DAY TV':m==='irw'?'IR WHT':'IR BLK';}
-function setSensorMode(m){if(m!=='tv'&&m!=='irw'&&m!=='irb')return;SENSOR.mode=m;irDirty=true;}
+  if(r)return m==='tv'?'Day camera':m==='nir'?'Night camera':(m==='irb'?'Heat camera (black)':'Heat camera');
+  return m==='tv'?'DAY TV':m==='nir'?'NIR':m==='irw'?'IR WHT':'IR BLK';}
+// sensor item 3: four sensors, DTV (colour), NIR (reflected near infrared, monochrome), IR white hot and black hot
+function setSensorMode(m){if(m!=='tv'&&m!=='nir'&&m!=='irw'&&m!=='irb')return;SENSOR.mode=m;irDirty=true;}
 // Rookie gets two entries, day and heat; Pilot also gets black hot
-function sensorModeStep(){const L=rookie()?['tv','irw']:['tv','irw','irb'];
+function sensorModeStep(){const L=rookie()?['tv','irw']:['tv','nir','irw','irb'];
   setSensorMode(L[(L.indexOf(SENSOR.mode)+1)%L.length]);toast(sensorModeName(),1.5);}
 // d: +1 in, -1 out, 0 cycles round
-function sensorZoomStep(d){const n=SENSOR_FOV.length;
-  SENSOR.zoom=d?clamp(SENSOR.zoom+d,0,n-1):(SENSOR.zoom+1)%n;}
+function sensorZoomStep(d){const n=sensorZoomMax()+1;
+  SENSOR.zoom=d?clamp(SENSOR.zoom+d,0,n-1):(SENSOR.zoom+1)%n;if(typeof updateCtx==='function')updateCtx();}
 // a new lock moves the orbit over it, so the ball keeps looking down at it from all sides
 function sensorRecentre(){
   if(!st.ap||!st.ap.sensor||STRIKE.active||st.onGround)return;
-  const p=SENSOR.tgt?_st2.set(SENSOR.tgt.x,SENSOR.tgt.y,SENSOR.tgt.z):SENSOR.track;if(p)sensorOrbit(p);}
+  const p=SENSOR.tgt?_st2.set(SENSOR.tgt.x,SENSOR.tgt.y,SENSOR.tgt.z):SENSOR.track||SENSOR.geo;if(p)sensorOrbit(p);}
 function sensorLock(){
   if(!sensorMode)return;
   if(SENSOR.tgt||SENSOR.track){sensorBreak('Lock off');return;}
+  // a geo stare (sensor item 5): LOCK turns it into a video track on what is under the crosshair
   sensorTrackHere();sensorRecentre();}
 function sensorOrbit(p){
   const V=Math.hypot(st.vel.x,st.vel.z),trk=Math.atan2(st.vel.x,-st.vel.z);
@@ -21006,12 +21351,20 @@ function sensorAP(){
   initAudio();sensorUpdate(0);
   const p=SENSOR.tgt?_st2.set(SENSOR.tgt.x,SENSOR.tgt.y,SENSOR.tgt.z):SENSOR.track||(SENSOR.valid?SENSOR.spot:null);
   if(p)sensorOrbit(p);
-  else{const trk=Math.atan2(st.vel.x,-st.vel.z);apEngage(st,'hold');const a=st.ap;a.y=st.pos.y-GEAR;a.trk=trk;a.v=AC.vcruise;a.sensor=true;}
+  // Easy: the ball holds the orbit's centre (a geo stare), so the picture does not slide away as the aircraft circles
+  if(p&&rookie()&&!SENSOR.tgt&&!SENSOR.track&&!SENSOR.geo&&!STRIKE.active)SENSOR.geo=p.clone();
+  if(!p){const trk=Math.atan2(st.vel.x,-st.vel.z);apEngage(st,'hold');const a=st.ap;a.y=st.pos.y-GEAR;a.trk=trk;a.v=AC.vcruise;a.sensor=true;}
   toast('AUTOPILOT ENGAGED',2);
 }
 // ---------- main loop ----------
 function resize(){const w=window.innerWidth,h=window.innerHeight;VP.w=w;VP.h=h;renderer.setSize(w,h,false);glcH=glc.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();csmRadii();sizeMap();fmSize();FM.prepT=0;if(FM.on){lblUI();fmDraw();}}
 window.addEventListener('resize',()=>{resize();relayoutSoon();});window.__glReady=1;resize();
+// sensor item 2: the view is from inside the ball, so the turret (neck, ball, window) hides while it is up
+// The A-10's pod (no turret on the model, and not the MTS-B this models): its airframe hides whole in the sensor view,
+// so a steep gun-run bank never lays its own wing across the picture, and it never masks the tracker
+function turretShow(v){const g=plane&&plane.g;if(!g||g.userData.turretV===v)return;g.userData.turretV=v;
+  let L=g.userData.turretM;if(!L){L=g.userData.turretM=[];if(g.userData.ballAt)g.traverse(o=>{if(o.userData.turret)L.push(o);});else for(const o of g.children)if(o.visible)L.push(o);}
+  for(const o of L)o.visible=v;}
 const hudSens=$('sensorHud');let sensOn=false;const hIas=$('hIas'),hAlt=$('hAlt'),hWindT=$('hWindT'),hWindA=$('hWindA'),hAp=$('hAp'),bAuto=$('bAuto'),bAutoT=$('bAutoT'),warnEl=$('warn'),hVs=$('hVs'),hHdg=$('hHdg');
 const APN={to:'AUTO T/O',hold:'ALT HOLD',land:'AUTOLAND',orbit:'ORBIT'},APP={climb:'CLIMB',nav:'NAV',loc:'FINAL',orb:'DESCEND'};
 const _cf=new V3(),_cu=new V3(),_co=new V3(),_ct=new V3(),_eu=new THREE.Euler(0,0,0,'YXZ');
@@ -21263,7 +21616,11 @@ function tick(t,skipRender){
   // cameras
   {const sv=camMode===2&&!PHOTO.on;
    if(sv!==sensOn){sensOn=sv;hudSens.classList.toggle('on',sv);document.body.classList.toggle('sensorOn',sv);GFX.sens=sv;GFX.applyPR();}
-   const flt=sv&&SENSOR.mode==='tv'?'saturate(0.75) contrast(1.05)':'';if(glc.style.filter!==flt)glc.style.filter=flt;
+   turretShow(!sv);
+   // NIR: the composite turns it monochrome on Medium and High (uNir); Low has no post chain, so a CSS grey; at night it
+   // goes through the IR pass instead (sensorIRPass), a little brighter at sunset and in the haboob
+   const nir=sv&&SENSOR.mode==='nir'&&!TOD.night,flt=sv&&SENSOR.mode==='tv'?'saturate(0.75) contrast(1.05)':nir?(GFX.post?'':'grayscale(1) contrast(1.4) brightness(0.9) ')+(TOD.id==='sunset'||TOD.id==='haboob'?'brightness(1.25)':''):'';
+   if(glc.style.filter!==flt.trim())glc.style.filter=flt.trim();
    sensorFxUpdate(sv,ts);strikeUI();}
   if(camMode!==0||PHOTO.on||FREECAM||DF.kc>0)DCAM.chLive=false;
   if(PHOTO.on){photoCam();snapCamera=false;}
@@ -21277,15 +21634,16 @@ function tick(t,skipRender){
   else if(camMode===1){_co.set(AC.cam1[0],AC.cam1[1],AC.cam1[2]).applyQuaternion(q).add(dp);camera.position.copy(_co);camera.quaternion.copy(q);camera.rotateX(-0.05);if(DF.sixK>0.001)camera.rotateY(Math.PI*DF.sixK);camera.fov=64;camera.up.set(0,1,0);snapCamera=false;}
   else if(camMode===3)dfPadCam(q,dp,_cf,dt);   // the dogfight's padlock view (item 4)
   else if(camMode===2){
-    sensorOrigin(_co);camera.position.copy(_co);camera.up.set(0,1,0);snapCamera=false;
-    sensorDir(SENSOR.az,SENSOR.el,_sd);
-    _ct.copy(_co).addScaledVector(_sd,2000);camera.lookAt(_ct);
-    camera.fov=SENSOR_FOV[SENSOR.zoom];
+    // sensor item 2: from the ball's centre on the airframe as drawn (dp, q: no substep jitter against the wing in view),
+    // along the held line of sight, the picture's up from the gimbal (it rolls with the airframe, as a two axis ball does)
+    _co.copy(ballAt()).applyQuaternion(q).add(dp);camera.position.copy(_co);sensorUp(SENSOR.az,SENSOR.el,camera.up,q);snapCamera=false;
+    _ct.copy(_co).addScaledVector(SENSOR.los,2000);camera.lookAt(_ct);
+    camera.fov=sensorFovV();
     sensorHudUpdate();}
   if(camBump>0){camBump=Math.max(0,camBump-dt*2.4);const k=camBump*camBump*1.3;
     camera.position.x+=(Math.random()-0.5)*k;camera.position.y+=(Math.random()-0.5)*k*1.5;camera.position.z+=(Math.random()-0.5)*k;}
   camera.updateProjectionMatrix();sky.position.copy(camera.position);hbUpdate(paused?0:dt);dustFxUpdate(paused?0:dt);fxLightFeed();sunDiscUpdate();farUpdate();
-  if(sensOn)tgtMarkUpdate(dt);else if(TM.shown)tgtMarkHide();
+  if(sensOn){tgtMarkUpdate(dt);sensorGateUpdate(dt);}else if(TM.shown)tgtMarkHide();
   dfHudUpdate();hogUI();fdTick();
   // PAPI
   PAPI.forEach(pp=>{const eye=camera.position,du=(toU(eye.x,eye.z)-pp.u)*pp.dir;const ang=du<0?Math.atan2(eye.y-0.9,-du)*180/Math.PI:10;
@@ -21335,7 +21693,7 @@ function tick(t,skipRender){
   // it pushed the menu's WARM steps past warm_console_check's window); kgeuNoPre keeps the old 40 frames
   else{if((!menu.classList.contains('on')||(frameN<40&&(!PRE.done||PRE.skip)))&&!FM.on){   // the open map is opaque: no 3D frame under it
       rebuildTerrain(camera.position.x,camera.position.z);   // the LOD rings round the camera this frame looks from
-      if(camMode===2&&SENSOR.mode!=='tv'&&!PHOTO.on&&!FREECAM){csmIdle();pfxRender(true);}else{csmFrame(Math.min(0.1,rdt));pfxRender();}
+      if(camMode===2&&sensorIRPass()&&!PHOTO.on&&!FREECAM){csmIdle();pfxRender(true);}else{csmFrame(Math.min(0.1,rdt));pfxRender();}
       if(BUG.want){if(paused)bugGrab();else BUG.want=0;}}   // the bug report's screenshot: this frame, in this task (bugs1)
     const po=pauseOv.classList.contains('on');document.body.classList.toggle('pauseOn',po);}
 }
@@ -21348,7 +21706,7 @@ function tick(t,skipRender){
 // it switched off, so nothing is fetched and no request can fail in their console.
 var LB=null;
 LB=(function(){
-const APP_VER='2026-10-15-fix2';          // keep version.json in step when shipping
+const APP_VER='2026-10-16-sensor';          // keep version.json in step when shipping
   const ORIGINS=['https://rabahharchaoui-design.github.io','http://localhost:8765'];
   let over='';try{over=localStorage.getItem('kgeuLBUrl')||'';}catch(e){}
   const E={url:over||'https://pfs-scores.rabahharchaoui.workers.dev',enabled:!!over||ORIGINS.includes(location.origin),online:null,
@@ -22027,8 +22385,17 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
   dropCam:()=>{const p=MISS.pallet;return {mode:DCAM.mode==='chase'&&(DCAM.drag||DCAM.yaw||DCAM.pitch)?'look':DCAM.mode,
     yaw:+(DCAM.yaw*180/Math.PI).toFixed(2),pitch:+(DCAM.pitch*180/Math.PI).toFixed(2),
     toCenter:p?Math.hypot(p.pos.x-DROPZ.x,p.pos.z-DROPZ.z):null,pallet:p?p.pos.toArray():null,down:!!(p&&p.down),blend:DCAM.bt};},
-  sensor:()=>({mode:SENSOR.mode,zoomIdx:SENSOR.zoom,fov:SENSOR_FOV[SENSOR.zoom],lock:!!(SENSOR.tgt||SENSOR.track),
-    az:+(SENSOR.az*180/Math.PI).toFixed(2),el:+(SENSOR.el*180/Math.PI).toFixed(2),ap:!!st.ap}),
+  sensor:()=>({mode:SENSOR.mode,zoomIdx:SENSOR.zoom,fov:sensorFovV(),fovName:sensorFovName(),zoomMax:sensorZoomMax(),lock:!!(SENSOR.tgt||SENSOR.track||SENSOR.geo),
+    az:+(SENSOR.az*180/Math.PI).toFixed(2),el:+(SENSOR.el*180/Math.PI).toFixed(2),ap:!!st.ap,
+    los:SENSOR.los.toArray(),mask:SENSOR.mask,masked:SENSOR.masked,gimbal:SENSOR.gimbal,rx:SENSOR.rx,ry:SENSOR.ry,valid:SENSOR.valid,slant:SENSOR.slant,
+    kind:SENSOR.tgt?'pt':SENSOR.track?'ar':SENSOR.geo?'geo':'',cue:SENSOR.cueT>0?SENSOR.cue:'',lrf:SENSOR.lrfT>0,dclt:SENSOR.dclt||0,slewTo:!!SENSOR.slewTo}),
+  // sensor item 2: hold the slew thumb at (x, y) for n frames of dt (the command lasts one frame, as the stick's does)
+  slewHold:(x,y,n,dt)=>{loopHeld=true;for(let i=0;i<n;i++){if(window.__slewPre)window.__slewPre();slewSensor(x,y,dt);tick(last+dt*1000,true);}return window.__kgeu.sensor();},
+  sensorNose:()=>sensorNose(),sensorStep:dt=>sensorUpdate(dt),sensorDclt:()=>sensorDclt(),sensorLase:()=>sensorLase(),toMGRS:toMGRS,geoLL:geoLL,sensorUTC:()=>sensorUTC(),gate:()=>({c:GATE.c,x:Math.round(GATE.x),y:Math.round(GATE.y),w:Math.round(GATE.w)}),
+  // point the line of sight in the world: true bearing and depression below the horizon, degrees (no track)
+  sensorLook:(brg,dep)=>{const S=SENSOR,b=brg*Math.PI/180,d=dep*Math.PI/180;S.tgt=S.track=S.geo=S.slewTo=null;S.rx=S.ry=0;
+    S.los.set(Math.sin(b)*Math.cos(d),-Math.sin(d),-Math.cos(b)*Math.cos(d));const g=gimAngles(S.los,S.az,S.el,true);
+    S.az=S._az=g.az;S.el=S._el=g.el;S.losOK=true;S._t=performance.now();sensorUpdate(0);return window.__kgeu.sensor();},
   setSensorMode:setSensorMode,sensorZoom:()=>sensorZoomStep(0),sensorLock:()=>sensorLock(),sensorCone:()=>{const c=sensorCone();return {on:c.on,brgT:+c.brgT.toFixed(2),rel:+c.rel.toFixed(2),half:c.half,len:Math.round(c.len)};},
   fire:()=>fireMissile(),trackHere:()=>sensorTrackHere(),nextTarget:()=>nextTarget(),explode:explode,fxClear:()=>fxClear(),fxReset:()=>{fxClear();fireClear();debrisClear();},warmTimes:()=>({ms:WARM.ms.slice(),total:WARM.total,n:WARM_STEPS.length}),
   // profiling: one pass of the effect updates outside the tick, ms per part
@@ -22052,11 +22419,11 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
   pylonsVisible:()=>(plane.pylons||[]).map(p=>p.visible),
   // point the ball at a target the way a slew would, so the real lock path is exercised
   pointAt:(i)=>{const t=STRIKE.targets[i];if(!t)return false;
-    sensorOrigin(_so);const dx=t.x-_so.x,dy=(t.y+1.5)-_so.y,dz=t.z-_so.z,hz=Math.hypot(dx,dz);
-    const e=new THREE.Euler().setFromQuaternion(st.quat,'YXZ');
-    let az=Math.atan2(dx,-dz)-(-e.y);az=Math.atan2(Math.sin(az),Math.cos(az));
-    SENSOR.az=clamp(az,-GIM_AZ,GIM_AZ);SENSOR.el=clamp(Math.atan2(dy,hz),GIM_EL_LO,GIM_EL_HI);
-    return Math.abs(az)<=GIM_AZ;},
+    // sensor item 2: the line of sight straight at it, the gimbal angles from that (the airframe banks in the orbit)
+    const S=SENSOR;sensorOrigin(_so);S.tgt=S.track=S.geo=S.slewTo=null;S.rx=S.ry=0;
+    S.los.set(t.x-_so.x,(t.y+1.5)-_so.y,t.z-_so.z).normalize();const g=gimAngles(S.los,S.az,S.el,true);
+    S.az=S._az=g.az;S.el=S._el=g.el;S.losOK=true;S._t=performance.now();sensorUpdate(0);
+    return !g.clamped;},
   // fix2 item 5: the strike run's state, and aim, fire and clock hooks. strikeAim locks target i like a real lock
   // (offsetM > 0: a ground point that far east of it instead, so the shot misses by about that much)
   strike:()=>({active:STRIKE.active,shots:STRIKE.shots,hits:STRIKE.hits,flying:STRIKE.missiles.length,limit:STRIKE.limit,
