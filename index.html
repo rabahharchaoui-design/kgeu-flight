@@ -416,6 +416,11 @@ body.touch #touch{ display:block; }
 .ccol button i{ font-style:normal; font-size:9px; font-weight:800; letter-spacing:.04em; color:var(--soft); white-space:nowrap; }
 .ccol button.lit{ border-color:var(--caution); } .ccol button.lit i{ color:var(--caution); }
 .ccol button.on i{ color:#15110a; }
+/* sensor item 7: the sensor buttons answer the press (mobile: no grey flash, a small scale on the press itself) */
+body.sensorOn .ccol button{ -webkit-tap-highlight-color:transparent; transition:transform 120ms cubic-bezier(.23,1,.32,1); }
+body.sensorOn .ccol button:active{ transform:scale(.96); }
+/* the smallest phones (568 wide): three slimmer columns keep clear of the middle third */
+@media (max-width:620px) and (orientation:landscape){ body.sensorOn #uiroot > #dock{ gap:6px; } body.sensorOn .ccol button{ width:54px; } body.sensorOn .ccol button i{ font-size:8.5px; letter-spacing:0; } body.sensorOn #fovInd{ min-width:54px; } }
 .ccol button.dim{ opacity:.38; }
 #flapGrp,#fovGrp{ display:flex; flex-direction:column; align-items:center; gap:4px; }
 #flapInd,#fovInd{ height:16px; min-width:60px; border-radius:6px; background:rgba(12,16,22,.7); border:1px solid rgba(255,255,255,.14); font:800 11px var(--font); line-height:14px; text-align:center; color:var(--ink); pointer-events:none; }
@@ -11553,7 +11558,9 @@ function trackAtScreen(cx,cy){
   sensorTrackAt(_sp);
 }
 // sensor view: one finger (or the mouse) drags the ball, two fingers pinch the zoom.
-// A touch never locks; that is the LOCK button's job, so a drag cannot lock by accident.
+// sensor item 7: a double tap (two taps inside 320 ms and 30 px, neither moving) tracks what is under the finger;
+// a single tap or a drag never does, so a slew cannot lock by accident. The mouse: one click.
+let stap={t:0,x:0,y:0};
 const spts=new Map();let spinch=0;
 // sensor item 2: the finger grabs the picture (it follows the finger, one to one), a flick glides on and settles
 function sensorDragK(){return (sensorFovV()*Math.PI/180)/Math.max(200,glc.clientHeight);}
@@ -11583,6 +11590,9 @@ glc.addEventListener('pointermove',e=>{
 const yokeUp=e=>{
   if(spts.delete(e.pointerId)&&spts.size<2)spinch=0;
   if(sdrag&&e.pointerId===sdrag.id){if(sdrag.mouse&&!sdrag.moved&&sensorMode){trackAtScreen(e.clientX,e.clientY);sensorRecentre();}
+    else if(!sdrag.moved&&sensorMode&&!spinch){const now=e.timeStamp;
+      if(now-stap.t<320&&Math.hypot(e.clientX-stap.x,e.clientY-stap.y)<30){stap.t=0;trackAtScreen(e.clientX,e.clientY);sensorRecentre();hapPattern('detent');if(typeof updateCtx==='function')updateCtx();}
+      else stap={t:now,x:e.clientX,y:e.clientY};}
     // a flick: the ball glides on at the finger's last speed and settles (still for 80 ms first: no glide)
     else if(sdrag.moved&&sensorMode&&e.timeStamp-sdrag.t<80){const k=sensorDragK(),w=sensorRateMax();
       SENSOR.rx=clamp(-sdrag.vx*k/w,-1.5,1.5);SENSOR.ry=clamp(-sdrag.vy*k/w,-1.5,1.5);SENSOR.fling=true;}
@@ -12839,6 +12849,7 @@ function sensorView(){if(!running||st.crashed||!hasBall())return;
     const sv=sensorMode,lo=dcOn()&&!MISS.result;
     if(lo!==document.body.classList.contains('lookOn')){document.body.classList.toggle('lookOn',lo);if(!lo&&DCAM.drag){DCAM.drag=null;$('lookPad').classList.remove('held');}}
     $('bLookBack').classList.toggle('lit',DCAM.mode==='ramp');
+    {const ht=sv?'SLEW':'STICK',he=$('stickHint');if(he.textContent!==ht)he.textContent=ht;}   // sensor item 7: the pad slews the ball
     // the Red Flag Dogfight: the weapon buttons take the lower right, AUTO, GEAR and BRAKE step out (VIEW stays)
     const df=DF.live&&running;
     const show={bAuto:!df&&!sv,bCam:!sv,bLookBack:lo,bSensor:hasBall(),bNose:sv,bDclt:sv,bMode:sv,fovGrp:sv,bGeo:sv&&!rookie(),bLase:sv&&!rookie(),bLock:sv,bNext:sv&&STRIKE.active,bFire:sv&&STRIKE.active,bDrop:dropOn,
@@ -22366,7 +22377,7 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
   sensor:()=>({mode:SENSOR.mode,zoomIdx:SENSOR.zoom,fov:sensorFovV(),fovName:sensorFovName(),zoomMax:sensorZoomMax(),lock:!!(SENSOR.tgt||SENSOR.track||SENSOR.geo),
     az:+(SENSOR.az*180/Math.PI).toFixed(2),el:+(SENSOR.el*180/Math.PI).toFixed(2),ap:!!st.ap,
     los:SENSOR.los.toArray(),mask:SENSOR.mask,masked:SENSOR.masked,gimbal:SENSOR.gimbal,rx:SENSOR.rx,ry:SENSOR.ry,valid:SENSOR.valid,slant:SENSOR.slant,
-    kind:SENSOR.tgt?'pt':SENSOR.track?'ar':SENSOR.geo?'geo':'',cue:SENSOR.cueT>0?SENSOR.cue:''}),
+    kind:SENSOR.tgt?'pt':SENSOR.track?'ar':SENSOR.geo?'geo':'',cue:SENSOR.cueT>0?SENSOR.cue:'',lrf:SENSOR.lrfT>0,dclt:SENSOR.dclt||0,slewTo:!!SENSOR.slewTo}),
   // sensor item 2: hold the slew thumb at (x, y) for n frames of dt (the command lasts one frame, as the stick's does)
   slewHold:(x,y,n,dt)=>{loopHeld=true;for(let i=0;i<n;i++){if(window.__slewPre)window.__slewPre();slewSensor(x,y,dt);tick(last+dt*1000,true);}return window.__kgeu.sensor();},
   sensorNose:()=>sensorNose(),sensorStep:dt=>sensorUpdate(dt),sensorDclt:()=>sensorDclt(),sensorLase:()=>sensorLase(),toMGRS:toMGRS,geoLL:geoLL,sensorUTC:()=>sensorUTC(),gate:()=>({c:GATE.c,x:Math.round(GATE.x),y:Math.round(GATE.y),w:Math.round(GATE.w)}),
