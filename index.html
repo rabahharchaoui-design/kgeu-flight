@@ -16141,7 +16141,8 @@ const HAP_PAT={
   crash:[[0,'h'],[80,'h'],[170,'h'],[280,'h'],[420,'h'],[580,'h']],       // long heavy burst
   launch:[[0,'m'],[90,'m']],                                             // Hellfire away, FOX 2: sharp double
   launch3:[[0,'h'],[120,'m'],[240,'m'],[360,'l']],                        // FOX 3 (arsenal): the big motor, a heavy kick rolling off
-  impact:[[0,'h'],[70,'h']],                                             // Hellfire impact: heavy thump (delayed by the time of flight)
+  impact:[[0,'h'],[70,'h']],
+  trk:[[0,'m'],[110,'l']],                                               // sensor: a track lost (sensor item 5)                                             // Hellfire impact: heavy thump (delayed by the time of flight)
   gun:[[0,'l'],[45,'l'],[90,'l'],[135,'l'],[180,'l']],                   // gun or cannon: rapid ticks
   tdLight:[[0,'l']],tdFirm:[[0,'m'],[90,'m']],tdHard:[[0,'h'],[80,'h']],  // touchdown by how hard
   detent:[[0,'l']],ap:[[0,'m']],trim:[[0,'l']],                          // gear, flaps, throttle detents, trim, autopilot
@@ -20905,8 +20906,16 @@ function targetUnder(p,maxD){
     const d=Math.hypot(t.x-p.x,t.z-p.z);if(d<bd){bd=d;best=t;}}
   // a tasking's targets (Overwatch's building and pickup): LOCK takes them a little wider, Easy wider still
   if(TASK.on)for(const t of TASK.tgts){if(t.dead)continue;const d=Math.hypot(t.x-p.x,t.z-p.z),lim=Math.max(maxD,rookie()?200:110);if(d<lim&&d<(best?bd:lim)){bd=d;best=t;}}
+  // sensor item 5: in free flight the freeway traffic can be point tracked (a car within 30 m, Easy 50 m)
+  if(!best&&!STRIKE.active&&!TASK.on&&cars.length){const lim=rookie()?50:30;let bk=-1,bc=lim;
+    for(let k=0;k<cars.length;k++){const c=cars[k],x=c.r===0?FWY_X+c.off:c.s,z=c.r===0?c.s:I10_Z+c.off,d=Math.hypot(x-p.x,z-p.z);if(d<bc){bc=d;bk=k;}}
+    if(bk>=0)best=carTgt(bk);}
   return best;
 }
+// a stand-in for freeway car k whose position follows the car (the instanced cars have no objects of their own)
+const CAR_TGT=[];
+function carTgt(k){let o=CAR_TGT[k];if(o)return o;const c=cars[k];
+  o={name:'Vehicle',dead:false,car:k,y:0.4,get x(){return c.r===0?FWY_X+c.off:c.s;},get z(){return c.r===0?c.s:I10_Z+c.off;}};return CAR_TGT[k]=o;}
 // a track at ground point p: a point track on the target there, else an area track on the patch (sensor item 5)
 function sensorTrackAt(p){
   const t=targetUnder(p,60);SENSOR.geo=null;SENSOR.slewTo=null;SENSOR.maskT=0;
@@ -20957,7 +20966,7 @@ const fmtDist=d=>d<1000?(Math.round(d/10)*10)+' m':(d/1000).toFixed(1)+' km';
 function sensorBreak(why,cue){
   if(!SENSOR.track&&!SENSOR.tgt&&!SENSOR.geo)return;
   SENSOR.track=null;SENSOR.tgt=null;SENSOR.geo=null;SENSOR.maskT=0;if(why)toast(why);
-  if(cue){SENSOR.cue=cue;SENSOR.cueT=2.5;}
+  if(cue){SENSOR.cue=cue;SENSOR.cueT=2.5;hapPattern('trk');}
   if(typeof updateCtx==='function')updateCtx();
 }
 // slew to nose: the ball swings back to the boresight preset (approximation: az 0, el -15 degrees, about 0.6 s)
