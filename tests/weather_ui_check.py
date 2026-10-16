@@ -4,6 +4,10 @@
 # taps the pill, measures the nine tiles (44 px or more, on screen, no scroll in landscape), picks every weather by
 # touch (localStorage kgeuWX and the pill follow, the sheet closes), the dice (random on, the tag, the toast), the
 # pause sheet's pill, and the migration (an old install's kgeuTOD 'haboob' reads as Day + Haboob, both saved).
+# Weather regions item (regions(), once): the daily card shows the day's weather as a fact (icon and name); a lesson
+# sets its fixed weather (clear; the crosswind lesson gusty under its own steady wind) without saving it and the
+# player's comes back at the menu; a mission and a tasking do the same; Tokyo's first visit rolls from Tokyo's odds,
+# seeded by the day (__kgeu.wxFirst), saved as kgeuWX_rjtt only.
 # Measuring in the style of tests/ui1_break_check.py (not imported). Shots: /tmp/wx_ui/<size>_<screen>.png
 #   .venv/bin/python tests/weather_ui_check.py                    (844x390 and 568x320, the full pass)
 #   .venv/bin/python tests/weather_ui_check.py --size 568x320     (one size)
@@ -212,6 +216,49 @@ async def full(b, url, W, H):
     await pg.context.close()
 
 
+async def regions(b, url):
+    tag = 'regions'
+    pg = await page(b, url, vp={'width': 844, 'height': 390}, storage=BASE)
+    await pg.evaluate(f"()=>{{{K}.openMenu('sArc');}}")
+    await pg.wait_for_timeout(500)
+    d = await pg.evaluate(f"()=>{{const s={K}.dailySpec(),W={K}.WX_SET[s.wx],c=document.querySelector('#arcCards .mcard[data-m=daily] .d');"
+                          "return [s.wx,s.kind,W&&W.icon,W&&W.name,c?c.textContent:null]}")
+    ok(f'{tag} daily card: the weather fact (icon and name), never the haboob or fog', d[4] is not None and (d[1] == 'dogfight' or (d[2] + '\u00a0' + d[3]) in d[4]) and d[0] not in ('haboob', 'fog'), d)
+    await pg.evaluate(f"()=>{{{K}.setWX('storm');}}")
+    await pg.evaluate(f"()=>{K}.startLesson('pattern',true)")
+    await pg.wait_for_timeout(500)
+    a = await pg.evaluate(f"()=>[{K}.WX().id,localStorage.getItem('kgeuWX'),{K}.wxOf('les:pattern')]")
+    ok(f'{tag} lesson: its fixed weather (clear), the player\'s choice kept in storage', a[0] == 'clear' and a[1] == 'storm' and a[2] == 'clear', a)
+    await pg.evaluate(f"()=>{K}.openMenu('sFly')")
+    await pg.wait_for_timeout(400)
+    a = await pg.evaluate(f"()=>[{K}.WX().id,document.querySelector('#wxPill .lg').textContent]")
+    ok(f'{tag} lesson: the player\'s weather back at the menu, the pill shows it', a == ['storm', 'Thunderstorm'], a)
+    await pg.evaluate(f"()=>{K}.startLesson('xwind',true)")
+    await pg.wait_for_timeout(500)
+    a = await pg.evaluate(f"()=>{{const s={K}.state();return [{K}.WX().id,s.windKt,s.windHold,s.wxW,s.gustAmp]}}")
+    ok(f'{tag} crosswind lesson: the gusty look, lesWind\'s steady wind (12 kt, held), no weather gusts', a[0] == 'gusty' and a[1] in (8, 12) and a[2] == 1 and not a[3] and a[4] <= 0.15, a)
+    await pg.evaluate(f"()=>{K}.mission('drop')")
+    await pg.wait_for_timeout(500)
+    a = await pg.evaluate(f"()=>[{K}.WX().id,localStorage.getItem('kgeuWX')]")
+    ok(f'{tag} airdrop: scattered for the run, storm still saved', a == ['scattered', 'storm'], a)
+    await pg.evaluate(f"()=>{{{K}.pick('cessna');{K}.pickBase('kgeu');{K}.start('runway');}}")
+    await pg.wait_for_timeout(400)
+    a = await pg.evaluate(f"()=>{K}.WX().id")
+    ok(f'{tag} the next free flight flies the player\'s weather', a == 'storm', a)
+    ok(f'{tag} no page errors', not pg.errs, pg.errs[:3])
+    await pg.context.close()
+    # Tokyo's first visit: no kgeuWX_rjtt, an Arizona choice saved
+    pg = await page(b, url, vp={'width': 844, 'height': 390}, storage=dict(BASE, kgeuRegion='rjtt', kgeuWX='haboob', kgeuTOD='day'))
+    await pg.wait_for_function(f"()=>{K}.boot&&{K}.boot().pre.done", timeout=120000)
+    t = await pg.evaluate(f"()=>{{const d=new Date(),k=d.getUTCFullYear()*10000+(d.getUTCMonth()+1)*100+d.getUTCDate();"
+                          f"return [{K}.WX().id,{K}.wxFirst('rjtt','day',k),Object.keys({K}.wxOdds('rjtt','day')),localStorage.getItem('kgeuWX_rjtt'),localStorage.getItem('kgeuWX'),"
+                          f"document.querySelector('#wxPill .lg').textContent,{K}.WX().name]}}")
+    ok(f'{tag} Tokyo first visit: rolled from Tokyo\'s odds (seeded by the day), saved as kgeuWX_rjtt only, the pill shows it',
+       t[0] == t[1] and t[0] in t[2] and t[3] == t[0] and t[4] == 'haboob' and t[5] == t[6], t)
+    ok(f'{tag} Tokyo: no page errors', not pg.errs, pg.errs[:3])
+    await pg.context.close()
+
+
 async def main():
     srv, url = serve()
     async with async_playwright() as p:
@@ -226,6 +273,8 @@ async def main():
                 sizes = [(int(w), int(h))]
             for W, H in sizes:
                 await full(b, url, W, H)
+            if '--size' not in sys.argv or '--regions' in sys.argv:
+                await regions(b, url)
         await b.close()
     srv.shutdown()
     return ok.done('weather_ui_check')

@@ -7566,6 +7566,15 @@ const WX_SET={};
  ['haboob','Haboob','🌪️','Dust wall from the south east','haboob',8,35,0.35]
 ].forEach(([id,name,icon,hint,clouds,k0,k1,g])=>{WX_SET[id]={id:id,name:name,icon:icon,hint:hint,clouds:clouds,wind:{kt:[k0,k1],gust:g}};});
 let WX=Object.assign({random:false},WX_SET.scattered);
+// weather regions item: a world region's own feel (m above the field; null in Arizona, as built). cu: the fair weather
+// cumulus base; deck: the overcast and rain stratus bases; rainMi: the visibility in rain (statute miles, by the day);
+// drizzle: finer, fainter rain streaks. Tokyo and Paris: stratus at 1,500 to 2,500 ft, cumulus at 2,500 to 4,000, rain
+// 2 to 3 miles in drizzle. Rio: shower: its rain is tropical showers, broken towering cumulus at 2,000 to 3,000 ft
+// with two or three rain shafts near the field and the sun between them ('shower' clouds, cldShower)
+const WX_REGS={rjtt:{cu:[760,1220],deck:{overcast:[460,760],rain:[460,620]},rainMi:[2,3],drizzle:1},
+  sbrj:{cu:[610,915],deck:{overcast:[610,915],rain:[610,800]},rainMi:[3,3],shower:1}};
+WX_REGS.lfpg=WX_REGS.rjtt;
+const WX_REG=WX_REGS[REGION_ID]||null;
 const wxOv=document.getElementById('wxOv'),WX_SHORT={storm:'Storm',gusty:'Gusty'};   // the sheet (markup above), the pause pill's short names
 const WX_HOOKS=[];   // fns() the next item's rain, fog and wind push, run at the end of setWX (like TOD_HOOKS)
 const wxOK=id=>!!WX_SET[id]&&(id!=='haboob'||REGION.az);
@@ -7575,7 +7584,9 @@ function setWX(id,o){o=o||{};if(!WX_SET[id])id='scattered';
   // the dust storm is Arizona's: clear in a world region, the saved Haboob kept for coming back
   const fb=!wxOK(id),hb0=WX.id==='haboob',cl0=WX.clouds;
   WX=Object.assign({random:!!o.random},WX_SET[fb?'clear':id]);
-  if(!fb&&!o.keep)try{localStorage.setItem('kgeuWX',WX.id);localStorage.setItem('kgeuWXR',WX.random?'1':'0');}catch(e){}
+  if(WX.id==='rain'&&WX_REG&&WX_REG.shower)WX.clouds='shower';   // Rio's rain: tropical showers, not a deck
+  // weather regions item: saved per region (kgeuWX_<region>) and as the last choice anywhere (kgeuWX)
+  if(!fb&&!o.keep)try{for(const k of ['kgeuWX','kgeuWX_'+REGION_ID]){localStorage.setItem(k,WX.id);localStorage.setItem(k.replace('WX','WXR'),WX.random?'1':'0');}}catch(e){}
   if(!o.noLight){if(hb0!==(WX.id==='haboob'))setTOD(TOD.id);   // the haboob's own light by day, its wall on or off
     else if(cl0!==WX.clouds&&cloudMat)cloudsAuto();}
   if(typeof wxUI==='function')wxUI();
@@ -7592,14 +7603,38 @@ const WX_ODDS={
   sbrj:{scattered:35,rain:25,clear:20,storm:10,overcast:10}};
 WX_ODDS.lfpg=WX_ODDS.rjtt;
 function wxOdds(reg,tod){return reg==='az'?WX_ODDS['az_'+tod]||WX_ODDS.az_day:WX_ODDS[reg]||WX_ODDS.rjtt;}
+// one weather from odds P for region reg, u a uniform 0..1 (Math.random, or a seeded one); skip: ids left out
+function wxPick(P,reg,u,skip){let n=0;const ok=k=>(k!=='haboob'||reg==='az')&&!(skip&&skip.indexOf(k)>=0);
+  for(const k in P)if(ok(k))n+=P[k];
+  let r=u*n,id='scattered';for(const k in P){if(!ok(k))continue;r-=P[k];if(r<0){id=k;break;}}return id;}
 function wxRoll(o){o=o||{};
-  const reg=!o.start&&FLY_LOC&&REGIONS[FLY_LOC.reg]?FLY_LOC.reg:REGION_ID,P=wxOdds(reg,TOD.id);
-  let n=0;for(const k in P)if(k!=='haboob'||reg==='az')n+=P[k];
-  let r=Math.random()*n,id='scattered';for(const k in P){if(k==='haboob'&&reg!=='az')continue;r-=P[k];if(r<0){id=k;break;}}
-  setWX(id,{random:true,noLight:o.noLight});
+  const reg=!o.start&&FLY_LOC&&REGIONS[FLY_LOC.reg]?FLY_LOC.reg:REGION_ID,id=wxPick(wxOdds(reg,TOD.id),reg,Math.random());
+  setWX(id,{random:true,noLight:o.noLight,keep:o.keep});
   if(!o.quiet)wxToast('Rolled: '+WX_SET[id].icon+' '+WX_SET[id].name);
   return id;
 }
+// weather regions item: the first visit to a region with no saved weather (kgeuWX_<region>) rolls one from the region's
+// odds, seeded by the UTC day and the region (everyone landing in Tokyo today first sees the same sky)
+function wxFirst(reg,tod,day){return wxPick(wxOdds(reg,tod),reg,dayRng((day||todayKey())*31+Object.keys(REGIONS).indexOf(reg)*7+17)());}
+// The fixed weather of a run, so its board stays fair (wxOf(kind)): the landing challenges and the arcade as their scores
+// were set (clear), the missions, the dogfight, the taskings (from their briefs: Overwatch watches a compound and
+// Shepherd escorts at altitude in clear air, Lifeline drops on smoke and Finder searches the White Tanks under
+// fair weather cumulus), every flight school lesson clear but the crosswind lesson (the gusty look; lesWind's steady
+// wind stays the wind) and the night one. The daily's own is dailySpec's roll. 'random' rolls one for the region instead.
+// wxFix(kind): set for this run only (no save), the player's choice stashed in ARC.prevWX (as the daily since weather
+// item 2): back at the next start(), at the menu (wxBack, openMenu) or, for a lesson, at its end (LES_WX, lesRestore)
+const WX_FIX={landing:'clear',landing1:'clear',apt:'clear',drop:'scattered',range:'clear',gunrun:'clear',short:'clear',df:'clear',
+  les:'clear','les:xwind':'gusty','les:night':'clear','task:overwatch':'clear','task:lifeline':'scattered','task:shepherd':'clear','task:finder':'scattered'};
+function wxOf(kind){if(kind==='daily')return dailySpec().wx;
+  return WX_FIX[kind]||(/^les:/.test(kind)?WX_FIX.les:/^task:/.test(kind)?'clear':null);}
+function wxFix(kind){let id=wxOf(kind);if(!id)return null;
+  if(id==='random')id=wxPick(wxOdds(REGION_ID,TOD.id),REGION_ID,Math.random());
+  const hb0=WX.id==='haboob';ARC.prevWX=ARC.prevWX||{id:WX.id,random:WX.random};
+  if(WX.id!==id||WX.random)setWX(id,{keep:true});
+  if(hb0!==(WX.id==='haboob'))hbSync(true);
+  return ARC.prevWX;}
+// the player's weather back when a run ends at the menu (start() does it for the next flight)
+function wxBack(){const pw=ARC.prevWX;if(!pw)return;ARC.prevWX=null;setWX(pw.id,{random:pw.random});}
 let starField=null,cloudMat=null;
 // the clouds (weather item 1): one instanced mesh of sun lit billboard puffs (CLD, built with the world). The dogfight
 // hides them (dfStart) and dfStop brings them back. cloudMat is CLD's one material (setTOD's cloudsAuto fires on it).
@@ -8988,7 +9023,7 @@ const CLD_CAP={low:[160,220],medium:[320,520],high:[480,700]},CLD_MAX=700,CLD_ST
 const CLD_MIST={day:0xdcdfe4,sunset:0xb6a498,night:0x10131b,haboob:0xc2ae98};
 CLD={mesh:null,mat:null,U:null,n:0,cells:0,nE:0,E:new Float32Array(40*6),src:new Float32Array(CLD_MAX*CLD_ST),key:new Float32Array(CLD_MAX),
   idx:new Uint16Array(CLD_MAX),prev:new Uint16Array(CLD_MAX),A:null,base:1600,tier:'',gk:'',sorts:0,sortT:0,sp:new V3(1e9,0,0),drift:new V3(),
-  inside:0,dirty:false,skyK:0,s0:{near:0,far:0,haze:0,sunI:0,airY:0,kw:0,ty:1,tz:1},cellC:new Float32Array(24),deck:0,deckY:0};
+  inside:0,dirty:false,skyK:0,s0:{near:0,far:0,haze:0,sunI:0,airY:0,kw:0,ty:1,tz:1},cellC:new Float32Array(24),deck:0,deckY:0,shw:[]};
 // the atlas, made once: a 512 x 256 RGBA data texture (no image file, no canvas premultiply on the soft edges). Left
 // cell: the four puff variants, one per channel (a few dome shaped lumps, the low ones big, roughened by value noise,
 // a soft flat base), stored as a soft height (the shader maps it to alpha and reads its slope toward the sun for the
@@ -9175,6 +9210,8 @@ function cldDeck(y,cx,cz,R,n,sh,o){
 // lower; the fog's top over the field
 const wxBase=()=>{try{return st.base||BASE0;}catch(e){return BASE0;}};   // st is made later in the boot
 const CLD_DECK={overcast:[900,1100,500,800],rain:[600,800,400,600]},WX_FOGTOP=150;
+// the visibility in rain (statute miles): 3, a world region's 2 or 3 by the day (WX_REGS)
+const wxRainMi=()=>{const m=WX_REG&&WX_REG.rainMi;return m?(m[0]===m[1]||dayRng(todayKey()*7+13)()<0.5?m[0]:m[1]):3;};
 // the thunderstorm's cells (weather item 3): two over the approach path of the home runway (the nearest 6 to 10 km out,
 // the other within 15 km, either side of the centre line), the other four south and east 14 to 26 km
 function cldStormAt(k){
@@ -9191,26 +9228,47 @@ function cldGen(){
   const C=CLD,p=CLOUDS.preset,t=CLD_CAP[GFX.tier]?GFX.tier:'medium',day=todayKey(),gk=p+t+day+(p==='storm'?wxBase():'');
   if(C.gk===gk)return;C.gk=gk;C.n=0;C.nE=0;C.cells=0;C.tier=t;C.deck=0;C.deckY=0;
   C.base=1350+dayRng(day*7+5)()*550;   // the day's cloud base (4,500 to 6,200 ft), all flights agree
+  if(WX_REG){const u=WX_REG.cu;C.base=u[0]+(u[1]-u[0])*dayRng(day*7+5)();}C.shw.length=0;   // a world region's own (WX_REGS)
   if(p==='clear'){const r=dayRng(day*7+9),n=6+Math.floor(r()*5);
     for(let i=0;i<n;i++){const w=4000+r()*5000,x=APC.x+(r()-0.5)*50000,z=APC.z+(r()-0.5)*50000;cldPuff(x,7000+r()*2000,z,(r()-0.5)*0.3,w,w*(0.1+0.08*r()),1,0.25,0,1,0,4);}
     return;}
   const dn={low:0.75,medium:1,high:1.2}[t];
-  if(p==='overcast'||p==='rain'){const L=CLD_DECK[p],a=REGION.az?L[0]:L[2],b=REGION.az?L[1]:L[3];
+  if(p==='overcast'||p==='rain'){const L=CLD_DECK[p],R=WX_REG&&WX_REG.deck[p],a=R?R[0]:REGION.az?L[0]:L[2],b=R?R[1]:REGION.az?L[1]:L[3];
     C.deck=C.deckY=a+(b-a)*dayRng(day*7+11)();cldDeck(C.deck,APC.x,APC.z,12000,Math.round(62*dn),p==='rain'?0.12:0.22,{ell:true,sd:3,k:1.15});return;}
   if(p==='fog'){const g=groundHeight(APC.x,APC.z);C.deckY=g+70;   // the sheet solid to 6.5 km, ragged to 9.5
     cldDeck(g+70,APC.x,APC.z,6500,Math.round(60*dn),0.6,{gnd:-1e4,sd:7,up:40,k:1.2});return;}
-  const f={low:0.45,medium:0.9,high:1.35}[t],sm=clamp(Math.sqrt(1/f),0.86,1.5),big=p==='monsoon'||p==='storm'||p==='haboob',cap=CLD_CAP[t][big?1:0];
+  const f={low:0.45,medium:0.9,high:1.35}[t],sm=clamp(Math.sqrt(1/f),0.86,1.5),big=p==='monsoon'||p==='storm'||p==='haboob',cap=CLD_CAP[t][big||p==='shower'?1:0];
   if(p==='haboob'){const a=150*Math.PI/180;C.deck=C.deckY=2500;
     cldDeck(2500,APC.x+Math.sin(a)*8000,APC.z-Math.cos(a)*8000,14000,Math.round(56*dn),0.18,{ell:true,sd:5});
     const N=Math.min(70,Math.floor((cap-C.n)/3));
     for(let k=0;k<3;k++){const b=(140+12*k+hash(k,506)*6)*Math.PI/180,d=36000+hash(k,507)*8000;cldCell(k+1,N,[APC.x+Math.sin(b)*d,APC.z-Math.cos(b)*d]);}
     C.n=Math.min(C.n,cap);return;}
   const torn=p==='torn';
-  for(let k=0;k<(torn?44:34);k++)if(!big||!(k&1))cldCumulus(k,f,sm,torn);   // the monsoon: half the fair weather field
+  if(p==='shower')cldShower(f,sm,day);   // first: the cap trims the fair weather field after it, never the showers
+  for(let k=0;k<(torn?44:p==='shower'?40:34);k++)if(!big||!(k&1))cldCumulus(k,f,sm,torn);   // the monsoon: half the fair weather field
   if(p==='monsoon'){const N=Math.floor((cap-C.n)/6);for(let k=0;k<6;k++)cldCell(k,N);}
   if(p==='storm'){const N=Math.floor((cap-C.n)/6);for(let k=0;k<6;k++)cldCell(k,N,cldStormAt(k));}
   C.n=Math.min(C.n,cap);
 }
+// weather regions item, Rio's rain: 2 or 3 towering cumulus 4 to 9 km from the field (the day's), each over a rain shaft
+// (the cells' slot 5 quad hanging plumb from the base to the ground), the fair weather field round them and the sun
+// between; C.shw their centres (x, z pairs) for the streaks near a shower (wxShowerNear)
+function cldShower(f,sm,day){
+  const C=CLD,r=dayRng(day*7+21),S=2+(r()<0.5?1:0),B=C.base;
+  for(let j=0;j<S;j++){const a=(j/S+r()*0.25)*6.283,d=4000+r()*5000,cx=APC.x+Math.sin(a)*d,cz=APC.z-Math.cos(a)*d,W=2200+r()*800,Ht=2600+r()*1400,n=Math.max(6,Math.round(14*f));
+    // a flat dark base row (bottoms aligned), then the tower in puffs narrowing upward
+    for(let i=0;i<5;i++){const aa=(i+r()*0.5)/5*6.283,rr=W*0.26,w=W*0.55*sm,hh=w/1.7;
+      cldPuff(cx+Math.cos(aa)*rr,B+0.3*hh,cz+Math.sin(aa)*rr,(r()-0.5)*0.1,w,hh,0,1,Math.cos(aa)*0.3,-1,Math.sin(aa)*0.3,Math.floor(r()*4));}
+    for(let i=0;i<n;i++){const t=i/(n-1),w=sm*clamp((1500-700*t)*(0.85+0.3*r()),600,1500),hh=w*(0.8+0.5*r()),aa=r()*6.283,rr=W*0.35*(1-0.6*t)*Math.sqrt(r());
+      const x=cx+Math.cos(aa)*rr,z=cz+Math.sin(aa)*rr,y=B+0.45*hh+t*Ht*0.85;
+      cldPuff(x,y,z,(r()-0.5)*0.3,w,hh,clamp((y-B)/Ht,0,1),1,x-cx,(y-B-Ht*0.4)*1.2,z-cz,Math.floor(r()*4));}
+    // three overlapping shafts slanted a touch, denser than a cell's (op 1.6: the sprite's alpha doubled up)
+    const top=B+120,bot=groundHeight(cx,cz)-60;
+    for(let k=0;k<3;k++)cldPuff(cx+(k-1)*380+(r()-0.5)*200,(top+bot)/2,cz+(r()-0.5)*300,0.06+0.05*r(),800+300*r(),top-bot,0.05,1.6,0,-1,0,5);
+    cldEll(cx,B+Ht*0.5,cz,W*0.45,Ht*0.5,W*0.45);C.shw.push(cx,cz);}
+}
+// the nearest shower's distance (m) from (x, z), drifting with the clouds
+function wxShowerNear(x,z){const C=CLD,S=C.shw;let d=1e9;for(let i=0;i<S.length;i+=2)d=Math.min(d,Math.hypot(S[i]+C.drift.x-x,S[i+1]+C.drift.z-z));return d;}
 // back to front from the camera through a permutation of the source list; uploaded only when the order changed
 function cldSort(force){
   const C=CLD,n=C.n,cp=camera.position,dx=C.drift.x,dz=C.drift.z,S=C.src,K=C.key,I=C.idx;
@@ -9237,6 +9295,7 @@ function cldColours(){
   else{b.setHex(T.hemiSky).lerp(_cldA.setHex(T.haze),0.3).multiplyScalar(0.66);tp.setHex(0xffffff);sc.setHex(T.sun).multiplyScalar(0.16);rc.setHex(T.sun).multiplyScalar(0.8);}
   const p=CLOUDS.preset;
   if(p==='monsoon'||p==='storm'){b.r*=0.76;b.g*=0.78;b.b*=0.81;}   // a storm's dark blue grey base (0x6f7784 by day)
+  else if(p==='shower'){b.r*=0.84;b.g*=0.86;b.b*=0.88;}   // Rio's showers: heavier bases
   // weather item 3: the decks. Overcast: a flat grey underside (lit only from above: shade 1 is the sunlit top), the
   // sunset's purple grey under an orange top, a dark lid at night; rain darker; the fog's sheet pale; the haboob's deck
   // and cells a dirty warm grey brown, darkened with the light
@@ -9401,10 +9460,13 @@ function wxApply(){
   WXL.id=W;WXL.fogK=-1;WXL.below=1;
   if(CLD&&CLD.dirty)cldRestore();
   let near=T.fog[0],far=T.fog[1],hz=-1,hk=0,sI=T.sunI,hI=T.hemiI,air=1,disc=1,sh=false,dome=0;
-  if(W==='overcast'||W==='rain'){const r=W==='rain';
+  const shw=W==='rain'&&WX.clouds==='shower';WXL.shower=shw;
+  // Rio's showers (weather regions item): the sun out between the towers, the air hazier and greyer, 8 km
+  if(shw){hz=nt?0x0d1016:ss?0x8a8288:0xa9b0b6;hk=nt?0.4:0.45;sI=T.sunI*0.8;hI=T.hemiI*0.95;air=0.7;near=500;far=Math.min(far,9000);}
+  else if(W==='overcast'||W==='rain'){const r=W==='rain';
     hz=nt?0x0b0d12:ss?(r?0x6c676e:0x8a8088):(r?0x989ca2:0xb9bcc0);hk=nt?0.5:0.85;
     sI=T.sunI*(r?0.28:0.35);hI=T.hemiI*1.15*(r?0.88:1);air=0.25;disc=0;sh=true;dome=1;
-    if(r){near=300;far=5000;}else far=Math.min(far,30000);}
+    if(r){near=300;far=wxRainMi()*1650;}else far=Math.min(far,30000);}   // 3 miles: 5 km (a world region's 2 or 3 miles, WX_REGS)
   else if(W==='storm'){hz=nt?0x0c0f16:ss?0x7c7884:0x8e98a6;hk=nt?0.4:0.6;sI=T.sunI*0.55;hI=T.hemiI*0.9;air=0.5;dome=3;}
   else if(W==='fog'){hz=nt?0x2a2c30:ss?0xa8a29e:0xc9cbcd;hk=1;air=0;disc=nt?0:0.4;sh=true;dome=2;far=Math.min(far,ss||nt?14000:20000);near=40;
     B.vis=nt||ss?800:1200;B.top=(CLD.deckY?CLD.deckY-70:groundHeight(APC.x,APC.z))+WX_FOGTOP;
@@ -9428,7 +9490,7 @@ function wxApply(){
   WXL.rainOn=W==='rain';WXL.rm.count=WXL.rainN[GFX.tier]||300;
   WXL.wet=W==='rain'&&GFX.on('wet');wetSet(WXL.wet);if(WXL.wet)wxRefl();
   WXL.dustOn=W==='gusty'&&REGION.az;WXL.dT=0;
-  {const U=WXL.rm.material.uniforms;U.uCol.value.setHex(nt?0x343842:ss?0x96928f:0xb4b8be);U.uP.value.z=nt?0.22:0.28;
+  {const U=WXL.rm.material.uniforms,dz=WX_REG&&WX_REG.drizzle;U.uCol.value.setHex(nt?0x343842:ss?0x96928f:0xb4b8be);U.uP.value.z=(nt?0.22:0.28)*(dz?0.72:1);U.uP.value.x=dz?0.01:0.014;   // Tokyo and Paris: finer, fainter drizzle
    const D=WXL.dm.material.uniforms;D.uCol.value.setHex(0xe8d6ba).multiplyScalar(nt?0.15:ss?0.75:1);}
   const F=WXL.fl;F.next=performance.now()/1000+3+Math.random()*6;
   WXL.vis=scene.fog.far;
@@ -9477,11 +9539,13 @@ function wxFrame(dt){
     WXL.noSh=k<0.5;if(bl!==WXL.below){WXL.below=bl;skyPaint();CLD.skyK=-1;}}
   // rain: the streaks follow the camera, stretched along the air's motion past it (falling at 8 m/s, plus the wind,
   // less the aircraft's velocity) over a 45 ms shutter: straight down parked, slanting back into streaks at speed
-  const rv=WXL.rainOn&&live&&camMode!==2&&!DF.on;WXL.rm.visible=rv;
+  // Rio's showers: only within 3 km of a shaft (the sun between them)
+  const shr=!WXL.shower||wxShowerNear(cp.x,cp.z)<3000;
+  const rv=WXL.rainOn&&shr&&live&&camMode!==2&&!DF.on;WXL.rm.visible=rv;
   if(rv){const U=WXL.rm.material.uniforms;U.uOrg.value.copy(cp);windVec(_wxW);_wxV.copy(_wxW).sub(st.vel);_wxV.y-=8;_wxV.multiplyScalar(0.045);
     const l=_wxV.length();if(l<0.7)_wxV.multiplyScalar(0.7/Math.max(l,1e-3));U.uS.value.copy(_wxV);U.uNear.value=camMode===1?1.6:0.4;}
   // the canopy drops (cockpit, Medium and High): running down the glass, faster with the airspeed
-  {const R=RAINFX,on=WXL.rainOn&&running&&camMode===1&&!menu.classList.contains('on')&&GFX.on('rain');
+  {const R=RAINFX,on=WXL.rainOn&&shr&&running&&camMode===1&&!menu.classList.contains('on')&&GFX.on('rain');
     if(on){const V=st.ias||0;R.fr=PFX.frames;R.k=0.95;R.sm=0.05;if(!paused)R.ph=(R.ph+dt*(0.03+0.004*V))%1;}else R.k=0;}
   // gusty: the dust wisps drift with the wind, 2 to 10 m over the ground within 2 km (heights every 0.4 s)
   const dv=WXL.dustOn&&live&&camMode!==2&&!DF.on&&st.agl<900;WXL.dm.visible=dv;
@@ -9570,9 +9634,11 @@ function wxCond(){
   const W=WX.id,g0=groundHeight(APC.x,APC.z);
   const o={vis:10,ceil:null,vT:'visibility 10 miles',vC:['t_visibility','t_n_10','t_miles'],vP:'visibility 10 miles',sT:'sky clear',sC:['t_sky_clear'],sP:'clear sky'};
   if(W==='fog'){const h=TOD.night||TOD.id==='sunset';o.vis=h?0.5:1;o.vT='visibility '+(h?'one half mile':'one mile')+' in fog';o.vC=['t_visibility',h?'t_one_half_mile':'t_one_mile','t_in_fog'];o.vP='visibility '+(h?'half a mile':'one mile')+' in fog';}
-  else if(W==='rain'){o.vis=3;o.vT='visibility 3 miles in rain';o.vC=['t_visibility','t_n_3','t_miles','t_in_rain'];o.vP='visibility 3 miles in rain';}
+  else if(W==='rain'){const mi=WX.clouds==='shower'?5:wxRainMi();o.vis=mi;o.vT='visibility '+mi+' miles in rain';o.vC=['t_visibility','t_n_'+mi,'t_miles','t_in_rain'];o.vP='visibility '+mi+' miles in rain';}
   else if(W==='storm'){o.vis=5;o.vT=o.vP='visibility 5 miles';o.vC=['t_visibility','t_n_5','t_miles'];}
-  if(W==='overcast'||W==='rain'||W==='fog'){const c=o.ceil=CLD&&CLD.deckY?wxFt(CLD.deckY-g0):W==='fog'?200:3000;
+  if(W==='rain'&&WX.clouds==='shower'){const c=o.ceil=wxFt((CLD&&CLD.base||700)-g0);   // Rio's showers: the towers' base, broken
+    o.sT='ceiling '+c.toLocaleString('en-US')+' broken';o.sC=['t_ceiling'].concat(ftC(c),['t_broken']);o.sP='cloud base '+c.toLocaleString('en-US')+' ft';}
+  else if(W==='overcast'||W==='rain'||W==='fog'){const c=o.ceil=CLD&&CLD.deckY?wxFt(CLD.deckY-g0):W==='fog'?200:3000;
     o.sT='ceiling '+c.toLocaleString('en-US')+' overcast';o.sC=['t_ceiling'].concat(ftC(c),['t_overcast']);o.sP='cloud base '+c.toLocaleString('en-US')+' ft';}
   else if(W==='storm'){const c=o.ceil=wxFt(1800-g0);
     o.sT='ceiling '+c.toLocaleString('en-US')+' broken, thunderstorms in the vicinity';o.sC=['t_ceiling'].concat(ftC(c),['t_broken','t_ts_vicinity']);o.sP='thunderstorms nearby';}
@@ -14458,7 +14524,7 @@ const endApt=e=>e.name||(e.rwy.code==='KGEU'?'Glendale':e.rwy.code==='KLUF'?'Luk
 // the board (and the records key) of an arcade kind
 const arcBoard=k=>k==='daily'?'daily':k==='landing1'?'arc:landing1':k==='apt'?aptBoard(REGION.id):'arc:landing';
 // start a world airport's challenge: in its region at once, from anywhere else after the region switch
-function aptStart(id){if(REGION.id!==id){pickRegion(id,{resume:{arc:'apt',region:id,type:savedType,tod:TOD.id}});return;}arcStart('apt');}
+function aptStart(id){if(REGION.id!==id){pickRegion(id,{resume:{arc:'apt',region:id,type:savedType,tod:TOD.id,wx:wxOf('apt')}});return;}arcStart('apt');}
 // the UTC date, so the daily challenge is the same worldwide and turns over at 00:00 UTC
 function todayKey(){const d=new Date();return d.getUTCFullYear()*10000+(d.getUTCMonth()+1)*100+d.getUTCDate();}
 function dayRng(k){let s=(k*2654435761)>>>0;return ()=>{s=(s+0x6D2B79F5)>>>0;let t=s;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
@@ -14470,8 +14536,12 @@ function dayRng(k){let s=(k*2654435761)>>>0;return ()=>{s=(s+0x6D2B79F5)>>>0;let
 // ARC.dailyKind (tests only, __kgeu.dailyKind) forces the kind.
 function dailySpec(){const r=dayRng(todayKey()),d0=DAILY_REGIONS[Math.floor(r()*DAILY_REGIONS.length)],region=ARC.dailyRegion&&REGIONS[ARC.dailyRegion]?ARC.dailyRegion:d0,T=region==='az'?ARC_TARGETS():[aptEnd(region)];
   const o={region:region,type:DAILY_TYPES[Math.floor(r()*DAILY_TYPES.length)],end:T[Math.floor(r()*T.length)],dist:6500+r()*4000,off:(r()*2-1)*1.3,alt:1800+r()*1600};
-  o.tod=['day','sunset','night'][Math.floor(r()*3)];o.wdir=10*(1+Math.floor(r()*36));o.wkt=2+Math.floor(r()*11);o.day=todayKey();o.wx='clear';
-  o.kind=ARC.dailyKind||(ARC.dailyRegion?'landing':dfDayOf(o.day)?'dogfight':'landing');return o;}
+  o.tod=['day','sunset','night'][Math.floor(r()*3)];o.wdir=10*(1+Math.floor(r()*36));o.wkt=2+Math.floor(r()*11);o.day=todayKey();
+  // weather regions item: the day's weather from the same seed with the region's odds: a thunderstorm 10% of days, else
+  // clear, scattered, overcast, rain or gusty winds, never the haboob or fog (one official attempt, fair for everyone).
+  // Cosmetic to the board: the Worker's daily score rule (server boards.js) does not read it. The daily keeps its own wind.
+  {const u=r();o.wx=u<0.1?'storm':wxPick(wxOdds(region,o.tod),region,(u-0.1)/0.9,['haboob','fog','storm']);}
+  o.kind=ARC.dailyKind||(ARC.dailyRegion?'landing':dfDayOf(o.day)?'dogfight':'landing');if(o.kind==='dogfight')o.wx='clear';return o;}
 // a dogfight day for the Daily challenge (the Worker has the same rule, boards.js dfDay): the UTC day number % 5 === 3
 const dfDayOf=k=>Math.floor(Date.UTC(Math.floor(k/10000),Math.floor(k/100)%100-1,k%100)/864e5)%5===3;
 function placeAir(x,z,aglFt,h,kt){
@@ -14485,7 +14555,7 @@ function arcStart(kind){
   const D=kind==='daily'?dailySpec():null,reg=kind==='apt'?REGION.id:D?D.region:'az';
   if(D&&D.kind==='dogfight'){dfStart({daily:1});return;}   // a dogfight day: the day's seeded fight over the Goldwater Range
   // the arcade is at Glendale and Luke, the daily wherever today's is: from elsewhere switch first, the run starts after the reload
-  if(REGION.id!==reg){pickRegion(reg,{resume:{arc:kind,region:reg,type:savedType,tod:TOD.id}});return;}
+  if(REGION.id!==reg){pickRegion(reg,{resume:{arc:kind,region:reg,type:savedType,tod:TOD.id,wx:wxOf(kind)}});return;}
   const g1=TYPES[savedType]&&TYPES[savedType].minRwy&&REGION.az?RWY_ENDS.find(e=>e.rwy.code==='KPHX'&&e.num==='7L'):RWY_ENDS.find(e=>e.rwy.code==='KGEU'&&e.num==='1');
   // the 1 mile challenge starts lined up on the centre line, on the 3 degree path, at approach speed
   const sp=D?D:kind==='landing1'?{type:savedType,end:g1,dist:1852,off:0,alt:1852*Math.tan(GS)*M2FT,gs:1}
@@ -14497,6 +14567,7 @@ function arcStart(kind){
   // the daily's own time and (weather item 2, for now) clear weather; the player's both come back on the next start()
   if(kind==='daily'){setWX(sp.wx||'clear',{keep:true,noLight:true});setTOD(sp.tod);try{localStorage.setItem('kgeuTOD',keepTod);}catch(e){}ARC.prevTod=keepTod;ARC.prevWX=keepWX;hbSync(true);
     st.windBase=st.windDir=sp.wdir;st.windKt=sp.wkt;st.windPh=0;}
+  else wxFix(kind);   // the landing challenges' fixed weather (WX_FIX)
   const e=sp.end,back=Math.atan2(-Math.sin(e.h),Math.cos(e.h))+sp.off;         // bearing from the threshold out along the approach, swung aside
   const x=e.x+Math.sin(back)*sp.dist,z=e.z-Math.cos(back)*sp.dist,h=Math.atan2(e.x-x,-(e.z-z));
   placeAir(x,z,sp.alt,h,AC.vapp*MS2KT*(sp.gs?1:1.35));st.mode='arcade';A.land=1;A.tko=1;
@@ -14798,11 +14869,11 @@ function dfFall(b,dt){
 function dfStart(o){
   const daily=!!(o&&o.daily);
   // the range is Arizona's: from a world region switch there first, the run starts after the reload
-  if(!REGION.az){pickRegion('az',{resume:{df:1,daily:daily?1:0,region:'az',type:'f16',tod:TOD.id}});return;}
+  if(!REGION.az){pickRegion('az',{resume:{df:1,daily:daily?1:0,region:'az',type:'f16',tod:TOD.id,wx:wxOf('df')}});return;}
   if(!WORLD.ready){toast('Loading '+REGION.city+'…');return;}
   pickType('f16',1);start('runway','luke');RUNSTART={k:'df',daily:daily};wxWindOff();
-  // no haboob over the range: clear weather for this run (weather item 2: the time of day stays), the saved choice comes back on the next start()
-  if(WX.id==='haboob'){ARC.prevWX=ARC.prevWX||{id:WX.id,random:WX.random};setWX('clear',{keep:true});hbSync(true);}
+  // clear weather over the range for this run (WX_FIX; the time of day stays), the saved choice comes back on the next start()
+  wxFix('df');
   dfBuild();
   // in over the range from the Luke side, 7 nm out from the centre, heading in
   const ux=LUKE.x-DF.C.x,uz=LUKE.z-DF.C.z,ul=Math.hypot(ux,uz),x=DF.C.x+ux/ul*13000,z=DF.C.z+uz/ul*13000,h=Math.atan2(DF.C.x-x,-(DF.C.z-z));
@@ -16069,13 +16140,13 @@ function tqClear(){for(const o of TASK.objs){scene.remove(o);o.traverse&&o.trave
 // ---- start, stop, the frame ----
 // id: a tasking; from a world region it switches to Arizona first (the taskings fly around Luke and the White Tanks)
 function taskStart(id,o){const D=TASKS[id];if(!D)return;
-  if(!REGION.az){pickRegion('az',{resume:{task:id,region:'az',type:D.ac,tod:TOD.id}});return;}
+  if(!REGION.az){pickRegion('az',{resume:{task:id,region:'az',type:D.ac,tod:TOD.id,wx:wxOf('task:'+id)}});return;}
   if(!WORLD.ready){toast('Loading '+REGION.city+'…');return;}
   const seed=(o&&o.seed!=null)?o.seed:TASK.test.seed!=null?TASK.test.seed:(Math.random()*4294967296)>>>0;
   pickType(D.ac,1);
   start('runway',D.base||'luke');RUNSTART={k:'task',id:id};wxWindOff();
-  // no haboob for a tasking: the day sky for this run, the saved choice comes back on the next start() (as the dogfight)
-  if(WX.id==='haboob'){ARC.prevWX=ARC.prevWX||{id:WX.id,random:WX.random};setWX('clear',{keep:true});hbSync(true);}
+  // the weather its brief implies for this run (WX_FIX), the saved choice comes back on the next start() (as the dogfight)
+  wxFix('task:'+id);
   Object.assign(TASK,{on:true,id:id,def:D,seed:seed,R:tqRng(seed),si:0,stage:null,t:0,brief:false,ask:null,quiet:null,later:[],done:false,res:null,sens:false,log:[]});
   tqClear();
   const d=TASK.d={id:id,seed:seed,mode:runMode(),t0:0,replies:0,replyT:0,missed:0};
@@ -16151,7 +16222,9 @@ function tqBriefShow(d){const D=TASK.def,B=D.brief(d),ov=$('tkBrief');
   const h=$('tkbT');h.textContent=D.name.toUpperCase();const mt=document.createElement('span');mt.className='modeTag '+runMode();mt.textContent=runMode()==='easy'?'EASY':'HARD';h.appendChild(mt);
   $('tkbAc').textContent=B.ac;$('tkbSit').textContent=B.sit;
   $('tkbSt').innerHTML='';D.stages.forEach((s,i)=>{const li=document.createElement('li');li.innerHTML='<i></i><span></span>';li.firstChild.textContent=String(i+1);li.lastChild.textContent=s.name;$('tkbSt').appendChild(li);});
-  $('tkbF').innerHTML='';B.facts.forEach(f=>{const s=document.createElement('span');s.innerHTML='<b></b><i></i>';s.firstChild.textContent=f[0];s.lastChild.textContent=f[1];$('tkbF').appendChild(s);});
+  // weather regions item: the tasking's fixed weather next to its wind
+  const F=B.facts.some(f=>/^WIND/.test(f[0]))?B.facts.concat([['WEATHER',wxFact(wxOf('task:'+TASK.id))]]):B.facts;
+  $('tkbF').innerHTML='';F.forEach(f=>{const s=document.createElement('span');s.innerHTML='<b></b><i></i>';s.firstChild.textContent=f[0];s.lastChild.textContent=f[1];$('tkbF').appendChild(s);});
   $('tkbHow').textContent=B.how||'Mission Control calls on the radio. Answer with the buttons at the top of the screen.';
   TASK.brief=true;paused=true;pauseOv.classList.remove('on');ov.classList.add('on');
 }
@@ -16727,7 +16800,7 @@ function runRestart(){const R=RUNSTART;
   start(R.mode||'runway',R.base||undefined);}
 function start(mode,base){
   // missions, the strike and the Luke dash are Arizona's for now: from a world region they switch back
-  if(!REGION.az&&(mode==='range'||mode==='drop'||mode==='short'||base==='luke')){pickRegion('az',{resume:{mode:mode,base:base,type:acType,tod:TOD.id}});return;}
+  if(!REGION.az&&(mode==='range'||mode==='drop'||mode==='short'||base==='luke')){pickRegion('az',{resume:{mode:mode,base:base,type:acType,tod:TOD.id,wx:wxOf(mode==='range'&&acType==='a10'?'gunrun':mode)}});return;}
   if(!WORLD.ready){toast('Loading '+REGION.city+'\u2026');return;}
   if(!baseOK(acType,base||SPAWN_BASE)){const hb=HOME(acType);if(!REGION.az){pickRegion('az',{resume:{mode:mode,base:hb,type:acType,tod:TOD.id}});return;}base=hb;SPAWN_BASE=hb;locSel();}
   if(FM.on)fmClose();
@@ -16758,6 +16831,9 @@ function start(mode,base){
   if(mode==='range')strikeStart();
   if(mode==='drop'||mode==='short')missStart(mode==='drop'?'drop':'short');
   if(mode==='drop')dzStart();
+  // the missions' fixed weather (WX_FIX: the drop scattered, the strike range, the gun run and the short field clear),
+  // after hudClear (a lesson's end puts the player's back)
+  if(mode==='range'||mode==='drop'||mode==='short')wxFix(mode==='range'&&acType==='a10'?'gunrun':mode);
   hbSync(true);
   csmRecv();   // the receivers once a flight, here at the tap rather than on its first frame
   if(LB){LB.reset();if(mode==='range'||mode==='drop'||mode==='short')LB.runStart(mode==='range'?(acType==='a10'?'arc:gunrun':'arc:strike'):mode==='drop'?'arc:drop':'mission:short');}
@@ -16788,7 +16864,7 @@ function hudClear(){
   if(window.layoutCtl)layoutCtl();   // the LOOK pad and DROP button go with the mission
 }
 const pauseOv=$('pauseOv');
-function openMenu(scr){GFX.pendingApply();if(BUG&&BUG.askHide)BUG.askHide();if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.forced=null;hudClear();pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
+function openMenu(scr){GFX.pendingApply();if(BUG&&BUG.askHide)BUG.askHide();if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.forced=null;hudClear();wxBack();pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
 // the pause button, P and a backgrounded app all land here; the sheet shows while paused
 // bugs1 item 5: the bug report's screenshot. Going to paused asks for one frame: the render loop copies the WebGL canvas
 // right after its next render, in the same task, so preserveDrawingBuffer stays off and no other frame pays anything.
@@ -17734,10 +17810,10 @@ function startLesson(id,force,o){   // o.brief false: a restart (pause Restart, 
   const L=lessonDef(id);if(L&&L.oral){if(!force&&!lessonOpen(id)){lockSay(id);return;}gradeOv.classList.remove('on');if(!menu.classList.contains('on')||curScr!=='sSchool')openMenu('sSchool');oralStart(id);return;}   // the oral exam: no flight, its sheet on the school screen
   if(!L||!L.fly)return;   // a lesson still to come has no flight yet
   if(!force&&!lessonOpen(id)){lockSay(id);return;}   // locked by the placement (force: a retry, a restart, the tests)
-  if(!REGION.az){pickRegion('az',{resume:{lesson:id,tod:TOD.id}});return;}   // flight school is at Glendale
+  if(!REGION.az){pickRegion('az',{resume:{lesson:id,tod:TOD.id,wx:wxOf('les:'+id)}});return;}   // flight school is at Glendale
   if(id==='first')pickType('cessna',1);else if(acType!==schoolAc)pickType(schoolAc,1);
   const S=SCH[acType];gradeOv.classList.remove('on');
-  start(L.fly.at||'final','kgeu');A.land=1;
+  start(L.fly.at||'final','kgeu');A.land=1;lesWX(id);
   lesEl.classList.toggle('tut',id==='first');$('lesQuit').textContent=id==='first'?'Skip':'End';
   RUNSTART={k:'les',id:id};wxWindOff();LES.on=id;LES.t=0;LES.ph=0;LES.d={};LES.name=L.name;LES.quiz=null;lesT.textContent=id==='first'?'Lesson 1: First flight':L.short||LES.name;   // the lesson's name alone (SLOW FLIGHT); the tutorial keeps its number
   st.ezManFlap=0;navOff();L.fly.start(S,LES.d);
@@ -18563,6 +18639,9 @@ function lesRestore(){if(HOOD.on){HOOD.on=false;document.body.classList.remove('
 // ARC.prevTod (the next start() puts it back: a restart sets night again), LES_TOD for lesRestore
 // weather item 2: no haboob on the night lesson either (it was the old Time row's fourth chip): LES_WX, ARC.prevWX as the tod
 let LES_TOD=null,LES_WX=null;
+// weather regions item: a lesson's fixed weather (WX_FIX: clear, the crosswind lesson's gusty look under lesWind's steady
+// wind); the player's comes back at the lesson's end (lesRestore). The checkride's tasks each take their lesson's.
+function lesWX(id){const p=wxFix('les:'+id);if(p)LES_WX=p;}
 function lesNight(){const k=LES_TOD||TOD.id;
   if(WX.id==='haboob'&&!LES_WX){LES_WX={id:WX.id,random:WX.random};ARC.prevWX=LES_WX;setWX('clear',{keep:true,noLight:true});}
   setTOD('night');try{localStorage.setItem('kgeuTOD',k);}catch(e){}ARC.prevTod=k;LES_TOD=k;hbSync(true);}
@@ -18641,7 +18720,7 @@ function rideTick(dt){RIDE.t+=dt;
 // a task flown as its lesson starts, without the briefing: the same set up as startLesson and lesGo
 function rideRun(i){const id=RIDE.seq[i],L=lessonDef(id);if(!L||!L.fly){rideFinish(true);return;}
   const rr=LB&&LB.E.runs['lesson:ride'];   // the ride's board run outlives each task's start() (LB.reset, a new st)
-  RIDE.i=i;RIDE.gap=0;RIDE.busy=1;bannerWait=true;start(L.fly.at||'final','kgeu');bannerWait=false;RIDE.busy=0;A.land=1;   // start(): a clean flight, the ride kept (RIDE.busy), held pops held
+  RIDE.i=i;RIDE.gap=0;RIDE.busy=1;bannerWait=true;start(L.fly.at||'final','kgeu');bannerWait=false;RIDE.busy=0;A.land=1;lesWX(id);   // start(): a clean flight, the ride kept (RIDE.busy), held pops held
   if(rr){rr.st=st;LB.E.runs['lesson:ride']=rr;}
   const S=SCH[acType];lesEl.classList.remove('tut');$('lesQuit').textContent='End';
   RUNSTART={k:'les',id:'ride'};wxWindOff();LES.on=id;LES.t=0;LES.ph=0;LES.d={};LES.name=L.name;LES.quiz=null;LES.brief=false;LES.last='ride';rideTitle(rideName(id));
@@ -19070,7 +19149,9 @@ function dailyCard(wide){const D=dailySpec(),DI=AC_INFO[D.type];let used=false;t
   if(D.kind==='dogfight')return {id:'daily',lb:'daily',icon:'dogfight',ac:'Daily challenge',here:1,name:'Red Flag Dogfight',
     desc:'Barry M. Goldwater Range, F-16. '+(rookie()?'Easy':'Hard')+' mode, half the score counts. '+tail,go:()=>arcStart('daily')};
   return {id:'daily',lb:'daily',ac:'Daily challenge',here:1,name:endApt(D.end)+', runway '+D.end.num,
-    desc:DI[1]+', '+D.tod+', wind '+String(D.wdir).padStart(3,'0')+' at '+D.wkt+'. '+(used?'Official attempt flown, practice only. ':wide?'Same worldwide. One official attempt. ':'One official attempt. ')+'Next in <i class="cd">'+dailyLeft()+'</i>',go:()=>arcStart('daily')};}
+    desc:DI[1]+', '+D.tod+', '+wxFact(D.wx)+', wind '+String(D.wdir).padStart(3,'0')+' at '+D.wkt+'. '+(used?'Official attempt flown, practice only. ':wide?'Same worldwide. One official attempt. ':'One official attempt. ')+'Next in <i class="cd">'+dailyLeft()+'</i>',go:()=>arcStart('daily')};}
+// a weather as a fact: its icon and name (the daily card, the tasking brief's WEATHER)
+const wxFact=id=>{const W=WX_SET[id]||WX_SET.clear;return W.icon+'\u00a0'+W.name;};
 function dailyLeft(){const n=Date.now(),d=new Date(n),nx=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()+1),s=Math.max(0,Math.floor((nx-n)/1000));
   return Math.floor(s/3600)+':'+String(Math.floor(s/60)%60).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
 setInterval(()=>{if(!menu.classList.contains('on')||curScr!=='sArc')return;const t=dailyLeft();document.querySelectorAll('.mcard .cd').forEach(e=>e.textContent=t);},1000);
@@ -23149,7 +23230,7 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
     return out;},
   cloudMat:()=>({color:CLD.U.uTop.value.getHex(),emissive:CLD.U.uBase.value.getHex()}),   // weather item 1: the tops and the base
   // graphics item 6: the cloud preset (setClouds(null) hands it back to the per flight pick), the cascades and the air
-  setClouds:p=>{CLOUDS.forced=/^(clear|scattered|monsoon|overcast|rain|storm|fog|torn|haboob)$/.test(p)?p:null;cloudsAuto();return CLOUDS.preset;},
+  setClouds:p=>{CLOUDS.forced=/^(clear|scattered|monsoon|overcast|rain|storm|fog|torn|haboob|shower)$/.test(p)?p:null;cloudsAuto();return CLOUDS.preset;},
   clouds:()=>({preset:CLOUDS.preset,forced:CLOUDS.forced,visible:!!(CLOUD_MESH&&CLOUD_MESH.visible),hd:CLOUDS.hd,
     cb:CLOUDS.cb,cells:CLD.cells,inside:CLD.inside,tris:CLOUDS.tris,puffs:CLOUD_MESH?CLOUD_MESH.count:0,pick:(t,k)=>cloudsPick(t,k)}),
   cld:()=>({puffs:CLD.n,cells:CLD.cells,inside:CLD.inside,base:CLD.base,tier:CLD.tier,sorted:CLD.sorts,drift:[CLD.drift.x,CLD.drift.z],ell:CLD.nE,dirty:CLD.dirty}),
@@ -23181,7 +23262,7 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
   RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,ticker:()=>{const e=document.getElementById('tk'),c=document.getElementById('tkCtl');return {on:e.classList.contains('on'),paused:e.classList.contains('paused'),anim:getComputedStyle(document.getElementById('tkT')).animationName,scroll:e.classList.contains('scroll'),open:c.classList.contains('on'),text:e.querySelector('#tkT i').textContent,vis:e.offsetParent!==null&&getComputedStyle(e).display!=='none',ctlVis:c.offsetParent!==null};},tickerForce:n=>{TK.force=n||null;tkUI();},tickerOpen:()=>tkOpen(),tickerClose:()=>{TK.open=false;tkUI();},musicTick:musicTick,MUSIC:MUSIC,actx:()=>actx,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,VQ:VQ,vqLog:clear=>{const r=VQ.log.map(e=>Object.assign({},e));if(clear)VQ.log.length=0;return r;},vqAdd:(who,kind,text,clips,o)=>vqAdd(L(who,kind,text,clips),o),coach2:coach2,chatNow:()=>chatNow(),atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),bannerShow:(k,t)=>bannerShow(k,t),badgeHide:()=>badgeHide(),auto:()=>autoSmart(),mission:k=>{if(k==='gunrun'){pickType('a10',1);start('range');return;}pickType(k==='range'?'reaper':'c130',1);start(k);},HOG:HOG,strikeScore:()=>strikeScore(),CRASH_FX:CRASH_FX,baseOK:baseOK,rwyLenOf:rwyLenOf,FD:FD,BASES:BASES,setThr:setThr,setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
-  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day,kind:d.kind}},dfDayOf:k=>dfDayOf(k),aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,NAV:NV,navPlan:navPlan,DIV:DIV,divSet:divSet,LES:LES,events:events,rwyFrame:()=>({thr:THR01,rh:RH*180/Math.PI,aim:AIM,field:FIELD_FT,gear:GEAR}),grSite:()=>grSite(),lesObjs:()=>LES_OBJ.map(o=>({name:o.name,type:o.geometry&&o.geometry.type,tri:o.geometry?(o.geometry.index?o.geometry.index.count:o.geometry.attributes.position.count)/3:0,col:o.material&&o.material.color&&o.material.color.getHex(),x:o.position.x,z:o.position.z,inScene:!!o.parent})),get lesBrief(){return {on:!!LES.brief,slide:BR.slide,quiz:LES.quiz};},lesBriefNext:()=>brNextTap(),lesBriefSkip:lesBriefSkip,lesBriefBack:lesBriefBack,lesBriefAnswer:k=>brAnswer(k),get ORAL(){return OR.draw;},ORAL_Q:ORAL_Q,oralSeed:oralSeed,rideSeed:rideSeed,rideDraw:rideDraw,rideName:rideName,get RIDE(){return RIDE;},certGet:certGet,dpe:dpe,oralStart:oralStart,oralAnswer:oralAnswer,oralNext:oralNext,get oral(){return {on:orOv.classList.contains('on'),n:OR.n,ans:OR.ans,right:OR.right,res:OR.res};},get G(){return G;},gBegin:gBegin,gHold:gHold,gHoldEnd:gHoldEnd,gTick:gTick,gRange:gRange,gEvent:gEvent,gEnd:gEnd,dbTip:dbTip,dbSay:dbSay,cfi:cfi,cfiCue:cfiCue,cfiSp:cfiSp,cfiVoice:cfiVoice,endorsements:endorsements,get LOGB(){return LOGB;},logbookAdd:logbookAdd,logSummary:logSummary,tqAnswer:tqAnswer,ezSet:ezSet,SCHOOL:SCHOOL,get PLACE(){return PLACE;},setPlace:(l,h)=>{setPlace(l,h);if(curScr==='sSchool')schoolList(true);},lessonOpen:lessonOpen,stageOpen:stageOpen,get schSel(){return SCH_SEL;},schSelect:schSelect,lessonDef:lessonDef,stageOf:stageOf,tolOf:tolOf,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,wx:WX.id,wxRandom:WX.random,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day,kind:d.kind,wx:d.wx}},wxOf:wxOf,wxFirst:wxFirst,WX_FIX:WX_FIX,wxShowers:()=>CLD.shw.slice(),dfDayOf:k=>dfDayOf(k),aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,NAV:NV,navPlan:navPlan,DIV:DIV,divSet:divSet,LES:LES,events:events,rwyFrame:()=>({thr:THR01,rh:RH*180/Math.PI,aim:AIM,field:FIELD_FT,gear:GEAR}),grSite:()=>grSite(),lesObjs:()=>LES_OBJ.map(o=>({name:o.name,type:o.geometry&&o.geometry.type,tri:o.geometry?(o.geometry.index?o.geometry.index.count:o.geometry.attributes.position.count)/3:0,col:o.material&&o.material.color&&o.material.color.getHex(),x:o.position.x,z:o.position.z,inScene:!!o.parent})),get lesBrief(){return {on:!!LES.brief,slide:BR.slide,quiz:LES.quiz};},lesBriefNext:()=>brNextTap(),lesBriefSkip:lesBriefSkip,lesBriefBack:lesBriefBack,lesBriefAnswer:k=>brAnswer(k),get ORAL(){return OR.draw;},ORAL_Q:ORAL_Q,oralSeed:oralSeed,rideSeed:rideSeed,rideDraw:rideDraw,rideName:rideName,get RIDE(){return RIDE;},certGet:certGet,dpe:dpe,oralStart:oralStart,oralAnswer:oralAnswer,oralNext:oralNext,get oral(){return {on:orOv.classList.contains('on'),n:OR.n,ans:OR.ans,right:OR.right,res:OR.res};},get G(){return G;},gBegin:gBegin,gHold:gHold,gHoldEnd:gHoldEnd,gTick:gTick,gRange:gRange,gEvent:gEvent,gEnd:gEnd,dbTip:dbTip,dbSay:dbSay,cfi:cfi,cfiCue:cfiCue,cfiSp:cfiSp,cfiVoice:cfiVoice,endorsements:endorsements,get LOGB(){return LOGB;},logbookAdd:logbookAdd,logSummary:logSummary,tqAnswer:tqAnswer,ezSet:ezSet,SCHOOL:SCHOOL,get PLACE(){return PLACE;},setPlace:(l,h)=>{setPlace(l,h);if(curScr==='sSchool')schoolList(true);},lessonOpen:lessonOpen,stageOpen:stageOpen,get schSel(){return SCH_SEL;},schSelect:schSelect,lessonDef:lessonDef,stageOf:stageOf,tolOf:tolOf,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,wx:WX.id,wxRandom:WX.random,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   // @OhRabah easter eggs (3.10): where each one is, whether its lights are on, and the tow banner
   eggs:()=>EGG.list.map(o=>{const p=o.getWorldPosition(new V3()),r={name:o.name,x:p.x,y:p.y,z:p.z,ry:o.rotation.y,lit:(o.name==='egg_billboard'||o.name==='egg_rooftop')&&EGG.lit,visible:o.visible};
     if(o.name==='egg_tow'){const b=EGG.tow.ban.getWorldPosition(new V3()),f=new V3(0,0,-1).applyQuaternion(o.quaternion);r.banner={x:b.x,y:b.y,z:b.z};r.fwd=[f.x,f.y,f.z];}return r;}),
@@ -23259,11 +23340,17 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
   starField.visible=false;starField.renderOrder=-1;scene.add(starField);
 })();
 // the time of day and (weather item 2) the weather; an old install's Haboob time (kgeuTOD 'haboob') reads as Day with the
-// haboob weather, both saved back
-(function(){let t='day',w='scattered',r=false;try{const v=localStorage.getItem('kgeuTOD'),x=localStorage.getItem('kgeuWX');
+// haboob weather, both saved back. Weather regions item: the region's own saved weather (kgeuWX_<region>; Arizona falls
+// back to kgeuWX, an install from before it); a world region's first visit rolls one (wxFirst), saved as its own, the
+// Random setting carried over
+(function(){let t='day',w='scattered',r=false,first=false;try{const v=localStorage.getItem('kgeuTOD'),R=REGION_ID,x=localStorage.getItem('kgeuWX_'+R)||(REGION.az?localStorage.getItem('kgeuWX'):null);
   if(v==='haboob'){w='haboob';localStorage.setItem('kgeuWX','haboob');localStorage.setItem('kgeuWXR','0');localStorage.setItem('kgeuTOD','day');}
-  else{if(v&&TOD_SET[v])t=v;if(x&&WX_SET[x])w=x;r=localStorage.getItem('kgeuWXR')==='1';}}catch(e){}
-  setWX(w,{random:r,noLight:true});setTOD(t);})();
+  else{if(v&&TOD_SET[v])t=v;const rr=localStorage.getItem('kgeuWXR_'+R);r=(rr!==null?rr:localStorage.getItem('kgeuWXR'))==='1';
+    if(x&&WX_SET[x])w=x;else if(!REGION.az){w=wxFirst(R,t);first=true;}}}catch(e){}
+  // the first visit's roll saved as the region's own only (kgeuWX stays Arizona's fallback)
+  setWX(w,{random:r,noLight:true,keep:first});
+  if(first)try{localStorage.setItem('kgeuWX_'+REGION_ID,WX.id);localStorage.setItem('kgeuWXR_'+REGION_ID,r?'1':'0');}catch(e){}
+  setTOD(t);})();
 window.__kgeu.dailyRegion=id=>{ARC.dailyRegion=id||null;return dailySpec().region;};window.__kgeu.dailyKind=k=>{ARC.dailyKind=k==='dogfight'||k==='landing'?k:null;return dailySpec().kind;};window.__kgeu.TFC=TFC;window.__kgeu.tfcList=tfcList;window.__kgeu.tfcSpawn=tfcSpawn;window.__kgeu.tfcClear=tfcClear;
 window.__kgeu.TCAS={levels:tcasLevels,state:()=>({ta:TCAS.list.some(o=>tcasLvl(o)>=2),ra:!!TCAS.ra,sense:TCAS.ra?(TCAS.sense>0?'climb':'descend'):null,clear:TCAS.clear,inhibit:TCAS.inhibit,
   shown:TCAS.shown,on:TCAS.on,raT:TCAS.raT}),tcasConflict:tcasConflict,setTcas:setTcas,T:TCAS,tcasVoiceLog:TCAS.voiceLog};
@@ -23484,7 +23571,11 @@ worldLoad();
 (function(){let r=null;try{r=JSON.parse(sessionStorage.getItem('kgeuResume')||'null');sessionStorage.removeItem('kgeuResume');}catch(e){}
   if(!r)return;
   const go=()=>{const sp=$('splash');if(!WORLD.ready||(sp&&!sp.classList.contains('done'))){if(!WORLD.err)setTimeout(go,200);return;}
-    if(r.start){const S=r.start;if(S.skill&&S.skill!==SKILL)setSkill(S.skill);if(S.tod&&TOD_SET[S.tod])todLegacy(S.tod);
+    if(r.start){const S=r.start;if(S.skill&&S.skill!==SKILL)setSkill(S.skill);
+      // weather regions item: a run's fixed weather (the daily's, a challenge's) before its light; the region's own
+      // weather stashed to come back after it. A free flight keeps the region's own (saved per region, or rolled)
+      if(S.wx&&WX_SET[S.wx]&&S.mode!=='free'){ARC.prevWX=ARC.prevWX||{id:WX.id,random:WX.random};setWX(S.wx,{keep:true,noLight:true});if(!S.tod)setTOD(TOD.id);}
+      if(S.tod&&TOD_SET[S.tod])todLegacy(S.tod);
       if(S.df)dfStart(S.daily?{daily:1}:null);
       else if(S.task)taskStart(S.task);
       else if(S.arc){if(S.type&&TYPES[S.type])pickType(S.type);arcStart(S.arc);}
