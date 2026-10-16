@@ -36,11 +36,11 @@ async def main():
 
         s0 = await enter('reaper')
         # the overlay
-        hud = await pg.evaluate("()=>['shTL','shTR','shBL','shBR'].map(i=>document.getElementById(i).textContent)")
-        ok('overlay: mode and field of view top left', hud[0].startswith('DAY TV') and 'WFOV' in hud[0], hud[0])
-        ok('overlay: camera bearing, side of the nose and EL top right', hud[1].startswith('CAM ') and '°T  ' in hud[1] and ' EL ' in hud[1], hud[1])
-        ok('overlay: ALT and HDG bottom left', hud[2].startswith('ALT ') and 'HDG ' in hud[2], hud[2])
-        ok('overlay: AUTOPILOT tag bottom right', hud[3] == 'AUTOPILOT', hud[3])
+        # sensor item 4: the symbology (tests/sensor_overlay_check.py checks every value)
+        hud = await pg.evaluate("()=>['shTL','shTR','shTgt'].map(i=>document.getElementById(i).textContent)")
+        ok('overlay: sensor and field of view top left', hud[0].startswith('DTV') and 'WFOV' in hud[0], hud[0])
+        ok('overlay: UTC, AZ / EL / DEP and the laser top right', hud[1].endswith('Z\nAZ R000 EL -34 DEP 34\nLSR SAFE  CODE 1688') or (' EL ' in hud[1] and 'DEP' in hud[1] and 'LSR SAFE' in hud[1]), hud[1])
+        ok('overlay: point of interest and the aircraft (ALT, HDG) under the map', 'MGRS' not in hud[2] and '12S ' in hud[2] and 'ALT ' in hud[2] and 'HDG ' in hud[2], hud[2])
         ok('flight cards step aside in the ball view', not await pg.is_visible('#hud'))
         vis = await pg.evaluate("()=>['bMode','bZoom','bLock','bFire','bGear','bBrake'].filter(i=>{const e=document.getElementById(i);return e.offsetParent!==null})")
         ok('MODE, ZOOM and LOCK shown; FIRE, GEAR and BRAKE not', vis == ['bMode', 'bZoom', 'bLock'], vis)
@@ -143,7 +143,7 @@ async def main():
         for _ in range(6): await click(pg, '#bZoom')
         z = await sensor(pg); zl = await pg.inner_text('#fovInd')
         ok('Easy: five zoom steps, WFOV to NFOV, named 5 of 5', z['zoomIdx'] == 4 and z['fov'] == 0.47 and zl == '5 of 5', (z['zoomIdx'], zl))
-        bl = await pg.inner_text('#shBL')
+        bl = await pg.inner_text('#shTgt')
         ok('Rookie overlay uses feet and compass words', ' ft' in bl and 'HDG ' in bl, bl)
 
         ok('no page errors', not pg.errs, pg.errs[:3])

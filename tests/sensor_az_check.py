@@ -1,6 +1,6 @@
 # Sensor ball azimuth (Phone2 5): in the MQ-9 ball view the mini map shows a cone from the
 # aircraft in the camera's look direction, and #shTR reads the true bearing plus left/right
-# of the nose (Hard: CAM 237°T  R045  EL -30, Easy: plain words over three lines). Both
+# of the nose (Hard, sensor item 4: AZ R045 EL -30 DEP 22 under the UTC line; Easy: plain words over three lines). Both
 # follow a slew, a zoom and a lock; the cone goes away with the ball view. The readout must
 # not sit on the map, shTL, the pause button or any button at 568x320, 667x375, 844x390
 # and portrait 390x844. Screenshots (day, night, haboob at 844x390, day at 568x320) go to
@@ -58,8 +58,7 @@ async def main():
         # sensor item 2: the ball is inertially held and its azimuth is against the airframe (banked in the orbit), so the
         # bearing is the line of sight's own, within a degree or two of heading + 45 after one frame
         lb = await pg.evaluate(f"()=>{{const L={K}.SENSOR.los;return ((Math.atan2(L.x,-L.z)*180/Math.PI)%360+360)%360;}}")
-        ok('az +45: readout shows the true bearing of the line of sight', tr.startswith(f'CAM {round(lb) % 360:03d}°T'), f'{tr!r} hdg {h:.1f} los {lb:.1f}')
-        ok('az +45: readout shows R045 and EL', '  R045  EL -' in tr, repr(tr))
+        ok('az +45: readout shows R045, EL and DEP', '\nAZ R045 EL -' in tr and ' DEP ' in tr, repr(tr))
         ok('az +45: cone on, rel 45', c['on'] and abs(c['rel']-45) < 1.5, c)
         ok('az +45: cone bearing is the line of sight bearing', abs(((c['brgT']-lb) + 180) % 360 - 180) < 0.2, (c, lb))
         ok('cone half angle is FOV/2 (at least 4)', c['half'] == max(4, fov/2), f"{c['half']} fov {fov}")
