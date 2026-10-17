@@ -194,9 +194,9 @@ async def fly_size(b, url, W, H):
         await pg.screenshot(path=p, clip={'x': r[0], 'y': r[1], 'width': r[2], 'height': r[3]})
         print(p)
         # xc_final: short final to Sky Harbor 7L, about 1 nm out, 400 ft AGL, chase, body.appr
-        tx, tz = await pg.evaluate("()=>{const K=window.__kgeu;return [K.shX(-1751-1852,-300),K.shZ(-1751-1852,-300)]}")
+        tx, tz = await pg.evaluate("()=>{const K=window.__kgeu;return [K.shX(-1442.5-1852,361),K.shZ(-1442.5-1852,361)]}")
         await pg.evaluate(f"()=>{{{K}.LES.ph=3}}")
-        await fly(pg, 30, x=tx, z=tz, agl=400, kt=65, vs=-500, hdg=92)
+        await fly(pg, 30, x=tx, z=tz, agl=400, kt=65, vs=-500, hdg=90)
         appr = await pg.evaluate("()=>document.body.classList.contains('appr')")
         print('  xc_final state appr', appr)
         await shot(pg, 'xc_final_844x390.png')
@@ -221,11 +221,11 @@ async def debrief_size(b, url, W, H):
         for i in range(start_leg, 4):
             await fly_leg(pg, i, 3500)
         # Sky Harbor runway 7L: a touchdown 300 m past the threshold, then a stop
-        tx, tz = await pg.evaluate("()=>{const K=window.__kgeu;return [K.shX(-1751+300,-300),K.shZ(-1751+300,-300)]}")
-        await fly(pg, 2, x=tx, z=tz, agl=20, kt=62, vs=-200, hdg=92)
+        tx, tz = await pg.evaluate("()=>{const K=window.__kgeu;return [K.shX(-1442.5+300,361),K.shZ(-1442.5+300,361)]}")
+        await fly(pg, 2, x=tx, z=tz, agl=20, kt=62, vs=-200, hdg=90)
         await pg.evaluate(f"([x,z])=>{{const K={K};K.events.push({{type:'touchdown',fpm:180,paved:K.isPaved(x,z),x:x,z:z,ias:33,bank:0}})}}", [tx, tz])
-        await fly(pg, 2, agl=10, kt=55, vs=-100, hdg=92)
-        sx, sz = await pg.evaluate("()=>{const K=window.__kgeu;return [K.shX(-1751+900,-300),K.shZ(-1751+900,-300)]}")
+        await fly(pg, 2, agl=10, kt=55, vs=-100, hdg=90)
+        sx, sz = await pg.evaluate("()=>{const K=window.__kgeu;return [K.shX(-1442.5+900,361),K.shZ(-1442.5+900,361)]}")
         await pg.evaluate(f"""([x,z])=>{{const K={K};for(let i=0;i<30&&K.LES.on;i++){{const s=K.state();s.pos.set(x,K.groundHeight(x,z)+K.rwyFrame().gear,z);s.vel.set(0,0,0);s.w.set(0,0,0);s.onGround=true;s.throttle=0;K.stepFrame(0.1,false,true);}}
           K.stepFrame(0,true);}}""", [sx, sz])
         # the climb out home
@@ -277,9 +277,9 @@ async def measure_final844(b, url):
     await start(pg, 'pilotage')
     F = await rwy(pg)
     await call(pg)
-    tx, tz = await pg.evaluate("()=>{const K=window.__kgeu;return [K.shX(-1751-1852,-300),K.shZ(-1751-1852,-300)]}")
+    tx, tz = await pg.evaluate("()=>{const K=window.__kgeu;return [K.shX(-1442.5-1852,361),K.shZ(-1442.5-1852,361)]}")
     await pg.evaluate(f"()=>{{{K}.LES.ph=3}}")
-    await fly(pg, 30, x=tx, z=tz, agl=400, kt=65, vs=-500, hdg=92)
+    await fly(pg, 30, x=tx, z=tz, agl=400, kt=65, vs=-500, hdg=90)
     appr = await pg.evaluate("()=>document.body.classList.contains('appr')")
     bad = await pg.evaluate(CENTRE)
     print('MEASURE final844 appr', appr, 'centre-third-hits', bad)
@@ -537,11 +537,11 @@ async def solo_fly_full(pg):
     for i in range(start_leg, 4):
         await fly_leg(pg, i, 3500)
     # Sky Harbor runway 7L: a touchdown 300 m past the threshold, then a stop
-    tx, tz = await pg.evaluate("()=>{const K=window.__kgeu;return [K.shX(-1751+300,-300),K.shZ(-1751+300,-300)]}")
-    await fly(pg, 2, x=tx, z=tz, agl=20, kt=62, vs=-200, hdg=92)
+    tx, tz = await pg.evaluate("()=>{const K=window.__kgeu;return [K.shX(-1442.5+300,361),K.shZ(-1442.5+300,361)]}")
+    await fly(pg, 2, x=tx, z=tz, agl=20, kt=62, vs=-200, hdg=90)
     await pg.evaluate(f"([x,z])=>{{const K={K};K.events.push({{type:'touchdown',fpm:180,paved:K.isPaved(x,z),x:x,z:z,ias:33,bank:0}})}}", [tx, tz])
-    await fly(pg, 2, agl=10, kt=55, vs=-100, hdg=92)
-    sx, sz = await pg.evaluate("()=>{const K=window.__kgeu;return [K.shX(-1751+900,-300),K.shZ(-1751+900,-300)]}")
+    await fly(pg, 2, agl=10, kt=55, vs=-100, hdg=90)
+    sx, sz = await pg.evaluate("()=>{const K=window.__kgeu;return [K.shX(-1442.5+900,361),K.shZ(-1442.5+900,361)]}")
     await pg.evaluate(f"""([x,z])=>{{const K={K};for(let i=0;i<30&&K.LES.on;i++){{const s=K.state();s.pos.set(x,K.groundHeight(x,z)+K.rwyFrame().gear,z);s.vel.set(0,0,0);s.w.set(0,0,0);s.onGround=true;s.throttle=0;K.stepFrame(0.1,false,true);}}
       K.stepFrame(0,true);}}""", [sx, sz])
     # the climb out home

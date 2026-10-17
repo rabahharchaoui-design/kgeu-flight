@@ -87,11 +87,11 @@ async def main():
         ok('(b) bravo passed', bv and bv['ok'], bv)
         radio = [l['text'] for l in await pg.evaluate(f"()=>{K}.radioLog()")]
         ok('(b) Approach still talks: cleared into the Class Bravo airspace', any('cleared into the Class Bravo airspace' in t for t in radio), radio[-8:])
-        tx, tz = await pg.evaluate("()=>{const K=window.__kgeu;return [K.shX(-1751+300,-300),K.shZ(-1751+300,-300)]}")
-        await fly(pg, 2, x=tx, z=tz, agl=20, kt=62, vs=-200, hdg=92)
+        tx, tz = await pg.evaluate("()=>{const K=window.__kgeu;return [K.shX(-1442.5+300,361),K.shZ(-1442.5+300,361)]}")
+        await fly(pg, 2, x=tx, z=tz, agl=20, kt=62, vs=-200, hdg=90)
         await pg.evaluate(f"([x,z])=>{{const K={K};K.events.push({{type:'touchdown',fpm:180,paved:K.isPaved(x,z),x:x,z:z,ias:33,bank:0}})}}", [tx, tz])
-        await fly(pg, 2, agl=10, kt=55, vs=-100, hdg=92)
-        sx, sz = await pg.evaluate("()=>{const K=window.__kgeu;return [K.shX(-1751+900,-300),K.shZ(-1751+900,-300)]}")
+        await fly(pg, 2, agl=10, kt=55, vs=-100, hdg=90)
+        sx, sz = await pg.evaluate("()=>{const K=window.__kgeu;return [K.shX(-1442.5+900,361),K.shZ(-1442.5+900,361)]}")
         r = await pg.evaluate(f"""([x,z])=>{{const K={K};for(let i=0;i<30&&K.LES.on;i++){{const s=K.state();s.pos.set(x,K.groundHeight(x,z)+K.rwyFrame().gear,z);s.vel.set(0,0,0);s.w.set(0,0,0);s.onGround=true;s.throttle=0;K.stepFrame(0.1,false,true);}}
           K.stepFrame(0,true);return {{on:K.LES.on,ph:K.LES.ph,leg:K.NAV.leg,i:document.getElementById('lesI').textContent}}}}""", [sx, sz])
         ok('(b) stopped at Sky Harbor: phase 4, the card says what to do, no welcome', r['on'] == 'soloxc' and r['ph'] == 4 and r['leg'] == 4 and '4,500' in r['i'], r)

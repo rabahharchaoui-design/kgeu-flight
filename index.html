@@ -2731,10 +2731,15 @@ function fbm(x,z,o){let s=0,a=0.5,f=1,n=0;for(let i=0;i<o;i++){s+=a*vnoise(x*f+i
 // every coordinate of the region's JSON (ARP at 0,0) moved by WOFF so that pavement start is world 0,0.
 // RWY_LEN is then the measured length between the two pavement ends (the published one can be 2%
 // off the surveyed ends), THR01 its displaced threshold, THR19 the far end's.
+// runways 2: the OurAirports end points are 2 percent off the published length on Haneda 16R/34L (3,060 m for 3,000)
+// and on both Santos Dumont runways; OSM's pavement agrees with the published lengths. So every region runway is the
+// published length (r[2]) along its surveyed centre line, about the surveyed midpoint: rwEnds, used for the home frame,
+// RUNWAYS and the terrain's runway segments alike.
+function rwEnds(r){const ex=r[7]-r[4],ez=r[8]-r[5],k=(r[2]/Math.hypot(ex,ez)-1)/2;return [r[4]-ex*k,r[5]-ez*k,r[7]+ex*k,r[8]+ez*k];}
 const HM=(function(){
   if(REGION.az)return {h:26*Math.PI/180,len:2179,wid:30.5,t1:213.7,t2:305.1,woff:[0,0]};
-  for(const r of REGION.rw){const lo=r[0]===REGION.main;if(!lo&&r[1]!==REGION.main)continue;
-    const hx=lo?r[4]:r[7],hz=lo?r[5]:r[8],ox=lo?r[7]:r[4],oz=lo?r[8]:r[5];
+  for(const r of REGION.rw){const lo=r[0]===REGION.main;if(!lo&&r[1]!==REGION.main)continue;const E=rwEnds(r);
+    const hx=lo?E[0]:E[2],hz=lo?E[1]:E[3],ox=lo?E[2]:E[0],oz=lo?E[3]:E[1];
     return {h:Math.atan2(ox-hx,-(oz-hz)),len:Math.hypot(ox-hx,oz-hz),wid:r[3],t1:lo?r[6]:r[9],t2:lo?r[9]:r[6],woff:[hx,hz]};}
 })();
 const WOFF=HM.woff,HOME_RWY=REGION.az?'1':REGION.main;
@@ -2751,8 +2756,12 @@ const RANGE={x:-13400,z:14400,r:820,road:640};
 // from KGEU, and runway 03 is magnetic 030.6, so 042.6 true on a 12 degree east
 // variation. tests/luke_check.js checks all of that against the real numbers.
 const LUKE={x:-7679,z:-1855,h:42.6*Math.PI/180};
-const LUKE_RWY=[{v:-152.5,len:3021,lo:'03L',hi:'21R'},    // 9,910 ft
-                {v: 152.5,len:3052,lo:'03R',hi:'21L'}];   // 10,012 ft
+// runways 2: lengths from the FAA 5010 (OurAirports agrees), 150 ft wide (46 m). The two are staggered: from the OSM
+// runway ways through geoW (tools/build_az_airports.py) 03R's pavement starts 838 m further northeast than 03L's,
+// 303 m to its right. u0 is each runway's pavement centre along the Luke frame, v its centre line.
+// Lights (item 4): ALSF1 on 21L only (03L, 21R and 03R have no approach lights); 4-light PAPI on the left of all four ends.
+const LUKE_RWY=[{u0:-407,v:-177,len:3048,lo:'03L',hi:'21R'},    // 10,000 ft
+                {u0: 431,v: 126,len:3021,lo:'03R',hi:'21L'}];   //  9,912 ft
 // C-130 mission area, open desert 12.7 km due west of KGEU and 4.8 km beyond Luke.
 // The two sections under it are forced to desert in the West Valley generator, the
 // same way Luke, the river and the stadium claim theirs.
@@ -2765,13 +2774,27 @@ function lzZ(u,v){return LZ.z-LZc*u+LZs*v;}
 function lukeUV(x,z){const dx=x-LUKE.x,dz=z-LUKE.z,s=Math.sin(LUKE.h),c=Math.cos(LUKE.h);return [dx*s-dz*c,dx*c+dz*s];}
 // Sky Harbor, 28.6 km east southeast. Placed from the published ARP the same way
 // Luke is: KPHX is at 33.4343 N, 112.0116 W against KGEU at 33.52683, -112.29517.
-const SKY_HARBOR={x:26795,z:9287,h:92*Math.PI/180};
+// runways 2: the runways are aligned 090/270 true (FAA 5010, OurAirports 90.0 and 90.1)
+const SKY_HARBOR={x:26795,z:9287,h:90*Math.PI/180};
 const SHs=Math.sin(SKY_HARBOR.h),SHc=Math.cos(SKY_HARBOR.h);
 const shX=(u,v)=>SKY_HARBOR.x+SHs*u+SHc*v, shZ=(u,v)=>SKY_HARBOR.z-SHc*u+SHs*v;
 function shUV(x,z){const dx=x-SKY_HARBOR.x,dz=z-SKY_HARBOR.z;return [dx*SHs-dz*SHc, dx*SHc+dz*SHs];}
-const SH_RWY=[{v:-300,len:3502,lo:'07L',hi:'25R'},   // 11,489 ft
-              {v:   0,len:2377,lo:'07R',hi:'25L'},   //  7,800 ft
-              {v: 330,len:3140,lo:'08', hi:'26' }];  // 10,300 ft
+// runways 2: 8/26 is the north runway, 7L/25R and 7R/25L the close pair on the south side, the terminals between
+// 8/26 and 7L/25R. u0 the pavement centre along the frame, v the centre line (south positive), from the OSM runway ways
+// through geoW (tools/build_az_airports.py); lengths and the displaced threshold (thrLo, metres) from the FAA 5010.
+// Lights (item 4): 8 MALSF, 26 MALSF and REIL, 7L, 25R, 7R and 25L MALSR; 4-light PAPI on the left of all six ends;
+// HIRL; no centre line or touchdown zone lights.
+const SH_RWY=[{u0: 127,v: 361,len:3139,lo:'07L',hi:'25R',thrLo:0,  thrHi:0},   // 10,300 ft
+              {u0:-253,v: 604,len:2377,lo:'07R',hi:'25L',thrLo:0,  thrHi:0},   //  7,800 ft
+              {u0:  57,v:-726,len:3502,lo:'08', hi:'26', thrLo:274,thrHi:0}];  // 11,489 ft, 08 displaced 898 ft
+// Sky Harbor's drawn pavement (shared by isPaved and the builder), rectangles [u0,u1,v0,v1] in the frame above, picked
+// off assets/world/az_apt.json: taxiway E north of 7L/25R (v 235) and taxiway B south of 8/26 (v -604), their links to
+// the runway pavement (at the ends and where the airliner traffic turns off and lines up), and the terminal aprons:
+// the south apron (Terminal 3 and 4 south ramps down to taxiway E) and the north apron (the north ramps, the hold bays
+// and taxiway C up to taxiway B)
+const SH_TWY=[[-1450,1700,223,247],[-1700,1810,-616,-592]];
+const SH_LINK=[[-1402,247,338],[0,247,338],[1656,247,338],[-1680,-703,-616],[-217,-703,-616],[605,-703,-616],[1790,-703,-616]];   // [u, v0, v1], 30 m wide
+const SH_APRON=[[-700,1760,-140,223],[-600,1760,-592,-140]];
 function riverX(z){return REGION.az?1400+170*Math.sin(z/2300)+70*Math.sin(z/640+1.3):1e9;}
 function rangeH(x,z,cx,cz,ax,az,rot,h,seed){
   const dx=x-cx,dz=z-cz,c=Math.cos(rot),s=Math.sin(rot);
@@ -2822,7 +2845,7 @@ function terrZoneD(x,z){
 }
 function terrSet(d,hAbs,wat){
   const T=d.terrain,W=T.w,H=T.h,c=T.cell,ox=T.x0-WOFF[0],oz=T.z0-WOFF[1],mv=p=>[p[0]-WOFF[0],p[1]-WOFF[1]];
-  TERR.segs=REGION.rw.map(r=>[r[4]-WOFF[0],r[5]-WOFF[1],r[7]-WOFF[0],r[8]-WOFF[1]]);
+  TERR.segs=REGION.rw.map(r=>{const E=rwEnds(r);return [E[0]-WOFF[0],E[1]-WOFF[1],E[2]-WOFF[0],E[3]-WOFF[1]];});
   TERR.aero=(d.aerodrome||[]).map(mv);
   {const A=TERR.aero,b=[1e9,1e9,-1e9,-1e9];for(const p of A){b[0]=Math.min(b[0],p[0]);b[1]=Math.min(b[1],p[1]);b[2]=Math.max(b[2],p[0]);b[3]=Math.max(b[3],p[1]);}TERR.aeroB=b;}
   // the box the flat zone and its blend can reach
@@ -2904,17 +2927,17 @@ function isPaved(x,z){
   if(u>=640&&u<=1600&&v>=-442&&v<=-122) return true;
   if(((u>=170&&u<=640)||(u>=1600&&u<=2090))&&v>=-392&&v<=-122) return true;
   const L=lukeUV(x,z);
-  for(const r of LUKE_RWY) if(Math.abs(L[0])<=r.len/2&&Math.abs(L[1]-r.v)<=25) return true;
+  for(const r of LUKE_RWY) if(Math.abs(L[0]-r.u0)<=r.len/2&&Math.abs(L[1]-r.v)<=25) return true;
   if(L[0]>=-900&&L[0]<=900&&L[1]>=190&&L[1]<=700) return true;
   if(Math.abs(L[0]+300)<=13&&L[1]>=-185&&L[1]<=200) return true;     // ramp to both runways
   const Z=lzUV(x,z);
   if(Math.abs(Z[0])<=LZ.len/2+10&&Math.abs(Z[1])<=LZ.wid/2+4) return true;
   const S=shUV(x,z);
-  for(const r of SH_RWY) if(Math.abs(S[0])<=r.len/2&&Math.abs(S[1]-r.v)<=23) return true;
-  // fix2 item 6: Sky Harbor's drawn pavement: the terminal apron, the two parallel taxiways and the apron's link to 7L
-  if(S[0]>=-380&&S[0]<=-120&&S[1]>=-240&&S[1]<=460) return true;
-  if(Math.abs(S[0])<=1500&&(Math.abs(S[1]+150)<=12||Math.abs(S[1]-165)<=12)) return true;
-  if(Math.abs(S[0]+250)<=13&&S[1]>=-280&&S[1]<=-235) return true;
+  for(const r of SH_RWY) if(Math.abs(S[0]-r.u0)<=r.len/2&&Math.abs(S[1]-r.v)<=23) return true;
+  // Sky Harbor's drawn pavement: the aprons, the two parallel taxiways and their links to the runways (SH_APRON, SH_TWY, SH_LINK)
+  for(const a of SH_APRON) if(S[0]>=a[0]&&S[0]<=a[1]&&S[1]>=a[2]&&S[1]<=a[3]) return true;
+  for(const a of SH_TWY) if(S[0]>=a[0]&&S[0]<=a[1]&&S[1]>=a[2]&&S[1]<=a[3]) return true;
+  for(const l of SH_LINK) if(Math.abs(S[0]-l[0])<=15&&S[1]>=l[1]&&S[1]<=l[2]) return true;
   return false;
 }
 const OBST=[];
@@ -2983,19 +3006,21 @@ const BASES=!REGION.az?{[REGION.id]:{id:REGION.id,name:REGION.base,rwy:REGION.ma
         ramp:[()=>wX(1150,-250),()=>wZ(1150,-250)],rampHdg:116,
         fin:d=>[wX(THR01+300-d,0),wZ(THR01+300-d,0)]},
   luke:{id:'luke',name:'Luke AFB',rwy:'03L',hdg:42.6,twr:'Luke Tower 133.45',gnd:'Luke Ground 121.8',twrClip:'luke_tower',gndClip:'luke_ground',rwyClip:'rwy_03l',
-        runway:[()=>lkX(-1498,-152.5),()=>lkZ(-1498,-152.5)],
+        // runways 2: 03L's threshold is at u = -407 - 1524 (LUKE_RWY)
+        runway:[()=>lkX(-1919,-177),()=>lkZ(-1919,-177)],
         ramp:[()=>lkX(-300,430),()=>lkZ(-300,430)],rampHdg:312.6,
-        fin:d=>[lkX(-1210-d,-152.5),lkZ(-1210-d,-152.5)]},
-  // planes2: Sky Harbor for the airliners. Runway 7L is 11,489 ft; the frame is shX/shZ (u along 092, v right)
-  phx:{id:'phx',name:'Sky Harbor',rwy:'7L',hdg:92,twr:'Phoenix Tower 120.9',gnd:'Phoenix Ground 132.55',twrClip:'phoenix_tower',gndClip:'phoenix_ground',rwyClip:'rwy_07l',
-        runway:[()=>shX(-1739,-300),()=>shZ(-1739,-300)],
-        // fix2 item 6: the gate row of the terminal apron (u -380..-120), east of the airliners' stands (u -420..-228): a 747's
-        // wingtips 14 m clear of the next stand and 35 m of the Terminal 4 concourse, facing north across 7R to 7L
-        ramp:[()=>shX(-165,95),()=>shZ(-165,95)],rampHdg:2,
-        fin:d=>[shX(-1451-d,-300),shZ(-1451-d,-300)]}
+        fin:d=>[lkX(-1631-d,-177),lkZ(-1631-d,-177)]},
+  // planes2: Sky Harbor for the airliners. Runway 7L is 10,300 ft; the frame is shX/shZ (u along 090, v right)
+  phx:{id:'phx',name:'Sky Harbor',rwy:'7L',hdg:90,twr:'Phoenix Tower 120.9',gnd:'Phoenix Ground 132.55',twrClip:'phoenix_tower',gndClip:'phoenix_ground',rwyClip:'rwy_07l',
+        // runways 2: 7L's threshold is at u = 127 - 1569.5 (SH_RWY)
+        runway:[()=>shX(-1430.5,361),()=>shZ(-1430.5,361)],
+        // a gate stand on Terminal 4's south side, between its D and C concourses (OSM gates C1 to C9, D2 to D8 line
+        // this alley), nose in to the terminal facing north; a 747's wingtips 60 m clear of either concourse
+        ramp:[()=>shX(1250,60),()=>shZ(1250,60)],rampHdg:0,
+        fin:d=>[shX(-1142.5-d,361),shZ(-1142.5-d,361)]}
 };
 // the longest runway of a base, metres: the long runway rule for the airliners (TYPES.minRwy)
-const BASE_RWY={kgeu:RWY_LEN,luke:3052,phx:3502};
+const BASE_RWY={kgeu:RWY_LEN,luke:3048,phx:3502};   // Luke 03L/21R, Sky Harbor 8/26
 function rwyLenOf(b){if(BASE_RWY[b])return BASE_RWY[b];const R=REGIONS[b];if(R&&R.rw){const r=R.rw.find(r=>r[0]===R.main||r[1]===R.main);return r?r[2]:1e9;}return 1e9;}
 function baseOK(t,b){const T=TYPES[t];return !T||!T.minRwy||rwyLenOf(b)>=T.minRwy;}
 // ---------- every runway in the game, and both of its ends ----------
@@ -3010,12 +3035,12 @@ const RUNWAYS=(function(){
     out.push(r);}
   if(!REGION.az){
     // world region: every runway, both ends, from the REGIONS table (pavement ends, lengths measured between them)
-    for(const r of REGION.rw){const lx=r[4]-WOFF[0],lz=r[5]-WOFF[1],hx=r[7]-WOFF[0],hz=r[8]-WOFF[1];
+    for(const r of REGION.rw){const E=rwEnds(r),lx=E[0]-WOFF[0],lz=E[1]-WOFF[1],hx=E[2]-WOFF[0],hz=E[3]-WOFF[1];
       add(REGION.short,REGION.icao,r[0]+'-'+r[1],Math.hypot(hx-lx,hz-lz),r[3],(lx+hx)/2,(lz+hz)/2,Math.atan2(hx-lx,-(hz-lz)),r[0],r[1],r[6],r[9]);}
     return out;}
   add('Glendale','KGEU','1-19',RWY_LEN,30,wX(RWY_LEN/2,0),wZ(RWY_LEN/2,0),RH,'1','19',THR01,RWY_LEN-THR19);
-  for(const r of LUKE_RWY)add('Luke AFB','KLUF',r.lo+'-'+r.hi,r.len,46,lkX(0,r.v),lkZ(0,r.v),LUKE.h,r.lo,r.hi,0,0);
-  for(const r of SH_RWY)add('Sky Harbor','KPHX',r.lo+'-'+r.hi,r.len,46,shX(0,r.v),shZ(0,r.v),SKY_HARBOR.h,r.lo,r.hi,0,0);
+  for(const r of LUKE_RWY)add('Luke AFB','KLUF',r.lo+'-'+r.hi,r.len,46,lkX(r.u0,r.v),lkZ(r.u0,r.v),LUKE.h,r.lo,r.hi,0,0);
+  for(const r of SH_RWY)add('Sky Harbor','KPHX',r.lo+'-'+r.hi,r.len,46,shX(r.u0,r.v),shZ(r.u0,r.v),SKY_HARBOR.h,r.lo,r.hi,r.thrLo,r.thrHi);
   add('Assault strip','LZ','9-27',LZ.len,LZ.wid,LZ.x,LZ.z,LZ.h,'9','27',0,0);
   return out;})();
 const RWY_ENDS=[].concat(...RUNWAYS.map(r=>r.ends));
@@ -3095,7 +3120,7 @@ const TYPES={
     maxBank:0.52,ipD:9000,fafD:5500,slowD:4000,decel:0.5,ezG:0.2,ezGR:0.08,ezBank:0.45,thrC:0.55,flareH:9,flareK:0.22,tdSink:0.7,tdPitch:0.05,rotP:0.14,rotRate:0.045,apRate:[0.12,0.15,0.3],vne:340,vfe:175,snd:'fan',cam1:[-0.5,1.0,-14.3],cam1Name:'Flight deck',chase:[14,78],
     minRwy:2400,athr:1,fd:1,heavy:1,
     cs:'Pocket 737',csS:'Pocket 737',say:'Pocket seven three seven',sayS:'Pocket seven three seven',
-    sub:'Pocket Air Boeing 737-800, N737PA, at Phoenix Sky Harbor. 174 seats, two CFM56s, blended winglets. Heavy and deliberate: plan every turn and every descent a long way ahead. Runway 7L is 11,489 ft, field elevation 1,135.',
+    sub:'Pocket Air Boeing 737-800, N737PA, at Phoenix Sky Harbor. 174 seats, two CFM56s, blended winglets. Heavy and deliberate: plan every turn and every descent a long way ahead. Runway 7L is 10,300 ft, field elevation 1,135.',
     // outside Arizona (4.6b): the same without the field; flySub adds the region's runway and elevation
     sub2:'Pocket Air Boeing 737-800, N737PA. 174 seats, two CFM56s, blended winglets. Heavy and deliberate: plan every turn and every descent a long way ahead.',
     tips:'Manual: flaps 5, full power, rotate at 145 kt, gear up. Approach at 145 kt with flaps 30, about 750 fpm down final, a small flare at 30 ft.'},
@@ -3106,7 +3131,7 @@ const TYPES={
     maxBank:0.52,ipD:9000,fafD:5500,slowD:4000,decel:0.5,ezG:0.2,ezGR:0.08,ezBank:0.45,thrC:0.55,flareH:9,flareK:0.22,tdSink:0.7,tdPitch:0.06,rotP:0.14,rotRate:0.045,apRate:[0.12,0.15,0.3],vne:350,vfe:177,snd:'fan',cam1:[-0.5,1.08,-13.5],cam1Name:'Flight deck',chase:[14,76],
     minRwy:2400,athr:1,fd:1,heavy:1,
     cs:'Pocket 320',csS:'Pocket 320',say:'Pocket three two zero',sayS:'Pocket three two zero',
-    sub:'Pocket Air Airbus A320, N320PA, at Phoenix Sky Harbor. 180 seats, two CFM56s, sharklets, fly by wire. Heavy and deliberate: plan every turn and every descent a long way ahead. Runway 7L is 11,489 ft, field elevation 1,135.',
+    sub:'Pocket Air Airbus A320, N320PA, at Phoenix Sky Harbor. 180 seats, two CFM56s, sharklets, fly by wire. Heavy and deliberate: plan every turn and every descent a long way ahead. Runway 7L is 10,300 ft, field elevation 1,135.',
     // outside Arizona (4.6b): the same without the field; flySub adds the region's runway and elevation
     sub2:'Pocket Air Airbus A320, N320PA. 180 seats, two CFM56s, sharklets, fly by wire. Heavy and deliberate: plan every turn and every descent a long way ahead.',
     tips:'Manual: flaps 10, full power, rotate at 140 kt, gear up. Approach at 135 kt with full flap, about 700 fpm down final, a small flare at 30 ft.'},
@@ -3117,7 +3142,7 @@ const TYPES={
     maxBank:0.45,ipD:11000,fafD:6500,slowD:5000,decel:0.4,ezG:0.15,ezGR:0.06,ezBank:0.4,thrC:0.6,flareH:12,flareK:0.2,tdSink:0.8,tdPitch:0.06,rotP:0.12,rotRate:0.035,apRate:[0.08,0.1,0.2],vne:365,vfe:180,snd:'fan',cam1:[-0.55,4.3,-27.9],cam1Name:'Flight deck',chase:[22,120],
     minRwy:2400,athr:1,fd:1,heavy:1,
     cs:'Pocket 747',csS:'Pocket 747',say:'Pocket seven four seven',sayS:'Pocket seven four seven',
-    sub:'Pocket Air Boeing 747-400, N747PA, at Phoenix Sky Harbor. The Queen: the upper deck hump, four engines, 211 ft of wing, 870,000 lb. Everything happens slowly and a long way ahead. Runway 7L is 11,489 ft, field elevation 1,135.',
+    sub:'Pocket Air Boeing 747-400, N747PA, at Phoenix Sky Harbor. The Queen: the upper deck hump, four engines, 211 ft of wing, 870,000 lb. Everything happens slowly and a long way ahead. Runway 7L is 10,300 ft, field elevation 1,135.',
     // outside Arizona (4.6b): the same without the field; flySub adds the region's runway and elevation
     sub2:'Pocket Air Boeing 747-400, N747PA. The Queen: the upper deck hump, four engines, 211 ft of wing, 870,000 lb. Everything happens slowly and a long way ahead.',
     tips:'Manual: flaps 10, all four up, rotate at 170 kt, gear up. Approach at 155 kt with flaps 30, 800 fpm down final, flare at 40 ft, the main gear is a long way behind you.'},
@@ -3368,8 +3393,8 @@ function apBank(trk,cmd,max,V){return clamp(wrapPi(cmd-trk)*1.6*clamp((V||50)/50
 // the base's own runway frame for the ground roll (planes2): u from the runway start along the takeoff direction, v right,
 // h the heading. Glendale's is the world frame; Luke and Sky Harbor have their own (lukeUV, shUV)
 function homeRwy(base,x,z){
-  if(base==='luke'){const K=lukeUV(x,z);return [K[0]+1510.5,K[1]+152.5,LUKE.h];}
-  if(base==='phx'){const K=shUV(x,z);return [K[0]+1751,K[1]+300,SKY_HARBOR.h];}
+  if(base==='luke'){const K=lukeUV(x,z);return [K[0]+1931,K[1]+177,LUKE.h];}          // from 03L's threshold (LUKE_RWY)
+  if(base==='phx'){const K=shUV(x,z);return [K[0]+1442.5,K[1]-361,SKY_HARBOR.h];}     // from 7L's threshold (SH_RWY)
   return [toU(x,z),toV(x,z),RH];}
 function apGround(st,hdg,v,pitchCmd,rate,rh){
   const hc=(rh===undefined?RH:rh)-clamp(v*0.08,-0.15,0.15);if(!st.apW)st.apW=new V3();
@@ -9005,11 +9030,11 @@ if(REGION.az)(function(){
   for(const r of LUKE_RWY){
     const mid=r.len-800;
     const g=new THREE.PlaneGeometry(46,mid);g.rotateX(-Math.PI/2);
-    const m=new THREE.Mesh(g,conc);m.position.set(LKX(0,r.v),0.06,LKZ(0,r.v));m.rotation.y=-lh;scene.add(m);
+    const m=new THREE.Mesh(g,conc);m.position.set(LKX(r.u0,r.v),0.06,LKZ(r.u0,r.v));m.rotation.y=-lh;scene.add(m);
     for(const end of [-1,1]){
       const eg=new THREE.PlaneGeometry(46,400);eg.rotateX(-Math.PI/2);
       const em=new THREE.Mesh(eg,lam(0xffffff,{map:lukeEnd(end<0?r.lo:r.hi)}));
-      em.position.set(LKX(end*(r.len/2-200),r.v),0.07,LKZ(end*(r.len/2-200),r.v));
+      em.position.set(LKX(r.u0+end*(r.len/2-200),r.v),0.07,LKZ(r.u0+end*(r.len/2-200),r.v));
       em.rotation.y=-lh+(end>0?Math.PI:0);scene.add(em);
     }
   }
@@ -9021,47 +9046,43 @@ if(REGION.az)(function(){
   const jetG=new THREE.Group();{const b=new THREE.Mesh(new THREE.BoxGeometry(1.6,1.4,15),lam(0x6b7280));jetG.add(b);const w=new THREE.Mesh(new THREE.BoxGeometry(10.5,0.3,5),lam(0x6b7280));w.position.set(0,0,1.5);jetG.add(w);
     for(const sx of [-1,1]){const t=new THREE.Mesh(new THREE.BoxGeometry(0.3,2.4,2.4),lam(0x6b7280));t.position.set(sx*1.2,1.4,6);t.rotation.z=sx*0.4;jetG.add(t);}}
   for(let k=0;k<10;k++){const j=jetG.clone();j.position.set(LKX(-600+k*60,300),1.4,LKZ(-600+k*60,300));j.userData.heat=0.85;j.rotation.y=-lh+Math.PI/2;scene.add(j);}
-  // Sky Harbor: three parallel runways east to west, the terminals between the
-  // inner two, and the tower. 28.6 km out, so it is geometry and no textures.
+  // Sky Harbor: three parallel runways east to west, 8/26 on the north side and the 7L/25R, 7R/25L pair on the south,
+  // the terminals between 8/26 and 7L/25R, and the tower. 28.6 km out, so it is geometry and no textures. Placed from
+  // assets/world/az_apt.json (OSM through geoW): runways 2.
   (function(){
     const conc2=lam(0x8e8c85),pale=lam(0xb4b2ab),glass2=lam(0x3f5f7a),roof=lam(0x9a9790);
+    const flat=(u0,u1,v0,v1,y,mat)=>{const g=new THREE.PlaneGeometry(u1-u0,v1-v0);g.rotateX(-Math.PI/2);
+      const m=new THREE.Mesh(g,mat);m.position.set(shX((u0+u1)/2,(v0+v1)/2),y,shZ((u0+u1)/2,(v0+v1)/2));m.rotation.y=Math.PI/2-SKY_HARBOR.h;scene.add(m);return m;};
     for(const r of SH_RWY){
       const g=new THREE.PlaneGeometry(46,r.len);g.rotateX(-Math.PI/2);
-      const m=new THREE.Mesh(g,conc2);m.position.set(shX(0,r.v),0.06,shZ(0,r.v));   // planes2: the paint height the player rolls on (SURF_Y)
+      const m=new THREE.Mesh(g,conc2);m.position.set(shX(r.u0,r.v),0.06,shZ(r.u0,r.v));   // planes2: the paint height the player rolls on (SURF_Y)
       m.rotation.y=-SKY_HARBOR.h;scene.add(m);
-      // centreline, so the runways read as runways from the air
-      const cg=new THREE.PlaneGeometry(2.2,r.len-160);cg.rotateX(-Math.PI/2);
-      const cm=new THREE.Mesh(cg,lam(0xe8e6de));cm.position.set(shX(0,r.v),0.075,shZ(0,r.v));
+      // centreline, so the runways read as runways from the air: threshold to threshold (8's starts at its displaced threshold)
+      const c0=r.u0-r.len/2+r.thrLo+80,c1=r.u0+r.len/2-r.thrHi-80;
+      const cg=new THREE.PlaneGeometry(2.2,c1-c0);cg.rotateX(-Math.PI/2);
+      const cm=new THREE.Mesh(cg,lam(0xe8e6de));cm.position.set(shX((c0+c1)/2,r.v),0.075,shZ((c0+c1)/2,r.v));
       cm.rotation.y=-SKY_HARBOR.h;scene.add(cm);
     }
-    // parallel taxiways either side of the middle runway
-    for(const v of [-150,165]){
-      const g=new THREE.PlaneGeometry(24,3000);g.rotateX(-Math.PI/2);
-      const m=new THREE.Mesh(g,pale);m.position.set(shX(0,v),0.05,shZ(0,v));
-      m.rotation.y=-SKY_HARBOR.h;scene.add(m);
+    // taxiways E (north of 7L/25R) and B (south of 8/26), their links to the runways, the two terminal aprons (SH_TWY, SH_LINK, SH_APRON)
+    for(const a of SH_TWY)flat(a[0],a[1],a[2],a[3],0.05,pale);
+    for(const l of SH_LINK)flat(l[0]-15,l[0]+15,l[1],l[2],0.05,pale);
+    for(const a of SH_APRON)flat(a[0],a[1],a[2],a[3],0.045,pale);
+    // Terminals 3 and 4 and the D11-D18 satellite, from their OSM outlines: [u0,u1,v0,v1,height,main]
+    const box=(u0,u1,v0,v1,h,mat)=>{const b=new THREE.Mesh(new THREE.BoxGeometry(u1-u0,h,v1-v0),mat);
+      b.position.set(shX((u0+u1)/2,(v0+v1)/2),h/2,shZ((u0+u1)/2,(v0+v1)/2));b.rotation.y=Math.PI/2-SKY_HARBOR.h;scene.add(b);return b;};
+    for(const [u0,u1,v0,v1,h,main] of [
+      [-40,300,-38,16,22,1],[230,270,-406,-38,14,0],[150,345,-156,-98,14,0],                       // Terminal 3, its pier and north concourse
+      [1100,1625,-214,-40,26,1],[1115,1160,-406,62,14,0],[1355,1395,-406,56,14,0],[1580,1620,-406,56,14,0],   // Terminal 4 and its piers
+      [871,1100,-50,-10,12,0],[871,910,-10,64,12,0]]){                                               // Gates D11-D18
+      const t=box(u0,u1,v0,v1,h,roof);
+      if(main){const gl=box(u0+4,u1-4,v0-1,v1+1,9,glass2);gl.position.y=h-7;strMesh(t,'building','the terminal',{parts:[gl]});}
+      else strMesh(t,'building','a concourse');
     }
-    // the apron by the airliner stands, where the Pocket Air ramp start is (planes2)
-    {const g=new THREE.PlaneGeometry(700,260);g.rotateX(-Math.PI/2);const m=new THREE.Mesh(g,pale);m.position.set(shX(-250,110),0.045,shZ(-250,110));m.rotation.y=-SKY_HARBOR.h;scene.add(m);}
-    // fix2 item 6: the apron (u -380..-120, v -240..460) to 7L across the gap north of it, so a ramp start can reach 7L (isPaved)
-    {const g=new THREE.PlaneGeometry(46,26);g.rotateX(-Math.PI/2);const m=new THREE.Mesh(g,pale);m.position.set(shX(-250,-257),0.05,shZ(-250,-257));m.rotation.y=-SKY_HARBOR.h;scene.add(m);}
-    // Terminals 3 and 4 with their concourses, between the inner runways
-    for(const [u0,v0,L,W] of [[-620,150,300,90],[120,150,420,100]]){
-      const t=new THREE.Mesh(new THREE.BoxGeometry(L,26,W),roof);
-      t.position.set(shX(u0,v0),13,shZ(u0,v0));t.rotation.y=-SKY_HARBOR.h;scene.add(t);
-      const gl=new THREE.Mesh(new THREE.BoxGeometry(L-8,9,W+2),glass2);
-      gl.position.set(shX(u0,v0),19,shZ(u0,v0));gl.rotation.y=-SKY_HARBOR.h;scene.add(gl);
-      strMesh(t,'building','the terminal',{parts:[gl]});
-      for(let k=-1;k<=1;k++){
-        const c=new THREE.Mesh(new THREE.BoxGeometry(46,16,150),roof);
-        c.position.set(shX(u0+k*L*0.34,v0-115),8,shZ(u0+k*L*0.34,v0-115));
-        c.rotation.y=-SKY_HARBOR.h;scene.add(c);strMesh(c,'building','a concourse');
-      }
-    }
-    // the tower
+    // the tower (OSM PHX Tower, between the terminals)
     const tw=new THREE.Mesh(new THREE.CylinderGeometry(7,10,74,10),pale);
-    tw.position.set(shX(-180,205),37,shZ(-180,205));scene.add(tw);
+    tw.position.set(shX(528,-113),37,shZ(528,-113));scene.add(tw);
     const cab=new THREE.Mesh(new THREE.CylinderGeometry(14,11,13,10),glass2);
-    cab.position.set(shX(-180,205),79,shZ(-180,205));scene.add(cab);strMesh(tw,'tower','the control tower',{parts:[cab],top:85.5});
+    cab.position.set(shX(528,-113),79,shZ(528,-113));scene.add(cab);strMesh(tw,'tower','the control tower',{parts:[cab],top:85.5});
   })();
 
   // Downtown Phoenix skyline, about 21 km ESE
@@ -10687,13 +10708,15 @@ function tfcEnd(code,num){return RWY_ENDS.find(e=>e.rwy.code===code&&e.num===num
 // Arizona: Sky Harbor arrivals on 8/26 and departures off 7L/25R, Glendale left traffic on 1/19,
 // the Luke overhead to 3L/21R with departures off 3R/21L, helicopters over Phoenix (a world region: tfcRegion)
 if(REGION.az)(function(){
-  const sh=[];for(let k=0;k<5;k++)sh.push([shX(-420+48*k,95),shZ(-420+48*k,95)]);
+  // runways 2: the airliners' stands on the north apron between Terminals 3 and 4, clear of the tower (u 528, v -113), so the
+  // taxi in from taxiway B and the taxi out to taxiway E both run straight across the aprons (SH_APRON)
+  const sh=[410,470,600,660,720].map(u=>[shX(u,-250),shZ(u,-250)]);
   const lk=[];for(let k=0;k<4;k++)lk.push([lkX(60+60*k,300),lkZ(60+60*k,300)]);
   const roam=lists.sub.concat(lists.near).filter(e=>e[0]>FWY_X+400).map(e=>[e[0],e[1]]);
   for(const [dx,dz] of [[0,0],[1500,800],[-1200,1200],[900,-1400],[-1500,-700]])roam.push([DT_TOP.x+dx,DT_TOP.z+dz]);
   TFC.plans.push(
     {type:'airliner',apt:'KPHX',ends:[tfcEnd('KPHX','08'),tfcEnd('KPHX','26')],depEnds:[tfcEnd('KPHX','07L'),tfcEnd('KPHX','25R')],pattern:'straightin',
-     park:{x:sh[0][0],z:sh[0][1],hdg:2,spots:sh},twy:90,depTwy:150,exitU:2000,climbOut:{hdg:0,alt:2500},count:{min:3,max:5},every:[60,120],fin:18520,surf:0.06},
+     park:{x:sh[0][0],z:sh[0][1],hdg:0,spots:sh},twy:122,depTwy:126,exitU:2000,climbOut:{hdg:0,alt:2500},count:{min:3,max:5},every:[60,120],fin:18520,surf:0.06},
     {type:'cessna',apt:'KGEU',ends:[tfcEnd('KGEU','1'),tfcEnd('KGEU','19')],pattern:'left',park:null,twy:120,exitU:0,climbOut:null,count:{min:1,max:2},surf:0.06},
     {type:'f16',apt:'KLUF',ends:[tfcEnd('KLUF','03L'),tfcEnd('KLUF','21R')],depEnds:[tfcEnd('KLUF','03R'),tfcEnd('KLUF','21L')],pattern:'overhead',
      park:{x:lk[0][0],z:lk[0][1],hdg:312.6,spots:lk},twy:152,depTwy:100,exitU:1800,climbOut:{hdg:0,alt:1500},count:{min:2,max:2},surf:0.06},
@@ -11282,7 +11305,8 @@ if(REGION.az)(function(){
   const G=makeLightLayer('KGEU'),K=makeLightLayer('KLUF');AL.KGEU=G;AL.KLUF=K;
   for(const r of RUNWAYS){
     if(r.code==='KGEU'){lightRunway(G,r);for(const e of r.ends)lightApproach(G,e,'REIL');}
-    if(r.code==='KLUF'){lightRunway(K,r);for(const e of r.ends)lightApproach(K,e,e.num==='03R'?'ALSF1':'REIL');}
+    // runways 2: the ALSF1 is on 21L (FAA 5010). Item 4: the 4-light PAPIs, and no REILs where Luke has none
+    if(r.code==='KLUF'){lightRunway(K,r);for(const e of r.ends)lightApproach(K,e,e.num==='21L'?'ALSF1':'REIL');}
   }
   // Glendale: parallel taxiway (15.2 m wide at v=-120) with gaps where the connectors
   // join, and the five connectors up to the runway
@@ -14572,7 +14596,7 @@ function atcUpdate(){
     say(B.twr,AC.csS+', make right closed traffic, runway '+B.rwy+'.',[csTs(),'t_closed_traffic',rwyC],{ok:inAir});}
   const hdg=((-new THREE.Euler().setFromQuaternion(s.quat,'YXZ').y*180/Math.PI)%360+360)%360;
   // lined up on the home base's runway, u from its threshold (Glendale 1 or Luke 03L)
-  const lk=s.base==='luke',ph=s.base==='phx',K=lk?lukeUV(s.pos.x,s.pos.z):ph?shUV(s.pos.x,s.pos.z):null,pu=lk?K[0]+1510.5:ph?K[0]+1751:u-THR01,pv=lk?K[1]+152.5:ph?K[1]+300:v;
+  const lk=s.base==='luke',ph=s.base==='phx',K=lk?lukeUV(s.pos.x,s.pos.z):ph?shUV(s.pos.x,s.pos.z):null,pu=lk?K[0]+1931:ph?K[0]+1442.5:u-THR01,pv=lk?K[1]+177:ph?K[1]-361:v;
   if(!A.land&&A.pattern&&!s.onGround&&s.agl<420&&pu<150&&pu>-7000-THR01&&Math.abs(pv)<450&&Math.abs(((hdg-B.hdg+540)%360)-180)<35){A.land=1;
     say(B.twr,AC.csS+', runway '+B.rwy+', check wheels down, cleared to land.',
         [csTs(),twrC,rwyC,'t_wheels_down','t_cleared_land'],{ok:inAir});readback('land');}
@@ -14583,12 +14607,12 @@ function atcTouchdown(e){
   const nice=B=>{say(B.twr,AC.csS+', nice landing. Turn left next taxiway, contact ground '+B.gnd.split(' ').pop()+'.',
         [csTs(),'t_nice_landing']);A.land=0;A.pattern=0;};
   if(!REGION.az){const f=runwayFix(e.x,e.z);if(f)nice(BASES[BASE0]);return;}   // any runway of the field
-  if(Math.abs(K[0])<1700&&Math.abs(K[1])<400){
+  if(K[0]>-2000&&K[0]<2000&&Math.abs(K[1])<400){
     if(st.base==='luke')nice(BASES.luke);       // home at Luke: a normal landing
     else say('Luke Tower 133.45',AC.cs+', you just landed at Luke Air Force Base. Hold position, security is on the way.',
         [csT(),'t_luke_tower','t_luke_security']);}
   else if(Math.abs(v)<17&&u>-5&&u<RWY_LEN+5)nice(BASES.kgeu);
-  else{const H=shUV(e.x,e.z);if(Math.abs(H[0])<1760&&Math.abs(H[1])<520)nice(BASES.phx);}
+  else{const H=shUV(e.x,e.z);if(Math.abs(H[0])<1860&&H[1]>-770&&H[1]<650)nice(BASES.phx);}
 }
 
 // ---------- guide path: glowing hoops down a 3 degree glideslope to one runway end ----------
@@ -14693,7 +14717,7 @@ function arcStart(kind){
   if(D&&D.kind==='dogfight'){dfStart({daily:1});return;}   // a dogfight day: the day's seeded fight over the Goldwater Range
   // the arcade is at Glendale and Luke, the daily wherever today's is: from elsewhere switch first, the run starts after the reload
   if(REGION.id!==reg){pickRegion(reg,{resume:{arc:kind,region:reg,type:savedType,tod:TOD.id,wx:wxOf(kind)}});return;}
-  const g1=TYPES[savedType]&&TYPES[savedType].minRwy&&REGION.az?RWY_ENDS.find(e=>e.rwy.code==='KPHX'&&e.num==='7L'):RWY_ENDS.find(e=>e.rwy.code==='KGEU'&&e.num==='1');
+  const g1=TYPES[savedType]&&TYPES[savedType].minRwy&&REGION.az?RWY_ENDS.find(e=>e.rwy.code==='KPHX'&&e.num==='07L'):RWY_ENDS.find(e=>e.rwy.code==='KGEU'&&e.num==='1');
   // the 1 mile challenge starts lined up on the centre line, on the 3 degree path, at approach speed
   const sp=D?D:kind==='landing1'?{type:savedType,end:g1,dist:1852,off:0,alt:1852*Math.tan(GS)*M2FT,gs:1}
     :{type:savedType,end:kind==='apt'?aptEnd(REGION.id):g1,dist:9000,off:0.9,alt:2500};
@@ -18672,10 +18696,10 @@ function pilFix(){const lm=LANDMARKS.find(l=>l.name==='State Farm Stadium')||{x:
     ph=PLACES.find(p=>p.name==='Phoenix')||geoW(33.4484,-112.074),r=SH_RWY[0];
   const G={name:'Glendale runway 1',short:'Glendale',say:'Glendale',x:wX(THR01,0),z:wZ(THR01,0)},S={name:'State Farm Stadium',short:'Stadium',say:'the stadium',x:lm.x,z:lm.z},
     T={name:'Tolleson',short:'Tolleson',say:'Tolleson',x:to.x,z:to.z},D={name:'Downtown Phoenix',short:'Downtown',say:'downtown Phoenix',x:ph.x,z:ph.z},
-    H={name:'Sky Harbor runway 7L',short:'Sky Harbor',say:'Sky Harbor',x:shX(-r.len/2,r.v),z:shZ(-r.len/2,r.v)};
+    H={name:'Sky Harbor runway 7L',short:'Sky Harbor',say:'Sky Harbor',x:shX(r.u0-r.len/2+r.thrLo,r.v),z:shZ(r.u0-r.len/2+r.thrLo,r.v)};
   return {G:G,S:S,T:T,D:D,H:H,out:[G,S,T,D,H],back:[H,D,T,S,G]};}
 // a Sky Harbor runway under (x, z), named for the direction of the roll; null off them
-function shRwy(x,z){const K=shUV(x,z);for(const r of SH_RWY)if(Math.abs(K[0])<=r.len/2+60&&Math.abs(K[1]-r.v)<=60)return st.vel.x*SHs-st.vel.z*SHc>=0?r.lo:r.hi;return null;}
+function shRwy(x,z){const K=shUV(x,z);for(const r of SH_RWY)if(Math.abs(K[0]-r.u0)<=r.len/2+60&&Math.abs(K[1]-r.v)<=60)return st.vel.x*SHs-st.vel.z*SHc>=0?r.lo:r.hi;return null;}
 // Dana in the pilotage helpers: silent on the solo cross country (d.solo); returns her line or null (a CALL then shows at once)
 function pilSay(d,t,sp,o){return d.solo?null:cfi(t,sp,o);}
 // the solo's card line for the CALL up (what Dana would have said), null otherwise

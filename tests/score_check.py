@@ -62,7 +62,7 @@ async def main():
       out.kgeu=K.runwayFix(K.wX(500,2),K.wZ(500,2));
       const lu=(u,v)=>[K.LUKE.x+Math.sin(K.LUKE.h)*u+Math.cos(K.LUKE.h)*v,
                        K.LUKE.z-Math.cos(K.LUKE.h)*u+Math.sin(K.LUKE.h)*v];
-      const a=lu(-1200,-152.5); out.luke=K.runwayFix(a[0],a[1]);
+      const a=lu(-1200,-177); out.luke=K.runwayFix(a[0],a[1]);
       out.lz=K.runwayFix(K.lzX(-300,1),K.lzZ(-300,1));
       out.desert=K.runwayFix(-20000,20000);
       return out;}""")
