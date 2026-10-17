@@ -21,7 +21,7 @@ FLY = """([type,sel,ax,sg,back,frac,spd,yabs])=>{const K=window.__kgeu;K.pick(ty
   st.pos.set(x,y,z);st.vel.copy(d).multiplyScalar(spd);st.quat.setFromUnitVectors(new THREE.Vector3(0,0,-1),d);st.onGround=false;st.gearDown=false;st.gearPos=0;st.w.set(0,0,0);
   st.throttle=st.power=0.6;st.airTime=5;
   let n=0;while(!st.crashed&&n<400){K.stepFrame(1/60,false,true);n++;}
-  return {crashed:st.crashed,why:st.crashReason,imp:K.strImp(),rec:{id:r.id,name:r.name,cls:r.cls,x:r.x,z:r.z,hx:r.hx,hz:r.hz,y0:r.y0,y1:r.y1},frames:n};}"""
+  return {crashed:st.crashed,why:st.crashReason,imp:K.strImp(),cfx:K.cfx(),rec:{id:r.id,name:r.name,cls:r.cls,x:r.x,z:r.z,hx:r.hx,hz:r.hz,y0:r.y0,y1:r.y1},frames:n};}"""
 
 async def main():
     region = sys.argv[sys.argv.index('--region') + 1] if '--region' in sys.argv else None
@@ -33,6 +33,11 @@ async def main():
         pg = await page(b, url, vp=IPHONE_15, storage=st0)
         await pg.evaluate(f"()=>{{{K}.setSkill('pilot');{K}.setTOD('day');{K}.setRadioOn&&{K}.setRadioOn(false);{K}.WST.off=true;}}")
         if not region:
+            # the warm-up first (the menu's steps, and a first flight frame): from then on every program a crash into a
+            # structure uses must already exist
+            await pg.wait_for_function("()=>window.__kgeu.warm()", timeout=300000)
+            await pg.evaluate("()=>{const K=window.__kgeu;K.pick('cessna');K.pickBase('kgeu');K.start('runway');for(let i=0;i<3;i++)K.stepFrame(1/30);}")
+            pr0 = await pg.evaluate("()=>window.__kgeu.progN()")
             n = await pg.evaluate(f"""()=>{{const S={K}.STR,c={{}};for(const r of S.list)c[r.name]=(c[r.name]||0)+1;return {{n:S.list.length,cells:S.grid.size,c:c}}}}""")
             print('  STR', n['n'], 'records in', n['cells'], 'cells:', json.dumps(n['c']))
             c = n['c']
@@ -65,6 +70,33 @@ async def main():
                 ok(f'{label}: speed, mass and fuel', abs(im['spd'] - spd) < spd * 0.15 and im['mass'] > 400 and im['fuel'] > 0,
                    f"{im['spd']:.0f} m/s {im['mass']} kg fuel {im['fuel']:.0f} kg KE {im['ke']/1e6:.1f} MJ cls {im['cls']}")
                 ok(f'{label}: the wall faces the path', im['roof'] or (im['n'][0] * 0 + 1) > 0, im['n'])
+            # item 2, the breakup: what breaks scales with the energy; a light structure collapses, a big one breaks locally
+            BR = {}
+            for t, sel, ax, sg, back, frac, spd, key in [('cessna', "r.name==='a hangar'", 'z', 1, 40, 0.5, 50, 'c_hangar'), ('b737', "r.name==='a hangar'", 'z', 1, 60, 0.5, 75, 'b_hangar'),
+                                                         ('cessna', "r.name==='the stadium'", 'x', -1, 40, 0.45, 50, 'c_stadium'), ('b747', "r.name==='the stadium'", 'x', -1, 60, 0.45, 80, 'b_stadium')]:
+                r = await pg.evaluate(FLY, [t, sel, ax, sg, back, frac, spd, None])
+                await pg.evaluate("()=>{const K=window.__kgeu;for(let i=0;i<150;i++)K.stepFrame(1/30,false,i%25!==0);}")
+                x = await pg.evaluate("()=>{const K=window.__kgeu,B=K.CFXB,I=K.cfx();I.hidden=K.STR.list.filter(r=>r.meshes&&r.meshes.length&&!r.meshes[0].visible).map(r=>r.id);return I;}")
+                BR[key] = (r, x)
+                print(f"  {key}: rh {x['rh']:.1f} m, collapse {x['rc'] if x['rc']<1e8 else 'all'}, fc {x['fc']:.2f}, E {x['E']/1e6:.0f} MJ, removed {x['removed']}, tris {x['tris']}, chunks {x['chunks']}, rest {x['rest']}, built in {x['ms']} ms")
+            pr1 = await pg.evaluate("()=>window.__kgeu.progN()")
+            ok('no shader program compiled in flight by any crash into a structure (after the warm-up)', pr1['compiles'] == pr0['compiles'], (pr0, pr1))
+            c, b7 = BR['c_hangar'][1], BR['b_hangar'][1]
+            ok('Cessna into a hangar: a hole and a partial collapse, the hangar stands', c['on'] and c['removed'] > 0 and not c['total'] and c['rc'] > c['rh'] and c['fc'] < 1, c)
+            ok('737 into a hangar: the hangar comes down', b7['total'], b7['fc'])
+            cs, bs = BR['c_stadium'][1], BR['b_stadium'][1]
+            ok('the stadium only ever breaks locally', not cs['total'] and not bs['total'] and cs['rc'] == cs['rh'] and bs['rc'] == bs['rh'], (cs['rc'], bs['rc']))
+            ok('a 747 breaks a far bigger hole than a Cessna (energy and span)', bs['rh'] > 4 * cs['rh'] and bs['removed'] > cs['removed'], (cs['rh'], bs['rh']))
+            ok('the 747 hole in the stadium stays local (under 15 percent of its 318 m)', bs['rh'] < 0.15 * 318, bs['rh'])
+            ok('the stadium mesh is swapped for the broken one', BR['b_stadium'][0]['imp']['id'] in bs['hidden'], bs['hidden'])
+            ok('chunks fall and settle (most at rest after 5 s)', sum(bs['rest'].values()) > 0.6 * sum(bs['chunks'].values()), (bs['chunks'], bs['rest']))
+            b0 = BR['b_stadium'][0]['cfx']
+            ok('dust and glass from the stadium', b0['dust'] > 0 and b0['glass'] > 0, (b0['dust'], b0['glass']))
+            ok('a breakup builds in under 60 ms (headless)', max(x[1]['ms'] for x in BR.values()) < 60, [x[1]['ms'] for x in BR.values()])
+            # a new flight puts every structure back
+            z = await pg.evaluate("()=>{const K=window.__kgeu;K.pick('cessna');K.pickBase('kgeu');K.start('runway');for(let i=0;i<3;i++)K.stepFrame(1/30,false,true);const S=K.R3().scene;"
+                                  "return {on:K.CFXB.on,adds:K.CFXB.adds.length,hidden:K.STR.list.filter(r=>r.meshes&&r.meshes.some(m=>!m.visible)).length,slab:S.getObjectByName('cfx_slab').visible};}")
+            ok('a new flight: every structure whole again, no chunks', not z['on'] and z['adds'] == 0 and z['hidden'] == 0 and not z['slab'], z)
             # a house: into its roof from above (a descent at 20 degrees)
             r = await pg.evaluate("""()=>{const K=window.__kgeu;K.pick('cessna');K.pickBase('kgeu');K.start('runway');for(let i=0;i<3;i++)K.stepFrame(1/30,false,true);
               const r=K.STR.list.find(r=>r.name==='a house'&&Math.hypot(r.x-3000,r.z+3000)<20000);const st=K.state(),d=new THREE.Vector3(1,-0.7,0).normalize();
@@ -72,6 +104,9 @@ async def main():
               let n=0;while(!st.crashed&&n<300){K.stepFrame(1/60,false,true);n++;}return {crashed:st.crashed,why:st.crashReason,imp:K.strImp(),id:r.id,y1:r.y1};}""")
             im = r['imp']
             ok('Cessna into a house: a house impact', r['crashed'] and im and im['id'] == r['id'] and im['cls'] == 'house', f"{r['why']} {im and (im['name'], im['roof'], [round(v,1) for v in im['p']])}")
+            h = await pg.evaluate("(id)=>{const K=window.__kgeu,r=K.STR.list[id],m=new THREE.Matrix4();r.im.getMatrixAt(r.ii,m);const s=new THREE.Vector3().setFromMatrixScale(m);"
+                                  "K.pick('cessna');K.start('runway');K.stepFrame(1/30,false,true);r.im.getMatrixAt(r.ii,m);const s2=new THREE.Vector3().setFromMatrixScale(m);return {hid:s.length(),back:s2.length()};}", r['id'])
+            ok('the house instance is hidden for its broken copy, and back on the next flight', h['hid'] < 1e-6 and h['back'] > 1, h)
             # a pass 25 m over the roofs and the stadium stays clear
             r = await pg.evaluate("""()=>{const K=window.__kgeu,S=K.STR.list,out=[];for(const nm of ['a house','the stadium','a hangar','a tower']){const r=S.find(q=>q.name===nm);
               out.push([nm,K.strHit(r.x,r.z,r.y1+(r.dome?30:25)),K.strHit(r.x,r.z,r.y0+2)&&K.strHit(r.x,r.z,r.y0+2).id===r.id]);}return out;}""")

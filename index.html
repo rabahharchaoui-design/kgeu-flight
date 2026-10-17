@@ -10413,7 +10413,7 @@ const WARM_STEPS=['reaper','mq9b','f16','cessna','alpha','c130','archer','a10','
   // full size canvas draw here would only repeat it (3 s of the warm-up headless); Low and kgeuNoPre still draw it
   // gfxfix item 3: the dogfight's bandit, missiles, tracers and flares (dfWarmBuild, the precompile queue's build job,
   // whose compile job links their programs behind the splash) drawn once here without a compile, for the buffers
-  .concat([()=>{if(!DZ.built)dzBuild();warmObj(DZ.g);},()=>{dfWarmBuild();warmObj(DF.pool[0].g,true);},()=>{if(GFX.post&&PRE.done&&!PRE.skip&&PRE.ms.explosion!=null)return;fxWarmLayer();},()=>fxWarmDebris(),()=>fxWarmDecals(),()=>{if(actx)boomBufs();}]);
+  .concat([()=>{if(!DZ.built)dzBuild();warmObj(DZ.g);},()=>{dfWarmBuild();warmObj(DF.pool[0].g,true);},()=>{if(GFX.post&&PRE.done&&!PRE.skip&&PRE.ms.explosion!=null)return;fxWarmLayer();},()=>fxWarmDebris(),()=>fxWarmDecals(),()=>cfxWarm(),()=>{if(actx)boomBufs();}]);
 function warmTick(){
   if(WARM.done)return;
   // flying: wait. The steps belong to the menu and the pause sheet, never to a flying frame
@@ -21196,8 +21196,9 @@ FXQ_MAT.map=fxAtlas;   // so the WARM step uploads the atlas with the other text
 // then the rings: 120 sparks and embers, 72 debris trail puffs, 96 burning-site flames and
 // puffs; plus the 12 wreck piece flames (built with the wreck pool). 394 in all.
 const FX_N=3,FX_FB=9,FX_SM=20,FX_CORE=3,FX_MINI=4;
-const FXD_N={spark:120,trail:72,burn:96};
-const FXQ_N=FX_N*(1+FX_FB+FX_SM)+FX_MINI*4+FXD_N.spark+FXD_N.trail+FXD_N.burn+12;
+// crashfx: dust (a breakup's dust cloud) and glass (glints out of a broken facade)
+const FXD_N={spark:120,trail:72,burn:96,dust:48,glass:48};
+const FXQ_N=FX_N*(1+FX_FB+FX_SM)+FX_MINI*4+Object.values(FXD_N).reduce((a,b)=>a+b,0)+12;
 const fxqGeo=new THREE.InstancedBufferGeometry();
 fxqGeo.setAttribute('position',new THREE.Float32BufferAttribute([-0.5,-0.5,0,0.5,-0.5,0,0.5,0.5,0,-0.5,0.5,0],3));
 fxqGeo.setAttribute('uv',new THREE.Float32BufferAttribute([0,0,1,0,1,1,0,1],2));
@@ -21209,7 +21210,7 @@ const fxqMesh=new THREE.Mesh(fxqGeo,FXQ_MAT);fxqMesh.frustumCulled=false;fxqMesh
 // graphics item 7: also drawn in the bloom pass (uBloom), which runs only while FXQ_BL (a bare object, PFX_SRC) is shown:
 // some record with a bloom weight is on
 fxqMesh.layers.enable(PFX_BLOOM);const FXQ_BL=new THREE.Object3D();FXQ_BL.visible=false;scene.add(FXQ_BL);PFX_SRC.push(FXQ_BL);
-const _fxOrd=[],_fxFwd=new V3();
+const _fxOrd=[],_fxFwd=new V3(),FXQ_HIDE={on:false};   // FXQ_HIDE: a review shot of a breakup without the fire and smoke in front of it
 function fxPack(){
   const P=FXQ_A.iP.array,C=FXQ_A.iC.array,M=FXQ_A.iM.array,Vv=FXQ_A.iV.array,X=FXQ_A.iX.array,cp=camera.position;
   camera.getWorldDirection(_fxFwd);
@@ -21225,7 +21226,7 @@ function fxPack(){
       Vv[k]=q.v.x;Vv[k+1]=q.v.y;Vv[k+2]=q.v.z;Vv[k+3]=q.str;
       X[k]=q.hot;X[k+1]=q.heat;X[k+2]=q.bl;X[k+3]=0;}
     for(const a of [FXQ_A.iP,FXQ_A.iC,FXQ_A.iM,FXQ_A.iV,FXQ_A.iX]){a.updateRange.count=n*4;a.needsUpdate=true;}}
-  fxqGeo.instanceCount=n;fxqMesh.visible=n>0;FXQ_BL.visible=bl&&n>0;
+  fxqGeo.instanceCount=n;fxqMesh.visible=n>0&&!FXQ_HIDE.on;FXQ_BL.visible=bl&&n>0&&!FXQ_HIDE.on;
 }
 // how lit unlit smoke should look: full by day, dim at dusk, dark at night; flat grey in IR
 // 0 on the camera, 1 from 20 m out: fire and smoke never render on top of the lens
@@ -21241,7 +21242,7 @@ function fxRamp(u,c){u=clamp(u,0,1)*4;const i=Math.min(3,u|0),f=u-i,a=FX_RAMP[i]
 // burn 0 flame lick, 1 smoke puff.
 const FXD={},FXD_NEXT={};
 for(const k in FXD_N){FXD[k]=[];FXD_NEXT[k]=0;
-  for(let i=0;i<FXD_N[k];i++)FXD[k].push({q:fxq(k==='spark'?3:k==='burn'?1:2,k==='spark'?2:k==='burn'?1:0,k==='trail'?0.3:1),
+  for(let i=0;i<FXD_N[k];i++)FXD[k].push({q:fxq(k==='spark'||k==='glass'?3:k==='burn'?1:2,k==='spark'||k==='glass'?2:k==='burn'?1:0,k==='trail'||k==='dust'?0.3:1),
     on:false,t:0,life:1,vx:0,vy:0,vz:0,gy:-1e9,s0:1,s1:1,a0:1,kind:0,seed:0});}
 function fxDyn(pool,x,y,z,vx,vy,vz,life,s0,s1,a0,kind){const L=FXD[pool],d=L[FXD_NEXT[pool]];FXD_NEXT[pool]=(FXD_NEXT[pool]+1)%L.length;
   d.on=true;d.t=0;d.life=life;d.vx=vx;d.vy=vy;d.vz=vz;d.s0=s0;d.s1=s1;d.a0=a0;d.kind=kind||0;d.seed=Math.random();d.gy=-1e9;
@@ -21260,6 +21261,18 @@ function fxDynUpdate(dt){
       const c=Math.min(1,u*1.25);q.c.setRGB(1,0.9-0.75*c,0.55-0.55*c);
       if(d.kind){q.str=0;q.sz=d.s0*(1-0.3*u);q.a=d.a0*(0.55+0.45*Math.sin(d.t*17+d.seed*20))*clamp((1-u)*2.5,0,1);}
       else{q.v.set(d.vx,d.vy,d.vz);q.str=0.05;q.sz=d.s0*(1-0.5*u);q.a=d.a0*clamp((1-u)*3,0,1);}}
+    else if(k==='dust'){
+      // a breakup's dust: thrown out, slowing, spreading and settling slowly, carried by the wind; lit like smoke
+      const dr=Math.exp(-0.7*dt);d.vx*=dr;d.vz*=dr;d.vy*=Math.exp(-0.35*dt);
+      q.p.x+=(d.vx+_fw.x*0.5*Math.min(1,u*3))*dt;q.p.y+=d.vy*dt;q.p.z+=(d.vz+_fw.z*0.5*Math.min(1,u*3))*dt;
+      q.sz=d.s0+(d.s1-d.s0)*Math.sqrt(u);q.a=d.a0*clamp(u*8,0,1)*Math.pow(1-u,1.3)*fxNearP(q.p);q.ero=0.12+0.45*u;q.rot+=dt*0.25*(d.seed-0.5);
+      const v=(0.5+0.12*d.seed)*g0;q.c.setRGB(v,v*0.94,v*0.84);}
+    else if(k==='glass'){
+      // a shard of glass: falls, tumbling, and glints as it turns (the sun by day, the fire at night)
+      d.vy-=9.81*dt;const dr=Math.exp(-0.3*dt);d.vx*=dr;d.vz*=dr;q.p.x+=d.vx*dt;q.p.y+=d.vy*dt;q.p.z+=d.vz*dt;
+      if(d.gy<-1e8)d.gy=groundHeight(q.p.x,q.p.z);if(q.p.y<d.gy+0.1){d.on=false;q.visible=false;continue;}
+      const tw=Math.pow(Math.abs(Math.sin(d.t*(9+d.seed*14)+d.seed*30)),8);q.str=0;q.sz=d.s0*(0.6+0.8*tw);
+      if(lit<0.5&&lit>=0)q.c.setRGB(1,0.62,0.3);else q.c.setRGB(0.85,0.93,1);q.a=d.a0*(0.15+0.85*tw)*clamp((1-u)*3,0,1)*fxNearP(q.p);}
     else if(k==='trail'){
       q.p.x+=(d.vx+_fw.x*0.6)*dt;q.p.y+=d.vy*dt;q.p.z+=(d.vz+_fw.z*0.6)*dt;
       q.sz=d.s0+(d.s1-d.s0)*Math.sqrt(u);q.a=d.a0*(1-u)*fxNearP(q.p);q.ero=0.15+0.5*u;q.rot+=dt*0.5*(d.seed-0.5);
@@ -21754,9 +21767,14 @@ function crashBegin(){
   C.dir.normalize();C.right.set(-C.dir.z,0,C.dir.x);
   // the bang reaches the camera at the speed of sound: at once in the cockpit, a beat later from outside
   C.boomAt=camMode===1?0:camera.position.distanceTo(C.p)/340;
-  C.main=explode(C.p.x,C.p.y,C.p.z,{scale:P.scale,secondary:P.sec,debris:P.deb,smokeSec:P.smoke,fireSec:P.fire,boomDelay:C.boomAt,baseFade:0.14});
+  // crashfx: into a structure, the fireball goes up where the aircraft met it (in the air: no ring, dust or scorch on the
+  // ground under a wall or a roof), and the airframe stops in it (its pieces keep a fifth of the speed)
+  const SI=CFX.imp,up=SI?SI.p.y-C.gy>6:false;
+  if(SI){C.p.copy(SI.p).addScaledVector(SI.dir,0.5);C.spd*=0.2;}
+  C.main=explode(C.p.x,C.p.y,C.p.z,{scale:P.scale,secondary:P.sec,debris:P.deb,smokeSec:P.smoke,fireSec:P.fire,boomDelay:C.boomAt,baseFade:0.14,air:up});
   C.fireballs=1;C.shake=0.6;camBump=0;
   crashParts(P);
+  if(SI)cfxBreak(SI);
   // the airframe goes; its props, lights and burner go with it (the tick passes on=false)
   plane.g.visible=false;shadow.visible=false;
   // the wreck camera starts exactly where the camera is now, so nothing snaps
@@ -21806,7 +21824,7 @@ function crashClear(){
   wastedEnd(false);CFX.imp=null;
   crashEl.classList.remove('on');crashTopEl.classList.remove('on');document.body.classList.remove('crashOn');
   if(!CRASH.on)return;
-  CRASH.on=CRASH.cam=CRASH.card=false;wreckClear();fxClear();fireClear();debrisClear();
+  CRASH.on=CRASH.cam=CRASH.card=false;wreckClear();fxClear();fireClear();debrisClear();cfxClear();
 }
 function crashFxInfo(){const C=CRASH,k={};let n=0,wingMax=0,trailMax=0;
   for(const p of WRK){if(p.life<=0)continue;n++;k[p.kind]=(k[p.kind]||0)+1;
@@ -21815,6 +21833,302 @@ function crashFxInfo(){const C=CRASH,k={};let n=0,wingMax=0,trailMax=0;
   return {type:C.type,scale:C.s,fireballs:C.fireballs,pieces:n,secondaries:C.prof?C.prof.sec:0,boomAt:C.boomAt,cardAt:C.cardAt,
     on:C.on,t:C.t,card:C.card,kinds:k,wingMax:wingMax,trailMax:trailMax,planeVisible:plane.g.visible,
     mainOn:!!(C.main&&C.main.on),mainScale:C.main?C.main.s:0,mainFire:C.main?C.main.fireSec:0,flames:WRK.filter(p=>p.fl.visible).length};}
+
+// ================= crashfx item 2: the structure breaks up =================
+// How much breaks, from the energy the crash puts into the structure: E = the aircraft's kinetic energy plus 0.05 percent
+// of its fuel's heat (43 MJ/kg; the share of a fuel air deflagration that does structural work in the open, the rest
+// burns as the fireball and the pool fire). CFX_S[cls]: [S, Sc]: S, the energy to break one cubic metre of it (J/m3:
+// sheet metal and light frames tens of kJ, reinforced concrete hundreds); Sc, the energy per cubic metre of its volume
+// that brings the whole frame down (light structures only; the stadium, big buildings and towers only ever break
+// locally). The hole: the airframe's own swath (a third of the span: the fuselage and the inner wings) or the sphere E
+// breaks, whichever is bigger, never bigger than the building. A light structure collapses round the hole in proportion
+// to sqrt(E / (Sc V)) of the 40 m round the impact, and all of it past E > Sc V.
+const CFX_S={shed:[15e3,1.5e3],hangar:[20e3,2e3],house:[40e3,5e3],mall:[60e3,4e3],sign:[5e3,1e3],building:[250e3,0],tower:[400e3,0],stadium:[300e3,0]};
+function cfxDamage(I){
+  const r=I.rec,S=CFX_S[I.cls]||CFX_S.building,E=I.ke+0.0005*I.fuel*43e6,span=AC.span||10;
+  let rh=Math.max(0.32*span,Math.cbrt(3*E/(4*Math.PI*S[0])));
+  if(r)rh=Math.min(rh,Math.max(r.hx,r.hz)*1.2);
+  let fc=0,total=false,rc=rh;
+  if(S[1]>0&&r){const H=r.y1-r.y0,V=Math.min(2*r.hx,40)*Math.min(2*r.hz,40)*H;fc=E/(S[1]*V);total=fc>=1&&Math.max(r.hx,r.hz)<45;rc=total?1e9:rh*(1+1.6*Math.sqrt(Math.min(fc,1)));}
+  // how far through it the hole goes along the path: through a light structure, a few hole radii into a heavy one
+  const depth=total?1e9:S[1]>0?rh*3:rh*1.5;
+  return {E:E,rh:rh,rc:rc,fc:fc,total:total,depth:depth};}
+// 3D value noise for the hole's ragged edge and the crumple
+function cfxH(i,j,k){let h=Math.imul(i|0,374761393)+Math.imul(j|0,668265263)+Math.imul(k|0,1274126177);h=Math.imul(h^(h>>>13),1103515245);return ((h^(h>>>16))>>>0)/4294967296;}
+function cfxN(x,y,z){const i=Math.floor(x),j=Math.floor(y),k=Math.floor(z),fx=x-i,fy=y-j,fz=z-k,u=fx*fx*(3-2*fx),v=fy*fy*(3-2*fy),w=fz*fz*(3-2*fz);
+  const L=(a,b,t)=>a+(b-a)*t;
+  return L(L(L(cfxH(i,j,k),cfxH(i+1,j,k),u),L(cfxH(i,j+1,k),cfxH(i+1,j+1,k),u),v),L(L(cfxH(i,j,k+1),cfxH(i+1,j,k+1),u),L(cfxH(i,j+1,k+1),cfxH(i+1,j+1,k+1),u),v),w);}
+// the materials and pools, made at load and drawn once by the WARM step (cfxWarm), so a breakup compiles nothing
+const CFXM={int:lam(0x1c1916),prism:new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide}),chunk:lam(0xffffff)};
+// soot: a charred ring round the hole and a plume of it climbing the face above (u across, v up: the hole at v 0.28)
+CFXM.sootTex=tex(256,256,(x,w,h)=>{const N=fxNoise(23),id=x.createImageData(w,h),d=id.data;
+  for(let j=0;j<h;j++)for(let i=0;i<w;i++){const u=(i/w-0.5)*2,v=1-j/h,k=(j*w+i)*4,n=N.f(i/17,j/17),n2=N.f(i/6+9,j/6+3);
+    const r=Math.hypot(u,(v-0.28)/0.62),core=clamp((1.0-r)*2.2,0,1);
+    const pl=v>0.28?clamp(1-Math.abs(u)/(0.42+0.5*(v-0.28)),0,1)*clamp((1-v)/0.5,0,1)*0.85:0;
+    const a=clamp(Math.max(core,pl)*(0.55+0.7*n)-0.12+0.2*(n2-0.5),0,1);
+    const c=14+18*n2;d[k]=c+4;d[k+1]=c+2;d[k+2]=c;d[k+3]=255*Math.pow(a,0.85)*0.96;}
+  x.putImageData(id,0,0);});
+CFXM.soot=new THREE.MeshBasicMaterial({map:CFXM.sootTex,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});
+// the fire's glow on the walls round it (night): additive, warm, strongest at the hole's lower edge
+CFXM.glowTex=tex(128,128,(x,w,h)=>{const g=x.createRadialGradient(w/2,h*0.72,2,w/2,h*0.72,w*0.5);
+  g.addColorStop(0,'rgba(255,170,80,1)');g.addColorStop(0.35,'rgba(255,120,40,.55)');g.addColorStop(1,'rgba(255,90,20,0)');x.fillStyle=g;x.fillRect(0,0,w,h);});
+CFXM.glow=new THREE.MeshBasicMaterial({map:CFXM.glowTex,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,opacity:0,polygonOffset:true,polygonOffsetFactor:-3,polygonOffsetUnits:-3});
+// chunks: wall and roof panels (slabs) and concrete lumps (rocks), two instanced pools, colours per instance
+const CFXC_N={slab:200,rock:140},CFXC={},_cm4=new THREE.Matrix4(),_cv=new V3(),_cc=new THREE.Color();
+{const rockG=new THREE.DodecahedronGeometry(0.62,0);
+ for(const k in CFXC_N){const im=new THREE.InstancedMesh(k==='slab'?new THREE.BoxGeometry(1,1,1):rockG,CFXM.chunk,CFXC_N[k]);
+  im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);im.frustumCulled=false;im.visible=false;im.userData.heat=0.8;im.name='cfx_'+k;
+  const L=[];for(let i=0;i<CFXC_N[k];i++){_cm4.makeScale(0,0,0);im.setMatrixAt(i,_cm4);im.setColorAt(i,_cc.setRGB(0.5,0.5,0.5));   // instanceColor from the start: the warm-up draws that variant
+    L.push({i:i,on:false,rest:false,p:new V3(),v:new V3(),q:new Q4(),w:new V3(),s:new V3(1,1,1),hh:0.5,t:0,dust:false});}
+  scene.add(im);CFXC[k]={im:im,L:L,next:0,moved:false};}}
+// tiers: how many chunks, dust puffs and glints a breakup may use (Low stays cheap)
+function cfxCaps(){const t=GFX.tier;return t==='low'?{slab:70,rock:45,dust:14,glass:16,sub:1.4}:t==='high'?{slab:200,rock:140,dust:40,glass:48,sub:1}:{slab:140,rock:100,dust:28,glass:32,sub:1};}
+function cfxChunk(kind,p,v,sx,sy,sz,col,spin){const P=CFXC[kind],c=P.L[P.next];P.next=(P.next+1)%P.L.length;
+  c.on=true;c.rest=false;c.t=0;c.dust=sx*sz>3;c.p.copy(p);c.v.copy(v);c.s.set(sx,sy,sz);c.hh=Math.min(sx,sy,sz)*0.5*(kind==='rock'?0.62:1);
+  c.q.setFromEuler(_sE.set(Math.random()*6.28,Math.random()*6.28,Math.random()*6.28));c.w.set((Math.random()-0.5)*spin,(Math.random()-0.5)*spin,(Math.random()-0.5)*spin);
+  P.im.setColorAt(c.i,_cc.setHex(col).multiplyScalar(0.75+Math.random()*0.35));P.im.instanceColor.needsUpdate=true;P.moved=true;P.im.visible=true;return c;}
+const _cw=new V3(),_cwq=new Q4();
+function cfxChunksUpdate(dt){
+  for(const k in CFXC){const P=CFXC[k];let any=false;
+    for(const c of P.L){if(!c.on)continue;any=true;if(c.rest||dt<=0)continue;c.t+=dt;
+      c.v.y-=9.81*dt;const dr=Math.exp(-0.08*dt);c.v.multiplyScalar(dr);c.p.addScaledVector(c.v,dt);
+      const w=c.w.length();if(w>1e-3){_cwq.setFromAxisAngle(_cw.copy(c.w).divideScalar(w),w*dt);c.q.premultiply(_cwq);}
+      const g=groundHeight(c.p.x,c.p.z)+c.hh;
+      if(c.p.y<g){c.p.y=g;
+        if(c.v.y<-2.2){c.v.y=-c.v.y*0.26;c.v.x*=0.5;c.v.z*=0.5;c.w.multiplyScalar(0.55);
+          if(c.dust){c.dust=false;fxDyn('dust',c.p.x,g,c.p.z,(Math.random()-0.5)*2,1,(Math.random()-0.5)*2,3+Math.random()*2,c.s.x*1.5+2,c.s.x*4+6,0.4,0);}}
+        else{c.v.set(0,0,0);c.w.set(0,0,0);c.rest=true;}}
+      _cm4.compose(c.p,c.q,c.s);P.im.setMatrixAt(c.i,_cm4);P.moved=true;}
+    if(P.moved){P.im.instanceMatrix.needsUpdate=true;P.moved=false;}
+    P.im.visible=any;}}
+function cfxChunksClear(){for(const k in CFXC){const P=CFXC[k];_cm4.makeScale(0,0,0);for(const c of P.L){c.on=false;P.im.setMatrixAt(c.i,_cm4);}P.im.instanceMatrix.needsUpdate=true;P.im.visible=false;}}
+// ---- the broken mesh ----
+// cfxBreakGeo(g, M, D): a copy of geometry g (any: indexed or not, with its uvs, colours and material groups) whose
+// triangles near the impact are split until their edges are under about a fifth of the hole (far ones are kept as they
+// are), then: the triangles inside the hole are taken out (handed back as removed panels for the chunks), the rim is
+// crumpled in along the flight path, a light structure's roof sags and tears round the hole (and all of it folds down
+// in a total collapse). M: the object's world matrix (an instance's composed in), so the hole is cut in world metres.
+// The displacement is a pure function of the world position, so split triangles stay joined.
+const _bA=new V3(),_bB=new V3(),_bC=new V3(),_bP=new V3(),_bN=new V3(),_bT1=new V3(),_bT2=new V3(),_bUp=new V3(0,1,0),_bMi=new THREE.Matrix4(),_bNm=new THREE.Matrix3();
+function cfxFrame(I,D){
+  const n=I.n,t1=new V3(),t2=new V3();
+  if(Math.abs(n.y)>0.7){t1.set(I.dir.x,0,I.dir.z);if(t1.lengthSq()<1e-4)t1.set(1,0,0);t1.normalize();t2.crossVectors(n,t1).normalize();}
+  else{t1.crossVectors(_bUp,n).normalize();t2.copy(_bUp);}
+  return {p:I.p,n:n,t1:t1,t2:t2,dir:I.dir,roof:Math.abs(n.y)>0.7,rh:D.rh,rc:D.rc,total:D.total,depth:D.depth,rec:I.rec,sw:0.32*(AC.span||10),
+    y0:I.rec?I.rec.y0:I.p.y-10,y1:I.rec?I.rec.y1:I.p.y+10};}
+// how deep inside the hole a world point is: under 1 is gone. The hole is wider than tall (the wings), ragged, and runs
+// along the path to the depth the energy reaches
+const _bH=new V3();
+function cfxHoleD(F,P){
+  _bH.copy(P).sub(F.p);const a=_bH.dot(F.t1),b=_bH.dot(F.t2),along=_bH.dot(F.dir),rh=F.rh;
+  // a total collapse folds the frame down rather than cutting it away: the hole there is the airframe's way in only
+  const rt=F.total?Math.min(rh,F.sw):rh,ra=F.roof?rt*1.2:rt*1.15,rb=F.roof?rt*0.9:rt*0.72;
+  // along the path: from 0.6 rh in front of the face to the depth
+  const ad=along<-0.6*rh?(-0.6*rh-along)/(0.5*rh):along>F.depth?(along-F.depth)/(0.5*rh):0;
+  const q=Math.sqrt((a*a)/(ra*ra)+(b*b)/(rb*rb))+ad;
+  const s=Math.max(1.5,rh*0.35);
+  return q/(0.78+0.44*cfxN(P.x/s,P.y/s,P.z/s));}
+// the displacement of a world point (written into out): the rim pushed in along the path and torn, the roof sagging
+function cfxDisp(F,P,out){
+  out.set(0,0,0);const rh=F.rh,d=cfxHoleD(F,P);
+  if(d<1.9){const k=Math.pow(clamp((1.9-d)/0.9,0,1),1.5),s=Math.max(1,rh*0.25);
+    out.addScaledVector(F.dir,k*rh*0.22*(0.5+cfxN(P.x/s+7,P.y/s,P.z/s)));
+    out.x+=(cfxN(P.x/s,P.y/s+3,P.z/s)-0.5)*k*rh*0.12;out.y-=k*rh*0.08*cfxN(P.x/s+1,P.y/s,P.z/s+5);out.z+=(cfxN(P.x/s+4,P.y/s,P.z/s+2)-0.5)*k*rh*0.12;}
+  if(F.rc>F.rh&&F.rec){const H=F.y1-F.y0,hb=P.y-F.y0;
+    if(F.total){// the frame folds down onto its contents: a heap a fifth of the height, the walls splayed out a little
+      const s=Math.max(2,H*0.4),fl=0.18+0.1*cfxN(P.x/s,P.y/s,P.z/s);out.y+=-hb*(1-fl);
+      const dx=P.x-F.rec.x,dz=P.z-F.rec.z,L=Math.hypot(dx,dz)||1;out.x+=dx/L*hb*0.25*cfxN(P.x/s+3,0,P.z/s);out.z+=dz/L*hb*0.25*cfxN(P.x/s,0,P.z/s+3);}
+    else{const hd=Math.hypot(P.x-F.p.x,P.z-F.p.z);
+      if(hd<F.rc){const k=1-(hd/F.rc)*(hd/F.rc),hk=clamp(hb/H,0,1);
+        // the roof comes down most over the hole; the walls lean in at the top with it
+        out.y-=k*k*hk*H*0.62*(0.75+0.5*cfxN(P.x/3,P.y/3,P.z/3));
+        out.addScaledVector(F.dir,k*hk*H*0.12);}}}
+  return out;}
+// split until short (near the damage only), copying every attribute by interpolation
+function cfxBreakGeo(g0,M,F,caps){
+  const g=g0.index?g0.toNonIndexed():g0,pa=g.attributes.position,na=g.attributes.normal,ua=g.attributes.uv,ca=g.attributes.color;
+  const nT=pa.count/3,grp=new Int16Array(nT);
+  if(g.groups&&g.groups.length)for(const G of g.groups)for(let t=G.start/3;t<(G.start+G.count)/3&&t<nT;t++)grp[t]=G.materialIndex;
+  const nm=_bNm.getNormalMatrix(M);_bMi.copy(M).invert();
+  // the reach of the damage (world): the hole, the collapse round it, the rim
+  const reach=F.total?1e9:Math.max(F.rh*2.1,F.rc*1.15)+F.rh,Lmin=clamp(F.rh/4,1,5)*caps.sub*(F.total?2:1);
+  const P=[],N=[],U=[],C=[],TG=[],rem=[];
+  // a vertex: local position, normal, uv, colour as plain arrays
+  const V=(i)=>({p:[pa.getX(i),pa.getY(i),pa.getZ(i)],n:na?[na.getX(i),na.getY(i),na.getZ(i)]:[0,1,0],u:ua?[ua.getX(i),ua.getY(i)]:null,c:ca?[ca.getX(i),ca.getY(i),ca.getZ(i)]:null});
+  const mid=(a,b)=>({p:[(a.p[0]+b.p[0])/2,(a.p[1]+b.p[1])/2,(a.p[2]+b.p[2])/2],n:[(a.n[0]+b.n[0])/2,(a.n[1]+b.n[1])/2,(a.n[2]+b.n[2])/2],
+    u:a.u&&[(a.u[0]+b.u[0])/2,(a.u[1]+b.u[1])/2],c:a.c&&[(a.c[0]+b.c[0])/2,(a.c[1]+b.c[1])/2,(a.c[2]+b.c[2])/2]});
+  const W=(v,o)=>o.set(v.p[0],v.p[1],v.p[2]).applyMatrix4(M);
+  let budget=20000;
+  const out=(a,b,c,mi)=>{
+    // centroid in the world: in the hole, out it goes
+    W(a,_bA);W(b,_bB);W(c,_bC);_bP.copy(_bA).add(_bB).add(_bC).multiplyScalar(1/3);
+    const d=cfxHoleD(F,_bP);
+    let torn=false;
+    if(F.rc>F.rh&&F.rec){const hd=Math.hypot(_bP.x-F.p.x,_bP.z-F.p.z),hb=(_bP.y-F.y0)/(F.y1-F.y0);
+      // a sagging roof tears: the further down it comes, the likelier a panel parts and falls
+      if(F.total)torn=cfxH(_bP.x*7|0,_bP.y*7|0,_bP.z*7|0)<0.3;
+      else if(hd<F.rc&&hb>0.8)torn=cfxH(_bP.x*7|0,_bP.y*7|0,_bP.z*7|0)<0.45*(1-hd/F.rc);}
+    if(d<1||torn){_bT1.subVectors(_bB,_bA);_bT2.subVectors(_bC,_bA);const ar=_bT1.cross(_bT2).length()/2;
+      _bN.set(a.n[0],a.n[1],a.n[2]).applyMatrix3(nm).normalize();rem.push({p:_bP.clone(),n:_bN.clone(),a:ar,mi:mi,torn:torn,y:_bP.y});return;}
+    for(const v of [a,b,c]){P.push(v.p[0],v.p[1],v.p[2]);N.push(v.n[0],v.n[1],v.n[2]);if(v.u)U.push(v.u[0],v.u[1]);if(v.c)C.push(v.c[0],v.c[1],v.c[2]);}
+    TG.push(mi);};
+  const split=(a,b,c,mi,depth)=>{
+    W(a,_bA);W(b,_bB);W(c,_bC);
+    const lab=_bA.distanceTo(_bB),lbc=_bB.distanceTo(_bC),lca=_bC.distanceTo(_bA),L=Math.max(lab,lbc,lca);
+    _bP.copy(_bA).add(_bB).add(_bC).multiplyScalar(1/3);
+    const near=_bP.distanceTo(F.p)<reach+L*0.6;
+    if(!near||L<=Lmin||depth>18||budget<=0){out(a,b,c,mi);return;}
+    budget--;
+    if(L===lab){const m=mid(a,b);split(a,m,c,mi,depth+1);split(m,b,c,mi,depth+1);}
+    else if(L===lbc){const m=mid(b,c);split(a,b,m,mi,depth+1);split(a,m,c,mi,depth+1);}
+    else{const m=mid(c,a);split(a,b,m,mi,depth+1);split(m,b,c,mi,depth+1);}};
+  for(let t=0;t<nT;t++)split(V(t*3),V(t*3+1),V(t*3+2),grp[t],0);
+  if(g!==g0)g.dispose();
+  // displace (world, then back to local) and give the bent triangles their own facet normal
+  const nV=P.length/3,disp=new Float32Array(nV);
+  for(let i=0;i<nV;i++){_bP.set(P[i*3],P[i*3+1],P[i*3+2]).applyMatrix4(M);cfxDisp(F,_bP,_bN);
+    if(_bN.lengthSq()>1e-4){disp[i]=1;_bP.add(_bN).applyMatrix4(_bMi);P[i*3]=_bP.x;P[i*3+1]=_bP.y;P[i*3+2]=_bP.z;}}
+  for(let t=0;t<nV/3;t++){if(!disp[t*3]&&!disp[t*3+1]&&!disp[t*3+2])continue;
+    _bA.fromArray(P,t*9);_bB.fromArray(P,t*9+3);_bC.fromArray(P,t*9+6);_bT1.subVectors(_bB,_bA);_bT2.subVectors(_bC,_bA);_bN.crossVectors(_bT1,_bT2);
+    // keep the facet facing the way the original normals did
+    const o=N[t*9]+N[t*9+3]+N[t*9+6],o1=N[t*9+1]+N[t*9+4]+N[t*9+7],o2=N[t*9+2]+N[t*9+5]+N[t*9+8];if(_bN.x*o+_bN.y*o1+_bN.z*o2<0)_bN.negate();_bN.normalize();
+    for(let j=0;j<3;j++){N[t*9+j*3]=_bN.x;N[t*9+j*3+1]=_bN.y;N[t*9+j*3+2]=_bN.z;}}
+  // sorted into the material groups
+  const ord=[...TG.keys()].sort((x,y)=>TG[x]-TG[y]),bg=new THREE.BufferGeometry(),f3=(A,k)=>{const o=new Float32Array(ord.length*3*k);ord.forEach((t,j)=>{for(let q=0;q<3*k;q++)o[j*3*k+q]=A[t*3*k+q];});return o;};
+  bg.setAttribute('position',new THREE.BufferAttribute(f3(P,3),3));bg.setAttribute('normal',new THREE.BufferAttribute(f3(N,3),3));
+  if(U.length)bg.setAttribute('uv',new THREE.BufferAttribute(f3(U,2),2));if(C.length)bg.setAttribute('color',new THREE.BufferAttribute(f3(C,3),3));
+  let s0=0;for(let j=0;j<=ord.length;j++){if(j===ord.length||(j>0&&TG[ord[j]]!==TG[ord[j-1]])){bg.addGroup(s0*3,(j-s0)*3,TG[ord[j-1]]);s0=j;}}
+  bg.computeBoundingSphere();
+  return {g:bg,rem:rem,nT:ord.length};}
+// the soot (and its glow) over the broken surface: the triangles of the broken mesh within reach of the hole, lifted
+// 6 cm off it along their normals, uv projected on the face (u across, v up from the hole at 0.28)
+function cfxSootGeo(bg,M,F,R){
+  const pa=bg.attributes.position,na=bg.attributes.normal,nm=_bNm.getNormalMatrix(M),P=[],UV=[],S=2.6*F.rh*1.1;
+  for(let t=0;t<pa.count/3;t++){let near=false;
+    for(let j=0;j<3;j++){_bA.fromBufferAttribute(pa,t*3+j).applyMatrix4(M);if(_bA.distanceTo(F.p)<R){near=true;break;}}
+    if(!near)continue;
+    for(let j=0;j<3;j++){_bA.fromBufferAttribute(pa,t*3+j).applyMatrix4(M);_bN.fromBufferAttribute(na,t*3+j).applyMatrix3(nm).normalize();_bA.addScaledVector(_bN,0.06);
+      P.push(_bA.x,_bA.y,_bA.z);_bP.copy(_bA).sub(F.p);UV.push(0.5+_bP.dot(F.t1)/S,0.28+_bP.dot(F.t2)/(S*1.25));}}
+  if(!P.length)return null;
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(UV,2));g.computeBoundingSphere();return g;}
+// a world region poly building as a prism: walls on each edge and a roof triangulated from its outline (one vertex
+// colour per part: the hangar's walls, door and roof; a terminal's concrete, glass band and lip)
+function cfxPrismGeo(r){
+  const P=r.P,y0=r.y0,y1=r.y1,pos=[],col=[],nor=[],term=r.cls!=='hangar';
+  let lj=-1,ll=0;for(let i=0,j=P.length-1;i<P.length;j=i++){const l=Math.hypot(P[i][0]-P[j][0],P[i][1]-P[j][1]);if(l>ll){ll=l;lj=i;}}
+  const q=(a,b,c,d,cl)=>{_bT1.set(b[0]-a[0],b[1]-a[1],b[2]-a[2]);_bT2.set(d[0]-a[0],d[1]-a[1],d[2]-a[2]);_bN.crossVectors(_bT1,_bT2).normalize();
+    for(const v of [a,b,c,a,c,d]){pos.push(v[0],v[1],v[2]);col.push(cl[0],cl[1],cl[2]);nor.push(_bN.x,_bN.y,_bN.z);}};
+  const bands=term?[[0,0.32,[0.62,0.61,0.58]],[0.32,0.79,[0.2,0.24,0.29]],[0.79,1,[0.74,0.73,0.7]]]:[[0,1,[0.70,0.71,0.70]]];
+  for(let i=0,j=P.length-1;i<P.length;j=i++){const a=P[j],b=P[i];if(Math.hypot(a[0]-b[0],a[1]-b[1])<0.5)continue;
+    for(const B of (!term&&i===lj?[[0,1,[0.3,0.32,0.34]]]:bands)){const ya=y0+(y1-y0)*B[0],yb=y0+(y1-y0)*B[1];q([a[0],ya,a[1]],[b[0],ya,b[1]],[b[0],yb,b[1]],[a[0],yb,a[1]],B[2]);}}
+  const v=P.map(p=>new THREE.Vector2(p[0],p[1]));if(v.length>3&&v[0].equals(v[v.length-1]))v.pop();
+  let f=[];try{f=THREE.ShapeUtils.triangulateShape(v,[]);}catch(e){}
+  const rc=term?[0.74,0.73,0.7]:[0.62,0.64,0.66];
+  for(const t of f){const A=v[t[0]],B=v[t[1]],C=v[t[2]];let a=[A.x,y1,A.y],b=[B.x,y1,B.y],c=[C.x,y1,C.y];
+    if((b[2]-a[2])*(c[0]-a[0])-(b[0]-a[0])*(c[2]-a[2])<0){const s=b;b=c;c=s;}
+    for(const p of [a,b,c]){pos.push(p[0],p[1],p[2]);col.push(rc[0],rc[1],rc[2]);nor.push(0,1,0);}}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3));
+  g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));return g;}
+// CFXB: what this crash broke, so crashClear can put it all back. undo: closures; meshes: what was added
+const CFXB={on:false,undo:[],adds:[],F:null,D:null,glows:[],sign:null,removed:0,tris:0,ms:0,kept:[]};
+function cfxAdd(o,shadow){scene.add(o);CFXB.adds.push(o);if(shadow&&!o.isInstancedMesh){o.castShadow=true;CSM.stat.push(o);}return o;}
+function cfxMatCol(m){const a=Array.isArray(m)?m[0]:m;return a&&a.color?a.color.getHex():0x9a958c;}
+function cfxBreak(I){
+  if(CFXB.on)cfxClear();
+  const t0=performance.now(),D=cfxDamage(I),F=cfxFrame(I,D),r=I.rec,caps=cfxCaps(),rem=[];CFXB.on=true;CFXB.F=F;CFXB.D=D;
+  const col=(r&&r.col)||0x9a958c;
+  const brk=(geo,M,mat,make)=>{const B=cfxBreakGeo(geo,M,F,caps);CFXB.tris+=B.nT;for(const x of B.rem){x.col=cfxMatCol(Array.isArray(mat)?mat[x.mi]||mat[0]:mat);rem.push(x);}
+    const o=make(B.g);const sg=cfxSootGeo(B.g,M,F,F.rh*2.4);
+    if(sg){const s=cfxAdd(new THREE.Mesh(sg,CFXM.soot));s.renderOrder=2;const gl=cfxAdd(new THREE.Mesh(sg,CFXM.glow.clone()));gl.renderOrder=3;CFXB.glows.push(gl);}
+    return o;};
+  // the inner shell: the original surface turned inside out and darkened, so the hole shows a burnt dark inside
+  const shell=(geo,M)=>{const g=geo.index?geo.toNonIndexed():geo.clone(),p=g.attributes.position;
+    for(let i=0;i<p.count;i+=3){const x=p.getX(i+1),y=p.getY(i+1),z=p.getZ(i+1);p.setXYZ(i+1,p.getX(i+2),p.getY(i+2),p.getZ(i+2));p.setXYZ(i+2,x,y,z);}
+    g.deleteAttribute('uv');if(g.attributes.color)g.deleteAttribute('color');g.clearGroups();g.computeVertexNormals();
+    const m=new THREE.Mesh(g,CFXM.int);M.decompose(m.position,m.quaternion,m.scale);m.scale.multiplyScalar(0.985);
+    if(!g.boundingBox)g.computeBoundingBox();const c=g.boundingBox.getCenter(new V3()).applyMatrix4(M);m.position.lerp(c,0.015);cfxAdd(m);};
+  if(r&&r.meshes&&r.meshes.length){
+    for(const m of r.meshes){if(!m.isMesh||!m.visible)continue;m.updateWorldMatrix(true,false);const M=m.matrixWorld.clone();
+      const o=brk(m.geometry,M,m.material,g=>{const b=new THREE.Mesh(g,m.material);M.decompose(b.position,b.quaternion,b.scale);b.receiveShadow=m.receiveShadow;b.userData.heat=0.9;return cfxAdd(b,true);});
+      if(m===r.meshes[0]&&!D.total)shell(m.geometry,M);
+      m.visible=false;CFXB.undo.push(()=>{m.visible=true;});}}
+  else if(r&&r.im){
+    // an instance: hidden (scale 0), its broken copy a one instance InstancedMesh with the same material, so the
+    // same program draws it; the roof that rides on it (a house) goes with it
+    for(const [im,ii] of [[r.im,r.ii]].concat(r.pair?[[r.pair,r.ii]]:[])){
+      const M0=new THREE.Matrix4();im.getMatrixAt(ii,M0);im.updateWorldMatrix(true,false);const M=M0.clone().premultiply(im.matrixWorld);
+      const ic=new THREE.Color(1,1,1);if(im.instanceColor)im.getColorAt(ii,ic);
+      brk(im.geometry,M,im.material,g=>{const b=new THREE.InstancedMesh(g,im.material,1);b.setMatrixAt(0,M);if(im.instanceColor)b.setColorAt(0,ic);b.frustumCulled=false;b.userData.heat=0.9;return cfxAdd(b);});
+      if(im===r.im&&!D.total)shell(im.geometry,M);
+      for(const x of rem)if(x.col===cfxMatCol(im.material))x.col=ic.getHex();
+      _cm4.makeScale(0,0,0);im.setMatrixAt(ii,_cm4);im.instanceMatrix.needsUpdate=true;
+      CFXB.undo.push(()=>{im.setMatrixAt(ii,M0);im.instanceMatrix.needsUpdate=true;});}}
+  else if(r&&r.mg){
+    // a region poly building: its triangles in the merged mesh folded to a point, a prism of its own broken instead
+    const mm=scene.getObjectByName(r.mg.name);
+    if(mm){const pa=mm.geometry.attributes.position,a=r.mg.a,b=r.mg.b,keep=pa.array.slice(a*3,b*3);
+      for(let i=a;i<b;i++)pa.setXYZ(i,pa.getX(a),pa.getY(a),pa.getZ(a));pa.needsUpdate=true;
+      CFXB.undo.push(()=>{pa.array.set(keep,a*3);pa.needsUpdate=true;});}
+    const pm=scene.getObjectByName('buildings'),mat=pm&&pm.material.vertexColors?pm.material:CFXM.prism,pg=cfxPrismGeo(r),M=new THREE.Matrix4();
+    brk(pg,M,mat,g=>cfxAdd(new THREE.Mesh(g,mat),true));pg.dispose();}
+  else if(I.o&&I.o.grp){
+    // a billboard: the posts fold at the base and the board goes over along the path (a falling pole, theta'' = 3g/2L sin)
+    const G=I.o.grp,ax=new V3(I.dir.z,0,-I.dir.x).normalize(),q0=G.quaternion.clone(),p0=G.position.clone();
+    const fame=REGION.az&&Math.hypot(I.o.x-2830,I.o.z+1000)<5?scene.getObjectByName('fame_billboard'):null,fv=fame&&fame.visible;if(fame)fame.visible=false;
+    CFXB.sign={g:G,ax:ax,q0:q0,th:0.06,w:0.6+Math.min(2,I.spd/40),L:10.5};
+    CFXB.undo.push(()=>{G.quaternion.copy(q0);G.position.copy(p0);if(fame)fame.visible=fv;CFXB.sign=null;});
+    for(let i=0;i<10;i++)rem.push({p:new V3(I.p.x+(Math.random()-0.5)*8,I.p.y,I.p.z+(Math.random()-0.5)*8),n:I.n.clone(),a:3,col:0x6b6e72,torn:false,y:I.p.y});}
+  // what hangs on its walls (the Glendale hangars' banner and the fame wall) goes with the wall: under the hole or the collapse
+  if(r&&REGION.az)for(const nm of ['egg_hangar','fame_hangar']){const o=scene.getObjectByName(nm);if(!o||!o.visible)continue;
+    o.getWorldPosition(_cv);if(!strInside(r,_cv.x+(r.x-_cv.x)*0.03,_cv.y,_cv.z+(r.z-_cv.z)*0.03))continue;   // its own building's (it hangs 15 cm off the wall)
+    if(D.total||_cv.distanceTo(I.p)<D.rh+9||D.rc>D.rh&&Math.hypot(_cv.x-I.p.x,_cv.z-I.p.z)<D.rc+6){o.visible=false;CFXB.undo.push(()=>{o.visible=true;});}}
+  CFXB.removed=rem.length;
+  // the chunks: the removed panels, a share of them, sized to the area each stands for; slabs from walls and roofs,
+  // lumps from concrete. Most go in along the path with a share of the impact speed; a quarter is blown back out by
+  // the fireball; torn roof panels just fall
+  const heavy=/building|tower|stadium/.test(I.cls),area=rem.reduce((s,x)=>s+x.a,0);
+  const nS=Math.min(caps.slab,Math.round((heavy?0.35:0.85)*Math.min(rem.length,caps.slab+caps.rock))),nR=heavy?Math.min(caps.rock,Math.round(0.65*Math.min(rem.length,caps.slab+caps.rock))):Math.min(18,caps.rock);
+  const pick=n=>{const out=[];for(let i=0;i<n&&rem.length;i++)out.push(rem[Math.floor(Math.random()*rem.length)]);return out;};
+  const per=clamp(area/Math.max(1,nS+nR),0.6,heavy?16:30),th=heavy?0.32:/house|sign/.test(I.cls)?0.1:0.06,v0=I.spd;
+  for(const kind of ['slab','rock'])for(const x of pick(kind==='slab'?nS:nR)){const R=Math.random,sz=Math.sqrt(per)*(0.45+R()*0.7);
+    const v=new V3();
+    if(x.torn)v.set((R()-0.5)*2,-1-R()*2,(R()-0.5)*2);
+    else if(R()<0.25)v.copy(x.n).multiplyScalar(4+R()*12).addScaledVector(_bUp,3+R()*9);
+    else v.copy(I.dir).multiplyScalar(v0*(0.08+R()*0.25)).addScaledVector(x.n,R()*3).addScaledVector(_bUp,R()*6).add(_cv.set((R()-0.5)*6,0,(R()-0.5)*6));
+    if(kind==='slab')cfxChunk('slab',x.p,v,sz,th*(0.7+R()*0.6),sz*(0.5+R()*0.6),x.col,4+R()*6);
+    else cfxChunk('rock',x.p,v,sz*0.7,sz*0.55,sz*0.65,heavy?0x8d8a83:x.col,3+R()*5);}
+  // dust: a burst at the impact and a slow cloud over the collapse; glass: glints out of the hole where it has windows
+  const dN=caps.dust,ds=Math.sqrt(D.rh);
+  for(let i=0;i<dN;i++){const R=Math.random,a=R()*6.283,rr=D.rh*(0.4+R()*(D.total||D.rc>D.rh?1.6:0.9)),c=D.total&&r?{x:r.x,z:r.z}:I.p;
+    const y=D.total&&r?r.y0+1:Math.max(groundHeight(c.x,c.z),I.p.y-D.rh*0.5);
+    fxDyn('dust',c.x+Math.cos(a)*rr,y+R()*D.rh*0.6,c.z+Math.sin(a)*rr,I.n.x*R()*4+(R()-0.5)*3,1+R()*2.5,I.n.z*R()*4+(R()-0.5)*3,7+R()*7,ds*3+R()*4,ds*9+10+R()*8,0.55,0);}
+  if(/building|tower|stadium|mall/.test(I.cls))for(let i=0;i<caps.glass;i++){const R=Math.random;
+    fxDyn('glass',I.p.x+(R()-0.5)*D.rh,I.p.y+(R()-0.3)*D.rh*0.6,I.p.z+(R()-0.5)*D.rh,I.n.x*(3+R()*9)+(R()-0.5)*6,2+R()*7,I.n.z*(3+R()*9)+(R()-0.5)*6,1.6+R()*1.6,0.18+R()*0.25,0.18,1,0);}
+  CFXB.ms=+(performance.now()-t0).toFixed(1);
+  return CFXB;}
+function cfxSignUpdate(dt){const S=CFXB.sign;if(!S||dt<=0)return;
+  if(S.th<1.45){S.w+=1.5*9.81/S.L*Math.sin(S.th)*dt;S.th=Math.min(1.45,S.th+S.w*dt);S.g.quaternion.copy(S.q0).premultiply(_cwq.setFromAxisAngle(S.ax,S.th));
+    if(S.th>=1.45){const g=S.g.position;fxDyn('dust',g.x,g.y,g.z,0,1,0,5,6,16,0.5,0);}}}
+function cfxUpdate(dt){if(!CFXB.on)return;cfxChunksUpdate(dt);cfxSignUpdate(dt);}
+function cfxClear(){
+  if(!CFXB.on)return;
+  for(const f of CFXB.undo.reverse())try{f();}catch(e){}
+  for(const o of CFXB.adds){scene.remove(o);const i=CSM.stat.indexOf(o);if(i>=0)CSM.stat.splice(i,1);
+    // shared geometry (the soot under its glow) is disposed once; the glow's cloned material with it
+    if(o.geometry&&!o.geometry.userData.gone){o.geometry.userData.gone=1;o.geometry.dispose();}if(CFXB.glows.includes(o))o.material.dispose();if(o.isInstancedMesh)o.dispose&&o.dispose();}
+  Object.assign(CFXB,{on:false,undo:[],adds:[],F:null,D:null,glows:[],sign:null,removed:0,tris:0,ms:0});cfxChunksClear();}
+function cfxInfo(){const D=CFXB.D,n={};for(const k in CFXC)n[k]=CFXC[k].L.filter(c=>c.on).length;
+  return {on:CFXB.on,rh:D?D.rh:0,rc:D?D.rc:0,fc:D?D.fc:0,total:D?D.total:false,E:D?D.E:0,removed:CFXB.removed,tris:CFXB.tris,ms:CFXB.ms,adds:CFXB.adds.length,chunks:n,
+    rest:Object.fromEntries(Object.keys(CFXC).map(k=>[k,CFXC[k].L.filter(c=>c.on&&c.rest).length])),dust:FXD.dust.filter(d=>d.on).length,glass:FXD.glass.filter(d=>d.on).length};}
+// the WARM step: every crashfx material drawn once (the chunks with their instance colours, the shell, the soot and
+// the glow, the prism), so the first breakup of a flight compiles nothing
+function cfxWarm(){
+  const g=new THREE.Group(),tri=new THREE.PlaneGeometry(2,2);
+  for(const m of [CFXM.int,CFXM.soot,CFXM.glow,CFXM.prism]){const me=new THREE.Mesh(tri,m);g.add(me);}
+  const pg=new THREE.BufferGeometry().copy(tri);pg.setAttribute('color',new THREE.Float32BufferAttribute(new Array(pg.attributes.position.count*3).fill(1),3));g.children[3].geometry=pg;
+  for(const k in CFXC){const im=CFXC[k].im;_cm4.makeScale(1,1,1);im.setMatrixAt(0,_cm4);im.instanceMatrix.needsUpdate=true;im.visible=true;}
+  const gl=CFXM.glow.opacity;CFXM.glow.opacity=0.5;scene.add(g);
+  try{warmObj(g);for(const k in CFXC)warmObj(CFXC[k].im);}finally{scene.remove(g);pg.dispose();CFXM.glow.opacity=gl;cfxChunksClear();}}
 
 // ---- the range itself ----
 function buildRange(){
@@ -22626,7 +22940,7 @@ function tick(t,skipRender){
       // time on target: the ball locked onto an actual target, not a ground point
       if(SENSOR.tgt&&!SENSOR.tgt.dead)STRIKE.tot=(STRIKE.tot||0)+dt;}
   }
-  {const fdt=paused?0:dt;fireUpdate(fdt);smokeUpdate(fdt);debrisUpdate(fdt);fxUpdate(fdt);crashTick(fdt);wreckUpdate(fdt);fxPack();}
+  {const fdt=paused?0:dt;fireUpdate(fdt);smokeUpdate(fdt);debrisUpdate(fdt);fxUpdate(fdt);crashTick(fdt);wreckUpdate(fdt);cfxUpdate(fdt);fxPack();}
   plane.g.position.copy(dp);plane.g.quaternion.copy(q);
   const on=running&&!s.crashed&&!DF.ej;   // the free camera shows the live prop; pause and photo freeze it (DF.ej: ejected, the jet is gone)
   propUpdate(plane,on,s.power,paused?0:dt);
@@ -23421,6 +23735,8 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
   STRIKE:STRIKE,SENSOR:SENSOR,RANGE:RANGE,groundHeight:groundHeight,secAt:secAt,CAR:CAR,
   isPaved:isPaved,spawnInfo:spawnInfo,riverX:riverX,FWY_X:FWY_X,I10_Z:I10_Z,APC:APC,LUKE:LUKE,
   smokeCount:()=>smoke.filter(p=>p.life>0).length,smokeMax:SMOKE_MAX,
+  cfx:()=>cfxInfo(),CFXB:CFXB,cfxDamage:cfxDamage,
+  fxHide:v=>{FXQ_HIDE.on=!!v;},
   STR:STR,strHit:(x,z,yb)=>{const r=strHit(x,z,yb);return r?{id:r.id,name:r.name,cls:r.cls}:null;},strInside:strInside,fuelNow:fuelNow,FUEL:FUEL,
   strImp:()=>{const I=CFX.imp;return I?{name:I.name,cls:I.cls,id:I.rec?I.rec.id:-1,p:[I.p.x,I.p.y,I.p.z],n:[I.n.x,I.n.y,I.n.z],roof:I.roof,spd:I.spd,mass:I.mass,fuel:I.fuel,ke:I.ke,type:I.type}:null;},
   camMode:()=>camMode,sensorMode:()=>sensorMode,
