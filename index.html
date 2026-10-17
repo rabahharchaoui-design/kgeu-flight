@@ -21196,9 +21196,10 @@ FXQ_MAT.map=fxAtlas;   // so the WARM step uploads the atlas with the other text
 // then the rings: 120 sparks and embers, 72 debris trail puffs, 96 burning-site flames and
 // puffs; plus the 12 wreck piece flames (built with the wreck pool). 394 in all.
 const FX_N=3,FX_FB=9,FX_SM=20,FX_CORE=3,FX_MINI=4;
-// crashfx: dust (a breakup's dust cloud) and glass (glints out of a broken facade)
-const FXD_N={spark:120,trail:72,burn:96,dust:48,glass:48};
-const FXQ_N=FX_N*(1+FX_FB+FX_SM)+FX_MINI*4+Object.values(FXD_N).reduce((a,b)=>a+b,0)+12;
+// crashfx: dust (a breakup's dust cloud), glass (glints out of a broken facade), sflame (a structure fire's flames); and
+// the structure fire's column, SF_SM puffs of its own
+const FXD_N={spark:120,trail:72,burn:96,dust:48,glass:48,sflame:64},SF_SM=150;
+const FXQ_N=FX_N*(1+FX_FB+FX_SM)+FX_MINI*4+Object.values(FXD_N).reduce((a,b)=>a+b,0)+12+SF_SM;
 const fxqGeo=new THREE.InstancedBufferGeometry();
 fxqGeo.setAttribute('position',new THREE.Float32BufferAttribute([-0.5,-0.5,0,0.5,-0.5,0,0.5,0.5,0,-0.5,0.5,0],3));
 fxqGeo.setAttribute('uv',new THREE.Float32BufferAttribute([0,0,1,0,1,1,0,1],2));
@@ -21242,12 +21243,13 @@ function fxRamp(u,c){u=clamp(u,0,1)*4;const i=Math.min(3,u|0),f=u-i,a=FX_RAMP[i]
 // burn 0 flame lick, 1 smoke puff.
 const FXD={},FXD_NEXT={};
 for(const k in FXD_N){FXD[k]=[];FXD_NEXT[k]=0;
-  for(let i=0;i<FXD_N[k];i++)FXD[k].push({q:fxq(k==='spark'||k==='glass'?3:k==='burn'?1:2,k==='spark'||k==='glass'?2:k==='burn'?1:0,k==='trail'||k==='dust'?0.3:1),
+  for(let i=0;i<FXD_N[k];i++)FXD[k].push({q:fxq(k==='spark'||k==='glass'?3:k==='burn'||k==='sflame'?1:2,k==='spark'||k==='glass'?2:k==='burn'||k==='sflame'?1:0,k==='trail'||k==='dust'?0.3:1),
     on:false,t:0,life:1,vx:0,vy:0,vz:0,gy:-1e9,s0:1,s1:1,a0:1,kind:0,seed:0});}
 function fxDyn(pool,x,y,z,vx,vy,vz,life,s0,s1,a0,kind){const L=FXD[pool],d=L[FXD_NEXT[pool]];FXD_NEXT[pool]=(FXD_NEXT[pool]+1)%L.length;
   d.on=true;d.t=0;d.life=life;d.vx=vx;d.vy=vy;d.vz=vz;d.s0=s0;d.s1=s1;d.a0=a0;d.kind=kind||0;d.seed=Math.random();d.gy=-1e9;
   const q=d.q;q.p.set(x,y,z);q.visible=true;q.rot=Math.random()*6.283;q.a=0;q.ero=0;q.hot=0;q.str=0;q.sz=s0;
   if(pool==='burn'){q.tex=d.kind?2:1;q.mode=d.kind?0:1;q.heat=d.kind?0.3:1;q.bl=d.kind?0:0.5;}
+  else if(pool==='sflame'){q.bl=0.5;q.v.set(0,1,0);q.str=0.7;}   // a structure fire's flame: a tongue, taller than wide
   return d;}
 function fxDynUpdate(dt){
   const lit=fxLit(),g0=Math.max(lit,0);
@@ -21771,10 +21773,11 @@ function crashBegin(){
   // ground under a wall or a roof), and the airframe stops in it (its pieces keep a fifth of the speed)
   const SI=CFX.imp,up=SI?SI.p.y-C.gy>6:false;
   if(SI){C.p.copy(SI.p).addScaledVector(SI.dir,0.5);C.spd*=0.2;}
-  C.main=explode(C.p.x,C.p.y,C.p.z,{scale:P.scale,secondary:P.sec,debris:P.deb,smokeSec:P.smoke,fireSec:P.fire,boomDelay:C.boomAt,baseFade:0.14,air:up});
+  // (the structure fire, sfStart, takes over the burning and the column: the fireball's own column only for its first seconds)
+  C.main=explode(C.p.x,C.p.y,C.p.z,{scale:P.scale,secondary:P.sec,debris:P.deb,smokeSec:SI?14:P.smoke,fireSec:SI?0:P.fire,boomDelay:C.boomAt,baseFade:0.14,air:up});
   C.fireballs=1;C.shake=0.6;camBump=0;
   crashParts(P);
-  if(SI)cfxBreak(SI);
+  if(SI){cfxBreak(SI);sfStart(SI,CFXB.D);}
   // the airframe goes; its props, lights and burner go with it (the tick passes on=false)
   plane.g.visible=false;shadow.visible=false;
   // the wreck camera starts exactly where the camera is now, so nothing snaps
@@ -22109,9 +22112,9 @@ function cfxBreak(I){
 function cfxSignUpdate(dt){const S=CFXB.sign;if(!S||dt<=0)return;
   if(S.th<1.45){S.w+=1.5*9.81/S.L*Math.sin(S.th)*dt;S.th=Math.min(1.45,S.th+S.w*dt);S.g.quaternion.copy(S.q0).premultiply(_cwq.setFromAxisAngle(S.ax,S.th));
     if(S.th>=1.45){const g=S.g.position;fxDyn('dust',g.x,g.y,g.z,0,1,0,5,6,16,0.5,0);}}}
-function cfxUpdate(dt){if(!CFXB.on)return;cfxChunksUpdate(dt);cfxSignUpdate(dt);}
+function cfxUpdate(dt){if(CFXB.on){cfxChunksUpdate(dt);cfxSignUpdate(dt);}sfUpdate(dt);}
 function cfxClear(){
-  if(!CFXB.on)return;
+  sfClear();if(!CFXB.on)return;
   for(const f of CFXB.undo.reverse())try{f();}catch(e){}
   for(const o of CFXB.adds){scene.remove(o);const i=CSM.stat.indexOf(o);if(i>=0)CSM.stat.splice(i,1);
     // shared geometry (the soot under its glow) is disposed once; the glow's cloned material with it
@@ -22127,8 +22130,97 @@ function cfxWarm(){
   for(const m of [CFXM.int,CFXM.soot,CFXM.glow,CFXM.prism]){const me=new THREE.Mesh(tri,m);g.add(me);}
   const pg=new THREE.BufferGeometry().copy(tri);pg.setAttribute('color',new THREE.Float32BufferAttribute(new Array(pg.attributes.position.count*3).fill(1),3));g.children[3].geometry=pg;
   for(const k in CFXC){const im=CFXC[k].im;_cm4.makeScale(1,1,1);im.setMatrixAt(0,_cm4);im.instanceMatrix.needsUpdate=true;im.visible=true;}
-  const gl=CFXM.glow.opacity;CFXM.glow.opacity=0.5;scene.add(g);
-  try{warmObj(g);for(const k in CFXC)warmObj(CFXC[k].im);}finally{scene.remove(g);pg.dispose();CFXM.glow.opacity=gl;cfxChunksClear();}}
+  const gl=CFXM.glow.opacity;CFXM.glow.opacity=0.5;scene.add(g);SF.ga.visible=true;SF.ga.material.opacity=0.5;SF.ga.position.set(0,0,0);
+  try{warmObj(g);for(const k in CFXC)warmObj(CFXC[k].im);}finally{scene.remove(g);pg.dispose();CFXM.glow.opacity=gl;cfxChunksClear();SF.ga.visible=false;}}
+
+// ================= crashfx item 3: the structure fire =================
+// A pool fire fed by the fuel that did not go up in the fireball (60 percent of what was on board spills; jet fuel and
+// avgas, 800 kg/m3, spread 2 cm deep on a hard floor, never wider than the building's floor), burning at the large pool
+// rate (Babrauskas: 0.039 kg/m2 s for kerosene, times 1-exp(-3.5 D)), 43 MJ/kg: Q (kW). Its flames are Heskestad's mean
+// flame height L = 0.235 Q^0.4 - 1.02 D; it burns for the spilt fuel over the burning rate (the building's own contents
+// keep it going: at least 3 minutes), dying down over the last 30 percent. The smoke column is a buoyant plume: the
+// centre line rises at w = 3.4 (g/(cp T rho))^(1/3) Qc^(1/3) z^(-1/3) (Heskestad, Qc the 70 percent convective), so
+// a parcel reaches height z after t = 3/4 z^(4/3) / C; it widens as b = 0.12 z; the wind (stronger with height, a 1/5
+// power law) carries it U(z) t downwind, so the column leans; it stops rising at the height its heat can lift it
+// (30 Q_MW^0.4, 40 to 1,500 m) and spreads out there. Jet fuel smokes near black, avgas and a house a dark grey.
+// One fire at a time; the column's puffs and the flames are records in the FX quad layer (no new programs).
+const SF_TIER={low:{fl:18,sm:44,em:3,sub:0.5},medium:{fl:36,sm:96,em:6,sub:1},high:{fl:56,sm:150,em:10,sub:1}};
+const SF={on:false,t:0,x:0,y:0,z:0,D:1,L:1,Q:1,zmax:50,C:10,dur:180,I:0,jet:false,vent:null,two:null,sm:[],fa:0,ea:0,ga:null,gb:null,n:0,fuel:0,cap:SF_TIER.medium};
+for(let i=0;i<SF_SM;i++)SF.sm.push({q:fxq(2,0,0.3),a:0,ang:0,j:0,shade:0,spin:0,live:false});
+// the fire's light on the ground round it: two additive decals (the pool, and the base of a wall fire's fall)
+{const glG=new THREE.PlaneGeometry(1,1);glG.rotateX(-Math.PI/2);
+ const mk=()=>{const m=new THREE.Mesh(glG,groundDecalMat(new THREE.MeshBasicMaterial({color:0xffffff,map:fxGlowTex,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide,fog:false,blending:THREE.AdditiveBlending})));
+   m.visible=false;m.renderOrder=2;scene.add(m);return m;};SF.ga=mk();SF.gb=mk();}
+function sfPool(fuel,floor){
+  const V=fuel*0.6/800,A=clamp(V/0.02,1,Math.min(3500,floor||3500)),D=Math.sqrt(4*A/Math.PI),mr=0.039*(1-Math.exp(-3.5*D)),Q=mr*A*43000;
+  return {A:A,D:D,Q:Q,L:Math.max(0.8,0.235*Math.pow(Q,0.4)-1.02*D),dur:Math.max(180,fuel*0.6/(mr*A)),C:3.4*0.3027*Math.cbrt(0.7*Q),zmax:clamp(30*Math.pow(Q/1000,0.4),40,1500)};}
+function sfStart(I,Dm){
+  const r=I.rec,heavy=/building|tower|stadium/.test(I.cls),floor=r?(r.shape==='ell'?Math.PI:4)*r.hx*r.hz:3500;
+  const P=sfPool(I.fuel,floor);Object.assign(SF,P);SF.on=true;SF.t=0;SF.fa=SF.ea=0;SF.fuel=I.fuel;SF.jet=!/cessna|archer|alpha/.test(I.type);SF.cap=SF_TIER[GFX.tier]||SF_TIER.medium;
+  // where it burns: a wall of a big building, on the floor inside the hole (the flames out of the hole, a share of the
+  // fuel and the burning wreckage down at its foot); a light structure or a roof, on its floor round the impact
+  const wall=!I.roof&&heavy;
+  if(wall){SF.x=I.p.x+I.dir.x*Math.min(Dm.rh,SF.D/2);SF.z=I.p.z+I.dir.z*Math.min(Dm.rh,SF.D/2);SF.y=Math.max(r?r.y0:groundHeight(I.p.x,I.p.z),I.p.y-Dm.rh*0.6);
+    SF.vent={p:I.p.clone(),n:I.n.clone(),t1:CFXB.F?CFXB.F.t1.clone():new V3(1,0,0),ra:Dm.rh*0.9,rb:Dm.rh*0.55};}
+  else{const gy=r&&!I.roof?r.y0:I.roof?Math.max(r?r.y0:0,I.p.y-(Dm.total?(r.y1-r.y0)*0.8:Dm.rh*0.3)):groundHeight(I.p.x,I.p.z);
+    SF.x=I.p.x+I.dir.x*Math.min(Dm.rh*0.8,SF.D*0.4);SF.z=I.p.z+I.dir.z*Math.min(Dm.rh*0.8,SF.D*0.4);SF.y=Math.max(gy,groundHeight(SF.x,SF.z));SF.vent=null;}
+  // the fall at the foot of a high wall fire: a quarter of the fuel and the wreckage burning on the ground below
+  const gy=groundHeight(I.p.x+I.n.x*2,I.p.z+I.n.z*2);
+  SF.two=wall&&SF.y-gy>6?Object.assign(sfPool(I.fuel*0.25,600),{x:I.p.x+I.n.x*Math.max(2,Dm.rh*0.3),y:gy,z:I.p.z+I.n.z*Math.max(2,Dm.rh*0.3)}):null;
+  // the column's puffs: their ages spread evenly over one rise and spread, so it stands complete at once (the fireball's
+  // own column covers the first seconds) and feeds continuously from then on
+  const n=SF.n=SF.cap.sm,aEnd=sfAEnd();
+  for(let i=0;i<SF_SM;i++){const m=SF.sm[i];m.live=i<n;m.q.visible=false;m.a=aEnd*(i+Math.random()*0.7)/n*0.999;m.ang=Math.random()*6.283;m.j=Math.random();m.shade=Math.random()*0.05;m.spin=(Math.random()-0.5)*0.3;m.q.rot=Math.random()*6.28;}
+  SF.ga.visible=SF.gb.visible=false;}
+// a parcel's age at the top of the rise, and when it has spread out and gone
+function sfAMax(){return 0.75*Math.pow(SF.zmax,4/3)/SF.C;}
+function sfAEnd(){return sfAMax()*1.7+8;}
+function sfZ(a){return Math.min(SF.zmax,Math.pow(4*SF.C*a/3,0.75));}
+const _sfw=new V3();
+function sfUpdate(dt){
+  if(!SF.on)return;SF.t+=dt;const t=SF.t,lit=fxLit(),g0=Math.max(lit,0),night=TOD.night?1:TOD.lights*0.45,cap=SF.cap,R=Math.random;
+  // intensity: up with the fireball, steady, dying down over the last 30 percent of the burn
+  SF.I=clamp(t/1.5,0,1)*clamp((SF.dur-t)/(0.3*SF.dur),0,1);const I=SF.I;
+  if(t>SF.dur+sfAEnd()){sfClear();return;}
+  windVec(_sfw);const U10=Math.hypot(_sfw.x,_sfw.z),ux=U10>0.05?_sfw.x/U10:1,uz=U10>0.05?_sfw.z/U10:0;
+  // flames: licks spread over the pool (a wall fire: half of them out of the hole, curling up the face)
+  if(I>0.02&&dt>0){SF.fa+=dt*cap.fl*I/0.9;
+    while(SF.fa>=1){SF.fa-=1;let x,y,z,s0,vy,life=0.6+R()*0.6;const twoS=SF.two&&R()<0.3,P=twoS?SF.two:SF;
+      if(SF.vent&&!twoS&&R()<0.55){const V=SF.vent,a=R()*6.283,r=Math.sqrt(R());
+        x=V.p.x+V.n.x*(0.5+R()*1.5)+V.t1.x*Math.cos(a)*r*V.ra;z=V.p.z+V.n.z*(0.5+R()*1.5)+V.t1.z*Math.cos(a)*r*V.ra;y=V.p.y+Math.sin(a)*r*V.rb*0.6-V.rb*0.3;
+        s0=clamp(V.ra*0.55,1.2,22)*(0.7+R()*0.5);vy=Math.min(SF.L,V.rb*3)/life;}
+      else{const a=R()*6.283,r=Math.sqrt(R())*P.D*0.45;x=P.x+Math.cos(a)*r;z=P.z+Math.sin(a)*r;y=P.y+0.3;
+        s0=clamp(P.D*0.42,1.0,28)*(0.7+R()*0.5);vy=P.L/life*(0.75+R()*0.5);}
+      const d=fxDyn('sflame',x,y,z,_sfw.x*0.25+(R()-0.5)*1.5,vy,_sfw.z*0.25+(R()-0.5)*1.5,life,s0,0,0.95,0);}
+    // embers lofted by the plume
+    SF.ea+=dt*cap.em*I*Math.min(2,Math.sqrt(SF.D/3));
+    while(SF.ea>=1){SF.ea-=1;const a=R()*6.283,r=R()*SF.D*0.4,w=SF.C*Math.pow(8,-1/3)*0.5;
+      fxDyn('spark',SF.x+Math.cos(a)*r,SF.y+SF.L*R()*0.6,SF.z+Math.sin(a)*r,_sfw.x+(R()-0.5)*3,w*(0.5+R()),_sfw.z+(R()-0.5)*3,3+R()*4,0.35+R()*0.35,0.3,1,1).gy=SF.y;}}
+  // the column
+  const aMax=sfAMax(),aEnd=sfAEnd(),bx=SF.vent?SF.vent.p.x+SF.vent.n.x*2:SF.x,bz=SF.vent?SF.vent.p.z+SF.vent.n.z*2:SF.z,by=SF.vent?SF.vent.p.y+SF.vent.rb*0.5:SF.y+SF.L*0.6;
+  const feed=t<SF.dur,thin=clamp((SF.dur+aEnd-t)/aEnd,0,1);
+  for(let i=0;i<SF.n;i++){const m=SF.sm[i],q=m.q;if(!m.live)continue;
+    m.a+=dt;if(m.a>=aEnd){if(feed){m.a-=aEnd;m.ang=R()*6.283;m.j=R();}else{m.live=false;q.visible=false;continue;}}
+    const a=m.a,z=sfZ(a),top=a>aMax,sp=top?(a-aMax)/(aEnd-aMax):0;
+    const zz=z+(top?SF.zmax*0.12*(1-Math.exp(-sp*3)):0),U=U10*Math.pow(Math.max(zz,10)/10,0.2),dr=U*a;
+    // out of a hole in a wall the smoke starts the size of the hole and stands off the face by half a puff, so no
+    // puff cuts into the wall behind it (the quads have no soft edge against geometry)
+    const b0=SF.vent?Math.min(SF.D*0.35,SF.vent.ra*0.6):SF.D*0.35,b=0.12*zz+b0+(top?SF.zmax*0.14*sp:0),jr=b*0.45*m.j;
+    q.sz=Math.min(320,(2.4*b+2)*(0.85+0.3*m.j));q.rot+=m.spin*dt;   // never a quad over 320 m: the cap spreads by its spread puffs instead
+    const so=SF.vent?Math.min(q.sz*0.55,80):0;
+    q.p.set(bx+ux*dr+Math.cos(m.ang)*jr+(SF.vent?SF.vent.n.x*so:0),by+zz,bz+uz*dr+Math.sin(m.ang)*jr+(SF.vent?SF.vent.n.z*so:0));q.visible=true;
+    // lit from under by the fire: strongly over the flames, fading up the lower column (at night it is all you see of it)
+    const fr=zz/SF.zmax,base=SF.jet?0.05:0.09,g=(base+0.12*fr+m.shade)*g0,hot=clamp(1-zz/(SF.L*3+10),0,1)*I;
+    const hk=0.35+0.65*night;q.c.setRGB(g+hot*0.25*hk,g+hot*0.1*hk,g*0.97+hot*0.02*hk);q.hot=hot*hk*0.9;q.ero=0.08+0.3*fr+0.35*sp;
+    q.a=0.88*clamp(a/0.4,0,1)*(1-sp*sp)*(0.25+0.75*thin)*Math.max(I,feed?0.15:0)*fxNearP(q.p);}
+  // the light on the ground round the fire (and on the walls by the hole): a pulse by day, a flickering glow at night
+  const fl=0.82+0.12*Math.sin(t*11.3)+0.07*Math.sin(t*23.1+1.3),gl=I*(0.18+0.82*night)*fl;
+  for(const [m,P] of [[SF.ga,SF],[SF.gb,SF.two]]){if(!P||gl<0.01){m.visible=false;continue;}
+    m.visible=true;m.position.set(P.x,terrainMeshH(P.x,P.z)+0.3,P.z);m.scale.setScalar(Math.max(P.D*3,P.L*2.2,16));m.material.opacity=Math.min(1,gl*1.4);}
+  for(const m of CFXB.glows)m.material.opacity=Math.min(1,I*(0.12+0.88*night)*fl*1.2);}
+function sfClear(){SF.on=false;for(const m of SF.sm){m.live=false;m.q.visible=false;}SF.ga.visible=SF.gb.visible=false;for(const d of FXD.sflame){d.on=false;d.q.visible=false;}}
+function sfInfo(){return {on:SF.on,t:SF.t,D:SF.D,L:SF.L,Q:SF.Q,zmax:SF.zmax,dur:SF.dur,I:SF.I,jet:SF.jet,wall:!!SF.vent,two:!!SF.two,puffs:SF.sm.filter(m=>m.live&&m.q.visible).length,
+  flames:FXD.sflame.filter(d=>d.on).length,fuel:SF.fuel,top:Math.max(0,...SF.sm.filter(m=>m.live).map(m=>m.q.p.y))-SF.y,glow:SF.ga.visible?SF.ga.material.opacity:0,tier:GFX.tier};}
 
 // ---- the range itself ----
 function buildRange(){
@@ -23736,7 +23828,7 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
   isPaved:isPaved,spawnInfo:spawnInfo,riverX:riverX,FWY_X:FWY_X,I10_Z:I10_Z,APC:APC,LUKE:LUKE,
   smokeCount:()=>smoke.filter(p=>p.life>0).length,smokeMax:SMOKE_MAX,
   cfx:()=>cfxInfo(),CFXB:CFXB,cfxDamage:cfxDamage,
-  fxHide:v=>{FXQ_HIDE.on=!!v;},
+  fxHide:v=>{FXQ_HIDE.on=!!v;},fxqN:()=>({n:FXQ.length,cap:FXQ_N,count:fxqGeo.instanceCount}),sf:()=>sfInfo(),SF:SF,sfPool:sfPool,
   STR:STR,strHit:(x,z,yb)=>{const r=strHit(x,z,yb);return r?{id:r.id,name:r.name,cls:r.cls}:null;},strInside:strInside,fuelNow:fuelNow,FUEL:FUEL,
   strImp:()=>{const I=CFX.imp;return I?{name:I.name,cls:I.cls,id:I.rec?I.rec.id:-1,p:[I.p.x,I.p.y,I.p.z],n:[I.n.x,I.n.y,I.n.z],roof:I.roof,spd:I.spd,mass:I.mass,fuel:I.fuel,ke:I.ke,type:I.type}:null;},
   camMode:()=>camMode,sensorMode:()=>sensorMode,

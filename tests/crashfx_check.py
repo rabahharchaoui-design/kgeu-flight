@@ -93,6 +93,27 @@ async def main():
             b0 = BR['b_stadium'][0]['cfx']
             ok('dust and glass from the stadium', b0['dust'] > 0 and b0['glass'] > 0, (b0['dust'], b0['glass']))
             ok('a breakup builds in under 60 ms (headless)', max(x[1]['ms'] for x in BR.values()) < 60, [x[1]['ms'] for x in BR.values()])
+            # item 3, the fire: its size, length and column from the fuel (Heskestad), the column leaning downwind, the glow at night
+            F = {}
+            for t, key in [('cessna', 'c'), ('f16', 'f'), ('b747', 'b')]:
+                await pg.evaluate("()=>{const K=window.__kgeu;K.setTOD('day');}")
+                r = await pg.evaluate(FLY, [t, "r.name==='the stadium'", 'x', -1, 50, 0.45, 70 if t != 'f16' else 150, None])
+                await pg.evaluate("()=>{const K=window.__kgeu,s=K.state();s.windDir=270;s.windKt=12;s.gust=0;for(let i=0;i<300;i++)K.stepFrame(1/30,false,i%30!==0);}")
+                F[key] = await pg.evaluate("()=>{const K=window.__kgeu,S=K.SF,f=K.sf();let dx=0,n=0;for(const m of S.sm)if(m.live&&m.q.visible&&m.q.p.y-S.y>0.6*S.zmax){dx+=m.q.p.x-S.x;n++;}f.lean=n?dx/n:0;return f;}")
+                f = F[key]
+                print(f"  {key}: fuel {f['fuel']:.0f} kg  pool D {f['D']:.1f} m  Q {f['Q']/1000:.0f} MW  flames L {f['L']:.1f} m  column to {f['zmax']:.0f} m  burns {f['dur']:.0f} s  puffs {f['puffs']} flames {f['flames']}  lean {f['lean']:.0f} m  top {f['top']:.0f} m")
+            ok('fire size follows the fuel: 747 > F-16 > Cessna (pool, flames, heat, column)', F['b']['D'] > F['f']['D'] > F['c']['D'] and F['b']['L'] > F['f']['L'] > F['c']['L'] and F['b']['zmax'] > F['f']['zmax'] > F['c']['zmax'], [(F[k]['D'], F[k]['L'], F[k]['zmax']) for k in 'cfb'])
+            ok('Heskestad flame lengths in range (Cessna 3-9 m, 747 35-70 m)', 3 <= F['c']['L'] <= 9 and 35 <= F['b']['L'] <= 70, (F['c']['L'], F['b']['L']))
+            ok('jet fuel smokes black, the Cessna is avgas', F['b']['jet'] and F['f']['jet'] and not F['c']['jet'])
+            ok('it burns on for minutes', min(F[k]['dur'] for k in 'cfb') >= 180, [F[k]['dur'] for k in 'cfb'])
+            ok('the column leans downwind (wind from 270: toward +x)', F['b']['lean'] > 30 and F['c']['lean'] > 5, (F['c']['lean'], F['b']['lean']))
+            ok('the 747 column stands hundreds of metres tall', F['b']['top'] > 300, F['b']['top'])
+            ok('a wall fire: flames out of the hole and the fall below it', F['b']['wall'] and F['b']['two'], F['b'])
+            await pg.evaluate("()=>{const K=window.__kgeu;K.setTOD('night');for(let i=0;i<30;i++)K.stepFrame(1/30,false,true);}")
+            gn = await pg.evaluate("()=>window.__kgeu.sf().glow")
+            await pg.evaluate("()=>{const K=window.__kgeu;K.setTOD('day');for(let i=0;i<30;i++)K.stepFrame(1/30,false,true);}")
+            gd = await pg.evaluate("()=>window.__kgeu.sf().glow")
+            ok('the ground glows round the fire at night, faintly by day', gn > 0.6 and gd < 0.45 * gn, (gd, gn))
             # a new flight puts every structure back
             z = await pg.evaluate("()=>{const K=window.__kgeu;K.pick('cessna');K.pickBase('kgeu');K.start('runway');for(let i=0;i<3;i++)K.stepFrame(1/30,false,true);const S=K.R3().scene;"
                                   "return {on:K.CFXB.on,adds:K.CFXB.adds.length,hidden:K.STR.list.filter(r=>r.meshes&&r.meshes.some(m=>!m.visible)).length,slab:S.getObjectByName('cfx_slab').visible};}")
