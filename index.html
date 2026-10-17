@@ -13017,7 +13017,7 @@ function capFill(){const c=$('lesCap'),b=atcEl.querySelector('b'),pl=atcEl.query
 // (2) the top column shows two at most, and only what ends above 26% of the height (the warning first, then the rear
 // threat, the subtitle when it is up there (a lesson), the mission pill, a toast); (3) the bottom caption's box, from the stick ring's right edge + 12 px to
 // the buttons' left edge - 12 px, 8 px above the bottom inset (in portrait: above the throttle, right of the clear zone).
-const HF={n:0,topR:-1,capLine:null,cap:''};
+const HF={n:0,topR:-1,capLine:null,cap:'',want:0};
 const HF_PRI={warn:1,dfSix:2,atc:3,miss:4,toast:5};   // the lesson panel, when it is in the column, is never held
 function hudFit(){
   const ui=$('uiroot'),U=ui.getBoundingClientRect(),W=U.width,H=U.height;if(!W||!H||document.body.classList.contains('menuOn'))return;
@@ -14331,7 +14331,7 @@ function playLine(l){
     const b=document.createElement('b');b.textContent=l.who;tx.appendChild(b);tx.appendChild(document.createTextNode(l.text));
     const pl=rookie()?plainOf(l):'';atcEl.classList.toggle('hasPlain',!!pl);atcEl.classList.toggle('cfi',sp);
     if(pl){const e=document.createElement('span');e.className='plain';e.textContent=pl;atcEl.appendChild(e);}
-    atcEl.classList.add('on');HF.capLine=l;capMirror();}
+    atcEl.classList.add('on');HF.capLine=l;capMirror();if(!HF.want)HF.want=1;}   // stepstall: the caption's box laid out on the next frame (hudFit), not up to 8 frames later
   const c={line:l,pri:l.pri,t0:VQ.clock,speech:sp,tok:++VQ.tok,fin:false};
   c.rec={pri:l.pri,who:l.who,text:l.text,speech:sp,a0:vqNow(),a1:null};VQ.log.push(c.rec);if(VQ.log.length>100)VQ.log.shift();
   let d;
@@ -23201,7 +23201,7 @@ function tick(t,skipRender){
     if(ev.type==='liftoff') clusters.forEach(c=>{if(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)<1500){c.cheer=4;}});
   }
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.classList.remove('on');}
-  missUpdate(dt);dzUpdate(dt);taskUpdate(dt);if(running&&!paused)arcTick();apprTick();stepCard();if(running&&(++HF.n&7)===0){if(STEPX.hold)HF.n--;else hudFit();}STEPX.hold=false;/* stepstall: no layout pass in a step's frame (the next frame runs it) */dfTick(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);if(LB)LB.frame();
+  missUpdate(dt);dzUpdate(dt);taskUpdate(dt);if(running&&!paused)arcTick();apprTick();stepCard();if(running){if((++HF.n&7)===0||HF.want>1){if(STEPX.hold){HF.n--;HF.want=2;}else{hudFit();HF.want=0;}}else if(HF.want)HF.want=2;}STEPX.hold=false;/* stepstall: no layout pass in a step's frame (the next frame runs it); a new caption's on the next frame */dfTick(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);if(LB)LB.frame();
   {const show=(!rookie()||LES.on==='hood')&&camMode===1&&(AC.id==='cessna'||AC.id==='alpha'||AC.id==='archer')&&running&&!st.crashed;
    if(spCan){spCan.classList.toggle('on',show);if(show)drawSixPack();}}
   radioUpdate(dt);cfgUpdate(dt);resTick(dt);
