@@ -18,7 +18,8 @@ for t in prefs_check landing_check touch_check ui_check menu_check skill_check s
          traffic_check tcas_check world_data_check world_check world_ui_check tokyo_check paris_check rio_check world_lb_check lb_boards_check dogfight_lb_check dogfight_check dogfight_weapons_check dogfight_defense_check dogfight_voice_check dogfight_modes_check dogfight2_check restart_check tip_check centre_check resume_check wasted_check offline_check breakui_check gunrun_check liner_check xp_check ui1_break_check arsenal_check tasking_check tasking_overwatch_check tasking_lifeline_check tasking_shepherd_check tasking_finder_check \
          school_map_check school_brief_check school_grade_check school_cfi_check school_log_check school_climbs_check school_ground_check school_landings_check school_solo_check \
          school_short_check school_soft_check school_xwind_check school_emerg_check school_hood_check school_xc_check school_divert_check school_night_check school_soloxc_check school_oral_check school_ride_check \
-         bugs_check bugs_context_check bugs_tickets_check; do
+         bugs_check bugs_context_check bugs_tickets_check \
+         runway_grade_check runway_data_check night_lights_check; do
   out=$($PY tests/$t.py 2>&1); code=$?
   echo "== $t (exit $code)"; echo "$out" | grep -E "FAIL|passed|clear|FAILS" | tail -4
   [[ $code -ne 0 ]] && fail+=("$t")

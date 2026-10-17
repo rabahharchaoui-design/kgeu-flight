@@ -7797,8 +7797,7 @@ function setTOD(id){TOD_N++;
     S.sp.scale.setScalar(sc);S.sp.material.color.setHex(TOD.disc||0xffffff);S.ang=Math.atan(sc*0.5/S.R);if(!S.want)S.sp.visible=false;}
   envApply();
   if(starField){starField.visible=TOD.stars>0;starField.material.opacity=TOD.stars;}
-  AL_MAT.uniforms.uLights.value=TOD.lights;
-  for(const L of AL_LAYERS)if(L.pts)L.pts.visible=TOD.lights>0;
+  alGuard();
   EGG.lit=TOD.lights>0;EGG.litMat.emissiveIntensity=TOD.night?1:TOD.lights*0.6;EGG.mat.emissiveIntensity=TOD.night?0:0.3*(1-TOD.lights);   // @OhRabah signs: off by day, dim at sunset
   if(CLD)CLD.dirty=false;   // the fog, haze and sun above are the clean TOD values again (a fly through's are stale)
   if(cloudMat)cloudsAuto();   // the flight's cloud preset and its colours (graphics item 6)
@@ -8422,14 +8421,28 @@ for(const c of CONNECT) boxLocal(0.25,0.9,2.2,signM,c+14,-62,0.3);
 // flash: 0 steady, 1 REIL (2 Hz, all together), 2 sequenced approach flasher
 // (runs toward the threshold twice a second, phase = order), 3 rotating beacon.
 const AL_K=700,AL_MIN=2.5,AL_MAX=7;       // CSS px: K/w clamped to [MIN,MAX], times pixel ratio
+// runways item 4, no dark field: a light is never under AL_FLOOR of its full intensity for distance (or rain), never
+// under AL_MIN CSS px; its depth is pulled GD_BIAS toward the camera (as the ground decals: 4.6 m at 5 nm), so a light
+// 0.3 m over a flat field never loses the depth test to the ground just behind it (the post chain's targets have a 16 bit
+// depth buffer in three r128); every layer is drawn without frustum culling and alGuard holds its visibility each frame
+const AL_FLOOR=0.35;
 const AL_LAYERS=[];
+// alGuard (setTOD and every frame): uLights is the time of day's and every layer (but a manual one, the Paris sparkle)
+// is shown whenever TOD.lights > 0, so nothing can leave a field dark at night; AL_HIDE (__kgeu.lightsHide, the tester's
+// difference pictures) hides the airport layers (L.apt), their wet reflections, the PAPI and the aircraft's own lights
+let AL_HIDE=false;
+function alGuard(){
+  const on=TOD.lights>0;AL_MAT.uniforms.uLights.value=TOD.lights;
+  for(const L of AL_LAYERS){if(!L.pts||L.manual)continue;const v=on&&!(AL_HIDE&&L.apt);if(L.pts.visible!==v)L.pts.visible=v;if(AL_HIDE&&L.ref)L.ref.visible=false;}
+}
 let AL_TFREEZE=null;                     // test hook: a fixed light clock (s), null = real time
 const AL_MAT=new THREE.ShaderMaterial({
   // weather item 3: uWx x the point size (fog 2), y the soft halo (fog), z 1 / the visibility (m) the lights fade
-  // over (0: none); uRef x 1 on the wet runway's reflection (AL_REF, the same program): drawn where the light's mirror
+  // over (0: none), w (runways item 4) the floor on the distance and rain fade (AL_FLOOR, 0 in the fog: beyond its
+  // visibility a field is gone); uRef x 1 on the wet runway's reflection (AL_REF, the same program): drawn where the light's mirror
   // image under the plane uRef.y falls on screen, at the depth of the surface over it (the runway in front hides it,
   // the aircraft and the cockpit too), 40% as bright
-  uniforms:{uLights:{value:0},uTime:{value:0},uCam:{value:new V3()},uPR:{value:1},uMono:{value:0},uWx:{value:new THREE.Vector4(1,0,0,0)},uRef:{value:new THREE.Vector2()}},
+  uniforms:{uLights:{value:0},uTime:{value:0},uCam:{value:new V3()},uPR:{value:1},uMono:{value:0},uWx:{value:new THREE.Vector4(1,0,0,AL_FLOOR)},uRef:{value:new THREE.Vector2()}},
   vertexShader:`#include <common>
 #include <logdepthbuf_pars_vertex>
 attribute vec3 aCol;attribute float kind;attribute vec3 aDir;attribute float flash;attribute float phase;
@@ -8448,11 +8461,14 @@ void main(){
     s=projectionMatrix*modelViewMatrix*vec4(position.x,uRef.y+0.12,position.z,1.0);
     gl_Position=vec4(m.xy/max(m.w,1e-3)*s.w,s.z,s.w);I*=0.4*step(0.0,m.w);}
   float w=gl_Position.w;
-  I*=clamp(1.25-w/40000.0,0.35,1.0)*exp(-w*uWx.z);
+  I*=max(clamp(1.25-w/40000.0,0.35,1.0)*exp(-w*uWx.z),uWx.w);
   vCol=aCol;vI=I;
   if(I<0.004){gl_Position=vec4(0.0,0.0,-2.0,1.0);gl_PointSize=0.0;}
   else gl_PointSize=clamp(${AL_K.toFixed(1)}/w,${AL_MIN.toFixed(2)},${AL_MAX.toFixed(2)})*sz*uPR*uWx.x;
   #include <logdepthbuf_vertex>
+  #if defined( USE_LOGDEPTHBUF ) && defined( USE_LOGDEPTHBUF_EXT )
+  vFragDepth=1.0+gl_Position.w*${GD_BIAS};
+  #endif
 }`,
   // uMono (IR sensor view): 1 white hot grey points, 2 black hot, drawn with multiply blending
   fragmentShader:`#include <logdepthbuf_pars_fragment>
@@ -8472,6 +8488,9 @@ void main(){
   gl_FragColor=vec4(c*I,a);
 }`,
   transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false});
+// the pixels a CSS px of point size is on the target being drawn: in the bloom pass (PFX.b1, 1/bk of the scene's size,
+// runways item 4) the point keeps its size on the screen instead of growing bk times into a wide smear round the field
+function alPR(r){const t=r.getRenderTarget();return r.getPixelRatio()*GFX.rs*(t&&t===PFX.b1&&PFX.bk>1?1/PFX.bk:1);}
 function makeLightLayer(name){
   const L={name:name,pos:[],col:[],kind:[],dir:[],flash:[],phase:[],fixt:[],pts:null};
   const c=new THREE.Color();
@@ -8490,20 +8509,20 @@ function makeLightLayer(name){
     g.setAttribute('flash',new THREE.Float32BufferAttribute(L.flash,1));
     g.setAttribute('phase',new THREE.Float32BufferAttribute(L.phase,1));
     g.computeBoundingSphere();
-    const p=new THREE.Points(g,AL_MAT);p.name='airportLights_'+L.name;p.renderOrder=2;
-    p.onBeforeRender=(r,sc,cam)=>{const u=AL_MAT.uniforms;u.uCam.value.setFromMatrixPosition(cam.matrixWorld);u.uTime.value=AL_TFREEZE!==null?AL_TFREEZE:performance.now()/1000;u.uPR.value=r.getPixelRatio()*GFX.rs;};
+    const p=new THREE.Points(g,AL_MAT);p.name='airportLights_'+L.name;p.renderOrder=2;p.frustumCulled=false;
+    p.onBeforeRender=(r,sc,cam)=>{const u=AL_MAT.uniforms;u.uCam.value.setFromMatrixPosition(cam.matrixWorld);u.uTime.value=AL_TFREEZE!==null?AL_TFREEZE:performance.now()/1000;u.uPR.value=alPR(r);};
     scene.add(p);L.pts=p;pfxBloomTag(p);
     // the fixtures themselves, for daylight: one instanced mesh of tiny posts, one per distinct spot
     const seen=new Set(),f=[];
     for(let i=0;i<L.fixt.length;i+=4){const k=Math.round(L.fixt[i]*5)+','+Math.round(L.fixt[i+2]*5);if(!seen.has(k)){seen.add(k);f.push(i);}}
-    const fg=new THREE.CylinderGeometry(0.09,0.12,0.36,5,1,true);
+    const fg=new THREE.CylinderGeometry(0.09,0.12,0.36,5,1,true);fg.boundingSphere=g.boundingSphere.clone();fg.boundingSphere.radius+=2;   // r128 culls an instanced mesh by its geometry's sphere: the whole field's
     const im=new THREE.InstancedMesh(fg,new THREE.MeshBasicMaterial({color:0xffffff,fog:false,toneMapped:false}),f.length),m=new THREE.Matrix4();   // raw: a light's colour, never pushed to orange
     f.forEach((i,n)=>{m.makeTranslation(L.fixt[i],L.fixt[i+1]-0.12,L.fixt[i+2]);im.setMatrixAt(n,m);im.setColorAt(n,c.setHex(L.fixt[i+3]));});
     im.name='airportFixtures_'+L.name;scene.add(im);L.fixMesh=im;
     return L;};
   AL_LAYERS.push(L);return L;
 }
-const AL_C={white:0xfff2d6,yellow:0xffc23a,green:0x38ff78,red:0xff2a1e,blue:0x2f6dff,beacon:0x30ff64};
+const AL_C={white:0xfff2d6,yellow:0xffc23a,green:0x38ff78,red:0xff2a1e,blue:0x2f6dff,beacon:0x30ff64,amber:0x9a6512};   // amber: the assault strip's dim portable markers
 // ---------- aircraft exterior lights ----------
 // AC_LIGHTS[type]: every exterior light on an airframe, in that model's own units
 // (nose -Z, right wing +X, up +Y). kind: nav (steady), strobe (white flash), beacon
@@ -8710,13 +8729,49 @@ function aclUpdate(L,dp,q,agl,s){
       ACL_POOL.scale.set(wid,1,len);
     }
   }
-  ACL_POOL.material.opacity=op;ACL_POOL.visible=op>0.003;ACL_STATE.pool=ACL_POOL.visible?op:0;
+  ACL_POOL.material.opacity=op;ACL_POOL.visible=op>0.003&&!AL_HIDE;ACL_STATE.pool=ACL_POOL.visible?op:0;
 }
 const alY=(x,z)=>groundHeight(x,z)+0.3;
-// r: {x,z (centre), h (heading of the low end, radians), len, wid, ends[{x,z (threshold)}]} as in RUNWAYS
-function lightRunway(L,r){
+// ---------- every runway lit to the real airport (runways item 4) ----------
+// AL_CFG, per airport: std (FAA or ICAO), edge (MIRL / HIRL, or 'portable': the assault strip's dim amber markers), thr
+// (false: no threshold and end bars), papi (boxes on the left of every end, or {end: boxes}; 0 none), als (approach
+// system per end, or one for every end: REIL, ALSF1, MALSR, MALSF, CAT1, CAT2), reil (a REIL beside an approach system),
+// cl (runways with centre line lights, 'all' or [num]), tdz (ends with touchdown zone lights, 'all' or [num]).
+// Sources: KGEU, KLUF and KPHX from the FAA 5010 through AirNav (runway edge intensity, approach lights, VGSI, REIL);
+// RJTT, LFPG and SBRJ from AIP level knowledge of the published AD 2.14 lighting tables (remembered, not a fresh read of
+// the AIP): Haneda CAT II/III on 34L, 34R, 22 and 23 and CAT I on the other four with centre line and TDZ on the long
+// pair, de Gaulle CAT III both ends of all four runways, Santos Dumont PAPI on 02R / 20L only and no approach lights
+// (both ends over the bay). Pilot controlled lighting (Glendale after the tower closes) is simply on: no dark field.
+const AL_CFG={
+  KGEU:{std:'FAA',edge:'MIRL',papi:2,als:{'1':'REIL','19':'REIL'}},
+  KLUF:{std:'FAA',edge:'HIRL',papi:4,als:{'21L':'ALSF1'}},
+  KPHX:{std:'FAA',edge:'HIRL',papi:4,als:{'07L':'MALSR','25R':'MALSR','07R':'MALSR','25L':'MALSR','08':'MALSF','26':'MALSF'},reil:['26']},
+  LZ:{std:'FAA',edge:'portable',thr:false,papi:0},
+  RJTT:{std:'ICAO',edge:'HIRL',papi:4,als:{'34L':'CAT2','34R':'CAT2','22':'CAT2','23':'CAT2','16L':'CAT1','16R':'CAT1','04':'CAT1','05':'CAT1'},
+    cl:['16L-34R','16R-34L'],tdz:['34L','34R','16L','16R']},
+  LFPG:{std:'ICAO',edge:'HIRL',papi:4,als:'CAT2',cl:'all',tdz:'all'},
+  SBRJ:{std:'ICAO',edge:'HIRL',papi:{'02R':4,'20L':4}}};
+// what was laid where, for the tester (__kgeu.rwyLights): per end, per runway, per airport (layer name, beacon, the blue
+// taxiway points, the floods)
+const AL_INFO={end:new Map(),rwy:new Map(),apt:{}};
+function alApt(code){return AL_INFO.apt[code]||(AL_INFO.apt[code]={layer:null,beacon:false,taxiBlue:0,taxiGreen:0,floods:0});}
+const AL_FT=0.3048;
+// the light POSITIONS (fixtures: distinct x,z to 0.2 m) among the points laid since point n0 (a caution zone edge light is
+// two points, yellow one way and white the other, at one position)
+function alPos(L,n0){const S=new Set();for(let i=n0*3;i<L.pos.length;i+=3)S.add(Math.round(L.pos[i]*5)+','+Math.round(L.pos[i+2]*5));return S.size;}
+// r: a RUNWAYS entry {x,z (centre), h (heading of the low end, radians), len, wid, ends[{x,z (threshold)}]}; c: {std,
+// edge, thr, cl}. Returns {edge, cl, thr:[lo, hi], end:[lo, hi]}: the points laid.
+function lightRunway(L,r,c){
+  c=c||{};
   const dx=Math.sin(r.h),dz=-Math.cos(r.h),rx=Math.cos(r.h),rz=Math.sin(r.h),H=r.len/2;
-  const P=(u,v)=>[r.x+dx*u+rx*v,r.z+dz*u+rz*v];
+  const P=(u,v)=>[r.x+dx*u+rx*v,r.z+dz*u+rz*v],R={edge:0,cl:0,thr:[0,0],end:[0,0]};
+  let n0=L.count();
+  if(c.edge==='portable'){
+    // an assault strip has no fixed lights: portable amber markers every 150 m down both edges, dim, so a night
+    // short field landing can still find the strip
+    const n=Math.round(r.len/150);
+    for(let i=0;i<=n;i++){const u=-H+i*r.len/n;for(const s of [-1,1]){const p=P(u,s*(r.wid/2+1.5));L.addLight(p[0],groundHeight(p[0],p[1])+0.2,p[1],AL_C.amber);}}
+    R.edge=alPos(L,n0);return R;}
   // edge lights every 60 m (200 ft); the last 610 m (2000 ft) toward each end shows
   // yellow to a pilot rolling into it and white the other way
   const ev=r.wid/2+2.5,n=Math.round(r.len/60);
@@ -8727,50 +8782,126 @@ function lightRunway(L,r){
       else{const sg=hi?-1:1;
         L.addDirectional(p[0],y,p[1],AL_C.yellow,dx*sg,dz*sg,Math.PI/2);
         L.addDirectional(p[0],y,p[1],AL_C.white,-dx*sg,-dz*sg,Math.PI/2,0,0,false);}}}
-  // threshold bars: green toward the approach, red (runway end) toward the runway.
-  // On a displaced threshold the green bar is at the threshold and the red at the pavement end.
-  r.ends.forEach((e,k)=>{const sg=k?1:-1,ut=(e.x-r.x)*dx+(e.z-r.z)*dz,ue=sg*H;
-    for(let j=0;j<8;j++){const v=-r.wid/2+j*r.wid/7,pt=P(ut,v),pe=P(ue,v);
+  R.edge=alPos(L,n0);
+  // threshold bars: green toward the approach, red (runway end) toward the runway, 4 m apart (FAA, at least 8) or
+  // 3 m (ICAO precision). On a displaced threshold the green bar is at the threshold and the red at the pavement end.
+  if(c.thr!==false)r.ends.forEach((e,k)=>{const sg=k?1:-1,ut=(e.x-r.x)*dx+(e.z-r.z)*dz,ue=sg*H,nb=Math.max(8,Math.round(r.wid/(c.std==='ICAO'?3:4))+1);
+    for(let j=0;j<nb;j++){const v=-r.wid/2+j*r.wid/(nb-1),pt=P(ut,v),pe=P(ue,v);
       L.addDirectional(pt[0],alY(pt[0],pt[1]),pt[1],AL_C.green,sg*dx,sg*dz,1.2);
-      L.addDirectional(pe[0],alY(pe[0],pe[1]),pe[1],AL_C.red,-sg*dx,-sg*dz,1.2);}});
+      L.addDirectional(pe[0],alY(pe[0],pe[1]),pe[1],AL_C.red,-sg*dx,-sg*dz,1.2);}
+    R.thr[k]=R.end[k]=nb;});
+  // centre line lights (in the pavement, no post) every 15 m: white, then alternate red and white over the last 900 m
+  // toward the end a pilot is rolling to and red over the last 300 m; where both ways are white, one plain point
+  if(c.cl){const c0=L.count();
+    const col=(rem,i)=>rem<=300?AL_C.red:rem<=900&&(i&1)?AL_C.red:AL_C.white;
+    for(let i=1,u=-H+15;u<H-7;i++,u+=15){const p=P(u,0),y=groundHeight(p[0],p[1])+0.15,cp=col(H-u,i),cn=col(u+H,i);
+      if(cp===AL_C.white&&cn===AL_C.white)L.addLight(p[0],y,p[1],AL_C.white,0,0,false);
+      else{L.addDirectional(p[0],y,p[1],cp,-dx,-dz,Math.PI/2,0,0,false);L.addDirectional(p[0],y,p[1],cn,dx,dz,Math.PI/2,0,0,false);}}
+    R.cl=alPos(L,c0);}
+  return R;
 }
-// e: a runway end from RUNWAYS (x,z threshold, h landing heading, rwy). type 'REIL' or 'ALSF1'.
+// touchdown zone lights (in the pavement): 3-light white barrettes every 60 m from 60 to 900 m past the threshold, both
+// sides of the centre line 9 to 12 m out, seen from the approach. Returns the points laid.
+function lightTDZ(L,e){
+  const n0=L.count(),rx=Math.cos(e.h),rz=Math.sin(e.h);
+  for(let d=60;d<=900;d+=60)for(const s of [-1,1])for(let j=0;j<3;j++){const v=s*(9+j*1.5),x=e.x+e.dx*d+rx*v,z=e.z+e.dz*d+rz*v;
+    L.addDirectional(x,groundHeight(x,z)+0.15,z,AL_C.white,-e.dx,-e.dz,1.2,0,0,false);}
+  return alPos(L,n0);
+}
+// e: a runway end from RUNWAYS (x,z threshold, h landing heading, rwy). type: REIL, ALSF1 (FAA 2,400 ft), MALSR or MALSF
+// (FAA 1,400 ft), CAT1 or CAT2 (ICAO 900 m). Every light faces the approach.
 function lightApproach(L,e,type){
   const dx=Math.sin(e.h),dz=-Math.cos(e.h),rx=Math.cos(e.h),rz=Math.sin(e.h);
   const P=(d,v)=>[e.x-dx*d+rx*v,e.z-dz*d+rz*v];   // d metres short of the threshold, v right of centreline
+  // fx: a daylight post under this one (one a bar: the posts of a whole system are thousands of triangles)
+  const A=(d,v,col,fx)=>{const p=P(d,v);L.addDirectional(p[0],alY(p[0],p[1]),p[1],col||AL_C.white,-dx,-dz,1.2,0,0,!!fx);};
+  const bar=d=>{for(let j=-2;j<=2;j++)A(d,j*1.05,AL_C.white,!j);};                                    // a 5-light centre line barrette
+  const side=(d,n,v0,col)=>{for(const s of [-1,1])for(let j=0;j<n;j++)A(d,s*(v0+j*1.5),col,!j);};  // n lights each side from v0 out
+  // sequenced flashers: one on the centre line at each station, the rabbit running toward the threshold twice a second
+  const fl=(ds)=>{const far=Math.max(...ds),near=Math.min(...ds);
+    for(const d of ds){const p=P(d,0);L.addDirectional(p[0],alY(p[0],p[1])+0.4,p[1],AL_C.white,-dx,-dz,1.3,2,far>near?(far-d)/(far-near)*0.8:0,false);}};
   if(type==='REIL'){const w=e.rwy.wid/2+12;
     for(const s of [-1,1]){const p=P(0,s*w);L.addDirectional(p[0],alY(p[0],p[1]),p[1],AL_C.white,-dx,-dz,1.4,1,0);}
     return;}
+  const F=AL_FT,st=[];
   if(type==='ALSF1'){
-    // 5-light white bars every 30 m out to 720 m, the 300 m bar a wide crossbar,
-    // red terminating bars at 60 m, and the rabbit on every bar from 330 m out
-    for(let i=1;i<=24;i++){const d=i*30;
-      for(let j=-2;j<=2;j++){const p=P(d,j);L.addDirectional(p[0],alY(p[0],p[1]),p[1],AL_C.white,-dx,-dz,1.2);}
-      if(d===300)for(const s of [-1,1])for(let j=0;j<8;j++){const p=P(d,s*(4+j*1.5));L.addDirectional(p[0],alY(p[0],p[1]),p[1],AL_C.white,-dx,-dz,1.2);}
-      if(d===60)for(const s of [-1,1])for(let j=0;j<3;j++){const p=P(d,s*(4.5+j*1.5));L.addDirectional(p[0],alY(p[0],p[1]),p[1],AL_C.red,-dx,-dz,1.2);}
-      if(d>=330){const p=P(d,0);L.addDirectional(p[0],alY(p[0],p[1])+0.4,p[1],AL_C.white,-dx,-dz,1.3,2,(720-d)/720*0.8,false);}
-    }}
+    // barrettes every 100 ft out to 2,400 ft, the 1,000 ft crossbar, a 500 ft bar, red terminating bars at 100 ft and
+    // red side row bars at 200 ft, sequenced flashers on every station from 1,000 ft out
+    for(let i=1;i<=24;i++){const d=i*100*F;bar(d);if(i>=10)st.push(d);}
+    side(1000*F,8,4,AL_C.white);side(500*F,4,4,AL_C.white);side(100*F,3,4.5,AL_C.red);side(200*F,3,4.5,AL_C.red);fl(st);return;}
+  if(type==='MALSR'||type==='MALSF'){
+    // steady barrettes every 200 ft out to 1,400 ft and the 1,000 ft crossbar; MALSR: RAIL flashers 1,600 to 2,400 ft,
+    // MALSF: flashers on the three outer barrettes (1,000, 1,200 and 1,400 ft)
+    for(let i=1;i<=7;i++)bar(i*200*F);
+    side(1000*F,5,4,AL_C.white);
+    if(type==='MALSR'){for(let i=8;i<=12;i++)st.push(i*200*F);}else st.push(1000*F,1200*F,1400*F);
+    fl(st);return;}
+  if(type==='CAT1'||type==='CAT2'){
+    // ICAO 900 m: barrettes every 30 m, the 300 m crossbar, flashers from 330 m out; CAT II/III adds the 150 m bar and the
+    // red side row barrettes over the inner 270 m
+    for(let d=30;d<=900;d+=30){bar(d);if(d>300)st.push(d);}
+    side(300,8,4.5,AL_C.white);
+    if(type==='CAT2'){side(150,4,4.5,AL_C.white);for(let d=30;d<=270;d+=30)side(d,3,9,AL_C.red);}
+    fl(st);return;}
 }
 // blue edge lights along both sides of a polyline pts [[x,z],...] of the given width
 // (width 0: one row on the line itself). skip(x,z) drops a light, e.g. across a runway.
-function lightTaxiway(L,pts,spacing,width,skip){
+// col: another colour (green: a centre line, in the pavement, no post). Returns the points laid.
+function lightTaxiway(L,pts,spacing,width,skip,col){
+  const n0=L.count();
   for(let k=0;k+1<pts.length;k++){const a=pts[k],b=pts[k+1],ex=b[0]-a[0],ez=b[1]-a[1],len=Math.hypot(ex,ez),n=Math.max(1,Math.round(len/spacing));
     const nx=-ez/len,nz=ex/len;
     for(let i=k?1:0;i<=n;i++){const t=i/n,x=a[0]+ex*t,z=a[1]+ez*t;
       for(const s of width>0?[-1,1]:[0]){const qx=x+nx*s*width/2,qz=z+nz*s*width/2;
-        if(skip&&skip(qx,qz))continue;L.addLight(qx,alY(qx,qz),qz,AL_C.blue);}}}
+        if(skip&&skip(qx,qz))continue;
+        if(col)L.addLight(qx,groundHeight(qx,qz)+0.15,qz,col,0,0,false);else L.addLight(qx,alY(qx,qz),qz,AL_C.blue);}}}
+  return alPos(L,n0);
 }
 // rotating beacon: white and green flashes alternating, one each per 2 s
 function lightBeacon(L,x,y,z){L.addLight(x,y,z,AL_C.white,3,0,false);L.addLight(x,y,z,AL_C.beacon,3,0.5,false);}
-// PAPI (P2L, 3.00 degrees) on the left of each runway
-const PAPI=[];
+// apron floods: white lights on poles h metres tall at the points pts [[x,z],...], the poles one instanced mesh
+function lightFloods(L,pts,h,name){
+  if(!pts.length)return 0;
+  const pm=new THREE.InstancedMesh(new THREE.CylinderGeometry(0.2,0.3,h,5).translate(0,h/2,0),lam(0x8a8d90),pts.length),M=new THREE.Matrix4();
+  pts.forEach((p,i)=>{const y=groundHeight(p[0],p[1]);M.makeTranslation(p[0],y,p[1]);pm.setMatrixAt(i,M);L.addLight(p[0],y+h,p[1],AL_C.white,0,0,false);});
+  pm.frustumCulled=false;pm.name=name||'apronPoles_'+L.name;scene.add(pm);return pts.length;
+}
+// PAPI on the left of a runway end, 300 m past the threshold (FAA 1,000 ft, ICAO 300 to 400 m), the first box 15 m
+// outside the edge, the boxes 9 m apart, on a 3.00 degree path: a 4-box PAPI is set (inside out) at 3.50, 3.17, 2.83
+// and 2.50 (all red below 2.5, one white from 2.5, two and two from 2.83, three white from 3.17, all white above 3.5); a
+// 2-box PAPI at 3.5 and 2.5 (two red, one and one, two white). Each box is a sprite the size of an airport light point,
+// white above its angle and red below, drawn only within 100 degrees of the approach side and 16 km (the main loop).
+const PAPI=[],PAPI_BOX=[];
 // same tight core and short halo as the airport light points, so a PAPI box is no bigger than an edge light
 const papiTex=tex(32,32,(x,w,h)=>{const g=x.createRadialGradient(16,16,0,16,16,16);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(0.7,'rgba(255,255,255,1)');g.addColorStop(0.85,'rgba(255,255,255,.25)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,32,32);});
-function papiUnit(u,v,dir,setAng){boxLocal(1.6,0.9,1.0,lam(0x3a3d42),u,v,0,0);
+function papiUnit(x,z,dx,dz,setAng){const y=groundHeight(x,z);PAPI_BOX.push([x,y,z,Math.atan2(dx,dz)]);
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:papiTex,color:0xff2020,fog:false,depthWrite:false,blending:THREE.AdditiveBlending}));
-  sp.position.set(wX(u,v),0.9,wZ(u,v));scene.add(sp);pfxBloomTag(sp);PAPI.push({sp:sp,u:u,v:v,dir:dir,ang:setAng});}
-if(REGION.az){papiUnit(THR01+300,-31.5,1,3.5);papiUnit(THR01+300,-39,1,2.5);
-papiUnit(THR19-300,31.5,-1,3.5);papiUnit(THR19-300,39,-1,2.5);}
+  sp.position.set(x,y+0.9,z);sp.visible=false;scene.add(sp);pfxBloomTag(sp);PAPI.push({sp:sp,x:x,z:z,y:y+0.9,dx:dx,dz:dz,ang:setAng});}
+function papiAt(e,n){
+  const rx=Math.cos(e.h),rz=Math.sin(e.h),off=e.rwy.wid/2+15,ang=n===2?[3.5,2.5]:[3.5,3.17,2.83,2.5];
+  for(let k=0;k<n;k++){const v=-(off+k*9),x=e.x+e.dx*300+rx*v,z=e.z+e.dz*300+rz*v;papiUnit(x,z,e.dx,e.dz,ang[k]);}}
+// the PAPI boxes laid so far, one instanced mesh (called once per layout)
+function papiBoxes(){
+  const B=PAPI_BOX.splice(0);if(!B.length)return;
+  const im=new THREE.InstancedMesh(new THREE.BoxGeometry(1.6,0.9,1.0).translate(0,0.45,0),lam(0x3a3d42),B.length),M=new THREE.Matrix4(),Q=new Q4(),S=new V3(1,1,1),Pp=new V3();
+  B.forEach((b,i)=>{Q.setFromAxisAngle(Pp.set(0,1,0),b[3]);Pp.set(b[0],b[1],b[2]);M.compose(Pp,Q,S);im.setMatrixAt(i,M);});
+  im.frustumCulled=false;im.name='papiBoxes';scene.add(im);}
+// every runway of an airport (RUNWAYS code) lit from AL_CFG into the layer L, the PAPIs placed, AL_INFO filled
+function alAirport(L,code){
+  const c=AL_CFG[code]||{std:'ICAO',edge:'HIRL',papi:4},has=(a,k)=>a==='all'||(Array.isArray(a)&&a.indexOf(k)>=0);
+  alApt(code).layer=L.name;
+  for(const r of RUNWAYS){if(r.code!==code)continue;
+    const R=lightRunway(L,r,{std:c.std,edge:c.edge,thr:c.thr,cl:has(c.cl,r.num)});
+    AL_INFO.rwy.set(r,{edge:R.edge,cl:R.cl});
+    r.ends.forEach((e,k)=>{const I={thr:R.thr[k],end:R.end[k],als:'none',reil:false,tdz:0,papi:0};
+      const a=typeof c.als==='string'?c.als:(c.als||{})[e.num];
+      if(a){lightApproach(L,e,a);I.als=a;I.reil=a==='REIL';}
+      if(has(c.reil,e.num)){lightApproach(L,e,'REIL');I.reil=true;}
+      if(has(c.tdz,e.num))I.tdz=lightTDZ(L,e);
+      const pn=typeof c.papi==='number'?c.papi:(c.papi&&c.papi[e.num])||0;
+      if(pn){papiAt(e,pn);I.papi=pn;}
+      AL_INFO.end.set(e,I);});}
+}
 // windsocks
 const socks=[];
 function windsock(u,v){
@@ -9482,11 +9613,11 @@ WXL.rm=wxStreaks(450,60,0);WXL.dm=wxStreaks(60,4000,1);
 // the wet runway's reflections of the home field's lights: each a second Points over the layer's geometry with a clone
 // of AL_MAT (the same program), uRef on. Made once a layer exists (the world regions build theirs later)
 function wxRefl(){
-  for(const k of ['KGEU','KLUF',REGION.icao]){const L=AL[k];if(!L||!L.pts||L.ref)continue;
+  for(const k of ['KGEU','KLUF','KPHX',REGION.icao]){const L=AL[k];if(!L||!L.pts||L.ref)continue;
     const m=AL_MAT.clone(),p=new THREE.Points(L.pts.geometry,m);m.uniforms.uRef.value.set(1,0.06);
     p.name='airportLightsRef_'+L.name;p.renderOrder=2;p.visible=false;p.frustumCulled=L.pts.frustumCulled;
     p.onBeforeRender=(r,sc,cam)=>{const u=m.uniforms,A=AL_MAT.uniforms;u.uCam.value.setFromMatrixPosition(cam.matrixWorld);u.uTime.value=AL_TFREEZE!==null?AL_TFREEZE:performance.now()/1000;
-      u.uPR.value=r.getPixelRatio()*GFX.rs;u.uLights.value=A.uLights.value;u.uWx.value.copy(A.uWx.value);u.uMono.value=0;};
+      u.uPR.value=alPR(r);u.uLights.value=A.uLights.value;u.uWx.value.copy(A.uWx.value);u.uMono.value=0;};
     scene.add(p);pfxBloomTag(p);L.ref=p;WXL.refl.push(p);}
 }
 // the dome after skyPaint: below a deck, from a degree up, the deck's underside (no blue through a gap); the fog: the
@@ -9533,7 +9664,7 @@ function wxApply(){
   if(!hb){if(CLD)CLD.skyK=0;skyPaint();}
   WXL.noSh=sh;if(starField)starField.visible=T.stars>0;   // wxFrame hides them under a deck and in the fog
   // the airport lights: the fog's wide soft glow fading over the visibility, rain a little of both
-  AL_MAT.uniforms.uWx.value.set(W==='fog'?2:W==='rain'?1.25:1,W==='fog'?1:W==='rain'?0.35:0,W==='fog'?1/(B.vis*1.3):W==='rain'?1/9000:0,0);
+  AL_MAT.uniforms.uWx.value.set(W==='fog'?2:W==='rain'?1.25:1,W==='fog'?1:W==='rain'?0.35:0,W==='fog'?1/((B.vis||1600)*1.3):W==='rain'?1/9000:0,W==='fog'?0:AL_FLOOR);
   // rain: the streaks (the tier's count), the wet runway; gusty: the wisps
   WXL.rainOn=W==='rain';WXL.rm.count=WXL.rainN[GFX.tier]||300;
   WXL.wet=W==='rain'&&GFX.on('wet');wetSet(WXL.wet);if(WXL.wet)wxRefl();
@@ -11211,28 +11342,46 @@ function updatePeople(dt,t){
 }
 
 // ---------- airport lights, laid out from the runway table ----------
+// Runways item 4: every Arizona field has its layer (KGEU, KLUF, KPHX, LZ) lit from AL_CFG by alAirport, plus its
+// taxiways, floods and beacon
 const AL={};
 if(REGION.az)(function(){
-  const G=makeLightLayer('KGEU'),K=makeLightLayer('KLUF');AL.KGEU=G;AL.KLUF=K;
-  for(const r of RUNWAYS){
-    if(r.code==='KGEU'){lightRunway(G,r);for(const e of r.ends)lightApproach(G,e,'REIL');}
-    // runways 2: the ALSF1 is on 21L (FAA 5010). Item 4: the 4-light PAPIs, and no REILs where Luke has none
-    if(r.code==='KLUF'){lightRunway(K,r);for(const e of r.ends)lightApproach(K,e,e.num==='21L'?'ALSF1':'REIL');}
-  }
+  const G=makeLightLayer('KGEU'),K=makeLightLayer('KLUF'),S=makeLightLayer('KPHX'),Z=makeLightLayer('LZ');
+  AL.KGEU=G;AL.KLUF=K;AL.KPHX=S;AL.LZ=Z;
+  for(const L of [G,K,S,Z])L.apt=L.name;
+  alAirport(G,'KGEU');alAirport(K,'KLUF');alAirport(S,'KPHX');alAirport(Z,'LZ');
+  const AG=alApt('KGEU'),AK=alApt('KLUF'),AS=alApt('KPHX');
   // Glendale: parallel taxiway (15.2 m wide at v=-120) with gaps where the connectors
   // join, and the five connectors up to the runway
   const gw=(u,v)=>[wX(u,v),wZ(u,v)];
-  lightTaxiway(G,[gw(-60,-120),gw(2239,-120)],60,15.2,(x,z)=>{const u=toU(x,z),v=toV(x,z);return v>-120&&CONNECT.some(c=>Math.abs(u-c)<12);});
-  for(const c of CONNECT)lightTaxiway(G,[gw(c,-111),gw(c,-26)],30,18);
-  lightBeacon(G,wX(1290,-470),28.2,wZ(1290,-470));
+  AG.taxiBlue+=lightTaxiway(G,[gw(-60,-120),gw(2239,-120)],60,15.2,(x,z)=>{const u=toU(x,z),v=toV(x,z);return v>-120&&CONNECT.some(c=>Math.abs(u-c)<12);});
+  for(const c of CONNECT)AG.taxiBlue+=lightTaxiway(G,[gw(c,-111),gw(c,-26)],30,18);
+  lightBeacon(G,wX(1290,-470),28.2,wZ(1290,-470));AG.beacon=true;
+  // five floods on 12 m poles along the back of the Glendale apron, in front of the terminal
+  AG.floods=lightFloods(G,[720,930,1140,1350,1560].map(u=>gw(u,-430)),12,'apronPoles_KGEU');
   // Luke: the crossing taxiway (26 m wide at u=-300), dark across both runways, and the ramp edge
   const lw=(u,v)=>[lkX(u,v),lkZ(u,v)];
-  lightTaxiway(K,[lw(-300,-186),lw(-300,190)],45,26,(x,z)=>{const v=lukeUV(x,z)[1];return LUKE_RWY.some(r=>Math.abs(v-r.v)<30);});
-  lightTaxiway(K,[lw(-900,190),lw(900,190),lw(900,700),lw(-900,700),lw(-900,190)],60,0,(x,z)=>{const q=lukeUV(x,z);return Math.abs(q[1]-190)<2&&Math.abs(q[0]+300)<15;});
+  AK.taxiBlue+=lightTaxiway(K,[lw(-300,-186),lw(-300,190)],45,26,(x,z)=>{const v=lukeUV(x,z)[1];return LUKE_RWY.some(r=>Math.abs(v-r.v)<30);});
+  AK.taxiBlue+=lightTaxiway(K,[lw(-900,190),lw(900,190),lw(900,700),lw(-900,700),lw(-900,190)],60,0,(x,z)=>{const q=lukeUV(x,z);return Math.abs(q[1]-190)<2&&Math.abs(q[0]+300)<15;});
   {const bx=lkX(-960,720),bz=lkZ(-960,720);
    const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.35,16,6),new THREE.MeshLambertMaterial({color:0x8a8d90}));pole.position.set(bx,8,bz);scene.add(pole);
-   lightBeacon(K,bx,16.4,bz);}
-  G.build();K.build();
+   lightBeacon(K,bx,16.4,bz);AK.beacon=true;}
+  // Sky Harbor (item 2's layout, SH_TWY, SH_LINK, SH_APRON): blue edges on taxiways E (v 235) and B (v -604), none on
+  // the apron side or across a link, both sides of every link up to the runway; green centre lines on E and B every
+  // 30 m; floods along both terminal aprons; the beacon on the tower; a light over each of the six windsocks
+  const sw=(u,v)=>[shX(u,v),shZ(u,v)],suv=(x,z)=>shUV(x,z);
+  const twy=[{v:235,u0:-1450,u1:1700,out:1,ap:SH_APRON[0]},{v:-604,u0:-1700,u1:1810,out:-1,ap:SH_APRON[1]}];
+  for(const t of twy){
+    AS.taxiBlue+=lightTaxiway(S,[sw(t.u0,t.v),sw(t.u1,t.v)],60,24,(x,z)=>{const q=suv(x,z),o=(q[1]-t.v)*t.out>0;
+      return o?SH_LINK.some(l=>Math.abs(q[0]-l[0])<17&&(l[1]+l[2])/2*t.out>t.v*t.out):q[0]>=t.ap[0]&&q[0]<=t.ap[1];});
+    AS.taxiGreen+=lightTaxiway(S,[sw(t.u0,t.v),sw(t.u1,t.v)],30,0,null,AL_C.green);}
+  const onRwy=(x,z)=>{const q=suv(x,z);return SH_RWY.some(r=>Math.abs(q[1]-r.v)<26&&Math.abs(q[0]-r.u0)<=r.len/2+5);};
+  for(const l of SH_LINK){const tv=l[1]<0?-604:235,v0=tv>0?tv+12:l[1],v1=tv>0?l[2]:tv-12;
+    AS.taxiBlue+=lightTaxiway(S,[sw(l[0],v0),sw(l[0],v1)],30,30,onRwy);}
+  AS.floods=lightFloods(S,[].concat(...[205,-575].map(v=>[-600,-350,-100,150,400,650,900,1150,1400,1650].map(u=>sw(u,v)))),18,'apronPoles_KPHX');
+  lightBeacon(S,shX(528,-113),87,shZ(528,-113));AS.beacon=true;
+  for(const p of [[-1231,681],[-1200,278],[752,680],[1464,444],[-1448,-811],[1503,-645]]){const q=sw(p[0],p[1]);S.addLight(q[0],groundHeight(q[0],q[1])+7.5,q[1],AL_C.white,0,0,false);}
+  G.build();K.build();S.build();Z.build();papiBoxes();
 })();
 // ---------- world regions: the airport, the city and the roads (4.6a) ----------
 // Built once from assets/world/<id>.json when worldLoad has it (never in Arizona), generic for every
@@ -11503,44 +11652,42 @@ function buildWorld(d){
   if(REGION.id==='sbrj')rioPrep(d);
   const t0=performance.now(),mv=p=>[p[0]-WOFF[0],p[1]-WOFF[1]],gh=(x,z)=>groundHeight(x,z);
   const terms=(d.terminals||[]).map(P=>P.map(mv)),hangs=(d.hangars||[]).map(P=>P.map(mv)),aprons=(d.aprons||[]).map(P=>P.map(mv));
-  const L=makeLightLayer(REGION.icao);AL[REGION.icao]=L;
+  const L=makeLightLayer(REGION.icao);AL[REGION.icao]=L;L.apt=REGION.icao;const AA=alApt(REGION.icao);
   const rwyIn=(x,z,m)=>RUNWAYS.some(r=>{const e=r.ends[0],dx=x-r.x,dz=z-r.z;return Math.abs(dx*e.dx+dz*e.dz)<=r.len/2+m&&Math.abs(dz*e.dx-dx*e.dz)<=r.wid/2+m;});
-  // ---- runways ----
-  for(const r of RUNWAYS){
-    // the pavement and its paint: rwPaint, with the hold lines, below
-    lightRunway(L,r);
-    const home=r.ends.some(e=>e.num===HOME_RWY);
-    if(home)for(const e of r.ends)lightApproach(L,e,e.num===HOME_RWY?'ALSF1':'REIL');
-  }
-  papiUnit(THR01+300,-(HM.wid/2+14),1,3.5);papiUnit(THR01+300,-(HM.wid/2+22),1,2.5);
-  papiUnit(THR19-300,HM.wid/2+14,-1,3.5);papiUnit(THR19-300,HM.wid/2+22,-1,2.5);
+  // ---- runways: lit to the real airport (AL_CFG, runways item 4); the pavement and its paint: rwPaint, below ----
+  alAirport(L,REGION.icao);papiBoxes();
   windsock(THR01+250,-(HM.wid/2+80));windsock(THR19-250,HM.wid/2+80);
-  // ---- taxiways: 23 m strips with a yellow centre line, blue edge lights (every 60 m or wider, at most 1,500) ----
+  // ---- taxiways: 23 m strips with a yellow centre line, blue edge lights (every 60 m or wider, at most 1,000) and, where
+  // the airport has them (Haneda, de Gaulle), green centre line lights in the pavement (every 30 m or wider, at most 900) ----
   const twG=wbGeo(),clG=wbGeo(),tws=(d.taxiways||[]).map(l=>l.map(mv)).filter(l=>l.length>1);
   let twLen=0;for(const l of tws)for(let k=0;k+1<l.length;k++)twLen+=Math.hypot(l[k+1][0]-l[k][0],l[k+1][1]-l[k][1]);
-  const sp=Math.max(60,twLen*2/1500);let twl=0,acc=0;
+  const sp=Math.max(60,twLen*2/1000),gOn=REGION.icao==='RJTT'||REGION.icao==='LFPG',gsp=Math.max(30,twLen/900);let twl=0,acc=0,gacc=0,tgl=0;
   for(const l of tws){
     for(let k=0;k+1<l.length;k++){const a=l[k],b=l[k+1],ex=b[0]-a[0],ez=b[1]-a[1],len=Math.hypot(ex,ez);if(len<0.5)continue;
       const nx=-ez/len*11.5,nz=ex/len*11.5,ya=gh(a[0],a[1])+0.045,yb=gh(b[0],b[1])+0.045,cx=nx/46,cz=nz/46;
       wbTriUp(twG,[a[0]+nx,ya,a[1]+nz],[b[0]+nx,yb,b[1]+nz],[b[0]-nx,yb,b[1]-nz]);wbTriUp(twG,[a[0]+nx,ya,a[1]+nz],[b[0]-nx,yb,b[1]-nz],[a[0]-nx,ya,a[1]-nz]);
       wbTriUp(clG,[a[0]+cx,ya+0.01,a[1]+cz],[b[0]+cx,yb+0.01,b[1]+cz],[b[0]-cx,yb+0.01,b[1]-cz]);wbTriUp(clG,[a[0]+cx,ya+0.01,a[1]+cz],[b[0]-cx,yb+0.01,b[1]-cz],[a[0]-cx,ya+0.01,a[1]-cz]);
       for(let t=(sp-acc)%sp;t<len;t+=sp){const px=a[0]+ex*t/len,pz=a[1]+ez*t/len;
-        for(const sg of [-1,1]){const qx=px+sg*nx*12.5/11.5,qz=pz+sg*nz*12.5/11.5;if(twl>=1500||rwyIn(qx,qz,8))continue;L.addLight(qx,gh(qx,qz)+0.3,qz,AL_C.blue);twl++;}}
-      acc=(acc+len)%sp;}
+        for(const sg of [-1,1]){const qx=px+sg*nx*12.5/11.5,qz=pz+sg*nz*12.5/11.5;if(twl>=1000||rwyIn(qx,qz,8))continue;L.addLight(qx,gh(qx,qz)+0.3,qz,AL_C.blue);twl++;}}
+      if(gOn)for(let t=(gsp-gacc)%gsp;t<len;t+=gsp){const px=a[0]+ex*t/len,pz=a[1]+ez*t/len;if(tgl>=900||rwyIn(px,pz,2))continue;L.addLight(px,gh(px,pz)+0.15,pz,AL_C.green,0,0,false);tgl++;}
+      acc=(acc+len)%sp;gacc=(gacc+len)%gsp;}
     // the joints: an octagon at every bend, so the strips meet without notches
     for(let k=1;k+1<l.length;k++){const c=l[k],y=gh(c[0],c[1])+0.044;
       for(let i=0;i<8;i++){const a1=i*Math.PI/4,a2=a1+Math.PI/4;wbTriUp(twG,[c[0],y,c[1]],[c[0]+Math.cos(a1)*11.5,y,c[1]+Math.sin(a1)*11.5],[c[0]+Math.cos(a2)*11.5,y,c[1]+Math.sin(a2)*11.5]);}}
   }
-  wbMesh(twG,lam(0x4b4d50),'taxiways',true);wbMesh(clG,lam(0xe8b923),'taxiLines',true);WB.n.twLights=twl;
-  // ---- aprons, with white floods on 18 m poles along their edges ----
+  wbMesh(twG,lam(0x4b4d50),'taxiways',true);wbMesh(clG,lam(0xe8b923),'taxiLines',true);WB.n.twLights=twl;AA.taxiBlue=twl;AA.taxiGreen=tgl;   // one point a position
+  // ---- aprons, with white floods on 18 m poles along their edges (every 150 m or wider, at most 150: runways item 4) ----
   const apG=wbGeo(),poles=[];
+  let apPer=0;for(const P of aprons)for(let i=0,j=P.length-1;i<P.length;j=i++)apPer+=Math.hypot(P[i][0]-P[j][0],P[i][1]-P[j][1]);
+  const fsp=Math.max(150,apPer/150);
   for(const P of aprons){wbPoly(apG,P,(x,z)=>gh(x,z)+0.035);
     let a2=0;for(let i=0,j=P.length-1;i<P.length;j=i++){const ax=P[j][0],az=P[j][1],ex=P[i][0]-ax,ez=P[i][1]-az,len=Math.hypot(ex,ez);
-      for(let t=(150-a2)%150;t<len&&poles.length<300;t+=150){const x=ax+ex*t/len,z=az+ez*t/len;if(rwyIn(x,z,40))continue;poles.push([x,z]);L.addLight(x,gh(x,z)+18,z,AL_C.white,0,0,false);}
-      a2=(a2+len)%150;}}
+      for(let t=(fsp-a2)%fsp;t<len&&poles.length<150;t+=fsp){const x=ax+ex*t/len,z=az+ez*t/len;if(rwyIn(x,z,40))continue;poles.push([x,z]);L.addLight(x,gh(x,z)+18,z,AL_C.white,0,0,false);}
+      a2=(a2+len)%fsp;}}
+  AA.floods=poles.length;
   wbMesh(apG,lam(0x8a8984),'aprons',true);
   if(poles.length){const pm=new THREE.InstancedMesh(new THREE.CylinderGeometry(0.2,0.3,18,5).translate(0,9,0),lam(0x8a8d90),poles.length),M=new THREE.Matrix4();
-    poles.forEach((p,i)=>{M.makeTranslation(p[0],gh(p[0],p[1]),p[1]);pm.setMatrixAt(i,M);});pm.name='apronPoles';scene.add(pm);WB.tris.apronPoles=poles.length*10;}
+    poles.forEach((p,i)=>{M.makeTranslation(p[0],gh(p[0],p[1]),p[1]);pm.setMatrixAt(i,M);});pm.frustumCulled=false;pm.name='apronPoles';scene.add(pm);WB.tris.apronPoles=poles.length*10;}
   // ---- terminals (14 m: the window band texture, a light roof, lit inside at night), hangars (16 m, the long side a dark door) ----
   const bG=wbGeo(),tG=wbGeo(),HW=[0.70,0.71,0.70],HD=[0.30,0.32,0.34],HR=[0.62,0.64,0.66];tG.uv=[];
   for(const P of terms){const c=wbCentroid(P),y0=gh(c[0],c[1]);
@@ -11559,7 +11706,7 @@ function buildWorld(d){
     const sh=new THREE.Mesh(new THREE.CylinderGeometry(H*0.05,H*0.075,H-7,12),pale);sh.position.set(T[0],y0+(H-7)/2,T[1]);scene.add(sh);
     const cab=new THREE.Mesh(new THREE.CylinderGeometry(H*0.12,H*0.09,6,10),lam(0x30495c));cab.position.set(T[0],y0+H-4,T[1]);scene.add(cab);
     const rf=new THREE.Mesh(new THREE.CylinderGeometry(H*0.13,H*0.13,1,10),lam(0x2a2f35));rf.position.set(T[0],y0+H-0.5,T[1]);scene.add(rf);
-    OBST.push({kind:'circ',x:T[0],z:T[1],r:H*0.12+2,h:y0+H,name:'the control tower'});lightBeacon(L,T[0],y0+H+1,T[1]);WB.tris.tower=96;}
+    OBST.push({kind:'circ',x:T[0],z:T[1],r:H*0.12+2,h:y0+H,name:'the control tower'});lightBeacon(L,T[0],y0+H+1,T[1]);AA.beacon=true;WB.tris.tower=96;}
   // ---- gates: a jet bridge at every 3rd gate within 60 m of a terminal (at most 40) ----
   const ramp=[REGION.ramp[0]-WOFF[0],REGION.ramp[1]-WOFF[1]],spots=REGION.park.map(p=>[p[0]-WOFF[0],p[1]-WOFF[1]]);
   const gates=(d.gates||[]).map(mv).map(g=>{let b=null,bp=null;for(const P of terms){const e=wbNearEdge(P,g[0],g[1]);if(!b||e[0]<b[0]){b=e;bp=P;}}
@@ -11982,7 +12129,7 @@ function buildParis(d){
     for(const s of S4){L.addLight(x+s[0]*p1/2*K,y0+64*K,z+s[1]*p1/2*K,0xffc27a,0,0,false);L.addLight(x+s[0]*p2/2*K,y0+120*K,z+s[1]*p2/2*K,0xffc27a,0,0,false);}
     L.addLight(x+2,y0+291*K,z,0xfff2c8,3,0,false);L.addLight(x-2,y0+291*K,z,0xfff2c8,3,0.5,false);
     // the sparkle: 500 white lights over the four faces (the legs only below the first platform) and the top
-    const SP=makeLightLayer('PARIS_SPARKLE');let n=0;
+    const SP=makeLightLayer('PARIS_SPARKLE');SP.manual=true;let n=0;   // manual: parisTick shows it, never alGuard
     for(let q=0;n<500&&q<20000;q++){const r=hash(q,701),y=r<0.06?282+hash(q,702)*46:hash(q,703)*280;
       if(y<282&&hash(q,704)>pEif(y)[0]/62.5*1.4)continue;
       let px=0,pz=0;
@@ -23358,11 +23505,16 @@ function tick(t,skipRender){
   camera.updateProjectionMatrix();sky.position.copy(camera.position);hbUpdate(paused?0:dt);cldFrame(paused?0:dt);wxFrame(paused?0:dt);dustFxUpdate(paused?0:dt);fxLightFeed();sunDiscUpdate();farUpdate();
   if(sensOn){tgtMarkUpdate(dt);sensorGateUpdate(dt);}else if(TM.shown)tgtMarkHide();
   dfHudUpdate();hogUI();fdTick();
-  // PAPI
-  PAPI.forEach(pp=>{const eye=camera.position,du=(toU(eye.x,eye.z)-pp.u)*pp.dir;const ang=du<0?Math.atan2(eye.y-0.9,-du)*180/Math.PI:10;
-    pp.sp.material.color.setHex(ang>pp.ang?0xffffff:0xff2a2a);const cd=camera.position.distanceTo(pp.sp.position);
-    // the same on-screen size as an airport light point: clamp(K/d) CSS px turned back into metres
-    pp.sp.scale.setScalar(clamp(AL_K/cd,AL_MIN,AL_MAX)*cd*2*Math.tan(camera.fov*Math.PI/360)/Math.max(1,glcH||(glcH=glc.clientHeight)));pp.sp.visible=du<0;});
+  // the airport light layers held visible at night (alGuard), then the PAPI: each box seen from its approach side within
+  // 16 km (white above its angle, red below), the same on-screen size as an airport light point (clamp(K/d) CSS px
+  // turned back into metres)
+  alGuard();
+  {const eye=camera.position,fk=2*Math.tan(camera.fov*Math.PI/360)/Math.max(1,glcH||(glcH=glc.clientHeight));
+   for(const pp of PAPI){const ex=eye.x-pp.x,ez=eye.z-pp.z,du=ex*pp.dx+ez*pp.dz,hd=Math.hypot(ex,ez),cd=Math.hypot(hd,eye.y-pp.y);
+    // drawn only within 100 degrees of the approach (cos 100 = -0.174) and 16 km
+    if(AL_HIDE||cd>16000||-du<-0.174*hd){pp.sp.visible=false;continue;}
+    const ang=Math.atan2(eye.y-pp.y,Math.max(-du,1))*180/Math.PI;pp.sp.material.color.setHex(ang>pp.ang?0xffffff:0xff2a2a);
+    pp.sp.scale.setScalar(clamp(AL_K/cd,AL_MIN,AL_MAX)*cd*fk);pp.sp.visible=true;}}
   // instruments
   _eu.setFromQuaternion(q,'YXZ');const hdgT=((-_eu.y*180/Math.PI)%360+360)%360,hdgM=(hdgT-MAGVAR+360)%360;
   mapT-=dt;if(mapT<=0){mapT=0.1;drawMap(hdgT);}
@@ -24049,13 +24201,21 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
   tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzBuild:()=>dzBuild(),dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
   SKY_HARBOR:SKY_HARBOR,shX:shX,shZ:shZ,
-  lights:()=>({KGEU:AL.KGEU.count(),KLUF:AL.KLUF.count(),uLights:AL_MAT.uniforms.uLights.value,
-    layers:AL_LAYERS.map(L=>({name:L.pts&&L.pts.name,visible:!!(L.pts&&L.pts.visible),inScene:!!(L.pts&&L.pts.parent)})),
+  lights:()=>({KGEU:AL.KGEU?AL.KGEU.count():0,KLUF:AL.KLUF?AL.KLUF.count():0,KPHX:AL.KPHX?AL.KPHX.count():0,LZ:AL.LZ?AL.LZ.count():0,
+    region:REGION.az?null:{code:REGION.icao,n:AL[REGION.icao]?AL[REGION.icao].count():0},uLights:AL_MAT.uniforms.uLights.value,
+    layers:AL_LAYERS.map(L=>({name:L.pts&&L.pts.name,visible:!!(L.pts&&L.pts.visible),inScene:!!(L.pts&&L.pts.parent),n:L.count(),apt:L.apt||null,manual:!!L.manual,culled:!!(L.pts&&L.pts.frustumCulled),fixTris:L.fixMesh?L.fixMesh.count*10:0})),
     oldGlow:scene.children.filter(o=>o.isPoints&&o.material.isPointsMaterial&&o.material.blending===THREE.AdditiveBlending).length,
     hasGLOWS:typeof GLOWS!=='undefined'||typeof lightGlow!=='undefined'||typeof lightScale!=='undefined'}),
   acLights:()=>({count:plane.lights?plane.lights.count:0,landingOn:ACL_STATE.on,poolOpacity:ACL_STATE.pool,
     inGroup:!!(plane.lights&&plane.lights.pts.parent===plane.g),traffic:TRAFFIC.map(o=>o.m.lights?o.m.lights.count:0)}),
   lightClock:t=>{AL_TFREEZE=t==null?null:t;},
+  // runways item 4: one entry per end in RWY_ENDS order (edge and cl: the runway's points; thr, end, tdz: this end's; thr
+  // the green bar at its threshold, end the red bar at its pavement end; beacon, taxiBlue, floods: the airport's)
+  rwyLights:()=>RWY_ENDS.map(e=>{const r=e.rwy,I=AL_INFO.end.get(e)||{},R=AL_INFO.rwy.get(r)||{},A=AL_INFO.apt[r.code]||{};
+    return {code:r.code,num:e.num,edge:R.edge||0,thr:I.thr||0,end:I.end||0,papi:{n:I.papi||0,side:'L',ang:3.0},als:I.als||'none',reil:!!I.reil,
+      cl:R.cl||0,tdz:I.tdz||0,beacon:!!A.beacon,taxiBlue:A.taxiBlue||0,taxiGreen:A.taxiGreen||0,floods:A.floods||0,layer:A.layer||null};}),
+  lightsHide:v=>{AL_HIDE=!!v;alGuard();for(const pp of PAPI)if(AL_HIDE)pp.sp.visible=false;ACL_MAT.visible=ACL_MAT_T.visible=!AL_HIDE;if(AL_HIDE)ACL_POOL.visible=false;return AL_HIDE;},
+  PAPI:PAPI,AL_CFG:AL_CFG,
   // screen position (CSS px, page coordinates) of each of the flown aircraft's lights
   acLightScreen:()=>{if(!plane.lights)return [];const P=plane.lights.pts,g=P.geometry.attributes,r=glc.getBoundingClientRect(),v=new V3(),out=[];
     P.updateWorldMatrix(true,false);const names=Object.keys(ACL_KIND);
