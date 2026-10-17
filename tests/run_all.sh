@@ -41,6 +41,11 @@ for sz in 568x320 390x844; do
   echo "== tasking_break_check $sz (exit $code)"; echo "$out" | grep -E "FAIL|passed" | tail -4
   [[ $code -ne 0 ]] && fail+=("tasking_break_check $sz")
 done
+# stepstall: every lesson, tasking and mission step change costs no frame (part B on the real loop, then part A: the 22
+# lesson, tasking and mission checks under the step probe, four at a time; about 35 min in all)
+out=$($PY tests/stepstall_check.py 2>&1); code=$?
+echo "== stepstall_check (exit $code)"; echo "$out" | grep -E "FAIL|passed" | tail -4
+[[ $code -ne 0 ]] && fail+=("stepstall_check")
 # sensor item 8: break-ui on the sensor view at three sizes (the full eight: tests/sensor_break_check.py alone)
 for sz in 568x320,844x390,390x844; do
   out=$($PY tests/sensor_break_check.py --sizes $sz --cases hard_worst,easy_worst,strike_dc2 2>&1); code=$?
