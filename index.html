@@ -8378,7 +8378,6 @@ function rebuildTerrain(x,z){
 }
 
 // ---------- KGEU runway ----------
-const PPM=128/30.5;
 function asphalt(x,w,h,base){x.fillStyle=base||'#3f4144';x.fillRect(0,0,w,h);speckle(x,w,h,w*h/40,0.05);}
 // weather item 3: the wet runway. wetReg lists a paved surface (its Lambert material); wetSet swaps every listed one to
 // its wet twin (made once: the same map, two thirds as bright, a glossy Phong that takes a sheen and a glint from the sun;
@@ -8390,39 +8389,14 @@ function wetReg(m){if(!m||!m.material)return m;const d=m.material;let w=WET.map.
     transparent:d.transparent,depthWrite:d.depthWrite,opacity:d.opacity});w.name='wet';WET.map.set(d,w);}
   m.userData.dry=d;m.userData.wet=w;WET.list.push(m);if(WET.on)m.material=w;return m;}
 function wetSet(on){on=!!on;if(WET.on===on)return;WET.on=on;for(const m of WET.list)m.material=on?m.userData.wet:m.userData.dry;}
-function digits(x,str,cxp,cyTop,hPx,wPerDigitPx){
-  x.save();x.font='800 100px '+F;x.textAlign='center';x.textBaseline='alphabetic';
-  const mw=x.measureText(str).width;x.translate(cxp,cyTop+hPx);x.scale((wPerDigitPx*str.length)/mw,hPx/72);x.fillText(str,0,0);x.restore();
-}
 // Arizona only from here to the hold line signs (REGION.az): a world region builds its own field (buildWorld)
 if(REGION.az){
-const rwBase=tex(128,256,(x,w,h)=>{asphalt(x,w,h);x.fillStyle='#f1f1ec';x.fillRect(2,0,4,h);x.fillRect(w-6,0,4,h);x.fillRect(w/2-2,0,4,Math.round(36.6*PPM));},[1,RWY_LEN/61]);
-wetReg(flatLocal(30.5,RWY_LEN,lam(0xffffff,{map:rwBase}),RWY_LEN/2,0,0.05));
-function endTex(lenM,dispM,num,npi){
-  const H=Math.round(lenM*PPM);
-  return tex(128,H,(x,w,h)=>{
-    const Y=m=>h-m*PPM; asphalt(x,w,h);
-    x.fillStyle='#f1f1ec';x.fillRect(2,0,4,h);x.fillRect(w-6,0,4,h);
-    for(let m=12;m<dispM-40;m+=45){x.fillRect(w/2-2,Y(m+26),4,26*PPM);x.beginPath();x.moveTo(w/2-9,Y(m+26));x.lineTo(w/2+9,Y(m+26));x.lineTo(w/2,Y(m+33));x.fill();}
-    for(const fx of [0.2,0.4,0.6,0.8]){x.beginPath();x.moveTo(w*fx-8,Y(dispM-12));x.lineTo(w*fx+8,Y(dispM-12));x.lineTo(w*fx,Y(dispM-4));x.fill();}
-    x.fillRect(6,Y(dispM+3),w-12,3*PPM);
-    let m=dispM+3+6;
-    if(npi){for(const xm of [1.5,4.7,7.9,11.1]){x.fillRect(xm*PPM,Y(m+45),1.6*PPM,45*PPM);x.fillRect(w-(xm+1.6)*PPM,Y(m+45),1.6*PPM,45*PPM);}m+=45+6;}
-    digits(x,num,w/2,Y(m+18.3),18.3*PPM,6*PPM);m+=18.3+12;
-    for(let s=m;s<lenM;s+=61){const L=Math.min(36.6,lenM-s);x.fillRect(w/2-2,Y(s+L),4,L*PPM);}
-  });
-}
-wetReg(flatLocal(30.5,330,lam(0xffffff,{map:endTex(330,THR01,'1',false)}),165,0,0.07));
-wetReg(flatLocal(30.5,460,lam(0xffffff,{map:endTex(460,305.1,'19',true)}),RWY_LEN-230,0,0.07,180));
-const aimTex=tex(128,190,(x,w,h)=>{x.clearRect(0,0,w,h);x.fillStyle='#f1f1ec';x.fillRect(w/2-6*PPM-6*PPM,0,6*PPM,h);x.fillRect(w/2+6*PPM,0,6*PPM,h);});
-// renderOrder -1: first of the transparent things, so the ground decals (scorch, shadow) blend
-// over it; at 0 the distance sort put it after them some frames and a scorch on it flickered
-wetReg(flatLocal(30.5,45,lam(0xffffff,{map:aimTex,transparent:true}),THR19-311-22,0,0.075,180)).renderOrder=-1;
+// the runway's pavement and paint: rwPaintAZ (runways item 3)
 // taxiway, connectors, pads
 const twTex=tex(64,128,(x,w,h)=>{asphalt(x,w,h,'#45474a');x.fillStyle='#e8b923';x.fillRect(w/2-1.5,0,3,h);},[1,2300/30]);
 wetReg(flatLocal(15.2,2300,lam(0xffffff,{map:twTex}),RWY_LEN/2,-120,0.05));
-const conTex=tex(108,630,(x,w,h)=>{asphalt(x,w,h,'#45474a');x.fillStyle='#e8b923';x.fillRect(w/2-1.5,0,3,h);
-  const y0=60*6;x.fillRect(4,y0-10,w-8,2);x.fillRect(4,y0-6,w-8,2);for(let xx=4;xx<w-8;xx+=12){x.fillRect(xx,y0+2,7,2);x.fillRect(xx,y0+6,7,2);}});
+// the hold lines across the connectors are geometry now (rwPaintAZ)
+const conTex=tex(108,630,(x,w,h)=>{asphalt(x,w,h,'#45474a');x.fillStyle='#e8b923';x.fillRect(w/2-1.5,0,3,h);});
 for(const c of CONNECT) wetReg(flatLocal(18,105,lam(0xffffff,{map:conTex}),c,-67.5,0.055,90));
 const asphM=lam(0x55575a,{map:tex(128,128,(x,w,h)=>asphalt(x,w,h,'#5a5c5f'),[20,20])});
 wetReg(flatLocal(62,130,asphM,5,-141,0.045));
@@ -9004,40 +8978,7 @@ if(REGION.az)(function(){
   // LKX/LKZ, not LX/LZ: LZ is the C-130 assault strip at module scope and shadowing
   // it here would be a trap for anyone editing this block later.
   const lh=LUKE.h,ls=Math.sin(lh),lc=Math.cos(lh);const LKX=(u,v)=>LUKE.x+ls*u+lc*v,LKZ=(u,v)=>LUKE.z-lc*u+ls*v;
-  const LPPM=128/46;                       // 150 ft wide runway across a 128 px texture
-  const conc=lam(0xb9b7b0,{map:tex(128,256,(x,w,h)=>{
-    x.fillStyle='#96948c';x.fillRect(0,0,w,h);speckle(x,w,h,2200,0.06);
-    x.fillStyle='rgba(120,118,112,.55)';for(let k=0;k<8;k++)x.fillRect(0,k*32,w,2);   // slab joints
-    x.fillStyle='#f4f2ec';x.fillRect(3,0,4,h);x.fillRect(w-7,0,4,h);          // edge lines
-    x.fillRect(w/2-2,0,4,Math.round(36.6*LPPM));                              // centreline dash
-  },[1,3021/61])});
-  // each end gets its own 400 m panel: piano keys, the number, and the aiming point
-  function lukeEnd(num){
-    const Lm=400,H=Math.round(Lm*LPPM);
-    return tex(128,H,(x,w,h)=>{
-      const Y=m=>h-m*LPPM;
-      x.fillStyle='#96948c';x.fillRect(0,0,w,h);speckle(x,w,h,1400,0.06);
-      x.fillStyle='rgba(60,56,50,.30)';x.fillRect(0,Y(360),w,60*LPPM);        // rubber in the touchdown zone
-      x.fillStyle='#f4f2ec';x.fillRect(3,0,4,h);x.fillRect(w-7,0,4,h);
-      x.fillRect(5,Y(3),w-10,3*LPPM);                                          // threshold bar
-      for(let k=0;k<6;k++){const bw=1.8*LPPM,gap=(w-12)/6;                     // piano keys
-        x.fillRect(6+k*gap+gap/2-bw/2,Y(36),bw,30*LPPM);}
-      digits(x,num,w/2,Y(60+18.3),18.3*LPPM,6*LPPM);
-      for(const s2 of [-1,1]) x.fillRect(w/2+s2*9*LPPM-1.5*LPPM,Y(300+22),3*LPPM,22*LPPM);  // aiming point
-      for(let m=110;m<Lm;m+=61){const L2=Math.min(36.6,Lm-m);x.fillRect(w/2-2,Y(m+L2),4,L2*LPPM);}
-    });
-  }
-  for(const r of LUKE_RWY){
-    const mid=r.len-800;
-    const g=new THREE.PlaneGeometry(46,mid);g.rotateX(-Math.PI/2);
-    const m=new THREE.Mesh(g,conc);m.position.set(LKX(r.u0,r.v),0.06,LKZ(r.u0,r.v));m.rotation.y=-lh;scene.add(m);
-    for(const end of [-1,1]){
-      const eg=new THREE.PlaneGeometry(46,400);eg.rotateX(-Math.PI/2);
-      const em=new THREE.Mesh(eg,lam(0xffffff,{map:lukeEnd(end<0?r.lo:r.hi)}));
-      em.position.set(LKX(r.u0+end*(r.len/2-200),r.v),0.07,LKZ(r.u0+end*(r.len/2-200),r.v));
-      em.rotation.y=-lh+(end>0?Math.PI:0);scene.add(em);
-    }
-  }
+  // the runways' pavement and paint: rwPaintAZ (runways item 3)
   const rg=new THREE.PlaneGeometry(510,1800);rg.rotateX(-Math.PI/2);const ramp=new THREE.Mesh(rg,lam(0xaaa89f));ramp.position.set(LKX(0,445),0.05,LKZ(0,445));ramp.rotation.y=-lh;scene.add(ramp);
   // taxiway from the ramp across 03R to 03L, so a ramp start can reach a runway
   const tg2=new THREE.PlaneGeometry(26,390);tg2.rotateX(-Math.PI/2);
@@ -9050,19 +8991,10 @@ if(REGION.az)(function(){
   // the terminals between 8/26 and 7L/25R, and the tower. 28.6 km out, so it is geometry and no textures. Placed from
   // assets/world/az_apt.json (OSM through geoW): runways 2.
   (function(){
-    const conc2=lam(0x8e8c85),pale=lam(0xb4b2ab),glass2=lam(0x3f5f7a),roof=lam(0x9a9790);
+    const pale=lam(0xb4b2ab),glass2=lam(0x3f5f7a),roof=lam(0x9a9790);
     const flat=(u0,u1,v0,v1,y,mat)=>{const g=new THREE.PlaneGeometry(u1-u0,v1-v0);g.rotateX(-Math.PI/2);
       const m=new THREE.Mesh(g,mat);m.position.set(shX((u0+u1)/2,(v0+v1)/2),y,shZ((u0+u1)/2,(v0+v1)/2));m.rotation.y=Math.PI/2-SKY_HARBOR.h;scene.add(m);return m;};
-    for(const r of SH_RWY){
-      const g=new THREE.PlaneGeometry(46,r.len);g.rotateX(-Math.PI/2);
-      const m=new THREE.Mesh(g,conc2);m.position.set(shX(r.u0,r.v),0.06,shZ(r.u0,r.v));   // planes2: the paint height the player rolls on (SURF_Y)
-      m.rotation.y=-SKY_HARBOR.h;scene.add(m);
-      // centreline, so the runways read as runways from the air: threshold to threshold (8's starts at its displaced threshold)
-      const c0=r.u0-r.len/2+r.thrLo+80,c1=r.u0+r.len/2-r.thrHi-80;
-      const cg=new THREE.PlaneGeometry(2.2,c1-c0);cg.rotateX(-Math.PI/2);
-      const cm=new THREE.Mesh(cg,lam(0xe8e6de));cm.position.set(shX((c0+c1)/2,r.v),0.075,shZ((c0+c1)/2,r.v));
-      cm.rotation.y=-SKY_HARBOR.h;scene.add(cm);
-    }
+    // the runways' pavement and paint: rwPaintAZ (runways item 3)
     // taxiways E (north of 7L/25R) and B (south of 8/26), their links to the runways, the two terminal aprons (SH_TWY, SH_LINK, SH_APRON)
     for(const a of SH_TWY)flat(a[0],a[1],a[2],a[3],0.05,pale);
     for(const l of SH_LINK)flat(l[0]-15,l[0]+15,l[1],l[2],0.05,pale);
@@ -9820,32 +9752,11 @@ if(REGION.az)(function(){
   const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,9,6),lam(0xd8d4cc));
   pole.position.set(DROPZ.x+18,4.5,DROPZ.z);scene.add(pole);
 
-  // Assault strip: graded dirt, 3,000 x 90 ft, threshold bars and edge markers.
-  // graded and rolled, so it reads darker and flatter than the desert either side
-  const dirt=tex(128,512,(x,w,h)=>{
-    x.fillStyle='#7d6749';x.fillRect(0,0,w,h);speckle(x,w,h,6000,0.09);
-    x.fillStyle='rgba(60,50,36,.45)';for(let i=0;i<50;i++)x.fillRect(0,Math.random()*h,w,1+Math.random()*2);
-    x.fillStyle='rgba(232,227,214,.9)';x.fillRect(3,0,5,h);x.fillRect(w-8,0,5,h);          // edge lines
-    x.fillStyle='rgba(232,227,214,.85)';for(let y=14;y<h;y+=46)x.fillRect(w/2-3,y,6,24);   // centreline
-  },[1,LZ.len/30]);
-  const strip=new THREE.Mesh(flatQuad,lam(0xffffff,{map:dirt}));
-  strip.scale.set(LZ.wid,1,LZ.len);strip.position.set(LZ.x,0.24,LZ.z);strip.rotation.y=-LZ.h;scene.add(strip);
-  const bar=lam(0xe8e3d6);
-  for(const end of [-1,1]){
-    for(let k=-2;k<=2;k++){
-      const m=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.12,9),bar);
-      const u=end*(LZ.len/2-7),v=k*4.6;
-      m.position.set(lzX(u,v),0.30,lzZ(u,v));m.rotation.y=-LZ.h;scene.add(m);}
-  }
+  // Assault strip, 3,000 x 90 ft: the pavement and paint are rwPaintAZ's (runways item 3); the edge markers
   const cone=new THREE.ConeGeometry(0.8,2.6,6);
   const cm=lam(0xef7d24);
   for(let u=-LZ.len/2;u<=LZ.len/2+1;u+=61)for(const v of [-LZ.wid/2-3,LZ.wid/2+3]){
     const m=new THREE.Mesh(cone,cm);m.position.set(lzX(u,v),1.3,lzZ(u,v));scene.add(m);}
-  // touchdown aim points 300 ft in from each threshold, where a Herc should plant it
-  for(const end of [-1,1])for(const s of [-1,1]){
-    const m=new THREE.Mesh(new THREE.BoxGeometry(2.2,0.12,14),bar);
-    const u=end*(LZ.len/2-91),v=s*10;
-    m.position.set(lzX(u,v),0.30,lzZ(u,v));m.rotation.y=-LZ.h;scene.add(m);}
 })();
 
 // ---------- aircraft ----------
@@ -11358,41 +11269,208 @@ function wbBuilding(G,P,y0,bands,roof,door){
 function wbNearEdge(P,x,z){let best=[1e9,0,0];for(let i=0,j=P.length-1;i<P.length;j=i++){const ax=P[j][0],az=P[j][1],ex=P[i][0]-ax,ez=P[i][1]-az,L=ex*ex+ez*ez,
   t=L>0?clamp(((x-ax)*ex+(z-az)*ez)/L,0,1):0,px=ax+ex*t,pz=az+ez*t,d=Math.hypot(x-px,z-pz);if(d<best[0])best=[d,px,pz];}return best;}
 const wbCentroid=P=>{let x=0,z=0;for(const p of P){x+=p[0];z+=p[1];}return [x/P.length,z/P.length];};
-// runway paint: the long middle (edge lines, centre line dashes) and one panel per end, drawn to the
-// runway's own width: displaced threshold arrows, the threshold bar, piano keys, the designator; a
-// shared transparent decal per width carries the touchdown zone bars and the aiming point
-function rwMidTex(wid,len){
-  return tex(64,128,(x,w,h)=>{asphalt(x,w,h);const px=w/wid,el=Math.max(1.5,0.9*px);x.fillStyle='#f1f1ec';
-    x.fillRect(0.6*px,0,el,h);x.fillRect(w-0.6*px-el,0,el,h);x.fillRect(w/2-Math.max(1,0.45*px),0,Math.max(2,0.9*px),Math.round(h*36.6/61));},[1,Math.max(1,len/61)]);}
-function rwEndTex(wid,disp,num,Lp){
-  const W=128,H=Math.min(2048,Math.ceil(Lp*2)),px=W/wid,PV=H/Lp;
-  return tex(W,H,(x,w,h)=>{const Y=m=>h-m*PV;asphalt(x,w,h);x.fillStyle='#f1f1ec';
-    const el=Math.max(1.5,0.9*px);x.fillRect(0.6*px,0,el,h);x.fillRect(w-0.6*px-el,0,el,h);
-    for(let m=12;m<disp-40;m+=45){x.fillRect(w/2-0.45*px,Y(m+26),0.9*px,26*PV);x.beginPath();x.moveTo(w/2-1.8*px,Y(m+26));x.lineTo(w/2+1.8*px,Y(m+26));x.lineTo(w/2,Y(m+33));x.fill();}
-    if(disp>0)for(const fx of [0.2,0.4,0.6,0.8]){x.beginPath();x.moveTo(w*fx-1.6*px,Y(disp-12));x.lineTo(w*fx+1.6*px,Y(disp-12));x.lineTo(w*fx,Y(disp-4));x.fill();}
-    x.fillRect(0.6*px+el,Y(disp+3),w-2*(0.6*px+el),3*PV);
-    let m=disp+3+6;const nk=wid>=55?8:wid>=40?6:wid>=28?4:2,step=(wid/2-5)/nk;
-    for(let k=0;k<nk;k++){const off=(3+k*step)*px,bw=1.8*px;x.fillRect(w/2+off,Y(m+30),bw,30*PV);x.fillRect(w/2-off-bw,Y(m+30),bw,30*PV);}
-    m+=30+6;const dg=num.replace(/[LRC]$/,''),lt=num.slice(dg.length);
-    if(lt){digits(x,lt,w/2,Y(m+18),18*PV,6*px);m+=18+6;}
-    digits(x,dg,w/2,Y(m+18),18*PV,6*px*Math.min(1,wid/30));m+=18+12;
-    for(let s2=m;s2<Lp;s2+=61){const L2=Math.min(36.6,Lp-s2);x.fillRect(w/2-0.45*px,Y(s2+L2),0.9*px,L2*PV);}});}
-const RW_TDZ={};
-function rwTdzTex(wid,long){const k=wid+'_'+(long?1:0);if(RW_TDZ[k])return RW_TDZ[k];
-  // covers 120 to 660 m past the threshold (120 to 360 on a short runway)
-  const L=long?540:240,H=long?256:128,PV=H/L,px=128/wid;
-  return RW_TDZ[k]=tex(128,H,(x,w,h)=>{x.clearRect(0,0,w,h);x.fillStyle='#f1f1ec';const Y=m=>h-(m-120)*PV;
-    const bars=(m,n)=>{for(let i=0;i<n;i++)for(const sg of [-1,1]){const o=(3+i*3.3)*px;x.fillRect(sg>0?w/2+o:w/2-o-1.8*px,Y(m+22.5),1.8*px,22.5*PV);}};
-    bars(150,3);
-    for(const sg of [-1,1]){const o=Math.min(9,wid/2-8)*px,bw=Math.min(9,wid*0.15)*px;x.fillRect(sg>0?w/2+o:w/2-o-bw,Y(345),bw,45*PV);}
-    if(long){bars(450,2);bars(600,2);}});}
-// a flat textured strip lying along heading h (rad), its texture's bottom at x,z
-function rwStrip(map,wid,len,x,z,h,y,transparent){
-  const g=new THREE.PlaneGeometry(wid,len);g.rotateX(-Math.PI/2);g.translate(0,0,-len/2);
-  const m=new THREE.Mesh(g,lam(0xffffff,{map:map,transparent:!!transparent,depthWrite:!transparent}));m.position.set(x,y,z);m.rotation.y=-h;
-  if(transparent)m.renderOrder=-1;scene.add(m);WB.tris.runways=(WB.tris.runways||0)+2;return wetReg(m);}
-const holdTex=tex(64,32,(x,w,h)=>{x.clearRect(0,0,w,h);x.fillStyle='#e8b923';
-  for(let i=0;i<w;i+=10){x.fillRect(i,3,6,3);x.fillRect(i,10,6,3);}x.fillRect(0,18,w,3);x.fillRect(0,25,w,3);});
+// ---------- runway paint (runways item 3): one painter for every runway in every region ----------
+// Pavement: one mesh per runway (and its stopways), a tiled 512 px surface (asphalt 15 x 15 m, paving lanes 3.75 m
+// apart; concrete 15 x 24 m, 7.5 x 6 m slabs, a joint on the centre line), uv in real metres. Markings: GEOMETRY, white and
+// yellow quads merged into one mesh per airport per colour, 1.5 cm over the pavement, so they stay sharp at any distance
+// and cost no texture. Rubber: a soft dark decal 150 to 900 m past each threshold. FAA AC 150/5340-1 at the US fields,
+// ICAO Annex 14 chapter 5 in the world regions; the class per end in RWP_CFG.
+// Layering by draw order, not by depth: the log depth buffer writes the depth per fragment, so a polygon offset does
+// nothing, and paint 1.5 cm over the pavement fought it from 150 m on (tested). So the pavement writes no depth and draws
+// after the terrain (renderOrder 1; it still tests against everything in front of it), the rubber and then the paint come
+// in the transparent pass (renderOrder -3 and -2, before the ground decals) and write no depth either: each one tests
+// only against the terrain 6 cm and more below it, and lies over the one before by order.
+// All Lambert (with a map, without, transparent with a map): the programs the precompile queue already links.
+const RWP={info:[],tex:{},mat:{},tris:0};
+const FT=0.3048,IN=0.0254;
+const RWP_STD={
+  FAA:{thrL:150*FT,thrW:5.75*FT,thrS:20*FT,cnt:[[18.3,4],[22.9,6],[30.5,8],[45.7,12],[61,16]],
+    bar:10*FT,arS:120*FT,arW:3*FT,arHW:16*FT,arHL:22*FT,arSp:200*FT,
+    dH:60*FT,dW:20*FT,dK:5*FT,dG:10*FT,dS:40*FT,lG:40*FT,
+    aim:r=>({d:1020*FT,L:150*FT,W:r.wid<35?20*FT:30*FT,inn:r.wid<35?48*FT:72*FT}),
+    tdz:{L:75*FT,W:6*FT,g:5*FT,inn:72*FT,grp:[[500*FT,3],[1500*FT,2],[2000*FT,2],[2500*FT,1],[3000*FT,1]]},
+    clL:120*FT,clG:80*FT,clW:{P:36*IN,X:18*IN},side:36*IN,chW:10*FT,chSp:100*FT,hold:{w:6*IN,dash:3*FT}},
+  ICAO:{thrL:30,thrW:1.8,thrS:6,cnt:[[18,4],[23,6],[30,8],[45,12],[60,16]],
+    bar:1.8,arS:24,arW:0.9,arHW:3,arHL:6,arSp:50,
+    dH:9,dW:4.5,dK:1.5,dG:1.5,dS:12,lG:6,
+    aim:r=>r.len>=2400?{d:400,L:45,W:6,inn:18}:{d:300,L:30,W:4,inn:18},
+    tdz:{L:22.5,W:1.8,g:1.5,inn:18,grp:[[150,3],[450,2],[600,2],[750,1],[900,1]]},
+    clL:30,clG:20,clW:{P:0.9,X:0.9},side:0.9,chW:3,chSp:30,hold:{w:0.15,dash:1}}};
+// per airport: standard, class per end (B basic, NP nonprecision, P precision), surface, rubber (decal opacity),
+// stopways (metres of blast pad past the pavement end, per end), hold line distance from the centre line (m)
+const RWP_CFG={
+  KGEU:{std:'FAA',cls:{'1':'B','19':'NP'},surf:'asphalt',rub:0.3,hold:200*FT},
+  KLUF:{std:'FAA',cls:'P',surf:'concrete',rub:0.5,stop:{'03L':330,'21R':330,'03R':330,'21L':330},hold:250*FT},
+  KPHX:{std:'FAA',cls:'P',surf:'concrete',rub:0.5,stop:{'07L':121,'25R':122,'07R':121,'25L':120,'08':121,'26':126},hold:250*FT},
+  LZ:{std:'FAA',cls:'B',stripes:true,surf:'asphalt',rub:0,hold:125*FT},
+  RJTT:{std:'ICAO',cls:'P',surf:'asphalt',rub:0.6},
+  LFPG:{std:'ICAO',cls:'P',surf:{'08R-26L':'concrete'},rub:0.6},
+  SBRJ:{std:'ICAO',cls:'NP',surf:'asphalt',rub:0.3}};
+function rwpCfg(r){const c=RWP_CFG[r.code]||{std:'ICAO',cls:'P',surf:'asphalt',rub:0.6};
+  const cl=e=>typeof c.cls==='string'?c.cls:(c.cls[e.num]||'NP');
+  const sf=typeof c.surf==='string'?c.surf:(c.surf[r.num]||'asphalt');
+  return {std:c.std,S:RWP_STD[c.std],cls:[cl(r.ends[0]),cl(r.ends[1])],surf:sf,rub:c.rub,stripesB:!!c.stripes,
+    stop:[c.stop&&c.stop[r.ends[0].num]||0,c.stop&&c.stop[r.ends[1].num]||0],hold:c.hold||(r.len>=2400?90:75)};}
+// the hold line distance from a runway's centre line (buildWorld's hold detection uses it)
+function rwpHoldD(r){return rwpCfg(r).hold;}
+// surface tiles, made once each: 512 px, mipmapped, anisotropic; uv in tiles (RWP_TILE: metres across, along)
+const RWP_TILE={asphalt:[15,15],concrete:[15,24]};
+function rwpTex(kind){
+  if(RWP.tex[kind])return RWP.tex[kind];
+  const S=512,wrapDot=(x,px,py,r,col)=>{for(const ox of [-S,0,S])for(const oy of [-S,0,S]){const g=x.createRadialGradient(px+ox,py+oy,0,px+ox,py+oy,r);
+    g.addColorStop(0,col);g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.fillRect(px+ox-r,py+oy-r,2*r,2*r);}};
+  let t;
+  if(kind==='asphalt')t=tex(S,S,(x,w,h)=>{x.fillStyle='#45474a';x.fillRect(0,0,w,h);
+    for(let i=0;i<40;i++)wrapDot(x,Math.random()*w,Math.random()*h,30+Math.random()*70,Math.random()<0.5?'rgba(255,255,255,0.035)':'rgba(0,0,0,0.05)');
+    for(let i=0;i<30000;i++){const g=Math.random()<0.5?0:255;x.fillStyle=`rgba(${g},${g},${g},${0.06+Math.random()*0.1})`;x.fillRect(Math.random()*w,Math.random()*h,1,1);}
+    for(let i=0;i<2500;i++){const g=Math.random()<0.6?20:200;x.fillStyle=`rgba(${g},${g},${g},${0.1+Math.random()*0.12})`;x.fillRect(Math.random()*w,Math.random()*h,2,2);}
+    // paving lanes 3.75 m apart (128 px): a faint seam, darker on one side
+    for(let i=0;i<4;i++){x.fillStyle='rgba(15,15,18,0.22)';x.fillRect(i*128,0,2,h);x.fillStyle='rgba(255,255,255,0.035)';x.fillRect(i*128+2,0,6,h);}},[1,1]);
+  else if(kind==='concrete')t=tex(S,S,(x,w,h)=>{
+    // 2 slabs across (7.5 m, 256 px) by 4 along (6 m, 128 px), each a slightly different warm grey
+    for(let i=0;i<2;i++)for(let j=0;j<4;j++){const k=(Math.random()-0.5)*7;x.fillStyle=`rgb(${Math.round(116+k)},${Math.round(113+k)},${Math.round(105+k*0.9)})`;x.fillRect(i*256,j*128,256,128);}
+    for(let i=0;i<30;i++)wrapDot(x,Math.random()*w,Math.random()*h,20+Math.random()*50,Math.random()<0.5?'rgba(255,255,255,0.04)':'rgba(60,50,40,0.05)');
+    for(let i=0;i<26000;i++){const g=Math.random()<0.5?40:255;x.fillStyle=`rgba(${g},${g},${g},${0.05+Math.random()*0.08})`;x.fillRect(Math.random()*w,Math.random()*h,1,1);}
+    // joints: transverse every 6 m, longitudinal every 7.5 m (one on the centre line: uv 0 is the centre line)
+    x.fillStyle='rgba(50,47,43,0.32)';for(let j=0;j<4;j++){x.fillRect(0,j*128,w,2);}for(let i=0;i<2;i++)x.fillRect(i*256,0,2,h);
+    x.fillStyle='rgba(255,255,255,0.05)';for(let j=0;j<4;j++)x.fillRect(0,j*128+2,w,1);},[1,1]);
+  else if(kind==='paint')t=tex(4,4,(x,w,h)=>{x.fillStyle='#fff';x.fillRect(0,0,w,h);});
+  else t=tex(128,512,(x,w,h)=>{x.clearRect(0,0,w,h);
+    // rubber: long smears in the rolling direction, most of it in the first half (the touchdown), under a soft mask
+    // two main gear tracks either side of the centre line and a lighter spread between and beyond them
+    const gs=()=>{let c=0;for(let k=0;k<4;k++)c+=Math.random();return c/4-0.5;};
+    for(let i=0;i<1600;i++){const q=Math.random(),c=q<0.36?0.3+gs()*0.3:q<0.72?0.7+gs()*0.3:0.5+gs()*0.9,y0=Math.pow(Math.random(),1.5)*h,L=20+Math.random()*180;
+      x.fillStyle=`rgba(18,16,15,${0.04+Math.random()*0.09})`;x.fillRect(c*w,y0,1+Math.random()*3,L);}
+    x.globalCompositeOperation='destination-in';
+    let g=x.createLinearGradient(0,0,w,0);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(0.22,'rgba(0,0,0,1)');g.addColorStop(0.78,'rgba(0,0,0,1)');g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.fillRect(0,0,w,h);
+    g=x.createLinearGradient(0,0,0,h);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(0.12,'rgba(0,0,0,1)');g.addColorStop(0.45,'rgba(0,0,0,0.85)');g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.fillRect(0,0,w,h);
+    x.globalCompositeOperation='source-over';},[1,1]);
+  t.generateMipmaps=true;t.minFilter=THREE.LinearMipmapLinearFilter;t.magFilter=THREE.LinearFilter;t.anisotropy=MAXANI;
+  return RWP.tex[kind]=t;}
+function rwpMat(kind,op){const k=kind+(op||'');if(RWP.mat[k])return RWP.mat[k];let m;
+  // the paint carries a 4 px white map: its wet twin is then the Phong with a map the wet pavement already uses (no new program)
+  if(kind==='white'||kind==='yellow')m=lam(kind==='white'?0xf1f1ec:0xe8b923,{map:rwpTex('paint'),transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2});
+  else if(kind==='rubber')m=lam(0xffffff,{map:rwpTex('rubber'),transparent:true,depthWrite:false,opacity:op,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1});
+  else m=lam(0xffffff,{map:rwpTex(kind),depthWrite:false});
+  return RWP.mat[k]=m;}
+// glyphs (FAA / ICAO block numerals and L, R, C): rectangles [x0,y0,x1,y1] and quads in a W x H box, stroke K, y up
+function rwpGlyph(ch,W,H,K){
+  const m=(H-K)/2,top=[0,H-K,W,H],mid=[0,m,W,m+K],bot=[0,0,W,K],lu=[0,m,K,H],ll=[0,0,K,m+K],ru=[W-K,m,W,H],rl=[W-K,0,W,m+K],lf=[0,0,K,H],rf=[W-K,0,W,H];
+  const R={'0':[top,bot,lf,rf],'2':[top,ru,mid,ll,bot],'3':[top,mid,bot,rf],'4':[lu,mid,rf],'5':[top,lu,mid,rl,bot],'6':[top,lf,mid,rl,bot],
+    '7':[top,rf],'8':[top,mid,bot,lf,rf],'9':[top,lu,mid,rf,bot],'L':[lf,bot],'C':[top,bot,lf],'R':[top,lf,ru,mid]}[ch];
+  // 0: chamfered corners, so it reads as a zero and not a D
+  if(ch==='0'){const c=1.5*K;return {r:[[c,0,W-c,K],[c,H-K,W-c,H],[0,c,K,H-c],[W-K,c,W,H-c]],
+    q:[[[0,c],[c,0],[c,K],[K,c]],[[W,c],[W-c,0],[W-c,K],[W-K,c]],[[0,H-c],[c,H],[c,H-K],[K,H-c]],[[W,H-c],[W-c,H],[W-c,H-K],[W-K,H-c]]]};}
+  if(ch==='1'){const c=(W-K)/2;return {r:[[c,0,c+K,H]],q:[[[c,H],[c,H-1.4*K],[c-1.3*K,H-2.2*K],[c-1.3*K,H-0.8*K]]]};}
+  if(ch==='R')return {r:R,q:[[[W*0.3,m],[W*0.3+1.25*K,m],[W,0],[W-1.25*K,0]]]};
+  return {r:R||[],q:[]};}
+// the painter. rws: the runways of one airport (RUNWAYS entries); holds: [{x,z,ax,az (along the line), tx,tz (toward the
+// runway), w (line length), y, r (its runway)}]
+function rwPaint(rws,holds){
+  const Y0=SURF_Y,YM=SURF_Y+0.015,YR=SURF_Y+0.007,G={white:[],yellow:[],rubber:{p:[],uv:[]}};
+  const tri=(A,a,b,c,y)=>{if((b[1]-a[1])*(c[0]-a[0])-(b[0]-a[0])*(c[1]-a[1])<0){const t=b;b=c;c=t;}A.push(a[0],y,a[1],b[0],y,b[1],c[0],y,c[1]);};
+  const quad=(A,a,b,c,d,y)=>{tri(A,a,b,c,y);tri(A,a,c,d,y);};
+  const mesh=(p,uv,mat,name)=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));
+    const n=new Float32Array(p.length);for(let i=1;i<n.length;i+=3)n[i]=1;g.setAttribute('normal',new THREE.BufferAttribute(n,3));
+    g.setAttribute('uv',new THREE.Float32BufferAttribute(uv||new Float32Array(p.length/3*2),2));g.computeBoundingSphere();
+    const m=new THREE.Mesh(g,mat);m.name=name;m.renderOrder=mat.transparent?(name==='runwayRubber'?-3:-2):1;scene.add(m);wetReg(m);
+    // the IR sensor view: the same order without depth writes (irHook); the paint cooler than the pavement (dark in white hot)
+    m.userData.irNoDepth=true;if(!uv&&mat.transparent){m.userData.heat=0.16;m.userData.irVar=0;}
+    const w=m.userData.wet;if(w&&mat.polygonOffset){w.polygonOffset=true;w.polygonOffsetFactor=mat.polygonOffsetFactor;w.polygonOffsetUnits=mat.polygonOffsetUnits;}
+    RWP.tris+=p.length/9;return m;};
+  for(const r of rws){
+    const c=rwpCfg(r),S=c.S,e0=r.ends[0],I={code:r.code,num:r.num,surface:c.surf,std:c.std,cls:c.cls.slice(),tris:0,thresholdStripes:[0,0],tdzPairs:[0,0],tdzStripes:[0,0],aimDist:[0,0],holdLines:0,r:r};
+    const nW=G.white.length,nY=G.yellow.length,nR=G.rubber.p.length;
+    // ---- pavement and stopways: the lo end's frame, a from the lo pavement end, t right of the centre line ----
+    const ax=e0.x-e0.dx*e0.thr,az=e0.z-e0.dz*e0.thr,rx=-e0.dz,rz=e0.dx,hw=r.wid/2,T=RWP_TILE[c.surf],P=[],UV=[];
+    const pv=(a,t)=>[ax+e0.dx*a+rx*t,az+e0.dz*a+rz*t];
+    for(const [a0,a1] of [[-c.stop[0],0],[0,r.len],[r.len,r.len+c.stop[1]]]){if(a1-a0<0.5)continue;
+      const A=pv(a0,-hw),B=pv(a1,-hw),C=pv(a1,hw),D=pv(a0,hw);
+      P.push(A[0],Y0,A[1],C[0],Y0,C[1],B[0],Y0,B[1],A[0],Y0,A[1],D[0],Y0,D[1],C[0],Y0,C[1]);
+      const u=t=>t/T[0],v=a=>a/T[1];UV.push(u(-hw),v(a0),u(hw),v(a1),u(-hw),v(a1),u(-hw),v(a0),u(hw),v(a0),u(hw),v(a1));}
+    // winding: the right vector is clockwise of the landing direction seen from above, so A,C,B faces up
+    I.pave=mesh(P,UV,rwpMat(c.surf),'runway');
+    // ---- per end: s along the landing direction from the threshold, t to the pilot's right ----
+    let clA=[0,0];
+    r.ends.forEach((e,k)=>{
+      const cls=c.cls[k],ex=-e.dz,ez=e.dx,F=(s,t)=>[e.x+e.dx*s+ex*t,e.z+e.dz*s+ez*t],W=G.white;
+      const rect=(A,s0,s1,t0,t1,y)=>quad(A,F(s0,t0),F(s1,t0),F(s1,t1),F(s0,t1),y||YM);
+      const smid=r.len/2-e.thr,inner=hw-0.6;
+      let s=0;
+      // displaced threshold: the bar, a row of arrowheads before it, arrows down the centre line every arSp
+      if(e.thr>1){rect(W,-S.bar,0,-inner,inner);
+        const n=r.wid<35?4:r.wid<50?6:8,sp=r.wid/n,h0=-S.bar-1.5;
+        for(let j=0;j<n;j++){const t=(j-(n-1)/2)*sp;tri(W,F(h0,t),F(h0-S.arHL,t-S.arHW/2),F(h0-S.arHL,t+S.arHW/2),YM);}
+        for(let tip=h0-S.arHL-S.arSp*0.5;tip-S.arHL-S.arS>=-e.thr+2;tip-=S.arSp){
+          tri(W,F(tip,0),F(tip-S.arHL,-S.arHW/2),F(tip-S.arHL,S.arHW/2),YM);rect(W,tip-S.arHL-S.arS,tip-S.arHL,-S.arW/2,S.arW/2);}}
+      // stopway or blast pad: yellow chevrons pointing at the runway, chSp apart
+      if(c.stop[k]>1){const s0=-e.thr,end=s0-c.stop[k],h=hw-0.5,th=S.chW*Math.SQRT2;
+        for(let ap=s0-1.5;ap-h-th>=end;ap-=S.chSp)for(const sg of [-1,1])
+          quad(G.yellow,F(ap,0),F(ap-h,sg*h),F(ap-h-th,sg*h),F(ap-th,0),YM);}
+      // threshold stripes
+      if(cls!=='B'||c.stripesB){let n=4;for(const q of S.cnt)if(r.wid+1>=q[0])n=q[1];
+        for(let j=0;j<n/2;j++){const t0=S.thrW+j*2*S.thrW;rect(W,S.thrS,S.thrS+S.thrL,t0,t0+S.thrW);rect(W,S.thrS,S.thrS+S.thrL,-t0-S.thrW,-t0);}
+        I.thresholdStripes[k]=n;s=S.thrS+S.thrL;}
+      // the designator: the letter nearer the threshold, then the number, both read from the approach
+      const dg=e.num.replace(/[LRC]$/,''),lt=e.num.slice(dg.length);s+=S.dS;
+      const put=(str,s0)=>{const tw=str.length*S.dW+(str.length-1)*S.dG;let t0=-tw/2;
+        for(const ch of str){const gl=rwpGlyph(ch,S.dW,S.dH,S.dK);
+          for(const b of gl.r)rect(W,s0+b[1],s0+b[3],t0+b[0],t0+b[2]);
+          for(const q of gl.q)quad(W,F(s0+q[0][1],t0+q[0][0]),F(s0+q[1][1],t0+q[1][0]),F(s0+q[2][1],t0+q[2][0]),F(s0+q[3][1],t0+q[3][0]),YM);
+          t0+=S.dW+S.dG;}};
+      if(lt){put(lt,s);s+=S.dH+S.lG;}
+      put(dg,s);s+=S.dH;clA[k]=s+S.dS*0.5;
+      // aiming point
+      if(cls!=='B'){const A=S.aim(r);if(A.d+A.L<smid-30){for(const sg of [-1,1])rect(W,A.d,A.d+A.L,sg*A.inn/2,sg*(A.inn/2+A.W));I.aimDist[k]=+A.d.toFixed(1);}}
+      // touchdown zone: groups of stripes either side, none within 900 ft of the runway's midpoint
+      if(cls==='P'){const Z=S.tdz;
+        for(const [d,n] of Z.grp){if(d+Z.L>smid-900*FT)continue;I.tdzPairs[k]++;I.tdzStripes[k]+=n;
+          for(let j=0;j<n;j++){const t0=Z.inn/2+j*(Z.W+Z.g);for(const sg of [-1,1])rect(W,d,d+Z.L,sg*t0,sg*(t0+Z.W));}}}
+      // rubber: 150 m to about 900 m past the threshold
+      if(c.rub>0){const s1=Math.min(900,smid-40);if(s1>300){const wr=Math.min(r.wid*0.6,27)/2,R=G.rubber;
+        const A=F(150,-wr),B=F(s1,-wr),C=F(s1,wr),D=F(150,wr);
+        R.p.push(A[0],YR,A[1],C[0],YR,C[1],B[0],YR,B[1],A[0],YR,A[1],D[0],YR,D[1],C[0],YR,C[1]);R.uv.push(0,1,1,0,0,0,0,1,1,1,1,0);}}   // the canvas top (flipY: v 1) at 150 m
+    });
+    // centre line between the designators: stripes clL long, the gaps evened out (no shorter than clG)
+    {const a0=e0.thr+clA[0],a1=r.len-r.ends[1].thr-clA[1],Lc=a1-a0,w=(c.cls.includes('P')?S.clW.P:S.clW.X)/2;
+      const n=Math.max(1,Math.floor((Lc+S.clG)/(S.clL+S.clG))),g=n>1?(Lc-n*S.clL)/(n-1):0;
+      for(let j=0;j<n;j++){const s0=a0+j*(S.clL+g),A=pv(s0,-w),B=pv(s0+S.clL,-w),C=pv(s0+S.clL,w),D=pv(s0,w);quad(G.white,A,B,C,D,YM);}
+      I.centreline=n;}
+    // side stripes, the full length: precision runways (and ICAO's nonprecision ones)
+    if(c.cls.includes('P')||c.std==='ICAO'){for(const sg of [-1,1]){const t0=sg*hw,t1=sg*(hw-S.side);quad(G.white,pv(0,t0),pv(r.len,t0),pv(r.len,t1),pv(0,t1),YM);}I.side=true;}
+    I.tris=2*P.length/18+(G.white.length-nW+G.yellow.length-nY+G.rubber.p.length-nR)/9;
+    RWP.info.push(I);
+  }
+  // runway holding position markings: two solid lines on the taxiway side, two dashed toward the runway
+  for(const h of holds||[]){const S=RWP_STD[rwpCfg(h.r).std],lw=S.hold.w,n0=G.yellow.length;
+    const F=(a,o)=>[h.x+h.ax*a+h.tx*o,h.z+h.az*a+h.tz*o],y=h.y!=null?h.y:SURF_Y+0.03;   // 3 cm over the taxiways (which write depth)
+    for(let i=0;i<4;i++){const o0=i*2*lw,o1=o0+lw;
+      if(i<2)quad(G.yellow,F(-h.w/2,o0),F(h.w/2,o0),F(h.w/2,o1),F(-h.w/2,o1),y);
+      else for(let a=-h.w/2;a<h.w/2-0.2;a+=2*S.hold.dash){const a1=Math.min(h.w/2,a+S.hold.dash);quad(G.yellow,F(a,o0),F(a1,o0),F(a1,o1),F(a,o1),y);}}
+    const I=RWP.info.find(i=>i.r===h.r);if(I){I.holdLines++;I.tris+=(G.yellow.length-n0)/9;}}
+  if(G.white.length)mesh(G.white,null,rwpMat('white'),'runwayPaint');
+  if(G.yellow.length)mesh(G.yellow,null,rwpMat('yellow'),'runwayPaintY');
+  if(G.rubber.p.length){const op=Math.max(...rws.map(r=>rwpCfg(r).rub));mesh(G.rubber.p,G.rubber.uv,rwpMat('rubber',op),'runwayRubber');}
+}
+// Arizona's four fields, their taxiway entrances hard coded from the drawn geometry (items 5 and 6 read az_apt.json)
+function rwPaintAZ(){
+  const byCode=k=>RUNWAYS.filter(r=>r.code===k),rw=(k,n)=>RUNWAYS.find(r=>r.code===k&&r.num.split('-').includes(n));
+  // frame helpers: a hold at (u,v) in a frame with along (sx,sz) and right (vx,vz), the runway on the +v side when dir>0
+  const H=(X,Z,s,cc,u,v,dir,w,r)=>({x:X(u,v),z:Z(u,v),ax:s,az:-cc,tx:dir*cc,tz:dir*s,w:w,r:r});
+  const holds=[];
+  // Glendale: the five connectors from the parallel taxiway (v -120), 200 ft from the centre line
+  const kg=byCode('KGEU')[0],dG=rwpHoldD(kg);
+  for(const u of CONNECT)holds.push(H(wX,wZ,Math.sin(RH),Math.cos(RH),u,-dG,1,18,kg));
+  // Luke: the crossing taxiway at u -300 (26 m): east of 03L, both sides of 03R (the east one where it meets the ramp)
+  const ls=Math.sin(LUKE.h),lc=Math.cos(LUKE.h),l1=rw('KLUF','03L'),l2=rw('KLUF','03R'),dL=rwpHoldD(l1);
+  holds.push(H(lkX,lkZ,ls,lc,-300,LUKE_RWY[0].v+dL,-1,26,l1));
+  holds.push(H(lkX,lkZ,ls,lc,-300,LUKE_RWY[1].v-dL,1,26,l2),H(lkX,lkZ,ls,lc,-300,LUKE_RWY[1].v+dL,-1,26,l2));
+  // Sky Harbor: the links (30 m) from taxiway E up to 7L/25R and from taxiway B down to 8/26
+  for(const l of SH_LINK){const r=SH_RWY.find(q=>Math.abs(q.v-l[1])<40||Math.abs(q.v-l[2])<40),R=rw('KPHX',r.lo),d=rwpHoldD(R),dir=r.v>l[2]?1:-1;
+    holds.push(H(shX,shZ,SHs,SHc,l[0],r.v-dir*d,dir,30,R));}
+  for(const k of ['KGEU','KLUF','KPHX','LZ'])rwPaint(byCode(k),holds.filter(h=>h.r.code===k));
+}
+if(REGION.az){rwPaintAZ();WB.tris.runways=RWP.tris;}
 function wbSignTex(letter,text){return tex(256,56,(x,w,h)=>{x.fillStyle='#111';x.fillRect(0,0,w,h);x.fillStyle='#f2c230';x.fillRect(64,3,w-67,h-6);
   x.font='800 40px '+F;x.textAlign='center';x.textBaseline='middle';x.fillText(letter,32,h/2+2);x.fillStyle='#111';x.fillText(text,64+(w-67)/2,h/2+2);});}
 // terminals: the three wall bands of before (so the same triangles), textured: u along the walls in
@@ -11429,14 +11507,7 @@ function buildWorld(d){
   const rwyIn=(x,z,m)=>RUNWAYS.some(r=>{const e=r.ends[0],dx=x-r.x,dz=z-r.z;return Math.abs(dx*e.dx+dz*e.dz)<=r.len/2+m&&Math.abs(dz*e.dx-dx*e.dz)<=r.wid/2+m;});
   // ---- runways ----
   for(const r of RUNWAYS){
-    const e0=r.ends[0],e1=r.ends[1],x0=r.x-e0.dx*r.len/2,z0=r.z-e0.dz*r.len/2,x1=r.x+e0.dx*r.len/2,z1=r.z+e0.dz*r.len/2;
-    const Lp=[Math.min(r.len/2-20,e0.thr+150),Math.min(r.len/2-20,e1.thr+150)];
-    rwStrip(rwEndTex(r.wid,e0.thr,e0.num,Lp[0]),r.wid,Lp[0],x0,z0,e0.h,0.07);
-    rwStrip(rwEndTex(r.wid,e1.thr,e1.num,Lp[1]),r.wid,Lp[1],x1,z1,e1.h,0.07);
-    const mid=r.len-Lp[0]-Lp[1];
-    rwStrip(rwMidTex(r.wid,mid),r.wid,mid,x0+e0.dx*Lp[0],z0+e0.dz*Lp[0],e0.h,0.06);
-    const long=r.len>=1800;
-    for(const e of r.ends)rwStrip(rwTdzTex(r.wid,long),r.wid,long?540:240,e.x+e.dx*120,e.z+e.dz*120,e.h,0.075,true);
+    // the pavement and its paint: rwPaint, with the hold lines, below
     lightRunway(L,r);
     const home=r.ends.some(e=>e.num===HOME_RWY);
     if(home)for(const e of r.ends)lightApproach(L,e,e.num===HOME_RWY?'ALSF1':'REIL');
@@ -11524,20 +11595,19 @@ function buildWorld(d){
     if(vs.length){const im=new THREE.InstancedMesh(new THREE.BoxGeometry(2.3,2.1,5.2).translate(0,1.05,0),lam(0xffffff),vs.length),M=new THREE.Matrix4(),Q=new Q4(),S=new V3(1,1,1),Pp=new V3(),c=new THREE.Color();
       vs.forEach((v,i)=>{Q.setFromAxisAngle(_yUp,v[2]);Pp.set(v[0],gh(v[0],v[1])+0.04,v[1]);M.compose(Pp,Q,S);im.setMatrixAt(i,M);im.setColorAt(i,c.set(i%2?'#f2c230':'#f2f2ee'));});
       im.name='apronVehicles';im.userData.heat=0.7;scene.add(im);WB.n.vehicles=vs.length;WB.tris.vehicles=vs.length*12;}}
-  // ---- hold short bars where a taxiway reaches a runway, signs at ten of them ----
+  // ---- runway holding positions where a taxiway reaches a runway (90 m from the centre line on code 4, 75 m on code 3),
+  // the runways' pavement and paint with them (rwPaint), signs at ten of them ----
   {const holds=[];
-    for(const r of RUNWAYS){const e=r.ends[0],hd=r.wid/2+45;
+    for(const r of RUNWAYS){const e=r.ends[0],hd=rwpHoldD(r);
       for(const l of tws)for(let k=0;k+1<l.length;k++){const a=l[k],b=l[k+1];
         const A=[(a[0]-r.x)*e.dx+(a[1]-r.z)*e.dz,(a[1]-r.z)*e.dx-(a[0]-r.x)*e.dz],B=[(b[0]-r.x)*e.dx+(b[1]-r.z)*e.dz,(b[1]-r.z)*e.dx-(b[0]-r.x)*e.dz];
         const sl=Math.hypot(B[0]-A[0],B[1]-A[1]);if(sl<1||Math.abs(B[1]-A[1])/sl<0.5)continue;     // nearly parallel to the runway: not a way onto it
         for(const sg of [-1,1]){const t=(sg*hd-A[1])/(B[1]-A[1]);if(t<0||t>1)continue;const ua=A[0]+(B[0]-A[0])*t;if(Math.abs(ua)>r.len/2)continue;
           const x=a[0]+(b[0]-a[0])*t,z=a[1]+(b[1]-a[1])*t;if(rwyIn(x,z,5)||holds.some(h=>Math.hypot(h.x-x,h.z-z)<40))continue;
-          holds.push({x:x,z:z,tx:sg*e.dz,tz:-sg*e.dx,r:r});}}}   // tx,tz: toward the runway
+          // tx,tz: toward the runway; ax,az: along it; w: across the 23 m taxiway, parallel to the runway
+          holds.push({x:x,z:z,tx:sg*e.dz,tz:-sg*e.dx,ax:e.dx,az:e.dz,w:Math.min(46,23*sl/Math.abs(B[1]-A[1])),y:gh(x,z)+SURF_Y+0.03,r:r});}}}
     holds.length=Math.min(holds.length,80);
-    if(holds.length){const g=new THREE.PlaneGeometry(23,3);g.rotateX(-Math.PI/2);
-      const im=new THREE.InstancedMesh(g,lam(0xffffff,{map:holdTex,transparent:true,depthWrite:false}),holds.length),M=new THREE.Matrix4(),Q=new Q4(),S=new V3(1,1,1),Pp=new V3();
-      holds.forEach((h,i)=>{Q.setFromAxisAngle(_yUp,Math.atan2(-h.tx,-h.tz));Pp.set(h.x,gh(h.x,h.z)+0.06,h.z);M.compose(Pp,Q,S);im.setMatrixAt(i,M);});
-      im.renderOrder=-1;im.name='holdBars';scene.add(im);WB.tris.holdBars=holds.length*2;}
+    rwPaint(RUNWAYS,holds);WB.tris.runways=RWP.tris;
     const side=lam(0x222222);
     holds.filter((h,i)=>i%Math.max(1,Math.floor(holds.length/10))===0).slice(0,10).forEach((h,i)=>{
       const sm=new THREE.MeshBasicMaterial({map:wbSignTex(String.fromCharCode(65+i),h.r.num)}),bx=new THREE.Mesh(new THREE.BoxGeometry(4.4,0.9,0.25),[side,side,side,side,sm,sm]);
@@ -20263,6 +20333,7 @@ function irHook(){
   const u=IR_MAT.uniforms,d=this.userData,m=Array.isArray(this.material)?this.material[0]:this.material;   // a multi material mesh: its first (graphics item 8)
   u.uHeat.value=d.irHeat;u.uVar.value=d.irVar;u.uSprite.value=this.isSprite?1:0;
   u.uAlpha.value=d.irSkip?0:this.isSprite?m.opacity:1;
+  IR_MAT.depthWrite=!d.irNoDepth;   // runways item 3: the runway pavement and paint lie in draw order, not by depth (rwPaint)
   const map=!this.isSprite&&m&&m.map;
   if(map){if(map.matrixAutoUpdate)map.updateMatrix();u.uUvT.value.copy(map.matrix);u.uMap.value=map;u.uHasMap.value=1;}
   else u.uHasMap.value=0;
@@ -24121,6 +24192,11 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
   setTOD(t);})();
 // runways item 1: every runway end's ground, pavement and runwayFix at its threshold, aim point, centre and far end
 window.__kgeu.isPaved=isPaved;window.__kgeu.runwayFix=runwayFix;
+// runways item 3: the paint on every runway (standard, class per end, the markings laid, triangles, hold lines)
+window.__kgeu.rwyPaint=()=>RWP.info.map(i=>({code:i.code,num:i.num,surface:i.surface,std:i.std,cls:i.cls.slice(),tris:i.tris,
+  thresholdStripes:i.thresholdStripes.slice(),tdzPairs:i.tdzPairs.slice(),tdzStripes:i.tdzStripes.slice(),aimDist:i.aimDist.slice(),
+  holdLines:i.holdLines,centreline:i.centreline,side:!!i.side,len:i.r.len,wid:i.r.wid,thr:i.r.ends.map(e=>e.thr)}));
+window.__kgeu.RWP=RWP;
 window.__kgeu.rwyAudit=()=>{const v0=st.vel.clone();try{return RWY_ENDS.map(e=>{const r=e.rwy,aimD=r.code==='LZ'?91:300,
     ax=e.x+e.dx*aimD,az=e.z+e.dz*aimD,fx=r.x+e.dx*(r.len/2-5),fz=r.z+e.dz*(r.len/2-5),P=[[e.x,e.z],[ax,az],[r.x,r.z],[fx,fz]];
     st.vel.set(e.dx*60,0,e.dz*60);const f=runwayFix(ax,az);
