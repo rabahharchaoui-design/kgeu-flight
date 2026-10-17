@@ -2913,17 +2913,49 @@ function isPaved(x,z){
   return false;
 }
 const OBST=[];
+// OBST.last: what the last hit was (the OBST entry or the STR record), for the crash's structure impact (crashfx)
 function hitObstacle(x,z,y){
   const u=toU(x,z),v=toV(x,z);
   for(const o of OBST){
-    if(o.kind==='rect'){ if(u>o.u0-9&&u<o.u1+9&&v>o.v0-9&&v<o.v1+9&&y-GEAR<o.h) return o.name; }
+    if(o.kind==='rect'){ if(u>o.u0-9&&u<o.u1+9&&v>o.v0-9&&v<o.v1+9&&y-GEAR<o.h){OBST.last=o;return o.name;} }
     // a building's own outline (world region terminals and hangars), 5 m of margin through the box test only
-    else if(o.kind==='poly'){ if(x>o.b[0]-5&&x<o.b[2]+5&&z>o.b[1]-5&&z<o.b[3]+5&&y-GEAR<o.h&&(pipXZ(o.P,x,z)||polyEdgeD(o.P,x,z)<5)) return o.name; }
+    else if(o.kind==='poly'){ if(x>o.b[0]-5&&x<o.b[2]+5&&z>o.b[1]-5&&z<o.b[3]+5&&y-GEAR<o.h&&(pipXZ(o.P,x,z)||polyEdgeD(o.P,x,z)<5)){OBST.last=o;return o.name;} }
     // lo (optional): the circle's underside, open below it (under the Eiffel Tower's first platform)
-    else if(Math.hypot(x-o.x,z-o.z)<o.r+5&&y-GEAR<o.h&&!(o.lo>y+3)) return o.name;
+    else if(Math.hypot(x-o.x,z-o.z)<o.r+5&&y-GEAR<o.h&&!(o.lo>y+3)){OBST.last=o;return o.name;}
   }
+  const r=strHit(x,z,y-GEAR);if(r){OBST.last=r;return r.name;}
   return null;
 }
+// ---------- structures (crashfx item 1) ----------
+// STR: every building the scenery draws that OBST does not already stand for (the stadium, the arena, Westgate, Luke's
+// shelters, Sky Harbor, downtown, the West Valley houses and strip malls, the world regions' city boxes and towers), as
+// a volume: shape 'box' (half sizes hx, hz along its own axes, yaw c/s) or 'ell' (an elliptic drum, radii hx, hz), from
+// y0 to y1, with an optional dome on top {y, h, k} (the stadium roof: y + h*sqrt(1-r^2) inside r<k of the drum's radii).
+// Records that mirror an OBST entry (the Glendale hangars, a region hangar) carry obst:true: OBST hits them, STR only
+// keeps their look for the breakup. cls: what it is built like (shed, hangar, house, mall, building, tower, stadium,
+// sign), which sets how it breaks. A 256 m grid holds every record in each cell its footprint and the margin reach.
+const STR={list:[],grid:new Map(),C:256,M:12};
+const strKey=(i,j)=>(i+4096)*8192+(j+4096);
+function strAdd(r){
+  r.id=STR.list.length;STR.list.push(r);if(r.obst)return r;
+  const R=Math.hypot(r.hx,r.hz)+STR.M,C=STR.C;
+  for(let i=Math.floor((r.x-R)/C);i<=Math.floor((r.x+R)/C);i++)for(let j=Math.floor((r.z-R)/C);j<=Math.floor((r.z+R)/C);j++){
+    const k=strKey(i,j);let a=STR.grid.get(k);if(!a)STR.grid.set(k,a=[]);a.push(r);}
+  return r;}
+// the top of a record over a point in its own frame (lx, lz): the dome where it has one
+function strTop(r,lx,lz){if(!r.dome)return r.y1;const d=r.dome,q=(lx*lx)/(r.hx*r.hx)+(lz*lz)/(r.hz*r.hz);
+  return q<d.k*d.k?Math.max(r.y1,d.y+d.h*Math.sqrt(Math.max(0,1-q))):r.y1;}
+// yb: the bottom of the aircraft (y less GEAR). The margin: about a third of the span, 2 to 12 m
+function strHit(x,z,yb){
+  const a=STR.grid.get(strKey(Math.floor(x/STR.C),Math.floor(z/STR.C)));if(!a)return null;
+  const m=Math.min(STR.M,1.5+0.3*(AC.span||10));
+  for(const r of a){if(r.gone)continue;const dx=x-r.x,dz=z-r.z;
+    if(dx*dx+dz*dz>(r.hx+r.hz+m)*(r.hx+r.hz+m)||yb<r.y0-3)continue;
+    const lx=dx*r.c-dz*r.s,lz=dx*r.s+dz*r.c;
+    if(r.shape==='ell'){const ax=r.hx+m,az=r.hz+m;if((lx*lx)/(ax*ax)+(lz*lz)/(az*az)>=1)continue;}
+    else if(Math.abs(lx)>=r.hx+m||Math.abs(lz)>=r.hz+m)continue;
+    if(yb<strTop(r,lx,lz))return r;}
+  return null;}
 
 // Where a flight starts. Navigation and autoland still target KGEU runway 1; this
 // only decides where the wheels are at t=0, which is what makes a Luke to Glendale
@@ -3254,7 +3286,7 @@ function step(st,dt,ev){
   const ang=st.w.length()*dt;
   if(ang>1e-9){_ax.copy(st.w).normalize();_dq.setFromAxisAngle(_ax,ang);q.multiply(_dq);q.normalize();}
   const hit=hitObstacle(st.pos.x,st.pos.z,st.pos.y);
-  if(hit){crash(st,'Collided with '+hit+'.');return;}
+  if(hit){st.hitObj=OBST.last;crash(st,'Collided with '+hit+'.');return;}
   const gh=groundHeight(st.pos.x,st.pos.z);
   if(st.pos.y-GEAR<=gh){
     const paved=isPaved(st.pos.x,st.pos.z);
@@ -7431,7 +7463,40 @@ const lam=(c,o)=>new THREE.MeshLambertMaterial(Object.assign({color:c},o||{}));
 function placeLocal(obj,u,v,y,yawDeg){obj.position.set(wX(u,v),y,wZ(u,v));obj.rotation.y=-RH+(yawDeg||0)*Math.PI/180;scene.add(obj);return obj;}
 function flatLocal(wv,wu,mat,u,v,y,yawDeg){const g=new THREE.PlaneGeometry(wv,wu);g.rotateX(-Math.PI/2);return placeLocal(new THREE.Mesh(g,mat),u,v,y,yawDeg);}
 function boxLocal(wv,h,wu,mat,u,v,y,yawDeg){return placeLocal(new THREE.Mesh(new THREE.BoxGeometry(wv,h,wu),mat),u,v,y+h/2,yawDeg);}
-function rectObst(u,v,wu,wv,h,name){OBST.push({kind:'rect',u0:u-wu/2,u1:u+wu/2,v0:v-wv/2,v1:v+wv/2,h:h,name:name});}
+function rectObst(u,v,wu,wv,h,name){OBST.push({kind:'rect',u0:u-wu/2,u1:u+wu/2,v0:v-wv/2,v1:v+wv/2,h:h,name:name});return OBST[OBST.length-1];}
+// crashfx item 1: a structure record (STR) from a placed mesh or one instance of an InstancedMesh, its volume read off the
+// geometry's own box and the object's world transform (a yaw only: every building here stands upright). A drum or a
+// sphere is an ellipse ('ell'). o: {parts: more meshes that belong to it (a glass band, a tower cab), top: a higher
+// top, dome: {y,h,k}, obst: the OBST entry it mirrors (collision stays with OBST), col: its colour for the chunks}.
+const _sP=new V3(),_sQ=new Q4(),_sS=new V3(),_sC=new V3(),_sM=new THREE.Matrix4(),_sE=new THREE.Euler(0,0,0,'YXZ');
+function strVol(g,M,cls,name,o){
+  if(!g.boundingBox)g.computeBoundingBox();const b=g.boundingBox;M.decompose(_sP,_sQ,_sS);_sE.setFromQuaternion(_sQ,'YXZ');
+  const t=g.type||'',ell=/Cylinder|Sphere|Circle/.test(t),yaw=_sE.y,c=Math.cos(yaw),s=Math.sin(yaw);
+  _sC.set((b.min.x+b.max.x)/2*_sS.x,(b.min.y+b.max.y)/2*_sS.y,(b.min.z+b.max.z)/2*_sS.z);
+  const cx=_sP.x+_sC.x*c+_sC.z*s,cz=_sP.z-_sC.x*s+_sC.z*c,cy=_sP.y+_sC.y,hy=(b.max.y-b.min.y)/2*Math.abs(_sS.y);
+  o=o||{};
+  const r={shape:ell?'ell':'box',x:cx,z:cz,c:c,s:s,hx:Math.abs((b.max.x-b.min.x)/2*_sS.x),hz:Math.abs((b.max.z-b.min.z)/2*_sS.z),
+    y0:cy-hy,y1:Math.max(cy+hy,o.top||-1e9),dome:o.dome||null,cls:cls,name:name,obst:o.obst||null,col:o.col||null,meshes:[],im:null,ii:-1,pair:o.pair||null};
+  if(o.obst)o.obst.str=r;
+  return r;}
+function strMesh(m,cls,name,o){m.updateWorldMatrix(true,false);const r=strVol(m.geometry,m.matrixWorld,cls,name,o);r.meshes=[m].concat((o&&o.parts)||[]);return strAdd(r);}
+function strInst(im,cls,name,o){
+  im.updateWorldMatrix(true,false);const n=im.count,out=[];
+  for(let i=0;i<n;i++){im.getMatrixAt(i,_sM);_sM.premultiply(im.matrixWorld);
+    const r=strVol(im.geometry,_sM,typeof cls==='function'?cls(i):cls,name,o);if(r.hx<0.5||r.y1-r.y0<1)continue;r.im=im;r.ii=i;out.push(strAdd(r));}
+  return out;}
+// a world region terminal or hangar (an OBST poly over merged geometry): its record for the breakup, the outline's
+// box, and where its triangles sit in the merged mesh (mg: {name, a, b} vertex range) so the breakup can take them out
+function strPoly(o,y0,cls,mg){const b=o.b;
+  return o.str=strAdd({shape:'box',x:(b[0]+b[2])/2,z:(b[1]+b[3])/2,c:1,s:0,hx:(b[2]-b[0])/2,hz:(b[3]-b[1])/2,y0:y0,y1:o.h,dome:null,cls:cls,name:o.name,
+    obst:o,P:o.P,col:cls==='hangar'?0xb3b5b3:0xc9c6bd,meshes:[],im:null,ii:-1,pair:null,mg:mg});}
+// the world regions' instanced buildings, once their scene is built (buildWorld): city boxes, Tokyo's skyline, la
+// Defense, Copacabana's hotels, Centro's towers, the favelas. Tall ones are towers (they break locally), the rest buildings.
+function strWorld(){
+  const tall=im=>i=>{im.getMatrixAt(i,_sM);_sM.decompose(_sP,_sQ,_sS);return _sS.y>=80?'tower':'building';};
+  for(const [n,nm] of [['cityBoxes','a building'],['tokyo_skyline','a skyscraper'],['la_defense','a skyscraper'],['copacabana_hotels','a hotel'],['centro_towers','a skyscraper']]){
+    const im=scene.getObjectByName(n);if(im&&im.isInstancedMesh)strInst(im,tall(im),nm);}
+  const f=scene.getObjectByName('favelas');if(f&&f.isInstancedMesh)strInst(f,'house','a house');}
 
 // ---------- sky ----------
 const sky=(function(){
@@ -8708,8 +8773,8 @@ const CSM_N0=scene.children.length;   // what this block adds casts sun shadows 
 if(REGION.az)(function(){
   // FBO terminal
   const term=boxLocal(20,8,46,[stucco,stucco,roofM,roofM,stucco,stucco],1100,-470,0);
-  boxLocal(20.4,2.4,46.4,glassM,1100,-470,3.2);
-  rectObst(1100,-470,46,20,8,'the terminal');
+  const termG=boxLocal(20.4,2.4,46.4,glassM,1100,-470,3.2);
+  strMesh(term,'building','the terminal',{parts:[termG],obst:rectObst(1100,-470,46,20,8,'the terminal')});
   const sign=tex(1024,128,(x,w,h)=>{x.fillStyle='#1d3557';x.fillRect(0,0,w,h);x.fillStyle='#fff';x.font='800 86px '+F;x.textAlign='center';x.textBaseline='middle';x.fillText('GLENDALE REGIONAL AIRPORT',w/2,h/2+4);});
   const sg=new THREE.PlaneGeometry(40,5);sg.rotateY(Math.PI/2);
   placeLocal(new THREE.Mesh(sg,new THREE.MeshLambertMaterial({map:sign})),1100,-459.8,8.8);
@@ -8720,14 +8785,15 @@ if(REGION.az)(function(){
   const cab=new THREE.Mesh(new THREE.CylinderGeometry(4.2,3.6,4,8),glassM);cab.position.set(wX(1290,-470),24,wZ(1290,-470));scene.add(cab);
   const cr=new THREE.Mesh(new THREE.CylinderGeometry(4.8,4.8,0.8,8),darkM);cr.position.set(wX(1290,-470),26.4,wZ(1290,-470));scene.add(cr);
   OBST.push({kind:'circ',x:wX(1290,-470),z:wZ(1290,-470),r:7,h:28,name:'the control tower'});
+  strMesh(tw,'tower','the control tower',{parts:[cab,cr],top:26.8,obst:OBST[OBST.length-1]});
   // box hangars
   const hdoor=tex(256,128,(x,w,h)=>{x.fillStyle='#c9ccd0';x.fillRect(0,0,w,h);x.strokeStyle='#9aa0a6';x.lineWidth=2;for(let i=0;i<w;i+=16){x.beginPath();x.moveTo(i,0);x.lineTo(i,h);x.stroke();}x.fillStyle='#8f3a2f';x.fillRect(0,0,w,10);});
   const hdM=lam(0xffffff,{map:hdoor}),hsM=lam(0xd7d4cc);
-  for(const u of [700,770,840,1400,1470]){boxLocal(34,11,58,[hdM,hsM,roofM,roofM,hsM,hsM],u,-415,0);rectObst(u,-415,58,34,11,'a hangar');}
+  for(const u of [700,770,840,1400,1470]){const h=boxLocal(34,11,58,[hdM,hsM,roofM,roofM,hsM,hsM],u,-415,0);strMesh(h,'hangar','a hangar',{obst:rectObst(u,-415,58,34,11,'a hangar'),col:0xd7d4cc});}
   // T-hangar rows
   const tdoor=tex(256,64,(x,w,h)=>{x.fillStyle='#b9b2a3';x.fillRect(0,0,w,h);for(let i=0;i<w;i+=64){x.fillStyle='#8e877a';x.fillRect(i+4,8,56,h-8);x.fillStyle='#7a7366';x.fillRect(i+30,8,2,h-8);}},[22,1]);
   const tdM=lam(0xffffff,{map:tdoor});
-  for(const [u0,u1] of [[190,630],[1620,2080]]) for(const v of [-165,-225,-285,-345]){boxLocal(14,4.6,u1-u0,[tdM,tdM,roofM,roofM,hsM,hsM],(u0+u1)/2,v,0);rectObst((u0+u1)/2,v,u1-u0,14,4.6,'a T-hangar');}
+  for(const [u0,u1] of [[190,630],[1620,2080]]) for(const v of [-165,-225,-285,-345]){const h=boxLocal(14,4.6,u1-u0,[tdM,tdM,roofM,roofM,hsM,hsM],(u0+u1)/2,v,0);strMesh(h,'shed','a T-hangar',{obst:rectObst((u0+u1)/2,v,u1-u0,14,4.6,'a T-hangar'),col:0xb9b2a3});}
   // fuel farm and truck
   for(const dv of [-2.2,2.2]){const tk=new THREE.Mesh(new THREE.CylinderGeometry(1.4,1.4,9,14),lam(0xeeeeee));tk.rotation.z=Math.PI/2;placeLocal(tk,1560,-425+dv,1.9,90);}
   rectObst(1560,-425,12,9,4,'the fuel farm');
@@ -8838,6 +8904,8 @@ overlay(lists.sub,subFarTex,true,false);overlay(lists.near,subNearTex,false,fals
     p.set(w[0],0,w[1]);s.set(14,H,15);m.compose(p,q,s);wm.setMatrixAt(k,m);wm.setColorAt(k,col.set(wc[Math.floor(w[2]*6)%6]));
     p.set(w[0],H,w[1]);s.set(14.8,2.6,15.8);m.compose(p,q,s);rm.setMatrixAt(k,m);rm.setColorAt(k,col.set(rc[Math.floor(w[2]*37)%6]));});
   wm.userData.heat=0.6;wm.userData.irVar=0.1;rm.userData.heat=0.62;rm.userData.irVar=0.1;scene.add(wm,rm);
+  wm.name='houses';rm.name='houseRoofs';strInst(wm,'house','a house',{pair:rm});   // crashfx: the roof rides on the walls' record (its top: the ridge)
+  for(const r of STR.list)if(r.im===wm){r.y1+=2.6;}
 })();
 // arterial section-line roads
 (function(){
@@ -8853,7 +8921,7 @@ overlay(lists.sub,subFarTex,true,false);overlay(lists.near,subNearTex,false,fals
   const bm=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1).translate(0,0.5,0),lam(0xffffff),malls.length),pm=new THREE.InstancedMesh(flatQuad,lam(0x4c4e51),malls.length),col=new THREE.Color();
   malls.forEach((c,k)=>{p.set(c[0]+20,0,c[1]-30);s.set(90,8,40);m.compose(p,q,s);bm.setMatrixAt(k,m);bm.setColorAt(k,col.set(['#e9e2d0','#d8cfbd','#f1ede4'][k%3]));
     p.set(c[0]+20,0.2,c[1]+25);s.set(120,1,70);m.compose(p,q,s);pm.setMatrixAt(k,m);});
-  bm.userData.heat=0.62;bm.userData.irVar=0.1;pm.userData.heat=0.38;pm.userData.irVar=0;if(malls.length) scene.add(bm,pm);
+  bm.userData.heat=0.62;bm.userData.irVar=0.1;pm.userData.heat=0.38;pm.userData.irVar=0;if(malls.length){scene.add(bm,pm);bm.name='stripMalls';strInst(bm,'mall','a strip mall');}
 })();
 // freeways with traffic
 const fwyTex=tex(128,64,(x,w,h)=>{asphalt(x,w,h,'#4b4d50');x.fillStyle='#d9d9d9';x.fillRect(62,0,4,h);x.fillStyle='#f2c230';x.fillRect(56,0,2,h);x.fillRect(70,0,2,h);x.fillStyle='#fff';x.fillRect(6,0,2,h);x.fillRect(w-8,0,2,h);
@@ -8884,9 +8952,12 @@ if(REGION.az)(function(){
   const panel=tex(256,64,(x,w,h)=>{x.fillStyle='#c4c8cc';x.fillRect(0,0,w,h);for(let i=0;i<w;i+=8){x.fillStyle=i%16?'#b3b8bd':'#d3d7db';x.fillRect(i,0,6,h);}x.fillStyle='#2b3a4a';x.fillRect(0,h-14,w,6);},[10,1]);
   const bowl=new THREE.Mesh(new THREE.CylinderGeometry(1,1.06,1,48,1),lam(0xffffff,{map:panel}));bowl.scale.set(150,50,118);bowl.position.set(3480,25,-979);scene.add(bowl);
   const roof=new THREE.Mesh(new THREE.SphereGeometry(1,40,12,0,Math.PI*2,0,0.55),lam(0xf4f4f4));roof.scale.set(152,26,120);roof.position.set(3480,40,-979);scene.add(roof);
+  // crashfx: the bowl's drum (its base radii, 1.06 of the top) and the roof cap inside 0.523 of the radii, 62 to 66 m
+  strMesh(bowl,'stadium','the stadium',{parts:[roof],dome:{y:40,h:26,k:0.523},col:0xc4c8cc});
   const arena=new THREE.Mesh(new THREE.BoxGeometry(170,34,150),lam(0x5d6d7e));arena.position.set(3650,17,-1600);scene.add(arena);
   const ar2=new THREE.Mesh(new THREE.BoxGeometry(174,4,154),lam(0xd0d0d0));ar2.position.set(3650,35,-1600);scene.add(ar2);
-  for(let k=0;k<12;k++){const b=new THREE.Mesh(new THREE.BoxGeometry(40+hash(k,1)*50,10+hash(k,2)*25,40+hash(k,3)*40),lam(['#e9dfc9','#c9b99a','#d7d9dc','#b88a64'][k%4]));b.position.set(3150+(k%4)*110,b.geometry.parameters.height/2,-1480-Math.floor(k/4)*120);scene.add(b);}
+  strMesh(arena,'building','the arena',{parts:[ar2],top:37,col:0x5d6d7e});
+  for(let k=0;k<12;k++){const b=new THREE.Mesh(new THREE.BoxGeometry(40+hash(k,1)*50,10+hash(k,2)*25,40+hash(k,3)*40),lam(['#e9dfc9','#c9b99a','#d7d9dc','#b88a64'][k%4]));b.position.set(3150+(k%4)*110,b.geometry.parameters.height/2,-1480-Math.floor(k/4)*120);scene.add(b);strMesh(b,'building','a building');}
   // Luke AFB
   // LKX/LKZ, not LX/LZ: LZ is the C-130 assault strip at module scope and shadowing
   // it here would be a trap for anyone editing this block later.
@@ -8929,7 +9000,7 @@ if(REGION.az)(function(){
   // taxiway from the ramp across 03R to 03L, so a ramp start can reach a runway
   const tg2=new THREE.PlaneGeometry(26,390);tg2.rotateX(-Math.PI/2);
   const tw=new THREE.Mesh(tg2,lam(0xb2b0a8));tw.position.set(LKX(-300,7.5),0.055,LKZ(-300,7.5));tw.rotation.y=-lh+Math.PI/2;scene.add(tw);
-  for(let k=0;k<14;k++){const sh=new THREE.Mesh(new THREE.BoxGeometry(40,9,30),lam(0x8f9a8a));sh.position.set(LKX(-780+k*120,680),4.5,LKZ(-780+k*120,680));sh.rotation.y=-lh;scene.add(sh);}
+  for(let k=0;k<14;k++){const sh=new THREE.Mesh(new THREE.BoxGeometry(40,9,30),lam(0x8f9a8a));sh.position.set(LKX(-780+k*120,680),4.5,LKZ(-780+k*120,680));sh.rotation.y=-lh;scene.add(sh);strMesh(sh,'hangar','an aircraft shelter');}
   const jetG=new THREE.Group();{const b=new THREE.Mesh(new THREE.BoxGeometry(1.6,1.4,15),lam(0x6b7280));jetG.add(b);const w=new THREE.Mesh(new THREE.BoxGeometry(10.5,0.3,5),lam(0x6b7280));w.position.set(0,0,1.5);jetG.add(w);
     for(const sx of [-1,1]){const t=new THREE.Mesh(new THREE.BoxGeometry(0.3,2.4,2.4),lam(0x6b7280));t.position.set(sx*1.2,1.4,6);t.rotation.z=sx*0.4;jetG.add(t);}}
   for(let k=0;k<10;k++){const j=jetG.clone();j.position.set(LKX(-600+k*60,300),1.4,LKZ(-600+k*60,300));j.userData.heat=0.85;j.rotation.y=-lh+Math.PI/2;scene.add(j);}
@@ -8962,23 +9033,24 @@ if(REGION.az)(function(){
       t.position.set(shX(u0,v0),13,shZ(u0,v0));t.rotation.y=-SKY_HARBOR.h;scene.add(t);
       const gl=new THREE.Mesh(new THREE.BoxGeometry(L-8,9,W+2),glass2);
       gl.position.set(shX(u0,v0),19,shZ(u0,v0));gl.rotation.y=-SKY_HARBOR.h;scene.add(gl);
+      strMesh(t,'building','the terminal',{parts:[gl]});
       for(let k=-1;k<=1;k++){
         const c=new THREE.Mesh(new THREE.BoxGeometry(46,16,150),roof);
         c.position.set(shX(u0+k*L*0.34,v0-115),8,shZ(u0+k*L*0.34,v0-115));
-        c.rotation.y=-SKY_HARBOR.h;scene.add(c);
+        c.rotation.y=-SKY_HARBOR.h;scene.add(c);strMesh(c,'building','a concourse');
       }
     }
     // the tower
     const tw=new THREE.Mesh(new THREE.CylinderGeometry(7,10,74,10),pale);
     tw.position.set(shX(-180,205),37,shZ(-180,205));scene.add(tw);
     const cab=new THREE.Mesh(new THREE.CylinderGeometry(14,11,13,10),glass2);
-    cab.position.set(shX(-180,205),79,shZ(-180,205));scene.add(cab);
+    cab.position.set(shX(-180,205),79,shZ(-180,205));scene.add(cab);strMesh(tw,'tower','the control tower',{parts:[cab],top:85.5});
   })();
 
   // Downtown Phoenix skyline, about 21 km ESE
   const win=tex(64,128,(x,w,h)=>{x.fillStyle='#5f7488';x.fillRect(0,0,w,h);for(let y=0;y<h;y+=8)for(let i=0;i<w;i+=8){x.fillStyle=Math.random()<0.5?'#8fa6ba':'#4a5d70';x.fillRect(i+1,y+1,6,5);}},[1,1]);
   for(let k=0;k<30;k++){const hgt=40+Math.pow(hash(k,9),1.6)*150,wd=25+hash(k,8)*25;const b=new THREE.Mesh(new THREE.BoxGeometry(wd,hgt,wd*(0.8+hash(k,6)*0.5)),lam(0xffffff,{map:win}));
-    b.position.set(21000+(hash(k,1)-0.5)*1600,hgt/2,7800+(hash(k,2)-0.5)*1300);scene.add(b);
+    b.position.set(21000+(hash(k,1)-0.5)*1600,hgt/2,7800+(hash(k,2)-0.5)*1300);scene.add(b);strMesh(b,hgt>=80?'tower':'building','a tower');
     if(hgt>DT_TOP.h)Object.assign(DT_TOP,{x:b.position.x,z:b.position.z,h:hgt,w:wd,d:b.geometry.parameters.depth});}
 })();
 csmScan(CSM_N1);BOOT.mark('world');   // the stadium, the arena, Westgate, Luke's shelters and jets, Sky Harbor's terminals and tower, downtown
@@ -10435,7 +10507,7 @@ if(REGION.az)(function(){
    G.add(new THREE.Mesh(eggBoxes([[0.45,13,0.45,-5.5,6.5,0],[0.45,13,0.45,5.5,6.5,0]].concat(eggFrame(18,5,10.5,0.7))),steel));
    scene.add(G);add(G,'egg_billboard');csmStatic(G);
    for(const s of [-1,1])for(const t of [-4.5,4.5])L.addLight(x+s*1.6,y0+7.9,z+t,WARM);
-   OBST.push({kind:'circ',x:x,z:z,r:9,h:13.5,name:'a billboard'});}
+   OBST.push({kind:'circ',x:x,z:z,r:9,h:13.5,name:'a billboard',grp:G});}
   // 3. rooftop sign on the tallest downtown block, 30 x 7.5 m, facing west to the airports
   {const T=DT_TOP,G=new THREE.Group();G.position.set(T.x-T.w/2+5,T.h,T.z);G.rotation.y=-Math.PI/2;
    const b=new THREE.Mesh(eggSheet(30,7.5,1,1,true,0.6),EGG.litMat);b.position.y=2+3.75;G.add(b);
@@ -10491,7 +10563,7 @@ function buildCityBillboard(x,z,hdg,cityName,L){
   G.name='city_billboard';scene.add(G);G.updateMatrixWorld(true);csmStatic(G);
   const p=new V3();for(const s of [-1,1])for(const u of [-4.5,4.5]){p.set(u,7.9,s*1.6).applyMatrix4(G.matrixWorld);L.addLight(p.x,p.y,p.z,0xffd49a);}
   if(own){L.build();L.pts.visible=TOD.lights>0;}
-  OBST.push({kind:'circ',x:x,z:z,r:9,h:y0+13.5,name:'a billboard'});
+  OBST.push({kind:'circ',x:x,z:z,r:9,h:y0+13.5,name:'a billboard',grp:G});
   const o={g:G,tex:t,mat:mat,city:cityName,x:x,z:z,hdg:hdg};CITYBB.list.push(o);
   if(!CITYBB.hook){CITYBB.hook=()=>{for(const q of CITYBB.list)q.mat.emissiveIntensity=EGG.litMat.emissiveIntensity;};TOD_HOOKS.push(CITYBB.hook);}
   return o;}
@@ -11362,12 +11434,12 @@ function buildWorld(d){
   for(const P of terms){const c=wbCentroid(P),y0=gh(c[0],c[1]);
     // de Gaulle's round Terminal 1 (the "camembert", 190 m across): a 25 m drum
     const H=REGION.id==='lfpg'&&P.length>=16&&Math.hypot(c[0]+880+WOFF[0],c[1]+602+WOFF[1])<60?25:14;if(H>14)WB.n.t1=(WB.n.t1||0)+1;
-    wbTerminal(tG,P,y0,H);
+    const n0=tG.p.length;wbTerminal(tG,P,y0,H);
     let b=[1e9,1e9,-1e9,-1e9];for(const p of P){b=[Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])];}
-    OBST.push({kind:'poly',P:P,b:b,h:y0+H,name:'the terminal'});}
-  for(const P of hangs){const c=wbCentroid(P),y0=gh(c[0],c[1]);wbBuilding(bG,P,y0,[[0,16,HW]],HR,HD);
+    OBST.push({kind:'poly',P:P,b:b,h:y0+H,name:'the terminal'});strPoly(OBST[OBST.length-1],y0,'building',{name:'terminals',a:n0/3,b:tG.p.length/3});}
+  for(const P of hangs){const c=wbCentroid(P),y0=gh(c[0],c[1]),n0=bG.p.length;wbBuilding(bG,P,y0,[[0,16,HW]],HR,HD);
     let b=[1e9,1e9,-1e9,-1e9];for(const p of P){b=[Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])];}
-    OBST.push({kind:'poly',P:P,b:b,h:y0+16,name:'a hangar'});}
+    OBST.push({kind:'poly',P:P,b:b,h:y0+16,name:'a hangar'});strPoly(OBST[OBST.length-1],y0,'hangar',{name:'buildings',a:n0/3,b:bG.p.length/3});}
   wbMesh(bG,new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide}),'buildings');WB.n.terminals=terms.length;
   {const m=wbMesh(tG,wbTermMat(),'terminals');if(m)WB.termMat=m.material;}WB.n.hangars=hangs.length;
   // ---- the control tower at its OSM spot, and the beacon on its roof ----
@@ -12167,7 +12239,7 @@ function worldLoad(){
   fetch('assets/world/'+REGION.id+'.json?v=1').then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(d=>
     Promise.all([worldInflate(d.terrain.b64),worldInflate(d.terrain.waterB64),worldInflate(d.urban.b64)]).then(b=>{
       terrSet(d,new Int16Array(b[0]),new Uint8Array(b[1]));WORLD.data=d;WORLD.urb=new Uint8Array(b[2]);worldParks(d);
-      {const n0=scene.children.length;buildWorld(d);csmScan(n0);}tfcRegion();if(LB)LB.fameApplyCity();   // the city billboard's champion, from the cached fame
+      {const n0=scene.children.length;buildWorld(d);csmScan(n0);strWorld();}tfcRegion();if(LB)LB.fameApplyCity();   // the city billboard's champion, from the cached fame
       tlReset();rebuildTerrain(camera.position.x,camera.position.z);
       WORLD.ms=Math.round(performance.now()-t0);WORLD.ready=true;mapRegionData();}))
     .catch(e=>{WORLD.err=String(e);console.warn('world region',e);const m=$('spMsg');if(m)m.textContent='Could not load '+REGION.city+'. Check the connection and reload.';});
@@ -21472,6 +21544,60 @@ function fxWarmDecals(){
   try{warmObj(o.ring);}finally{for(const m of ms){m.visible=false;m.material.opacity=0;}}
 }
 
+// ================= crashfx: a crash into a structure =================
+// Fuel on board (kg): a typical load at the start of a flight, burnt at a typical cruise flow (kg/h), never under the
+// reserve. Sources: the type certificate data and flight manuals (172: 40 of 53 gal at 8.5 gph; Archer 40 of 48 gal;
+// Alpha 50 l of mogas; MQ-9A 1,800 kg and MQ-9B 2,700 kg internal; F-16C 3,200 kg internal; A-10C 4,850 kg; C-130H
+// 20,800 kg; 737-800 20,900 kg and A320 19,400 kg of which a domestic sector carries about 60 percent; 747-400 174,000 kg,
+// a long haul load about 120,000).
+const FUEL={cessna:[109,23,20],archer:[109,26,20],alpha:[36,9,6],reaper:[1300,80,150],mq9b:[2000,80,200],f16:[2800,1800,500],
+  a10:[4000,1600,600],c130:[12000,2400,2500],b737:[12000,2500,2000],a320:[11000,2400,2000],b747:[120000,11000,12000]};
+function fuelNow(){const f=FUEL[AC.id]||FUEL.cessna;return Math.max(f[2],f[0]-f[1]*(st.time||0)/3600);}
+// inside a structure's volume (no margin)
+function strInside(r,x,y,z){const dx=x-r.x,dz=z-r.z,lx=dx*r.c-dz*r.s,lz=dx*r.s+dz*r.c;
+  if(r.poly){if(!pipXZ(r.P,x,z))return false;}
+  else if(r.shape==='ell'){if((lx*lx)/(r.hx*r.hx)+(lz*lz)/(r.hz*r.hz)>=1)return false;}
+  else if(Math.abs(lx)>=r.hx||Math.abs(lz)>=r.hz)return false;
+  return y>=r.y0-0.5&&y<=strTop(r,lx,lz);}
+function obstInside(o,x,y,z){
+  if(o.str)return strInside(o.str,x,y,z);
+  if(o.kind==='circ')return Math.hypot(x-o.x,z-o.z)<o.r&&y<o.h&&!(o.lo>y);
+  if(o.kind==='rect'){const u=toU(x,z),v=toV(x,z);return u>o.u0&&u<o.u1&&v>o.v0&&v<o.v1&&y<o.h;}
+  return x>o.b[0]&&x<o.b[2]&&z>o.b[1]&&z<o.b[3]&&pipXZ(o.P,x,z)&&y<o.h;}
+// CFX.imp: what the aircraft hit and how: rec (the STR record, if the structure has one), o (the OBST entry), name,
+// cls, p (the impact point on the structure's surface), n (its outward normal there), roof (came in through the top),
+// dir (the flight path), spd (m/s), mass (kg), fuel (kg), ke (J). The point: march along the flight path from the
+// aircraft (it is caught up to the margin short of the wall) to the first point inside; a glancing pass that never
+// gets inside takes the structure's nearest point instead.
+const CFX={imp:null};
+const _ci=new V3(),_cd=new V3();
+function strImpact(hit){
+  const rec=hit&&(hit.str||(hit.cls?hit:null)),o=hit&&!hit.cls?hit:(rec&&rec.obst)||null,inside=(x,y,z)=>rec?strInside(rec,x,y,z):obstInside(o,x,y,z);
+  const spd=st.vel.length();_cd.copy(st.vel);if(spd<1)_cd.set(0,0,-1).applyQuaternion(st.quat);_cd.normalize();
+  const yb=st.pos.y-GEAR*0.5;let p=null;
+  for(let d=0;d<=80;d+=0.25){_ci.copy(st.pos).addScaledVector(_cd,d);_ci.y=Math.max(_ci.y-GEAR*0.5,(rec?rec.y0:groundHeight(_ci.x,_ci.z))+0.5);
+    if(inside(_ci.x,_ci.y,_ci.z)){p=_ci.clone();break;}}
+  // glancing: the nearest point of the volume at the aircraft's height
+  if(!p){p=new V3(st.pos.x,yb,st.pos.z);
+    if(rec){const dx=p.x-rec.x,dz=p.z-rec.z;let lx=dx*rec.c-dz*rec.s,lz=dx*rec.s+dz*rec.c;
+      if(rec.shape==='ell'){const q=Math.hypot(lx/rec.hx,lz/rec.hz);if(q>0.999){lx/=q*1.001;lz/=q*1.001;}}else{lx=clamp(lx,-rec.hx*0.999,rec.hx*0.999);lz=clamp(lz,-rec.hz*0.999,rec.hz*0.999);}
+      p.set(rec.x+lx*rec.c+lz*rec.s,clamp(yb,rec.y0+0.5,strTop(rec,lx,lz)-0.2),rec.z-lx*rec.s+lz*rec.c);}
+    else if(o.kind==='circ'){const a=Math.atan2(p.z-o.z,p.x-o.x);p.set(o.x+Math.cos(a)*o.r*0.999,Math.min(yb,o.h-0.2),o.z+Math.sin(a)*o.r*0.999);}}
+  // the surface it went in through: the roof if the point is within 1.5 m of the top and the path came down onto it,
+  // else the wall facing the path (box: the face its local point is nearest; drum: the radial direction)
+  const n=new V3();let roof=false;
+  if(rec){const dx=p.x-rec.x,dz=p.z-rec.z,lx=dx*rec.c-dz*rec.s,lz=dx*rec.s+dz*rec.c,top=strTop(rec,lx,lz);
+    roof=p.y>top-1.5&&_cd.y<0.05||rec.poly&&p.y>top-1.5;
+    if(roof)n.set(0,1,0);
+    else if(rec.shape==='ell'){const nx=lx/(rec.hx*rec.hx),nz=lz/(rec.hz*rec.hz);n.set(nx*rec.c+nz*rec.s,0,-nx*rec.s+nz*rec.c).normalize();}
+    else if(rec.poly){const e=wbNearEdge(rec.P,p.x,p.z);n.set(p.x-e[1],0,p.z-e[2]);if(n.lengthSq()<1e-6)n.set(-_cd.x,0,-_cd.z);n.normalize();
+      if(pipXZ(rec.P,p.x+n.x*0.5,p.z+n.z*0.5))n.negate();}
+    else{const fx=rec.hx-Math.abs(lx),fz=rec.hz-Math.abs(lz);if(fx<fz){const sg=Math.sign(lx)||1;n.set(sg*rec.c,0,-sg*rec.s);}else{const sg=Math.sign(lz)||1;n.set(sg*rec.s,0,sg*rec.c);}}}
+  else if(o.kind==='circ'){roof=p.y>o.h-1.5&&_cd.y<0.05;if(roof)n.set(0,1,0);else n.set(p.x-o.x,0,p.z-o.z).normalize();}
+  else n.set(-_cd.x,0,-_cd.z).normalize();
+  const mass=AC.mass,fuel=fuelNow();
+  return {rec:rec,o:o,name:(rec||o).name,cls:rec?rec.cls:(/billboard/.test(o.name)?'sign':/tower|Tower|Skytree|Christ|skyscraper/.test(o.name)?'tower':'building'),
+    p:p,n:n,roof:roof,dir:_cd.clone(),spd:spd,mass:mass,fuel:fuel,ke:0.5*mass*spd*spd,type:AC.id};}
 // ================= crash FX (3.9): every crash explodes, sized by the airframe =================
 // CRASH_FX[type]: scale (explode() scale), sec (secondaries), deb (pooled debris boxes),
 // fire (wreck burn, s), smoke (column, s), r (fuselage radius, m), col (hull colour),
@@ -21589,6 +21715,7 @@ function wreckUpdate(dt){
 function onCrash(){
   resCloseAll();hapPattern('crash');const les=!!LES.on;
   if(LES.on){const k=(acType==='alpha'?'alpha':'cessna')+':'+(RIDE.on?'ride':LES.on);if(!schoolBest[k]){schoolBest[k]='F';try{localStorage.setItem('kgeuSchool',JSON.stringify(schoolBest));}catch(e){}}lesEnd();}
+  CFX.imp=st.hitObj?strImpact(st.hitObj):null;   // crashfx: a structure impact (what, where, how fast, how heavy, the fuel)
   crashBegin();if(!les)wastedStart();
   say(REGION.az?'Glendale Tower 121.0':BASES[BASE0].twr,'Crash, crash, crash. Emergency vehicles are rolling.',['t_crash']);
 }
@@ -21676,7 +21803,7 @@ function crashCam(dt){
 function wreckClear(){for(const p of WRK){p.life=0;p.g.visible=false;p.fl.visible=false;}}
 // a new flight: the wreck, its fire and smoke go, the card goes
 function crashClear(){
-  wastedEnd(false);
+  wastedEnd(false);CFX.imp=null;
   crashEl.classList.remove('on');crashTopEl.classList.remove('on');document.body.classList.remove('crashOn');
   if(!CRASH.on)return;
   CRASH.on=CRASH.cam=CRASH.card=false;wreckClear();fxClear();fireClear();debrisClear();
@@ -23294,6 +23421,8 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
   STRIKE:STRIKE,SENSOR:SENSOR,RANGE:RANGE,groundHeight:groundHeight,secAt:secAt,CAR:CAR,
   isPaved:isPaved,spawnInfo:spawnInfo,riverX:riverX,FWY_X:FWY_X,I10_Z:I10_Z,APC:APC,LUKE:LUKE,
   smokeCount:()=>smoke.filter(p=>p.life>0).length,smokeMax:SMOKE_MAX,
+  STR:STR,strHit:(x,z,yb)=>{const r=strHit(x,z,yb);return r?{id:r.id,name:r.name,cls:r.cls}:null;},strInside:strInside,fuelNow:fuelNow,FUEL:FUEL,
+  strImp:()=>{const I=CFX.imp;return I?{name:I.name,cls:I.cls,id:I.rec?I.rec.id:-1,p:[I.p.x,I.p.y,I.p.z],n:[I.n.x,I.n.y,I.n.z],roof:I.roof,spd:I.spd,mass:I.mass,fuel:I.fuel,ke:I.ke,type:I.type}:null;},
   camMode:()=>camMode,sensorMode:()=>sensorMode,
   dropCam:()=>{const p=MISS.pallet;return {mode:DCAM.mode==='chase'&&(DCAM.drag||DCAM.yaw||DCAM.pitch)?'look':DCAM.mode,
     yaw:+(DCAM.yaw*180/Math.PI).toFixed(2),pitch:+(DCAM.pitch*180/Math.PI).toFixed(2),
