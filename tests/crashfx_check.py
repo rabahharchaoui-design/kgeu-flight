@@ -128,6 +128,18 @@ async def main():
                    [(x['t'], x['inView'], x['inside'], round(x['d'])) for x in cam['seq']])
                 ok(f'{t}: it pulls back from the hole to show the whole fire', cam['seq'][2]['d'] > cam['seq'][0]['d'] * 1.4, [round(x['d']) for x in cam['seq']])
                 ok(f'{t}: the impact, the groans and the fire crackle play (audio context up)', cam['audio'] or not (await pg.evaluate(f"()=>!!{K}.actx()")), cam['audio'])
+            # a consequence, never a reward: a crash into a structure writes nothing a ground crash does not (scores, runs,
+            # achievements, XP, boards all live in localStorage or go through it)
+            SNAP = "()=>{const o={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);o[k]=localStorage.getItem(k);}return o;}"
+            def diff(a, b): return sorted(k for k in set(a) | set(b) if a.get(k) != b.get(k))
+            s0 = await pg.evaluate(SNAP)
+            await pg.evaluate("()=>{const K=window.__kgeu;K.pick('cessna');K.pickBase('kgeu');K.start('runway');for(let i=0;i<3;i++)K.stepFrame(1/30,false,true);K.crashNow('Test crash.');for(let i=0;i<150;i++)K.stepFrame(1/30,false,true);}")
+            s1 = await pg.evaluate(SNAP)
+            await pg.evaluate(FLY, ['cessna', "r.name==='a hangar'", 'z', 1, 40, 0.5, 50, None])
+            await pg.evaluate("()=>{const K=window.__kgeu;for(let i=0;i<150;i++)K.stepFrame(1/30,false,true);}")
+            s2 = await pg.evaluate(SNAP)
+            dg, ds = diff(s0, s1), diff(s1, s2)
+            ok('a crash into a structure writes nothing a ground crash does not (no score, run, XP or achievement)', set(ds) <= set(dg) | {'kgeuResume'}, (dg, ds))
             # a new flight puts every structure back
             z = await pg.evaluate("()=>{const K=window.__kgeu;K.pick('cessna');K.pickBase('kgeu');K.start('runway');for(let i=0;i<3;i++)K.stepFrame(1/30,false,true);const S=K.R3().scene;"
                                   "return {on:K.CFXB.on,adds:K.CFXB.adds.length,hidden:K.STR.list.filter(r=>r.meshes&&r.meshes.some(m=>!m.visible)).length,slab:S.getObjectByName('cfx_slab').visible,fire:K.sf().on,audio:K.cfxAudio()};}")

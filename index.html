@@ -7483,11 +7483,20 @@ function strVol(g,M,cls,name,o){
   if(o.obst)o.obst.str=r;
   return r;}
 function strMesh(m,cls,name,o){m.updateWorldMatrix(true,false);const r=strVol(m.geometry,m.matrixWorld,cls,name,o);r.meshes=[m].concat((o&&o.parts)||[]);return strAdd(r);}
+// an instanced family at load (16,000 houses): the instance matrices read straight (a yaw and a scale, no decompose)
 function strInst(im,cls,name,o){
-  im.updateWorldMatrix(true,false);const n=im.count,out=[];
-  for(let i=0;i<n;i++){im.getMatrixAt(i,_sM);_sM.premultiply(im.matrixWorld);
-    const r=strVol(im.geometry,_sM,typeof cls==='function'?cls(i):cls,name,o);if(r.hx<0.5||r.y1-r.y0<1)continue;r.im=im;r.ii=i;out.push(strAdd(r));}
+  const t0=performance.now();im.updateWorldMatrix(true,false);const n=im.count,out=[],g=im.geometry,W=im.matrixWorld,A=im.instanceMatrix.array,id=W.equals(_sMI);
+  if(!g.boundingBox)g.computeBoundingBox();const b=g.boundingBox,cx0=(b.min.x+b.max.x)/2,cy0=(b.min.y+b.max.y)/2,cz0=(b.min.z+b.max.z)/2,ex=(b.max.x-b.min.x)/2,ey=(b.max.y-b.min.y)/2,ez=(b.max.z-b.min.z)/2;
+  const ell=/Cylinder|Sphere|Circle/.test(g.type||''),fc=typeof cls==='function';
+  for(let i=0;i<n;i++){let e;
+    if(id)e=A.subarray(i*16,i*16+16);else{_sM.fromArray(A,i*16).premultiply(W);e=_sM.elements;}
+    const sx=Math.hypot(e[0],e[2]),sy=e[5],sz=Math.hypot(e[8],e[10]);if(sx<1e-6)continue;
+    const c=e[0]/sx,s=-e[2]/sx,lx=cx0*sx,lz=cz0*sz,hy=ey*Math.abs(sy),cy=e[13]+cy0*sy;
+    const r={shape:ell?'ell':'box',x:e[12]+lx*c+lz*s,z:e[14]-lx*s+lz*c,c:c,s:s,hx:ex*sx,hz:ez*sz,y0:cy-hy,y1:cy+hy,dome:null,cls:fc?cls(i):cls,name:name,obst:null,col:null,meshes:[],im:im,ii:i,pair:(o&&o.pair)||null};
+    if(r.hx<0.5||r.y1-r.y0<1)continue;out.push(strAdd(r));}
+  STR.ms=(STR.ms||0)+performance.now()-t0;
   return out;}
+const _sMI=new THREE.Matrix4();
 // a world region terminal or hangar (an OBST poly over merged geometry): its record for the breakup, the outline's
 // box, and where its triangles sit in the merged mesh (mg: {name, a, b} vertex range) so the breakup can take them out
 function strPoly(o,y0,cls,mg){const b=o.b;
@@ -7496,7 +7505,7 @@ function strPoly(o,y0,cls,mg){const b=o.b;
 // the world regions' instanced buildings, once their scene is built (buildWorld): city boxes, Tokyo's skyline, la
 // Defense, Copacabana's hotels, Centro's towers, the favelas. Tall ones are towers (they break locally), the rest buildings.
 function strWorld(){
-  const tall=im=>i=>{im.getMatrixAt(i,_sM);_sM.decompose(_sP,_sQ,_sS);return _sS.y>=80?'tower':'building';};
+  const tall=im=>i=>im.instanceMatrix.array[i*16+5]>=80?'tower':'building';
   for(const [n,nm] of [['cityBoxes','a building'],['tokyo_skyline','a skyscraper'],['la_defense','a skyscraper'],['copacabana_hotels','a hotel'],['centro_towers','a skyscraper']]){
     const im=scene.getObjectByName(n);if(im&&im.isInstancedMesh)strInst(im,tall(im),nm);}
   const f=scene.getObjectByName('favelas');if(f&&f.isInstancedMesh)strInst(f,'house','a house');}
