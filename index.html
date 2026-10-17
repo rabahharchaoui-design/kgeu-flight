@@ -2943,7 +2943,10 @@ function strAdd(r){
     const k=strKey(i,j);let a=STR.grid.get(k);if(!a)STR.grid.set(k,a=[]);a.push(r);}
   return r;}
 // the top of a record over a point in its own frame (lx, lz): the dome where it has one
-function strTop(r,lx,lz){if(!r.dome)return r.y1;const d=r.dome,q=(lx*lx)/(r.hx*r.hx)+(lz*lz)/(r.hz*r.hz);
+// eave (a house): its roof a pyramid from the eave height up to y1 at the middle
+function strTop(r,lx,lz){
+  if(r.eave)return r.eave+(r.y1-r.eave)*Math.max(0,1-Math.max(Math.abs(lx)/r.hx,Math.abs(lz)/r.hz));
+  if(!r.dome)return r.y1;const d=r.dome,q=(lx*lx)/(r.hx*r.hx)+(lz*lz)/(r.hz*r.hz);
   return q<d.k*d.k?Math.max(r.y1,d.y+d.h*Math.sqrt(Math.max(0,1-q))):r.y1;}
 // yb: the bottom of the aircraft (y less GEAR). The margin: about a third of the span, 2 to 12 m
 function strHit(x,z,yb){
@@ -8905,7 +8908,7 @@ overlay(lists.sub,subFarTex,true,false);overlay(lists.near,subNearTex,false,fals
     p.set(w[0],H,w[1]);s.set(14.8,2.6,15.8);m.compose(p,q,s);rm.setMatrixAt(k,m);rm.setColorAt(k,col.set(rc[Math.floor(w[2]*37)%6]));});
   wm.userData.heat=0.6;wm.userData.irVar=0.1;rm.userData.heat=0.62;rm.userData.irVar=0.1;scene.add(wm,rm);
   wm.name='houses';rm.name='houseRoofs';strInst(wm,'house','a house',{pair:rm});   // crashfx: the roof rides on the walls' record (its top: the ridge)
-  for(const r of STR.list)if(r.im===wm){r.y1+=2.6;}
+  for(const r of STR.list)if(r.im===wm){r.eave=r.y1;r.y1+=2.6;}
 })();
 // arterial section-line roads
 (function(){
