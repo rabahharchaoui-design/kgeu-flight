@@ -43,6 +43,8 @@ AUDIT = """([sel,boxSel])=>{const R=document.querySelector(sel);if(!R)return ['n
   return out;}"""
 
 async def audit(pg, sel, state):
+    # stepstall: a step's slide (the card or the mission pill, 320 ms) is cancelled and its ghost removed (finish() does not take before a rendered frame): the resting layout is what is audited
+    await pg.evaluate("()=>{document.getAnimations().forEach(a=>{const t=a.effect&&a.effect.target;if(t&&t.closest&&t.closest('#miss,#lesson'))a.cancel();});document.querySelectorAll('.stepGhost').forEach(g=>g.remove());}")
     res = await pg.evaluate(AUDIT, [sel, None])
     for f in res: print(f'  FAIL {TAG} {sel} {state}: {f}')
     ok(f'{TAG} {sel} {state} audit clean', len(res) == 0, res[:6])

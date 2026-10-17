@@ -205,9 +205,14 @@ body.appr #lesM{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #missS{ flex:0 100 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; color:var(--soft); font-weight:600; }
 #missS:empty, #miss.chip #missS{ display:none; }
 #miss.warn #missT{ color:var(--caution); }
-#miss.pulse{ animation:missP .6s ease-out; }
+#miss.pulse{ animation:missP .6s ease-out; } #miss.pulse.pB{ animation-name:missPb; }
+@keyframes missPb{ 0%{ border-color:rgba(255,255,255,.1); box-shadow:none; } 30%{ border-color:rgba(127,212,255,.9); box-shadow:0 0 8px rgba(127,212,255,.45); } 100%{ border-color:rgba(255,255,255,.1); box-shadow:none; } }
 @keyframes missP{ 0%{ border-color:rgba(255,255,255,.1); box-shadow:none; } 30%{ border-color:rgba(127,212,255,.9); box-shadow:0 0 8px rgba(127,212,255,.45); } 100%{ border-color:rgba(255,255,255,.1); box-shadow:none; } }
-#miss.pulse.pg{ animation-name:missPg; }
+#miss.pulse.pg{ animation-name:missPg; } #miss.pulse.pg.pB{ animation-name:missPgb; }
+@keyframes missPgb{ 30%{ border-color:rgba(43,255,106,.95); box-shadow:0 0 8px rgba(43,255,106,.5); } }
+/* stepstall: the old step's ghost while the new one slides in (stepSlide) */
+.stepGhost{ position:absolute; margin:0; padding:0; pointer-events:none; overflow:hidden; white-space:normal; z-index:1; }
+.stepGhost b{ font-weight:700; }
 @keyframes missPg{ 30%{ border-color:rgba(43,255,106,.95); box-shadow:0 0 8px rgba(43,255,106,.5); } }
 @media (prefers-reduced-motion: reduce){ #miss.pulse{ animation:none; } }
 #warn{ font-size:24px; text-align:center; font-weight:800; letter-spacing:.06em; color:#fff; background:var(--warn); border-radius:6px; padding:2px 16px; display:none; line-height:1.15; }
@@ -12392,9 +12397,19 @@ const rookie=()=>SKILL!=='pilot';
 // records and future leaderboards can trust a Hard tag. ----
 const RUN={easyEver:false,t0:0};
 const runMode=()=>RUN.easyEver?'easy':'hard';
-function runLog(kind,res){try{const L=JSON.parse(localStorage.getItem('kgeuRuns')||'[]');
+// stepstall item 2: storage off the frame. A write asked for in a frame keeps only its key's last value and is done in a task
+// after the frame (setTimeout 0 from the rAF callback: once the frame is painted); the value is made there too (fn), so the
+// JSON.stringify of a large blob is not in the frame either. Flushed at once when the page is hidden or closed.
+const LSQ={m:new Map(),t:0,n:0};
+function lsLater(k,fn){LSQ.m.set(k,fn);if(!LSQ.t)LSQ.t=setTimeout(lsFlush,0);}
+function lsFlush(){if(LSQ.t){clearTimeout(LSQ.t);LSQ.t=0;}const m=LSQ.m;if(!m.size)return;const E=[...m];m.clear();
+  for(const [k,fn] of E){try{const v=typeof fn==='function'?fn():fn;if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,v);LSQ.n++;}catch(e){}}}
+addEventListener('pagehide',lsFlush);document.addEventListener('visibilitychange',()=>{if(document.hidden)lsFlush();});
+// the run log: the list kept while its write waits (two runs logged in one frame both land)
+let RUNS=null;
+function runLog(kind,res){try{const L=LSQ.m.has('kgeuRuns')&&RUNS?RUNS:JSON.parse(localStorage.getItem('kgeuRuns')||'[]');
   L.unshift(Object.assign({kind:kind,ac:acType,mode:runMode(),when:Date.now()},res||{}));L.length=Math.min(L.length,60);
-  localStorage.setItem('kgeuRuns',JSON.stringify(L));}catch(e){}}
+  RUNS=L;lsLater('kgeuRuns',()=>JSON.stringify(RUNS));}catch(e){}}
 function modeTag(id){const el=document.getElementById(id);if(!el)return;const t=document.createElement('span');t.className='modeTag '+runMode();t.textContent=runMode()==='easy'?'EASY':'HARD';el.appendChild(t);}
 function autoSmart(){if(!running||paused||st.crashed)return;
   if(LES.on){toast('No autopilot in flight school. Tap End to quit the lesson');return;}
@@ -12494,7 +12509,7 @@ function pollPad(dt){
   } else if(crashEl.classList.contains('on')&&edge(0))crashRetry();
   touchIn.padBrake=B(1)>0.5;padPrev=g.buttons.map(b=>b.value||(b.pressed?1:0));
 }
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&running&&!paused&&!st.crashed){togglePause();try{speechSynthesis.cancel();}catch(e){}}if(typeof musicTick==='function')musicTick();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&running&&!paused&&!st.crashed){togglePause();spkCancel(true);}if(typeof musicTick==='function')musicTick();});
 document.addEventListener('gesturestart',e=>e.preventDefault());document.addEventListener('dblclick',e=>e.preventDefault());
 // No document wide touch handlers: a second finger must always reach its button. Zoom is
 // off through the viewport meta and touch-action:none on the scene and the controls.
@@ -12616,7 +12631,7 @@ function scLoad(){
       SCORE.best=j.best||{};SCORE.ach=j.ach||{};SCORE.recent=Array.isArray(j.recent)?j.recent:[];}
   }catch(e){}
 }
-function scSave(){try{localStorage.setItem(SC_KEY,JSON.stringify(SCORE));}catch(e){}}
+function scSave(){lsLater(SC_KEY,()=>JSON.stringify(SCORE));}   // stepstall: after the frame (a touchdown in a lesson is a step)
 function scReset(){SCORE.log={time:0,landings:0,streak:0,bestStreak:0};SCORE.best={};SCORE.ach={};SCORE.recent=[];scSave();scUI();}
 scLoad();
 
@@ -12953,11 +12968,14 @@ function missHud(title,sub,warn){
   if(!title){missEl.classList.remove('on','call','pulse','pg');MISS.hk='';return;}
   // a step change (3/4 to 4/4, WAVE 1/4 to 2/4, AIRDROP to TO CENTER) pulses the pill's border once
   const m=/^(\d+\/\d+|[A-Z]{2,}(?: [A-Z]{2,})*(?: \d+\/\d+)?)/.exec(title),k=m?m[1]:'';
-  if(k&&MISS.hk&&k!==MISS.hk&&missEl.classList.contains('on'))missPulse(false);if(k)MISS.hk=k;
+  const stp=k&&MISS.hk&&k!==MISS.hk&&missEl.classList.contains('on'),ot=stp?missT.textContent:'';
+  if(stp)missPulse(false);if(k)MISS.hk=k;
   setTxt(missT,title);setTxt(missS,sub||'');missEl.classList.toggle('warn',!!warn);missEl.classList.toggle('on',true);
+  if(stp&&running&&!paused){stepSlide(STEPX.miss,missT,'<b>'+stepEsc(ot)+'</b>');stepChime();STEPX.hold=true;}   // stepstall: the old step out, the new one in
 }
 // fix2 item 11: a 600 ms pulse of the pill's border (blue on a step, green when the jump light goes green)
-function missPulse(green){missEl.classList.remove('pulse','pg');void missEl.offsetWidth;missEl.classList.add('pulse');if(green)missEl.classList.add('pg');}
+// stepstall: restarted by swapping between two copies of the keyframes, not by a forced reflow (void offsetWidth)
+function missPulse(green){const b=!missEl.classList.contains('pB');missEl.classList.remove('pulse','pg','pB');missEl.classList.add('pulse');if(b)missEl.classList.add('pB');if(green)missEl.classList.add('pg');}
 // ---- approach: nothing in the centre third (phone3 item 4) ----
 // body.appr below 1,500 ft above the ground or inside 3 nm of any runway end (the CSS turns the centre
 // column into a one line strip under the pause button and keeps the lesson panel low); a mission card
@@ -12999,10 +13017,13 @@ function capFill(){const c=$('lesCap'),b=atcEl.querySelector('b'),pl=atcEl.query
 // (2) the top column shows two at most, and only what ends above 26% of the height (the warning first, then the rear
 // threat, the subtitle when it is up there (a lesson), the mission pill, a toast); (3) the bottom caption's box, from the stick ring's right edge + 12 px to
 // the buttons' left edge - 12 px, 8 px above the bottom inset (in portrait: above the throttle, right of the clear zone).
-const HF={n:0,topR:-1,capLine:null,cap:''};
+const HF={n:0,topR:-1,capLine:null,cap:'',want:0};
 const HF_PRI={warn:1,dfSix:2,atc:3,miss:4,toast:5};   // the lesson panel, when it is in the column, is never held
 function hudFit(){
   const ui=$('uiroot'),U=ui.getBoundingClientRect(),W=U.width,H=U.height;if(!W||!H||document.body.classList.contains('menuOn'))return;
+  if(LES.on&&lesEl.classList.contains('on'))stepGeo(STEPX.les,lesEl.classList.contains('lc')?$('lesRow'):lesI);   // stepstall: the card's place, for the next step's ghost
+  if(missEl.classList.contains('on'))stepGeo(STEPX.miss,missT);
+  if(LES.on&&G.holds.length)cueGeo();
   const R=e=>{if(!e)return null;const r=e.getBoundingClientRect();return r.width>0&&r.height>0?r:null;};
   capHome();
   const portrait=H>W,T=$('topCol'),rs=document.documentElement.style;
@@ -13755,7 +13776,7 @@ function initAudio(){
   if(actx){actx.resume&&actx.resume();return;}
   try{
     actx=new (window.AudioContext||window.webkitAudioContext)();
-    setTimeout(()=>{try{boomBufs();}catch(e){}},50);
+    setTimeout(()=>{try{boomBufs();}catch(e){}try{stepBuf();}catch(e){}},50);   // stepstall: the step chime's buffer too
     eng=actx.createOscillator();eng.type='sawtooth';engF=actx.createBiquadFilter();engF.type='lowpass';engF.frequency.value=380;engG=actx.createGain();engG.gain.value=0;eng.connect(engF).connect(engG).connect(actx.destination);eng.start();
     // second, slightly detuned tone. Four unsynchronised T56s beat against each other
     // at a couple of hertz, and that throb is most of what a Hercules sounds like.
@@ -14181,8 +14202,8 @@ function radioLive(){return running&&!paused&&!menu.classList.contains('on');}
 let radioFadeTok=0,radioWasLive=false;
 function radioFade(ms){
   radioWasLive=false;
-  const c=VQ.cur;if(c&&!c.line.offAir){if(c.speech){try{speechSynthesis.cancel();}catch(e){}}vqClose(c,vqNow()+(ms||120)/1000);}
-  if(!c||!c.line.offAir){try{if(window.speechSynthesis)speechSynthesis.cancel();}catch(e){}}
+  const c=VQ.cur;if(c&&!c.line.offAir){if(c.speech)spkCancel(true);vqClose(c,vqNow()+(ms||120)/1000);}
+  if(!c||!c.line.offAir)spkCancel(true);
   if(!actx||!radioGain){radioHush();return;}
   const now=actx.currentTime,tc=(ms||120)/4000;          // four time constants in ms: ~2% left
   radioGain.gain.cancelScheduledValues(now);radioGain.gain.setTargetAtTime(0,now,tc);
@@ -14273,7 +14294,7 @@ function vqClose(c,a1){const e=c.rec;if(e&&e.a1==null)e.a1=a1!=null?a1:c.speech?
 // cut the line on the air: an 80 ms fade on the radio, a cancel on the synthesised voice
 function vqCut(requeue){
   const c=VQ.cur;if(!c)return;const n=vqNow();
-  if(c.speech){try{speechSynthesis.cancel();}catch(e){}musicUnduck();vqClose(c,n);}
+  if(c.speech){spkCancel();musicUnduck();vqClose(c,n);}
   else{const g=RADIO.lineG;
     if(g&&actx){try{g.gain.setTargetAtTime(0,n,0.02);}catch(e){}
       if(staticG){staticG.gain.cancelScheduledValues(n);staticG.gain.setTargetAtTime(0,n,0.02);}
@@ -14310,12 +14331,12 @@ function playLine(l){
     const b=document.createElement('b');b.textContent=l.who;tx.appendChild(b);tx.appendChild(document.createTextNode(l.text));
     const pl=rookie()?plainOf(l):'';atcEl.classList.toggle('hasPlain',!!pl);atcEl.classList.toggle('cfi',sp);
     if(pl){const e=document.createElement('span');e.className='plain';e.textContent=pl;atcEl.appendChild(e);}
-    atcEl.classList.add('on');HF.capLine=l;capMirror();}
+    atcEl.classList.add('on');HF.capLine=l;capMirror();if(!HF.want)HF.want=1;}   // stepstall: the caption's box laid out on the next frame (hudFit), not up to 8 frames later
   const c={line:l,pri:l.pri,t0:VQ.clock,speech:sp,tok:++VQ.tok,fin:false};
   c.rec={pri:l.pri,who:l.who,text:l.text,speech:sp,a0:vqNow(),a1:null};VQ.log.push(c.rec);if(VQ.log.length>100)VQ.log.shift();
   let d;
   if(sp){d=coachSpeak(c,l.sp||l.text);c.estEnd=VQ.clock+d;c.end=VQ.clock+(c.voiced?d*1.6+1:d);c.rEnd=performance.now()/1000+d*1.6+1;}
-  else{try{if(window.speechSynthesis&&speechSynthesis.speaking)speechSynthesis.cancel();}catch(e){}
+  else{if(SPK.job||(window.speechSynthesis&&speechSynthesis.speaking))spkCancel();
     d=radioSpeak(l.clips,l.text.length);c.aEnd=RADIO.aEnd;if(RADIO.aEnd)c.rec.a0=RADIO.aStart;c.estEnd=c.end=VQ.clock+d;}
   VQ.cur=c;radioBusy=d;
   // fix2 item 11: the caption stays until 4 s after the call ends (vqClose brings it down to 4 s when it does)
@@ -14329,31 +14350,51 @@ function coachSpeak(c,text){
   const est=0.4+text.length*0.062;c.voiced=false;
   radioHush();                                                     // belt and braces: no clip left under the voice
   if(muted||!RADIO.on||!window.speechSynthesis)return est;         // silent: the subtitle still gets its time
-  try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);
+  try{const u=new SpeechSynthesisUtterance(text);
     u.rate=1.02;u.volume=0.9*RADIO.vol;const v=c.line&&c.line.who==='Frank'?dpeVoice():cfiVoice();if(v){u.voice=v;if(v.lang)u.lang=v.lang;}
     u.onend=u.onerror=()=>{if(VQ.cur===c){c.fin=true;if(c.rec.a1==null)c.rec.a1=vqNow();musicUnduck();}};
-    speechSynthesis.speak(u);c.voiced=true;
+    spkSay(u);c.voiced=true;
     if(actx){const n=actx.currentTime;musicDuck(n,n+est*1.6+1);}}catch(e){}
   return est;
 }
+// stepstall item 2: the speech engine is never called inside a frame. On an iPhone speechSynthesis.cancel() and speak() take
+// over the audio session (WebKit bug 218815: the other media is interrupted while an utterance plays) and can hold the main thread,
+// so a step change, which always comes with Dana's line, froze the frame that showed it. The line's utterance is built in the
+// frame; the calls run in a task queued after it (setTimeout 0 from the rAF callback runs once the frame is painted), cancel
+// only when something is speaking, and a newer job replaces one not yet run (a cut line never starts).
+const SPK={job:null,t:0,warm:false,runs:0,ms:0,worst:0};
+function spkRun(){SPK.t=0;const j=SPK.job;SPK.job=null;if(!j||!window.speechSynthesis)return;const t0=performance.now();
+  try{const S=speechSynthesis;if(S.speaking||S.pending)S.cancel();if(j.u)S.speak(j.u);}catch(e){}
+  const d=performance.now()-t0;SPK.runs++;SPK.ms+=d;if(d>SPK.worst)SPK.worst=d;}
+function spkSay(u){SPK.job={u:u};if(!SPK.t)SPK.t=setTimeout(spkRun,0);}
+// now: leaving the flight (pause, menu, hidden), where nothing is drawn; else after the frame like a line
+function spkCancel(now){if(!window.speechSynthesis)return;
+  if(now){SPK.job=null;try{speechSynthesis.cancel();}catch(e){}return;}
+  SPK.job={u:null};if(!SPK.t)SPK.t=setTimeout(spkRun,0);}
+// at a lesson's or a tasking's start (a menu moment, never in flight): the voice list read and both voices picked now, and
+// once a session a silent utterance so the engine is up before the first line in flight
+function spkWarm(){if(!window.speechSynthesis)return;cfiVoice();dpeVoice();
+  if(SPK.warm||muted||!RADIO.on)return;SPK.warm=true;
+  try{const u=new SpeechSynthesisUtterance(' ');u.volume=0;u.rate=2;const v=cfiVoice();if(v){u.voice=v;if(v.lang)u.lang=v.lang;}spkSay(u);}catch(e){}}
 // Dana's voice: an English female voice when the device has one (Samantha, Karen, Moira, Ava...), else the default.
 // The list can be empty until the engine loads it, so a miss is not cached
 let CFI_V=null;
-function cfiVoice(){if(CFI_V)return CFI_V;
+function cfiVoice(){if(CFI_V)return CFI_V;if(CFI_V===false)return null;
   try{const vs=(window.speechSynthesis&&speechSynthesis.getVoices&&speechSynthesis.getVoices())||[],en=vs.filter(v=>v&&/^en/i.test(v.lang||''));
     const by=n=>en.find(v=>v.name===n)||en.find(v=>(v.name||'').indexOf(n)===0);
-    CFI_V=['Samantha','Karen','Moira','Ava'].map(by).find(Boolean)||en.find(v=>/female|samantha|karen|moira|ava|allison|susan|zira/i.test(v.name||''))||null;}catch(e){CFI_V=null;}
-  return CFI_V;}
+    CFI_V=['Samantha','Karen','Moira','Ava'].map(by).find(Boolean)||en.find(v=>/female|samantha|karen|moira|ava|allison|susan|zira/i.test(v.name||''))||(vs.length?false:null);}catch(e){CFI_V=null;}
+  return CFI_V||null;}
 // Frank's voice (school2 item 6, the examiner): an English male voice picked the same way (Daniel, Alex, Tom, Nathan, Aaron,
 // Fred), else any English voice that is not on Dana's female list
 let DPE_V=null;
-function dpeVoice(){if(DPE_V)return DPE_V;
+function dpeVoice(){if(DPE_V)return DPE_V;if(DPE_V===false)return null;
   try{const vs=(window.speechSynthesis&&speechSynthesis.getVoices&&speechSynthesis.getVoices())||[],en=vs.filter(v=>v&&/^en/i.test(v.lang||''));
     const by=n=>en.find(v=>v.name===n)||en.find(v=>(v.name||'').indexOf(n)===0);
-    DPE_V=['Daniel','Alex','Tom','Nathan','Aaron','Fred'].map(by).find(Boolean)||en.find(v=>!/female|samantha|karen|moira|ava|allison|susan|zira/i.test(v.name||''))||null;}catch(e){DPE_V=null;}
-  return DPE_V;}
+    DPE_V=['Daniel','Alex','Tom','Nathan','Aaron','Fred'].map(by).find(Boolean)||en.find(v=>!/female|samantha|karen|moira|ava|allison|susan|zira/i.test(v.name||''))||(vs.length?false:null);}catch(e){DPE_V=null;}
+  return DPE_V||null;}
 // every instructor line in the game is Dana Reyes, CFI (SCHOOL.cfi): she sits beside you, so her lines are spoken, not radioed.
 // Frank Delgado, the DPE on the mock checkride (SCHOOL.dpe), sits there too: his lines follow the same queue rules
+try{if(window.speechSynthesis&&speechSynthesis.addEventListener)speechSynthesis.addEventListener('voiceschanged',()=>{CFI_V=null;DPE_V=null;});}catch(e){}
 const isCFI=l=>!!l&&(l.who==='Dana'||l.who==='Frank');
 // a new instruction replaces the one before it; tower calls waiting behind it keep waiting
 function coach2(t,sp,o,who){o=o||{};
@@ -14374,7 +14415,7 @@ function nWords(n){n=Math.round(Math.abs(n));if(n<20)return NW1[n];if(n<100)retu
   if(n<1e6)return nWords(n/1000|0)+' thousand'+(n%1000?' '+nWords(n%1000):'');return String(n);}
 function cfiSp(t){return String(t).replace(/\bft\b/g,'feet').replace(/\bkt\b/g,'knots').replace(/\bfpm\b/g,'feet a minute').replace(/\u00b0/g,' degrees')
   .replace(/\b\d[\d,]*\b/g,m=>nWords(+m.replace(/,/g,'')));}
-function vqReset(){radioQ.length=0;if(VQ.cur){const c=VQ.cur;if(c.speech){try{speechSynthesis.cancel();}catch(e){}}vqClose(c,vqNow());}radioBusy=0;}
+function vqReset(){radioQ.length=0;if(VQ.cur){const c=VQ.cur;if(c.speech)spkCancel(true);vqClose(c,vqNow());}radioBusy=0;}
 // a tower call to us: it drops pending chatter, supersedes a tower line on the air (whose
 // readback goes with it), and goes ahead of other tower lines, but waits for an instruction
 function say(who,text,clips,o){o=o||{};
@@ -16234,7 +16275,7 @@ function tqAskTick(dt){const a=TASK.ask;if(!a)return;
 function tqObj(title,sub,warn){const n=TASK.def.stages.length,k=TASK.si+1;missHud(k+'/'+n+'  '+title,sub||'',!!warn);}
 function tqStageGo(i){const D=TASK.def;TASK.si=i;TASK.stage=D.stages[i];TASK.st0=st.time;
   missEl.classList.remove('chip');APPR.missT0=st.time;APPR.missOn=true;   // a new stage: the full card again
-  if(i>0)hapPattern('green');
+  if(i>0){hapPattern('green');stepChime();}
   if(TASK.stage.enter)TASK.stage.enter(TASK.d);
   TASK.log.push({t:+st.time.toFixed(1),stage:TASK.stage.id});
 }
@@ -16249,6 +16290,7 @@ function taskStart(id,o){const D=TASKS[id];if(!D)return;
   if(!REGION.az){pickRegion('az',{resume:{task:id,region:'az',type:D.ac,tod:TOD.id,wx:wxOf('task:'+id)}});return;}
   if(!WORLD.ready){toast('Loading '+REGION.city+'…');return;}
   const seed=(o&&o.seed!=null)?o.seed:TASK.test.seed!=null?TASK.test.seed:(Math.random()*4294967296)>>>0;
+  spkWarm();stepPrep();   // stepstall: the voices and the stage change's chime ready before the flight
   pickType(D.ac,1);
   start('runway',D.base||'luke');RUNSTART={k:'task',id:id};wxWindOff();
   // the weather its brief implies for this run (WX_FIX), the saved choice comes back on the next start() (as the dogfight)
@@ -17041,7 +17083,7 @@ document.getElementById('oCap').onclick=()=>setCap(!CAPS.on);
 document.getElementById('oRvol').addEventListener('input',e=>{initAudio();setRadioVol(+e.target.value/10);});
 function soundUI(){document.querySelectorAll('.oSound').forEach(b=>{if(b.classList.contains('qs'))b.querySelector('b').textContent=muted?'Off':'On';else b.textContent='Sound: '+(muted?'Off':'On');b.classList.toggle('on',!muted);});}
 try{muted=localStorage.getItem('kgeuMuted')==='1';}catch(e){}
-function setMuted(v){muted=!!v;if(muted&&window.speechSynthesis)speechSynthesis.cancel();try{localStorage.setItem('kgeuMuted',muted?'1':'0');}catch(e){}soundUI();}
+function setMuted(v){muted=!!v;if(muted)spkCancel(true);try{localStorage.setItem('kgeuMuted',muted?'1':'0');}catch(e){}soundUI();}
 document.querySelectorAll('.oSound').forEach(b=>b.onclick=()=>{initAudio();setMuted(!muted);});
 // ================= haptics =================
 // One small module: hapPattern(name) and hapTick(strength). iOS Safari has no navigator.vibrate.
@@ -17463,10 +17505,14 @@ function gEnd(failWhy,why){if(!G.def||G.end)return;G.holds.slice().forEach(h=>gH
 function gLbl(t){const u=t.unit;return u==='ft'?'ALT':u==='kt'?'SPD':u==='deg'?(t.id==='bank'?'BANK':'HDG'):u==='m'||u==='nm'?'TRK':t.id.slice(0,4).toUpperCase();}
 function gCue(){const H=G.holds.slice(0,3);
   cueEl.innerHTML=H.map(h=>'<div class="cue"><b>'+gLbl(h.task)+'</b><i><u></u></i><span></span></div>').join('');
-  H.forEach((h,k)=>{h.row=cueEl.children[k];h.band='';h.hw=Math.max(10,(h.row.children[1].clientWidth||90)/2-3);
+  H.forEach((h,k)=>{h.row=cueEl.children[k];h.band='';h.hw=Math.max(10,(CUE_W||90)/2-3);   // stepstall: the bar's width from hudFit's pass (cueGeo), not a forced layout here
     if(h.lo!==h.hi){const a=(50-50*h.lo/(3*h.hi)).toFixed(2),b=(50+50/3).toFixed(2);   // the band off centre: -lo to +hi on the same 3x scale
       h.row.children[1].style.background='linear-gradient(90deg,rgba(255,255,255,.13) '+a+'%,rgba(255,255,255,.36) '+a+'% '+b+'%,rgba(255,255,255,.13) '+b+'%)';}});G.holds.slice(3).forEach(h=>h.row=null);
   cueEl.classList.toggle('on',H.length>0);lesEl.classList.toggle('cueOn',H.length>0);if(H.length)gCueTick();}
+let CUE_W=0;
+// hudFit's layout pass: the cue bar's real width (90, 60 or 36 px by the layout); a change re-scales the pips
+function cueGeo(){const h=G.holds.find(x=>x.row);if(!h)return;const w=h.row.children[1].clientWidth;if(!w||w===CUE_W)return;CUE_W=w;
+  for(const x of G.holds)if(x.row)x.hw=Math.max(10,w/2-3);}
 function gCueTick(){for(const h of G.holds){const r=h.row;if(!r)continue;const d=h.dev,a=Math.abs(d),b=gBand(h,d);
   if(b!==h.band){if(h.band)r.classList.remove(h.band);r.classList.add(b);h.band=b;}   // classes only when the band changes
   r.children[1].firstChild.style.transform='translateX('+(clamp(d/(3*h.tol),-1,1)*h.hw).toFixed(1)+'px)';   // the bar spans 3 tolerances each side
@@ -17571,6 +17617,51 @@ const altMSL=()=>(st.pos.y-GEAR)*M2FT+FIELD_FT,aglFt=()=>st.agl*M2FT,kts=()=>st.
 const angD=(a,b)=>Math.abs((((a-b)%360)+540)%360-180);
 const dev=f=>(f>=0?'+':'')+Math.round(f)+' ft',h3=h=>String(Math.round(h)%360||360).padStart(3,'0');
 function lesShow(i,m){if(lesI.textContent!==i)lesI.textContent=i;lesM.textContent=m;}
+// ---- stepstall item 2: a step change, smooth ----
+// The card's old step slides out to the left as a ghost (14 px, 120 ms) and the new one slides in from the right after it
+// (14 px, 220 ms from 100 ms; sideways, so the ghost never crosses the title row above it),
+// transforms and opacity only, so the compositor runs them and nothing is laid out again. The ghost's place and font come
+// from hudFit's own layout pass (stepGeo, every 8th frame, before it writes anything), never read at the step. One
+// ghost element per slot, made once. The chime: the leaderboard's chime notes and timbre (two notes, quieter), rendered
+// into a buffer once when the lesson or tasking starts (stepPrep); a step plays it through one buffer source.
+const STEPX={buf:null,g:null,last:0,ins:'',rm:null,hold:false,
+  les:{key:'',html:'',geo:null,ghost:null,el:null},miss:{key:'',html:'',geo:null,ghost:null,el:null}};
+function stepPrep(){STEPX.les.key='';STEPX.ins='';STEPX.miss.key='';stepBuf();}
+function stepBuf(){
+  if(STEPX.rm===null){try{STEPX.rm=matchMedia('(prefers-reduced-motion: reduce)');}catch(e){STEPX.rm=false;}}
+  if(STEPX.buf||!actx)return;
+  try{const sr=actx.sampleRate,n=Math.round(sr*0.62),b=actx.createBuffer(1,n,sr),d=b.getChannelData(0),k=Math.log(120)/0.48;
+    for(const [f,t0] of [[659.25,0],[783.99,0.11]]){const i0=Math.round(t0*sr);
+      for(let i=i0;i<n;i++){const t=(i-i0)/sr,e=t<0.02?t/0.02:Math.exp(-(t-0.02)*k),ph=(f*t)%1;d[i]+=0.12*e*(4*Math.abs(ph-0.5)-1);}}
+    const g=actx.createGain();g.gain.value=0.55;g.connect(actx.destination);STEPX.buf=b;STEPX.g=g;}catch(e){}}
+function stepChime(){if(!actx||muted||!STEPX.buf)return;const n=performance.now();if(n-STEPX.last<900)return;STEPX.last=n;
+  try{const s=actx.createBufferSource();s.buffer=STEPX.buf;s.connect(STEPX.g);s.start(actx.currentTime+0.01);}catch(e){}}
+const stepEsc=x=>String(x).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+// hudFit's pass (layout already done this frame): where the slot's element is and how its text looks
+function stepGeo(S,el){if(!el)return;const p=el.offsetParent;if(!p){S.geo=null;return;}
+  const cs=getComputedStyle(el);S.geo={el:el,p:p,x:el.offsetLeft,y:el.offsetTop,w:el.offsetWidth,h:el.offsetHeight,font:cs.font,color:cs.color,lh:cs.lineHeight};}
+// the swap: el already holds the new content; html is what it showed before
+function stepSlide(S,el,html){
+  const rm=STEPX.rm&&STEPX.rm.matches,G=S.geo;
+  try{if(S.anim)S.anim.cancel();S.el=el;   // a swap before the last one ended: the new one starts from the top
+    S.anim=el.animate(rm?[{opacity:0},{opacity:1}]:[{transform:'translateX(14px)',opacity:0},{transform:'translateX(0)',opacity:1}],
+      {duration:rm?160:220,delay:rm?0:100,easing:'cubic-bezier(.2,.8,.2,1)',fill:'backwards'});
+    if(!html||!G||G.el!==el||!G.p.isConnected)return;
+    let g=S.ghost;if(!g){g=S.ghost=document.createElement('div');g.className='stepGhost';g.setAttribute('aria-hidden','true');}
+    if(g.getAnimations)g.getAnimations().forEach(a=>a.cancel());
+    g.innerHTML=html;const q=g.style;q.left=G.x+'px';q.top=G.y+'px';q.width=G.w+'px';q.maxHeight=G.h+'px';q.font=G.font;q.color=G.color;q.lineHeight=G.lh;
+    if(g.parentNode!==G.p)G.p.appendChild(g);
+    const a=g.animate(rm?[{opacity:1},{opacity:0}]:[{transform:'translateX(0)',opacity:1},{transform:'translateX(-14px)',opacity:0}],{duration:120,easing:'ease-in',fill:'forwards'});
+    a.onfinish=()=>{if(g.parentNode)g.parentNode.removeChild(g);a.cancel();};}catch(e){}}
+// every frame of a lesson (tick, after apprTick): the card's visible content (the call on the air in the compact strip,
+// else the instruction) and the instruction itself (the step: the chime, even while a call covers it)
+function stepCard(){
+  if(!LES.on||!lesEl.classList.contains('on'))return;
+  const ins=lesI.textContent;if(ins!==STEPX.ins){const was=STEPX.ins;STEPX.ins=ins;if(was&&ins&&running&&!paused)stepChime();}
+  const lc=lesEl.classList.contains('lc'),call=lc&&lesEl.classList.contains('call'),cap=$('lesCap');
+  const key=(call?'c':'i')+(call?cap.textContent:ins),S=STEPX.les;if(key===S.key)return;
+  const old=S.key?S.html:'';S.key=key;S.html=call?cap.innerHTML:'<b>'+stepEsc(ins)+'</b>';STEPX.hold=true;
+  if(old&&running&&!paused)stepSlide(S,lc?$('lesRow'):lesI,old);}
 function airStart(u,v,altFt,hdg,kt,flap,thr){
   const y=(altFt-FIELD_FT)/M2FT+GEAR,h=hdg*Math.PI/180,V=kt/MS2KT/Math.sqrt(1.097*Math.exp(-y/9200)/1.225);
   st.pos.set(wX(u,v),y,wZ(u,v));st.vel.set(Math.sin(h)*V,0,-Math.cos(h)*V);st.quat.setFromEuler(new THREE.Euler(0.03,-h,0,'YXZ'));st.w.set(0,0,0);
@@ -17916,6 +18007,7 @@ function startLesson(id,force,o){   // o.brief false: a restart (pause Restart, 
   const L=lessonDef(id);if(L&&L.oral){if(!force&&!lessonOpen(id)){lockSay(id);return;}gradeOv.classList.remove('on');if(!menu.classList.contains('on')||curScr!=='sSchool')openMenu('sSchool');oralStart(id);return;}   // the oral exam: no flight, its sheet on the school screen
   if(!L||!L.fly)return;   // a lesson still to come has no flight yet
   if(!force&&!lessonOpen(id)){lockSay(id);return;}   // locked by the placement (force: a retry, a restart, the tests)
+  spkWarm();stepPrep();   // stepstall: the voices and the step change's chime and card ready before the flight
   if(!REGION.az){pickRegion('az',{resume:{lesson:id,tod:TOD.id,wx:wxOf('les:'+id)}});return;}   // flight school is at Glendale
   if(id==='first')pickType('cessna',1);else if(acType!==schoolAc)pickType(schoolAc,1);
   const S=SCH[acType];gradeOv.classList.remove('on');
@@ -18444,12 +18536,15 @@ function grDraw(g){g.C.forEach(c=>lesPylon(c.x,c.z));
   const r=lesAdd(new THREE.Mesh(rg,new THREE.MeshBasicMaterial({color:SAND,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2})));r.position.set(g.px,groundHeight(g.px,g.pz)+0.1,g.pz);}
 // the aiming point: a sand bar across runway 1 on the 1,000 ft markers
 const AIM=305;
+// stepstall: one material for every aiming bar, its program linked by the precompile queue ('lesson marks'): the
+// checkride's switch into its circuits (rideRun's start(), in flight) used to link it on its first frame
+const AIM_MAT=new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4});
 function lesAim(){const u0=THR01+AIM,W=HM.wid/2,e=0.35,pos=[],col=[],cS=new THREE.Color(SAND),cR=new THREE.Color(RUST);
   const q=(a0,a1,v0,v1,c)=>{for(const [a,v] of [[a0,v0],[a1,v0],[a1,v1],[a0,v0],[a1,v1],[a0,v1]]){pos.push(wX(u0+a,v),0,wZ(u0+a,v));col.push(c.r,c.g,c.b);}};
   q(-4+e,4-e,-W+e,W-e,cS);q(-4,4,-W,-W+e,cR);q(-4,4,W-e,W,cR);q(-4,-4+e,-W+e,W-e,cR);q(4-e,4,-W+e,W-e,cR);   // the sand bar, 8 m deep, its rust edge
   q(6,14,-W,W,cR);   // the rust bar 2 m beyond it: a stripe pair from the air
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
-  const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4}));
+  const m=new THREE.Mesh(g,AIM_MAT);
   m.name='aim';m.position.y=groundHeight(wX(u0,0),wZ(u0,0))+0.15;m.renderOrder=1;return lesAdd(m);}
 // circuits: d.K the kind of each (tg touch and go, ga Dana calls a go around on short final, stop a full stop), d.c the
 // circuit, d.s the step (0 takeoff and climb, 1 crosswind, 2 downwind, 3 base and final, 4 on the runway). The tower clears
@@ -20704,6 +20799,10 @@ function preJobs(){
       for(const m of [PFX_FIN,PFX_CMP]){const f=m.uniforms;if(f.tDiffuse)f.tDiffuse.value=null;f.tColor.value=null;f.tBloom.value=PFX_BLACK;f.uStr.value=0;}});}],
     ['explosion',()=>preAt(()=>fxWarmLayer(A))],
     ['weather',()=>preAt(()=>wxWarm(A))],   // weather item 3: the rain and dust streaks, the wet runway, the reflections
+    // stepstall: the landings lesson's aiming bar (vertex colours, both sides), the one lesson mark no other draw links
+    ['lesson marks',()=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute([0,0,0,8,0,0,0,0,8],3));
+      g.setAttribute('color',new THREE.Float32BufferAttribute([1,1,1,1,1,1,1,1,1],3));const m=new THREE.Mesh(g,AIM_MAT);m.renderOrder=1;m.position.set(0,-400,0);
+      scene.add(m);try{warmObj(m,true);}finally{scene.remove(m);g.dispose();}}],
     ['dz smoke',()=>{const sp=DZ.smoke[0];if(!sp)return;const v=sp.visible,o=sp.material.opacity;sp.visible=true;sp.material.opacity=0.5;
       try{warmObj(sp,true);}finally{sp.visible=v;sp.material.opacity=o;}}],
     // the IR pass, its tagging undone after (irTag puts the points on layer 1 only; the white instance colours of the
@@ -23056,6 +23155,7 @@ stallUI();
 // takes the GPU and the driver's shader work, which the CPU time cannot see). console.time on the very first menu frame
 // and on each first flight frame.
 BOOT.ft={boot:[],fly:[],run0:null,prev:null};
+let FRAME_IN=false;   // stepstall: true while the frame's tick runs (tests/stepprobe.py tells in-frame work from after-frame work by it)
 function frame(t){
   requestAnimationFrame(frame);
   stallProbe(t);   // before fpsFrame: it reads the gap from FPS.prev
@@ -23064,7 +23164,7 @@ function frame(t){
   if(!loopHeld){const fl=running&&!paused&&F.run0!==RUN.t0,lb=!F.boot.length?'pfs first menu frame':fl?'pfs first flight frame':null;
     if(fl){F.run0=RUN.t0;F.fly=[];}
     if(!F.boot.length)BOOT.t.frame1=Math.round(performance.now());
-    if(lb)console.time(lb);const a=performance.now();if(STALL.spin){const e=a+STALL.spin;STALL.spin=0;while(performance.now()<e);}tick(t);const ms=+(performance.now()-a).toFixed(1);if(lb)console.timeEnd(lb);STALL.tickMs=ms;
+    if(lb)console.time(lb);const a=performance.now();if(STALL.spin){const e=a+STALL.spin;STALL.spin=0;while(performance.now()<e);}FRAME_IN=true;tick(t);FRAME_IN=false;const ms=+(performance.now()-a).toFixed(1);if(lb)console.timeEnd(lb);STALL.tickMs=ms;
     const e=[ms,null,t];if(F.boot.length<12){F.boot.push(e);F.prev=e;}if(running&&!paused&&F.fly.length<600){F.fly.push(e);F.prev=e;}}
 }
 function tick(t,skipRender){
@@ -23093,7 +23193,7 @@ function tick(t,skipRender){
       missTouchdown(ev);onLanding(ev);arcTouchdown(ev);
       camBump=clamp(f/620,0.12,1);
       runLog('touchdown',{fpm:f,paved:!!ev.paved});
-      if(ev.paved&&(best===null||f<best)){best=f;try{localStorage.setItem(bestKey(),String(f));}catch(e){}showBest();}
+      if(ev.paved&&(best===null||f<best)){best=f;lsLater(bestKey(),String(f));showBest();}
       atcTouchdown(ev);clusters.forEach(c=>{if(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)<1800){c.cheer=4.5;}});}
     // flap and gear changes announce themselves through the big readout, not a toast
     if(ev.type==='ap'&&ev.done)sideCfg('AUTOLAND COMPLETE','your airplane','ap');
@@ -23101,7 +23201,7 @@ function tick(t,skipRender){
     if(ev.type==='liftoff') clusters.forEach(c=>{if(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)<1500){c.cheer=4;}});
   }
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.classList.remove('on');}
-  missUpdate(dt);dzUpdate(dt);taskUpdate(dt);if(running&&!paused)arcTick();apprTick();if(running&&(++HF.n&7)===0)hudFit();dfTick(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);if(LB)LB.frame();
+  missUpdate(dt);dzUpdate(dt);taskUpdate(dt);if(running&&!paused)arcTick();apprTick();stepCard();if(running){if((++HF.n&7)===0||HF.want>1){if(STEPX.hold){HF.n--;HF.want=2;}else{hudFit();HF.want=0;}}else if(HF.want)HF.want=2;}STEPX.hold=false;/* stepstall: no layout pass in a step's frame (the next frame runs it); a new caption's on the next frame */dfTick(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);if(LB)LB.frame();
   {const show=(!rookie()||LES.on==='hood')&&camMode===1&&(AC.id==='cessna'||AC.id==='alpha'||AC.id==='archer')&&running&&!st.crashed;
    if(spCan){spCan.classList.toggle('on',show);if(show)drawSixPack();}}
   radioUpdate(dt);cfgUpdate(dt);resTick(dt);
@@ -23234,7 +23334,7 @@ function tick(t,skipRender){
 // it switched off, so nothing is fetched and no request can fail in their console.
 var LB=null;
 LB=(function(){
-const APP_VER='2026-10-17-crashfx';          // keep version.json in step when shipping
+const APP_VER='2026-10-17-stepstall';          // keep version.json in step when shipping
   const ORIGINS=['https://rabahharchaoui-design.github.io','http://localhost:8765'];
   let over='';try{over=localStorage.getItem('kgeuLBUrl')||'';}catch(e){}
   const E={url:over||'https://pfs-scores.rabahharchaoui.workers.dev',enabled:!!over||ORIGINS.includes(location.origin),online:null,
@@ -23859,7 +23959,7 @@ const APP_VER='2026-10-17-crashfx';          // keep version.json in step when s
     get P(){return E.P;}};
 })();
 
-window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.holdF=n|0;},pfx:()=>{const L=PFX.last||{};return {w:L.w,h:L.h,sw:L.sw,sh:L.sh,bloomed:!!L.bloomed,smaa:!!L.smaa,sharp:L.sharp||0,samples:L.samples||0,layer:!!L.layer,box:L.box||null,split:!!L.split,full:L.full||null,webgl2:renderer.capabilities.isWebGL2,msaaRT:!!(PFX.rt&&PFX.rt.isWebGLMultisampleRenderTarget),allocN:PFX.allocN,scale:GFX.scale,rs:L.rs!=null?L.rs:GFX.rs,post:GFX.post,sens:GFX.sens};},setScale:s=>GFX.setScale(+s),sharpOff:v=>{PFX_SHARP.off=!!v;},msaaOff:v=>{PFX.msOff=!!v;},csmNBT:a=>{if(a)CSM.NBT=a.slice();if(CSM.n)csmRadii();return CSM.NBT.slice();},layerOff:v=>{PFX.layerOff=!!v;},splitOff:v=>{PFX.layerOff=!!v;},gfxBusy:()=>({applying:gfxApplying(),resumeWait:GFX.resumeWait,preDone:PRE.done,warmDone:WARM.done,busy:GFX.busy}),stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>({id:p.id,name:p.name,cacheKey:p.cacheKey,usedTimes:p.usedTimes})),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
+window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.holdF=n|0;},pfx:()=>{const L=PFX.last||{};return {w:L.w,h:L.h,sw:L.sw,sh:L.sh,bloomed:!!L.bloomed,smaa:!!L.smaa,sharp:L.sharp||0,samples:L.samples||0,layer:!!L.layer,box:L.box||null,split:!!L.split,full:L.full||null,webgl2:renderer.capabilities.isWebGL2,msaaRT:!!(PFX.rt&&PFX.rt.isWebGLMultisampleRenderTarget),allocN:PFX.allocN,scale:GFX.scale,rs:L.rs!=null?L.rs:GFX.rs,post:GFX.post,sens:GFX.sens};},setScale:s=>GFX.setScale(+s),sharpOff:v=>{PFX_SHARP.off=!!v;},msaaOff:v=>{PFX.msOff=!!v;},csmNBT:a=>{if(a)CSM.NBT=a.slice();if(CSM.n)csmRadii();return CSM.NBT.slice();},layerOff:v=>{PFX.layerOff=!!v;},splitOff:v=>{PFX.layerOff=!!v;},gfxBusy:()=>({applying:gfxApplying(),resumeWait:GFX.resumeWait,preDone:PRE.done,warmDone:WARM.done,busy:GFX.busy}),stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>({id:p.id,name:p.name,cacheKey:p.cacheKey,usedTimes:p.usedTimes})),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),tqStage:i=>tqStageGo(i),inFrame:()=>FRAME_IN,stepx:()=>({spk:{runs:SPK.runs,ms:+SPK.ms.toFixed(1),worst:+SPK.worst.toFixed(1),pend:!!SPK.job,warm:SPK.warm},ls:{n:LSQ.n,pend:LSQ.m.size},chime:!!STEPX.buf,last:STEPX.last,ghost:!!(STEPX.les.ghost&&STEPX.les.ghost.parentNode),geo:STEPX.les.geo&&{el:STEPX.les.geo.el.id,p:STEPX.les.geo.p.id,x:STEPX.les.geo.x,y:STEPX.les.geo.y,w:STEPX.les.geo.w,h:STEPX.les.geo.h},key:STEPX.les.key.slice(0,40)}),lsFlush:lsFlush,taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
   task:()=>({on:TASK.on,id:TASK.id,stage:TASK.stage&&TASK.stage.id,si:TASK.si,brief:TASK.brief,done:TASK.done,res:TASK.res,ask:TASK.ask&&{shown:TASK.ask.shown,opts:TASK.ask.opts.map(o=>o.k),t:TASK.ask.t},d:TASK.d,log:TASK.log.slice(),seed:TASK.seed}),
   tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzBuild:()=>dzBuild(),dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
