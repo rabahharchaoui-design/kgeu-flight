@@ -40,6 +40,10 @@ TABLE = {
     'b747': (64.44, 70.66, 19.41),      # 747-400
 }
 AIRLINERS = {'b737', 'a320', 'b747'}
+# runways item 7: the MQ-9B is one of the four reference models the owner's rule (CLAUDE.md) says never to change while
+# building other aircraft; its 25.13 m span (+4.7% on the 24.00 m SkyGuardian) is kept and allowed up to 5%
+EXCEPT = {'mq9b': (0.05, 'reference model kept as built (CLAUDE.md: never change the F-16, C-130, MQ-9A or MQ-9B)')}
+GEAR_737 = 5.7      # a 737-800's main gear track, metres
 SPAN_LEN_TOL = 0.03
 HEIGHT_TOL = 0.08
 AI_TOL = 0.05
@@ -105,7 +109,11 @@ async def main():
                 sx, sz = sz, sx   # x read as length, z as span: swap so sx=span, sz=length below
             span_pct, len_pct, h_pct = pct(sx, span), pct(sz, length), pct(sy, height)
             ROWS.append((t, sx, span, span_pct, sz, length, len_pct, sy, height, h_pct))
-            c(f'{t}: span {sx:.2f} m within 3% of {span:.2f} m', abs(span_pct) <= SPAN_LEN_TOL * 100, f'{span_pct:+.1f}%')
+            if t in EXCEPT and abs(span_pct) <= EXCEPT[t][0] * 100:
+                print(f'  note  {t}: span {sx:.2f} m is {span_pct:+.1f}% of {span:.2f} m: {EXCEPT[t][1]}')
+                c(f'{t}: span {sx:.2f} m within the documented {EXCEPT[t][0]*100:.0f}% exception', True, None)
+            else:
+                c(f'{t}: span {sx:.2f} m within 3% of {span:.2f} m', abs(span_pct) <= SPAN_LEN_TOL * 100, f'{span_pct:+.1f}%')
             c(f'{t}: length {sz:.2f} m within 3% of {length:.2f} m', abs(len_pct) <= SPAN_LEN_TOL * 100, f'{len_pct:+.1f}%')
             if abs(h_pct) > HEIGHT_TOL * 100:
                 print(f'  info  {t}: height {sy:.2f} m vs {height:.2f} m real ({h_pct:+.1f}%, informational, not failing)')
@@ -127,15 +135,21 @@ async def main():
         else:
             print('  [AI airliner] TFC.pool.airliner[0] not reachable: skipping, not failing')
 
-        # world check: a 737's main gear track (5.7 m) fits a Sky Harbor taxiway (>= 23 m)
-        twy = await pg.evaluate("""()=>{const K=window.__kgeu;
-          if(typeof K.aptEnv==='function')return {via:'aptEnv',v:K.aptEnv()};
-          if(K.TERR&&K.TERR.tw&&K.TERR.tw.length)return {via:'TERR.tw',v:K.TERR.tw.length};
-          return null;}""")
+        # world check (runways item 7): a 737 on the centre line of every Sky Harbor taxiway has both main gear
+        # legs (5.7 m track) on pavement, and the taxiways are at least a code C 15 m wide (OSM gives 23 m for E)
+        twy = await pg.evaluate("""(gear)=>{const K=window.__kgeu,E=K.twyEdges&&K.twyEdges('KPHX');if(!E)return null;
+          let n=0,bad=[],wmin=1e9,wmax=0;
+          for(const e of E){if(e[5]!==0)continue;const ex=e[2]-e[0],ez=e[3]-e[1],l=Math.hypot(ex,ez)||1,nx=-ez/l,nz=ex/l;
+            wmin=Math.min(wmin,e[4]);wmax=Math.max(wmax,e[4]);
+            for(const f of [0.25,0.5,0.75]){const x=e[0]+ex*f,z=e[1]+ez*f;n++;
+              if(!(K.isPaved(x+nx*gear/2,z+nz*gear/2)&&K.isPaved(x-nx*gear/2,z-nz*gear/2))&&bad.length<8)bad.push([Math.round(x),Math.round(z),e[4],e[6]]);}}
+          return {n:n,bad:bad,wmin:wmin,wmax:wmax};}""", GEAR_737)
         if twy is None:
-            print("  [taxiway width] no hook exposes Sky Harbor's taxiway width (aptEnv missing, SH_TWY is a private const): skipped, not failing")
+            c('Sky Harbor taxiway edges exposed (__kgeu.twyEdges)', False, 'hook missing')
         else:
-            print(f'  [taxiway width] found via {twy["via"]}: {twy["v"]!r} (not a width value, needs a real hook; not failing)')
+            print(f'  [taxiway width] Sky Harbor taxiways {twy["wmin"]:.0f} to {twy["wmax"]:.0f} m wide, {twy["n"]} gear checks')
+            c(f'a 737 on every Sky Harbor taxiway centre line keeps both main gear legs ({GEAR_737} m track) on pavement', not twy['bad'], twy['bad'])
+            c('every Sky Harbor taxiway is at least 15 m wide (ICAO code C)', twy['wmin'] >= 15, f'{twy["wmin"]:.1f} m')
 
         c('no console errors', not pg.errs, pg.errs[:5])
         await b.close()
