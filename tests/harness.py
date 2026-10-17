@@ -1,6 +1,6 @@
 # Shared Playwright setup for the UX checks: iPhone landscape, served over http so
 # the radio clips load, three.js from node_modules, fonts blocked.
-import os, threading, functools, http.server, socketserver
+import os, sys, threading, functools, http.server, socketserver
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 THREE = open(os.path.join(ROOT, 'node_modules/three/build/three.min.js')).read()
@@ -44,6 +44,14 @@ async def page(b, url, vp=IPHONE_SE, storage=None, touch=True, pre=None):
     if os.environ.get('PFS_SWITCH'):   # stand in iOS's <input switch>: the haptic labels go over every control (phone3 item 6)
         await ctx.add_init_script("Object.defineProperty(Navigator.prototype,'vibrate',{configurable:true,value:undefined});"
             "Object.defineProperty(HTMLInputElement.prototype,'switch',{configurable:true,get(){return this.hasAttribute('switch');},set(v){}});")
+    if os.environ.get('PFS_STEPPROBE'):   # stepstall item 1: record what each step change costs (tests/stepprobe.py)
+        from stepprobe import PROBE
+        await ctx.add_init_script(PROBE)
+        out, who = os.environ['PFS_STEPPROBE'], os.path.basename(sys.argv[0]).replace('.py', '')
+        def rec(m, out=out, who=who):
+            if m.text.startswith('[stepprobe] '):
+                with open(out, 'a') as f: f.write(who + ' ' + m.text[12:] + '\n')
+        pg.on('console', rec)
     if pre is not None: await pre(ctx)
     await pg.goto(url)
     await pg.wait_for_function('()=>window.__kgeu', timeout=30000)
