@@ -12657,26 +12657,16 @@ function achGrant(id){
 // Returns distance along from that runway's aim point, offset from its centreline,
 // and its name. The aim point is 1,000 ft in from the threshold on every runway.
 function runwayFix(x,z){
-  // a world region: the nearest runway it is on (60 m either side), and the end being landed on, from the motion
-  if(!REGION.az){let best=null;
-    for(const r of RUNWAYS){const e=r.ends[0],dx=x-r.x,dz=z-r.z,a=dx*e.dx+dz*e.dz,b=dz*e.dx-dx*e.dz;
-      if(Math.abs(a)<r.len/2+60&&Math.abs(b)<60&&(!best||Math.abs(b)<Math.abs(best[2])))best=[r,a,b];}
-    if(!best)return null;const r=best[0],fw=st.vel.x*r.ends[0].dx+st.vel.z*r.ends[0].dz>=0,e=fw?r.ends[0]:r.ends[1],a=fw?best[1]:-best[1],lat=fw?best[2]:-best[2];
-    return {name:REGION.short+' runway '+e.num,num:e.num,along:a-(-r.len/2+e.thr+300),off:Math.abs(lat),lat:lat,ax:[e.dx,e.dz],hdg:e.h*180/Math.PI};}
-  const u=toU(x,z),v=toV(x,z);
-  if(u>-60&&u<RWY_LEN+60&&Math.abs(v)<60)
-    return {name:'Glendale runway 1',along:u-(THR01+300),off:Math.abs(v),lat:v,ax:[DX,-Math.cos(RH)],hdg:26};
-  const K=lukeUV(x,z);
-  for(const r of LUKE_RWY){
-    if(Math.abs(K[0])<r.len/2+60&&Math.abs(K[1]-r.v)<60){
-      const thr=-r.len/2;
-      return {name:'Luke runway '+r.lo,along:K[0]-(thr+300),off:Math.abs(K[1]-r.v),lat:K[1]-r.v,ax:[Math.sin(LUKE.h),-Math.cos(LUKE.h)],hdg:42.6};
-    }
-  }
-  const Z=lzUV(x,z);
-  if(Math.abs(Z[0])<LZ.len/2+60&&Math.abs(Z[1])<40)
-    return {name:'the assault strip',along:Z[0]-(-LZ.len/2+91),off:Math.abs(Z[1]),lat:Z[1],ax:[LZs,-LZc],hdg:90};
-  return null;
+  // every region the same way: the nearest runway of RUNWAYS it is on (60 m either side, 40 m on the assault
+  // strip), the end being landed on from the motion (the first end when all but stopped), along from that end's aim point (the strip's at 91 m)
+  let best=null;
+  for(const r of RUNWAYS){const e=r.ends[0],dx=x-r.x,dz=z-r.z,a=dx*e.dx+dz*e.dz,b=dz*e.dx-dx*e.dz,lz=r.code==='LZ';
+    if(Math.abs(a)<r.len/2+60&&Math.abs(b)<(lz?40:60)&&(!best||Math.abs(b)<Math.abs(best[2])))best=[r,a,b];}
+  if(!best)return null;
+  const r=best[0],fw=st.vel.x*r.ends[0].dx+st.vel.z*r.ends[0].dz>-1,e=fw?r.ends[0]:r.ends[1],a=fw?best[1]:-best[1],lat=fw?best[2]:-best[2];
+  const lz=r.code==='LZ',name=!REGION.az?REGION.short+' runway '+e.num:lz?'the assault strip':
+    r.code==='KLUF'?'Luke runway '+e.num:r.code==='KPHX'?'Sky Harbor runway '+e.num.replace(/^0/,''):r.apt+' runway '+e.num;
+  return {name:name,num:e.num,along:a-(-r.len/2+e.thr+(lz?91:300)),off:Math.abs(lat),lat:lat,ax:[e.dx,e.dz],hdg:e.h*180/Math.PI};
 }
 // crosswind component across the runway in knots
 function xwind(hdg,wdir,wkt){
@@ -24105,6 +24095,13 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
   setWX(w,{random:r,noLight:true,keep:first});
   if(first)try{localStorage.setItem('kgeuWX_'+REGION_ID,WX.id);localStorage.setItem('kgeuWXR_'+REGION_ID,r?'1':'0');}catch(e){}
   setTOD(t);})();
+// runways item 1: every runway end's ground, pavement and runwayFix at its threshold, aim point, centre and far end
+window.__kgeu.isPaved=isPaved;window.__kgeu.runwayFix=runwayFix;
+window.__kgeu.rwyAudit=()=>{const v0=st.vel.clone();try{return RWY_ENDS.map(e=>{const r=e.rwy,aimD=r.code==='LZ'?91:300,
+    ax=e.x+e.dx*aimD,az=e.z+e.dz*aimD,fx=r.x+e.dx*(r.len/2-5),fz=r.z+e.dz*(r.len/2-5),P=[[e.x,e.z],[ax,az],[r.x,r.z],[fx,fz]];
+    st.vel.set(e.dx*60,0,e.dz*60);const f=runwayFix(ax,az);
+    return {apt:r.apt,code:r.code,num:e.num,thr:[e.x,e.z],aim:[ax,az],gh:P.map(p=>groundHeight(p[0],p[1])),paved:P.map(p=>isPaved(p[0],p[1])),fix:f?f.name:null};});}
+  finally{st.vel.copy(v0);}};
 window.__kgeu.dailyRegion=id=>{ARC.dailyRegion=id||null;return dailySpec().region;};window.__kgeu.dailyKind=k=>{ARC.dailyKind=k==='dogfight'||k==='landing'?k:null;return dailySpec().kind;};window.__kgeu.TFC=TFC;window.__kgeu.tfcList=tfcList;window.__kgeu.tfcSpawn=tfcSpawn;window.__kgeu.tfcClear=tfcClear;
 window.__kgeu.TCAS={levels:tcasLevels,state:()=>({ta:TCAS.list.some(o=>tcasLvl(o)>=2),ra:!!TCAS.ra,sense:TCAS.ra?(TCAS.sense>0?'climb':'descend'):null,clear:TCAS.clear,inhibit:TCAS.inhibit,
   shown:TCAS.shown,on:TCAS.on,raT:TCAS.raT}),tcasConflict:tcasConflict,setTcas:setTcas,T:TCAS,tcasVoiceLog:TCAS.voiceLog};
