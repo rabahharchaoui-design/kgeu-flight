@@ -14,6 +14,7 @@ def opt(k, d):
     return args[args.index(k) + 1] if k in args else d
 TODS = opt('--tod', 'day,night').split(',')
 NOFX = '--nofx' in args
+SEQ = '--seq' in args   # the crash camera itself: frames at 0.3, 1, 2 and 3.5 s, no fixed camera
 SECS = float(opt('--secs', '6'))
 ROOT = opt('--root', None)
 # name: type, record selector, approach axis and side, distance back, height fraction, speed m/s, views [(dist out, up, side, look up)]
@@ -54,6 +55,14 @@ async def main():
                 if 'err' in r or not r['imp']:
                     print('  no impact', c, r); continue
                 info[f'{c}_{tod}'] = {'why': r['why'], 'cfx': r['cfx'], 'imp': r['imp']}
+                if SEQ:
+                    tt = 0
+                    for ts in [0.3, 1.0, 2.0, 3.5, 6.0]:
+                        n = max(1, int((ts - tt) * 30)); tt = ts
+                        await pg.evaluate("(n)=>{const K=window.__kgeu;for(let i=0;i<n;i++)K.stepFrame(1/30,false,i<n-1);document.getElementById('bigFlash').style.visibility='hidden';}", n)
+                        await pg.wait_for_timeout(200)
+                        fn = os.path.join(out, f'{c}_{tod}_cam{ts:.1f}.png'); await pg.screenshot(path=fn, timeout=120000); print('  wrote', fn)
+                    continue
                 # let it play out in sim time, rendering now and then so the GPU keeps up
                 n = int(SECS * 30)
                 await pg.evaluate("(n)=>{const K=window.__kgeu;for(let i=0;i<n;i++)K.stepFrame(1/30,false,i%15!==14);}", n)

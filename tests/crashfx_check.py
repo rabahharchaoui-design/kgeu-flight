@@ -114,10 +114,24 @@ async def main():
             await pg.evaluate("()=>{const K=window.__kgeu;K.setTOD('day');for(let i=0;i<30;i++)K.stepFrame(1/30,false,true);}")
             gd = await pg.evaluate("()=>window.__kgeu.sf().glow")
             ok('the ground glows round the fire at night, faintly by day', gn > 0.6 and gd < 0.45 * gn, (gd, gn))
+            # item 4, the crash camera: after a crash into the stadium and into a hangar it ends outside every building, the
+            # impact point and the fire in the frame, the card after it
+            await pg.evaluate(f"()=>{K}.initAudio()")
+            for t, sel, ax, sg, back, spd in [('b747', "r.name==='the stadium'", 'x', -1, 60, 80), ('cessna', "r.name==='a hangar'", 'z', 1, 40, 50)]:
+                await pg.evaluate(FLY, [t, sel, ax, sg, back, 0.5, spd, None])
+                cam = await pg.evaluate("""()=>{const K=window.__kgeu,R=K.R3(),c=R.camera,out=[];
+                  for(const ts of [0.5,1.5,3.5]){while(K.crashFx().t<ts)K.stepFrame(1/30);const I=K.strImp(),p=new THREE.Vector3(...I.p).project(c),cp=c.position;
+                    const inside=K.STR.list.some(r=>Math.hypot(r.x-cp.x,r.z-cp.z)<r.hx+r.hz+5&&K.strInside(r,cp.x,cp.y,cp.z));
+                    out.push({t:ts,inView:Math.abs(p.x)<0.9&&Math.abs(p.y)<0.9&&p.z<1,inside:inside,d:cp.distanceTo(new THREE.Vector3(...I.p))});}
+                  return {seq:out,card:K.crashFx().card,audio:!!(K.cfxAudio&&K.cfxAudio())};}""")
+                ok(f'{t}: the crash camera stays outside the buildings and keeps the impact in the frame', all(x['inView'] and not x['inside'] for x in cam['seq']),
+                   [(x['t'], x['inView'], x['inside'], round(x['d'])) for x in cam['seq']])
+                ok(f'{t}: it pulls back from the hole to show the whole fire', cam['seq'][2]['d'] > cam['seq'][0]['d'] * 1.4, [round(x['d']) for x in cam['seq']])
+                ok(f'{t}: the impact, the groans and the fire crackle play (audio context up)', cam['audio'] or not (await pg.evaluate(f"()=>!!{K}.actx()")), cam['audio'])
             # a new flight puts every structure back
             z = await pg.evaluate("()=>{const K=window.__kgeu;K.pick('cessna');K.pickBase('kgeu');K.start('runway');for(let i=0;i<3;i++)K.stepFrame(1/30,false,true);const S=K.R3().scene;"
-                                  "return {on:K.CFXB.on,adds:K.CFXB.adds.length,hidden:K.STR.list.filter(r=>r.meshes&&r.meshes.some(m=>!m.visible)).length,slab:S.getObjectByName('cfx_slab').visible};}")
-            ok('a new flight: every structure whole again, no chunks', not z['on'] and z['adds'] == 0 and z['hidden'] == 0 and not z['slab'], z)
+                                  "return {on:K.CFXB.on,adds:K.CFXB.adds.length,hidden:K.STR.list.filter(r=>r.meshes&&r.meshes.some(m=>!m.visible)).length,slab:S.getObjectByName('cfx_slab').visible,fire:K.sf().on,audio:K.cfxAudio()};}")
+            ok('a new flight: every structure whole again, no chunks, the fire and its sound gone', not z['on'] and z['adds'] == 0 and z['hidden'] == 0 and not z['slab'] and not z['fire'] and not z['audio'], z)
             # a house: into its roof from above (a descent at 20 degrees)
             r = await pg.evaluate("""()=>{const K=window.__kgeu;K.pick('cessna');K.pickBase('kgeu');K.start('runway');for(let i=0;i<3;i++)K.stepFrame(1/30,false,true);
               const r=K.STR.list.find(r=>r.name==='a house'&&Math.hypot(r.x-3000,r.z+3000)<20000);const st=K.state(),d=new THREE.Vector3(1,-0.7,0).normalize();
