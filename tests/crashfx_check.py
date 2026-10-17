@@ -16,8 +16,15 @@ FLY = """([type,sel,ax,sg,back,frac,spd,yabs])=>{const K=window.__kgeu;K.pick(ty
   for(let i=0;i<3;i++)K.stepFrame(1/30,false,true);
   const S=K.STR.list,r=typeof sel==='number'?S[sel]:S.find(new Function('r','return '+sel));if(!r)return {err:'no record '+sel};
   const st=K.state();let lx=0,lz=0;if(ax==='x')lx=sg*(r.hx+back);else lz=sg*(r.hz+back);
-  const x=r.x+lx*r.c+lz*r.s,z=r.z-lx*r.s+lz*r.c,y=yabs!=null?yabs:r.y0+frac*(r.y1-r.y0)+2;
-  const d=new THREE.Vector3(r.x-x,0,r.z-z).normalize();
+  let x=r.x+lx*r.c+lz*r.s,z=r.z-lx*r.s+lz*r.c;const y=yabs!=null?yabs:r.y0+frac*(r.y1-r.y0)+2;
+  let d=new THREE.Vector3(r.x-x,0,r.z-z).normalize();
+  // runways item 5: a building outline (r.P: the OSM terminals and hangars, often concave, so the middle of their box can be
+  // open apron): at the middle of its longest wall that faces the side the box approach comes from, back metres out
+  if(r.P){const P=r.P,pip=(qx,qz)=>{let c=false;for(let i=0,j=P.length-1;i<P.length;j=i++){const a=P[i],b=P[j];if((a[1]>qz)!==(b[1]>qz)&&qx<(b[0]-a[0])*(qz-a[1])/(b[1]-a[1])+a[0])c=!c;}return c;};
+    let best=null;for(let i=0,j=P.length-1;i<P.length;j=i++){const ex=P[i][0]-P[j][0],ez=P[i][1]-P[j][1],l=Math.hypot(ex,ez);if(l<6)continue;
+      const mx=(P[i][0]+P[j][0])/2,mz=(P[i][1]+P[j][1])/2;let nx=ez/l,nz=-ex/l;if(pip(mx+nx,mz+nz)){nx=-nx;nz=-nz;}
+      if((ax==='x'?nx:nz)*sg<0.7)continue;if(!best||l>best.l)best={l:l,mx:mx,mz:mz,nx:nx,nz:nz};}
+    if(best){x=best.mx+best.nx*back;z=best.mz+best.nz*back;d=new THREE.Vector3(-best.nx,0,-best.nz);}}
   st.pos.set(x,y,z);st.vel.copy(d).multiplyScalar(spd);st.quat.setFromUnitVectors(new THREE.Vector3(0,0,-1),d);st.onGround=false;st.gearDown=false;st.gearPos=0;st.w.set(0,0,0);
   st.throttle=st.power=0.6;st.airTime=5;
   let n=0;while(!st.crashed&&n<400){K.stepFrame(1/60,false,true);n++;}
