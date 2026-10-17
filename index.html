@@ -631,6 +631,60 @@ body.dfOn #dfSub{ display:flex; }
 @media (max-width:700px) and (orientation:landscape){ .plH input{ width:84px; } #plOv #plBack{ min-width:70px; } #plOv #plGo{ min-width:120px; font-size:18px; padding:0 14px; } }   /* 568: hours, day one, Back and CONTINUE on one line */
 @media (orientation:portrait){ .plOpts{ grid-template-columns:repeat(2,minmax(0,1fr)); } #plOv #plGo{ flex:1 1 60%; } }
 @media (prefers-reduced-motion:reduce){ #plOv.on .sheet{ animation-name:plFade; } #plOv .plO{ transition:none; } }
+/* weather item 2: the WEATHER sheet. The placement intake's glass and entrance (plFade + plIn, 200 ms), out faster (150 ms);
+   eight tiles (4 x 2 landscape, 2 x 5 portrait) and the Random tile, the current one ringed like .pick.sel */
+#wxOv{ z-index:34; }
+#wxOv.on{ animation:plFade 200ms ease-out both; } #wxOv.on .sheet{ animation:plIn 200ms cubic-bezier(.23,1,.32,1) both; }
+#wxOv.out{ animation:plOut 150ms ease-out both; pointer-events:none; }
+#wxOv .sheet{ position:relative; max-width:640px; padding:12px 16px 14px; background:rgba(18,13,9,.95); text-align:left; max-height:calc(var(--vvh) - 16px); overflow-y:auto; overscroll-behavior:contain; }
+#wxOv h3{ margin:0; min-height:44px; display:flex; align-items:center; justify-content:center; font:800 20px/1 var(--font); letter-spacing:.08em; color:var(--sand); }
+#wxOv .wxX{ position:absolute; right:8px; top:8px; width:44px; height:44px; padding:0; margin:0; border:0; border-radius:12px; background:transparent; color:var(--soft); font:700 20px/1 var(--font); }
+.wxGrid{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-top:6px; }
+#wxOv button{ -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:manipulation; }
+#wxOv .wxT{ position:relative; min-width:0; min-height:68px; display:grid; grid-template-columns:auto minmax(0,1fr); grid-template-rows:auto auto; column-gap:8px; row-gap:2px; align-items:center;
+  padding:7px 10px; text-align:left; border-radius:12px; background:rgba(246,193,119,.1); color:var(--sand); border:2px solid rgba(246,193,119,.22); transition:transform 140ms ease-out; }
+#wxOv .wxT i{ grid-row:1 / span 2; font-style:normal; font-size:24px; line-height:1; }
+#wxOv .wxT b{ font-size:15px; font-weight:800; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#wxOv .wxT span{ font-size:11px; font-weight:600; line-height:1.2; color:var(--soft); display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+#wxOv .wxT:active{ transform:scale(.97); }
+#wxOv .wxT.sel{ border-color:var(--caution); box-shadow:inset 0 0 0 2px var(--caution); background:rgba(246,193,119,.16); }
+#wxOv .wxT.off{ opacity:.38; }
+#wxOv .wxT.rnd{ grid-column:1 / -1; min-height:48px; grid-template-columns:auto auto; justify-content:center; }
+#wxOv .wxT.rnd i{ grid-row:auto; font-size:20px; }
+#wxOv .wxT.rnd span{ display:none; }
+@media (hover:hover) and (pointer:fine){ #wxOv .wxT:hover{ border-color:rgba(246,193,119,.5); } }
+@media (max-height:360px){ #wxOv .sheet{ padding:6px 12px 10px; } #wxOv .wxX{ top:4px; right:6px; } #wxOv h3{ font-size:18px; min-height:40px; }
+  .wxGrid{ gap:6px; margin-top:2px; } #wxOv .wxT{ min-height:60px; padding:5px 8px; } #wxOv .wxT.rnd{ min-height:44px; } #wxOv .wxT i{ font-size:22px; } }
+/* 568 wide: three by three (Random the ninth tile), so the longest name has its room */
+@media (max-width:620px) and (orientation:landscape){ .wxGrid{ grid-template-columns:repeat(3,minmax(0,1fr)); } #wxOv .wxT.rnd{ grid-column:auto; grid-template-columns:auto minmax(0,1fr); justify-content:stretch; } #wxOv .wxT.rnd i{ grid-row:1 / span 2; } }
+@media (orientation:portrait){ .wxGrid{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (prefers-reduced-motion:reduce){ #wxOv.on .sheet{ animation-name:plFade; } #wxOv .wxT, .wxPill, .wxRnd{ transition:none; } }
+/* what the dice rolled: a small sand pill clear of the controls (wxToast places it), in with a fade and a 6 px rise */
+#wxToast{ position:fixed; z-index:36; left:50%; top:50%; max-width:calc(100vw - 32px); padding:8px 16px; border-radius:20px; background:var(--sand); color:var(--night);
+  border:2px solid rgba(42,22,8,.25); box-shadow:0 4px 14px rgba(0,0,0,.28); font:800 15px/1.2 var(--font); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none;
+  opacity:0; transform:translate(-50%,calc(-100% + 6px)); transition:opacity 200ms ease-out, transform 200ms cubic-bezier(.23,1,.32,1); }   /* left, top: its bottom centre (wxToast) */
+#wxToast.on{ opacity:1; transform:translate(-50%,-100%); }
+@media (prefers-reduced-motion:reduce){ #wxToast{ transform:translate(-50%,-100%); transition:opacity 200ms ease-out; } }
+/* the pill and the dice (Fly tab and pause sheet): one line, the icon then the name; on Random a tiny tag under the name */
+.frows .chip.wxPill{ display:flex; align-items:center; justify-content:center; gap:5px; padding:0 6px; transition:transform 140ms ease-out; }
+.frows .chip.wxPill b{ font-size:clamp(13px,1.9vw,16px); letter-spacing:-.01em; }
+.wxPill i{ flex:none; font-style:normal; font-size:18px; line-height:1; }
+.wxPill .wxN{ display:flex; flex-direction:column; align-items:flex-start; min-width:0; }
+.frows .chip.wxPill b{ max-width:100%; }
+/* the pills show the short name (Storm, Gusty; the sheet has the full ones), so the airports keep their room */
+.wxPill b .lg{ display:none; }
+.wxPill small{ font-size:8.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; line-height:1; margin-top:1px; opacity:.75; }
+.frows .chip.wxRnd{ flex:none; width:44px; min-width:44px; padding:0; font-size:20px; line-height:1; transition:transform 140ms ease-out; }
+.frows .chip.wxPill:active, .frows .chip.wxRnd:active{ transform:scale(.97); }
+/* 568 to 667 wide. FLY: the time chips the width their names need, the pill its short name (Storm, Gusty), the airports the rest
+   (they scroll). The pause row (the old Haboob chip's 46 px): the pill is the icon alone (RANDOM under it), the dice
+   steps out there (the sheet's Random tile is one tap further) */
+@media (max-width:700px) and (orientation:landscape){
+  #sFly .frow.locRow .grp.g4.cap, #sFly .frow.locRow .grp.wxG{ flex:0 0 auto; }
+  #sFly .frow.locRow .grp.g4.cap .chip{ flex:0 0 auto; min-width:54px; padding:0 6px; }
+  #sFly .frow.locRow .grp.locG{ flex:1 1 0; } #sFly .chip.wxPill{ flex:0 0 auto; width:auto; padding:0 8px; gap:5px; }
+  #pauseOv .frow.locRow .grp.g4 .chip.wxPill{ flex:none; width:44px; padding:0; flex-direction:column; gap:1px; } #pauseOv .wxPill .wxN{ align-items:center; } #pauseOv .wxPill .wxN b{ display:none; }
+  #pauseOv .wxPill small{ font-size:7.5px; letter-spacing:0; } #pauseOv .frow.locRow .chip.wxRnd{ display:none; } }
 /* school2 item 5: the oral exam over the flight school screen. The placement intake's entrance (fade, 8 px rise, no scale),
    the briefing quiz's answers, a question at a time */
 #orOv{ z-index:32; }
@@ -2099,6 +2153,10 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 .frow.locRow{ align-items:flex-end; }
 .grp.locG{ flex:2.2 1 0; min-width:0; }
 .frow.locRow .grp.g4.cap{ flex:1.9 1 0; }
+/* weather item 2: the airports keep the width they had beside the four time chips (2.2 of 4.1 of the row less its gap),
+   the weather group takes what the pill and the dice need, the time chips the rest */
+@media (min-width:701px){ #sFly .frow.locRow .grp.locG{ flex:0 0 calc((100% - 10px) * 2.2 / 4.1); }
+  #sFly .frow.locRow .grp.g4.cap{ flex:1 1 0; } #sFly .frow.locRow .grp.wxG{ flex:0 0 auto; } #sFly .chip.wxPill{ flex:none; width:clamp(100px,13.6vw,124px); } }
 .locs{ position:relative; flex:1; min-width:0; display:flex; gap:12px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; touch-action:pan-x; overscroll-behavior-x:contain; }
 .locs::-webkit-scrollbar{ display:none; }
 /* more cards past an edge: that edge fades out (locFade) */
@@ -2119,6 +2177,7 @@ body.mapOn #dzHint, body.mapOn #dzMark, body.mapOn #dzArrow, body.pauseOn #dzHin
 /* the pause sheet's time chips take the width their names need (44 px at least), the airports the rest */
 #pauseOv .frow.locRow .grp.locG{ flex:1 1 0; } #pauseOv .frow.locRow .grp.g4{ flex:0 1 auto; }
 #pauseOv .frow.locRow .grp.g4 .chip{ flex:1 0 auto; min-width:44px; padding:0 8px; }
+#pauseOv .frow.locRow .grp.g4 .chip.wxPill{ flex:1.6 0 auto; padding:0 8px; } #pauseOv .frow.locRow .grp.g4 .chip.wxRnd{ flex:none; padding:0; }
 @media (max-width:620px) and (orientation:landscape){ #pauseOv .lgrp .gchips{ gap:8px; } #pauseOv .frow .chip.loc{ padding:0 7px; } }
 /* Arizona only cards seen from a world region */
 .azTag{ display:inline-block; margin-left:6px; padding:1px 5px; border-radius:5px; font-style:normal; font-size:9px; font-weight:800; letter-spacing:.08em; line-height:1.3;
@@ -2325,8 +2384,10 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
   <div class="carx" id="carMain"></div>
   <div class="frows">
    <div class="frow locRow"><div class="grp locG"><div class="locs" id="locFly" role="radiogroup" aria-label="Location"></div></div>
-    <div class="grp g4 cap"><span class="gcap">Time</span><div class="gchips">
-     <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><button class="pick chip" data-tod="haboob"><b>Haboob</b></button></div></div></div>
+    <div class="grp g4 cap tGrp"><span class="gcap">Time</span><div class="gchips">
+     <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button></div></div>
+    <div class="grp cap wxG"><span class="gcap">Weather</span><div class="gchips">
+     <button class="chip wxPill" id="wxPill" aria-haspopup="dialog"><i aria-hidden="true"></i><span class="wxN"><b><span class="lg"></span><span class="sm"></span></b><small hidden>random</small></span></button><button class="chip wxRnd" id="wxRnd" aria-label="Random weather">🎲</button></div></div></div>
    <div class="frow starts"><div class="grp g2 cap" title="Do anything. A brief grade card on any landing."><span class="gcap">Free flight</span><div class="gchips">
      <button class="pick chip" data-pos="runway"><b>Runway</b></button><button class="pick chip" data-pos="ramp"><b>Ramp</b></button></div></div>
     <div class="grp g2 cap" title="Short scored starts. Each one ends in the results card."><span class="gcap">Segments</span><div class="gchips">
@@ -2493,7 +2554,7 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
     <div class="frows">
     <div class="frow locRow"><div class="grp locG"><div class="locs" id="locPz" role="radiogroup" aria-label="Location"></div></div>
      <div class="grp g4">
-      <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><button class="pick chip" data-tod="haboob"><b>Haboob</b></button></div></div>
+      <button class="pick chip" data-tod="day"><b>Day</b></button><button class="pick chip" data-tod="sunset"><b>Sunset</b></button><button class="pick chip" data-tod="night"><b>Night</b></button><button class="chip wxPill" id="wxPillP" aria-haspopup="dialog"><i aria-hidden="true"></i><span class="wxN"><b><span class="lg"></span><span class="sm"></span></b><small hidden>random</small></span></button><button class="chip wxRnd" id="wxRndP" aria-label="Random weather">🎲</button></div></div>
     <div class="frow starts"><div class="grp g2 cap"><span class="gcap">Free flight</span><div class="gchips">
       <button class="pick chip" data-pos="runway"><b>Runway</b></button><button class="pick chip" data-pos="ramp"><b>Ramp</b></button></div></div>
      <div class="grp g2 cap"><span class="gcap">Segments</span><div class="gchips">
@@ -2571,6 +2632,12 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
   <div class="brDots" id="brDots" aria-hidden="true"></div>
   <div class="brBtns"><button id="brBack">Back</button><button class="primary" id="brNext">NEXT</button></div>
 </div></div>
+<!-- weather item 2: the WEATHER sheet (the Fly tab's and the pause sheet's weather pill); the tiles are dealt by wxSheetBuild -->
+<div class="overlay" id="wxOv" role="dialog" aria-modal="true" aria-labelledby="wxT"><div class="sheet">
+  <h3 id="wxT">WEATHER</h3><button class="wxX" id="wxX" aria-label="Close">✕</button>
+  <div class="wxGrid" id="wxGrid" role="radiogroup" aria-labelledby="wxT"></div>
+</div></div>
+<div id="wxToast" role="status" aria-live="polite"></div>
 <div class="overlay" id="plOv" role="dialog" aria-modal="true" aria-labelledby="plT"><div class="sheet">
   <p class="plK">FLIGHT SCHOOL</p>
   <h3 id="plT">Where are you in training?</h3>
@@ -3054,17 +3121,21 @@ function trimSpawn(st,gam){
   st.trim=clamp((a-AC.trimBase)/AC.trimK,-1,1);
   st.throttle=st.power=clamp(T/Tav,0,1);
 }
+let WX_DICE=null;   // wxWindDice once the weather is built (null in the node suites)
 function createState(mode,base,finD){
   const st={pos:new V3(),vel:new V3(),quat:new Q4(),w:new V3(),throttle:0,flapIdx:0,trim:0.5,elev:0,ail:0,rud:0,steer:0,brake:false,
     onGround:true,crashed:false,crashReason:'',airTime:0,alpha:0,beta:0,aoaWarn:false,stalled:false,dropDir:1,gload:1,time:0,
-    ias:0,agl:0,ap:null,apW:null,apPI:0,apTI:0,sfR:0,sfU:1,rpm:700,power:0,gearDown:true,gearPos:1,windDir:50,windKt:5,windBase:50,windPh:0,gust:0,gustT:0,gustTarget:0,gustAmp:0.35,dust:0,dustDir:150,tv:0,tvT:0,tvTarget:0,bp:0,br:0,noPF:false,mode:mode};
+    ias:0,agl:0,ap:null,apW:null,apPI:0,apTI:0,sfR:0,sfU:1,rpm:700,power:0,gearDown:true,gearPos:1,windDir:50,windKt:5,windBase:50,windPh:0,gust:0,gustT:0,gustTarget:0,gustAmp:0.35,dust:0,dustDir:150,turb:0,wet:0,windOff:0,wxW:0,tv:0,tvT:0,tvTarget:0,bp:0,br:0,noPF:false,mode:mode};
   const yaw=h=>new THREE.Euler(0,-h*Math.PI/180,0,'YXZ');
   st.base=BASES[base]?base:BASE0;
   st.flapIdx=1;
-  if(typeof WIND_FIX==='undefined'||!WIND_FIX){st.windBase=10*(1+Math.floor(wRnd()*36));st.windKt=1+Math.floor(wRnd()*10);st.windPh=wRnd()*6.28;}
+  const B=BASES[st.base]||BASES[BASE0], bh=B.hdg*Math.PI/180;
+  if(typeof WIND_FIX==='undefined'||!WIND_FIX){st.windBase=10*(1+Math.floor(wRnd()*36));st.windKt=1+Math.floor(wRnd()*10);st.windPh=wRnd()*6.28;
+    // the weather's wind (wxWindDice, weather item 4) over the free flight dice: a runway, ramp or final start only (the
+    // missions, the challenges, the lessons, the taskings and the dogfight keep theirs: wxWindOff after their start())
+    if(WX_DICE&&(mode==='runway'||mode==='ramp'||mode==='final'))WX_DICE(st,B);}
   else{st.windBase=WIND_FIX[0];st.windKt=WIND_FIX[1];st.windPh=0;}
   st.windDir=st.windBase;
-  const B=BASES[st.base]||BASES[BASE0], bh=B.hdg*Math.PI/180;
   if(mode==='ramp'){st.pos.set(B.ramp[0](),GEAR,B.ramp[1]());st.quat.setFromEuler(yaw(B.rampHdg));}
   else if(mode==='final'){const D=finD||5556,tg=Math.tan(GS),P=B.fin(D);   // 3 nm final, or 1 nm (about 318 ft on the 3 degree path)
     // the 1 nm start flies at exactly the approach speed, indicated (true airspeed corrected for the air's density)
@@ -3116,10 +3187,11 @@ function step(st,dt,ev){
   st.gust+=(st.gustTarget-st.gust)*Math.min(1,dt*1.2);
   const wd=st.windDir*Math.PI/180, ws=Math.max(0,st.windKt*0.5144*(1+st.gust))*clamp(0.55+0.45*agl/30,0.55,1);
   _w.set(-Math.sin(wd)*ws,0,Math.cos(wd)*ws);
-  // haboob turbulence: a slow random vertical gust and a roll/pitch buffet, both scaled by
-  // how deep in the dust we are (st.dust, set by hbUpdate; 0 everywhere else)
-  if(st.dust>0){st.tvT-=dt;if(st.tvT<=0){st.tvT=0.5+wRnd();st.tvTarget=(wRnd()*2-1)*3;st.bp=wRnd()*2-1;st.br=wRnd()*2-1;}
-    st.tv+=(st.tvTarget-st.tv)*Math.min(1,dt*1.5);_w.y+=st.tv*st.dust;}
+  // turbulence: a slow random vertical gust and a roll/pitch buffet, both scaled by st.turb (0..1): the haboob's dust
+  // depth (hbUpdate), else the weather's by type and height (wxFly); 0 in the node suites and everywhere calm
+  const tb=st.turb||0;
+  if(tb>0){st.tvT-=dt;if(st.tvT<=0){st.tvT=0.5+wRnd();st.tvTarget=(wRnd()*2-1)*3;st.bp=wRnd()*2-1;st.br=wRnd()*2-1;}
+    st.tv+=(st.tvTarget-st.tv)*Math.min(1,dt*1.5);_w.y+=st.tv*tb;}
   _air.copy(st.vel).sub(_w);
   const Va=_air.length(), rho=1.097*Math.exp(-st.pos.y/9200), rr=rho/1.225, qd=0.5*rho*Va*Va;
   st.ias=Va*Math.sqrt(rr);
@@ -3177,7 +3249,8 @@ function step(st,dt,ev){
   if(AC.pf&&!st.noPF&&!st.onGround) ay+=st.power*(0.015+0.05*(1-clamp(Va/60,0,1)));
   if(stalled) az+=qn*1.1*st.dropDir;
   if(st.apW) st.w.copy(st.apW); else {st.w.x+=ax*dt; st.w.y+=ay*dt; st.w.z+=az*dt;}
-  if(st.dust>0&&!st.onGround){const k=st.dust*clamp(qn,0.3,1.5)*dt;st.w.x+=(st.bp*0.3+0.12*Math.sin(st.time*7.3))*k;st.w.z+=(st.br*0.5+0.2*Math.sin(st.time*9.1+1))*k;}
+  // the buffet's rates scale with the aircraft: 1/sqrt(mass over the Cessna's), 0.35 to 1 (a 747 does not bounce like a 172)
+  if(tb>0&&!st.onGround){const k=tb*clamp(Math.sqrt(1050/AC.mass),0.35,1)*clamp(qn,0.3,1.5)*dt;st.w.x+=(st.bp*0.3+0.12*Math.sin(st.time*7.3))*k;st.w.z+=(st.br*0.5+0.2*Math.sin(st.time*9.1+1))*k;}
   const ang=st.w.length()*dt;
   if(ang>1e-9){_ax.copy(st.w).normalize();_dq.setFromAxisAngle(_ax,ang);q.multiply(_dq);q.normalize();}
   const hit=hitObstacle(st.pos.x,st.pos.z,st.pos.y);
@@ -3215,10 +3288,11 @@ function step(st,dt,ev){
     const nwR=clamp(0.3*AC.len,3,6.5),nw=Math.min(spd/nwR,0.65/(1+spd/18));
     const target=-st.steer*nw+(st.noPF||!AC.pf?0:st.power*0.003*clamp(spd/8,0,1));
     st.w.y+=(target-st.w.y)*Math.min(1,dt*8);
-    const latx=st.vel.x-_hf.x*along, latz=st.vel.z-_hf.z*along, k=1-Math.exp(-12*dt);
+    // a wet runway (st.wet, wxFly): less lateral grip (a crosswind landing drifts), braking 0.3 g (Easy 0.4), water drag
+    const wet=st.wet&&paved, latx=st.vel.x-_hf.x*along, latz=st.vel.z-_hf.z*along, k=1-Math.exp(-(wet?7:12)*dt);
     st.vel.x-=latx*k; st.vel.z-=latz*k;
     const nf=clamp(1-liftY/mg,0,1);
-    const dec=((paved?0.02:0.08)+(st.brake?0.55:0))*AC.g*nf*dt;
+    const dec=((paved?0.02:0.08)+(wet?0.03:0)+(st.brake?(wet?(st.easy?0.4:0.3):0.55):0))*AC.g*nf*dt;
     const na=Math.max(0,Math.abs(along)-dec)*Math.sign(along);
     st.vel.x+=_hf.x*(na-along); st.vel.z+=_hf.z*(na-along);
   } else if(st.pos.y-GEAR>gh+0.05){
@@ -3228,7 +3302,7 @@ function step(st,dt,ev){
   if(st.onGround){st.gload=1;st.sfU=1;st.sfR=0;}
   st.time+=dt;
   // variable wind: the direction wanders about 25 degrees either side of the base, slowly
-  st.windDir=st.windHold?st.windBase:((st.windBase+17*Math.sin(st.time*0.011+st.windPh)+8*Math.sin(st.time*0.037+st.windPh*2.3))%360+360)%360;   // windHold: the crosswind lesson's steady wind
+  st.windDir=st.windHold?st.windBase:((st.windBase+(st.windOff||0)+17*Math.sin(st.time*0.011+st.windPh)+8*Math.sin(st.time*0.037+st.windPh*2.3))%360+360)%360;   // windHold: the crosswind lesson's steady wind; windOff: a gust front's swing (wxFly)
   // in a haboob the wind swings round to blow from where the wall comes from
   if(st.dust>0){const dd=((st.dustDir-st.windDir)%360+540)%360-180;st.windDir=((st.windDir+dd*st.dust)%360+360)%360;}
 }
@@ -3739,7 +3813,7 @@ const GFX_HOOKS=[];   // fns(tier) the later effects push, run by GFX.setTier (l
 // screen skips the bloom passes. PFX_OCC: what can hide them (terrain, aircraft), drawn depth only before them.
 const PFX_BLOOM=2,PFX_OCC=3,PFX_SRC=[];
 function pfxBloomTag(o){o.layers.enable(PFX_BLOOM);PFX_SRC.push(o);return o;}
-var GFX={tier:'medium',auto:'medium',override:'auto',scale:1,bench:null,dyn:true,FX:{tone:'low',bloom:'medium',smaa:'medium',shadows:'medium',shadowFar:'high',air:'low',clouds:'medium',cloudRim:'high',haboob:'medium',haboobDeep:'high',dust:'medium'},gpu:'',renderer:null,
+var GFX={tier:'medium',auto:'medium',override:'auto',scale:1,bench:null,dyn:true,FX:{tone:'low',bloom:'medium',smaa:'medium',shadows:'medium',shadowFar:'high',air:'low',clouds:'medium',cloudRim:'high',haboob:'medium',haboobDeep:'high',dust:'medium',rain:'medium',wet:'medium'},gpu:'',renderer:null,
   // post: the post chain is on (graphics item 3: bloom or SMAA), so the canvas keeps the tier's full pixel ratio and the
   // dynamic scale sizes the chain's scene target instead; rs: the render scale of the pass being drawn (point sizes)
   post:false,rs:1,
@@ -7282,7 +7356,7 @@ function csmFrame(dt){
   for(let i=0;i<n;i++){const g=want&(1<<i)?1:0;F[i]=snap?g:g?Math.min(1,F[i]+dt):Math.max(0,F[i]-dt);}
   if(F[0]>0&&F[0]<1)CSM.fadeN++;
   _csmD.copy(sun.position).normalize();
-  const k=TOD.night||GFX.thermS.on?0:clamp((_csmD.y-0.0175)/0.03,0,1)*(1-(HB.on?HB.d:0));   // thermS.on: the battery guard
+  const k=TOD.night||GFX.thermS.on||(WXL&&WXL.noSh)?0:clamp((_csmD.y-0.0175)/0.03,0,1)*(1-(HB.on?HB.d:0));   // thermS.on: the battery guard
   for(let i=0;i<3;i++){const c=CSM_K[i];U.a[c]=U.b[c]=U.d[c]=U.f[c]=0;U.c[c]=-1;}
   if(k<=0.001){CSM.prev=0;return;}
   let mask=0;for(let i=0;i<n;i++)if(F[i]>0)mask|=1<<i;
@@ -7338,7 +7412,7 @@ function airSet(){
   AIR.r0=T.night?0:0.6*(1-0.6*dust);// desert air is dry: by day and at sunset a thin air term (12% of the haze) and 1.4 at fog.far, so the White Tanks
   // keep their rock under a 25 to 35% blue veil at 10 to 16 km and stand blue grey off the sky at 24; the night's dark
   // haze and the haboob's dust as they were
-  A.k.w=T.night?1.9:T.id==='haboob'?2.3:1.4;A.k.x=T.night||T.id==='haboob'?0.35:0.12;
+  A.k.w=T.night?1.9:T.hb?2.3:1.4;A.k.x=T.night||T.hb?0.35:0.12;
   _airR.setHex(T.haze).lerp(_airQ.setHex(T.top),0.32*(1-band)).lerp(_airQ.setHex(T.sky.hA),band);set(A.a,_airR);
   _airR.setHex(T.haze).lerp(_airQ.setHex(T.sky.glow),0.35).lerp(_airQ.setHex(T.sky.hS),band);set(A.s,_airR);
   const wt=T.night?0:(1-band)*(1-dust);A.t.x=1;A.t.y=1-0.05*wt;A.t.z=1-0.12*wt;
@@ -7469,13 +7543,102 @@ for(const k in TOD_SET){const T=TOD_SET[k],sd=solarDir(T.hour,T.doy||105),el=Mat
   T.haze=M.haze;T.top=M.top;T.sun=M.sun;T.sunI=M.sunI;T.hemiSky=M.hemiSky;T.hemiGnd=M.hemiGnd;T.hemiI=M.hemiI;
   T.sky=M.sky;T.disc=M.disc;T.discS=T.night?0:M.discS;T.env=M.env;}
 let TOD=TOD_SET.day;
+// ---------- weather (weather item 2): the weather is its own choice, any weather at any time of day ----------
+// TOD is the light (Day, Sunset, Night); WX the weather: WX_SET entries with the sheet's icon, name and one line on how it
+// flies; clouds: the CLD preset it shows (weather item 3: the overcast and rain decks, the fog sheet, the storm's near
+// cells, the gusty winds' torn cumulus, the haboob's dirty deck; the rest of its look is wxApply and wxFrame); wind: kt
+// [min,max] and gust (st.gustAmp, a fraction of the wind), the free flight's dice (wxWindDice, weather item 4; the haboob
+// keeps its own wind in hbUpdate).
+// The haboob is Arizona's (wxOK). Its light: by day the dusty 17:15 sun of TOD_SET.haboob, as TOD_HBDAY (that profile
+// with id 'day' and hb set, so TOD.id still reads day and the Day chip stays lit; TOD.hb is what the tone, the air, the
+// clouds and the effects read where they used TOD.id==='haboob'); at sunset and at night the plain sunset or night light
+// with the wall and its dust darkened to match (hbTint): the simplest that looks right, no extra light presets.
+const TOD_HBDAY=Object.assign({},TOD_SET.haboob,{id:'day',name:'Day',hb:true});
+const todKey=()=>TOD.hb?'haboob':TOD.id;   // the light profile's key (PFS_EXP, CLD_MIST)
+const WX_SET={};
+[['clear','Clear','☀️','Calm air, unlimited visibility','clear',2,6,0.1],
+ ['scattered','Scattered','⛅','Puffy cumulus, light bumps','scattered',4,9,0.2],
+ ['overcast','Overcast','☁️','Grey deck at 3,000 ft, flat light','overcast',5,10,0.15],
+ ['rain','Rain','🌧️','Low cloud, wet runway','rain',8,14,0.3],
+ ['storm','Thunderstorm','⛈️','Towering cells, gusts, lightning','storm',10,16,0.6],
+ ['fog','Fog','🌫️','Half a mile, lights glow','fog',0,3,0.05],
+ ['gusty','Gusty winds','💨','20 knots gusting 35, crosswind','torn',18,24,0.55],
+ ['haboob','Haboob','🌪️','Dust wall from the south east','haboob',8,35,0.35]
+].forEach(([id,name,icon,hint,clouds,k0,k1,g])=>{WX_SET[id]={id:id,name:name,icon:icon,hint:hint,clouds:clouds,wind:{kt:[k0,k1],gust:g}};});
+let WX=Object.assign({random:false},WX_SET.scattered);
+// weather regions item: a world region's own feel (m above the field; null in Arizona, as built). cu: the fair weather
+// cumulus base; deck: the overcast and rain stratus bases; rainMi: the visibility in rain (statute miles, by the day);
+// drizzle: finer, fainter rain streaks. Tokyo and Paris: stratus at 1,500 to 2,500 ft, cumulus at 2,500 to 4,000, rain
+// 2 to 3 miles in drizzle. Rio: shower: its rain is tropical showers, broken towering cumulus at 2,000 to 3,000 ft
+// with two or three rain shafts near the field and the sun between them ('shower' clouds, cldShower)
+const WX_REGS={rjtt:{cu:[760,1220],deck:{overcast:[460,760],rain:[460,620]},rainMi:[2,3],drizzle:1},
+  sbrj:{cu:[610,915],deck:{overcast:[610,915],rain:[610,800]},rainMi:[3,3],shower:1}};
+WX_REGS.lfpg=WX_REGS.rjtt;
+const WX_REG=WX_REGS[REGION_ID]||null;
+const wxOv=document.getElementById('wxOv'),WX_SHORT={storm:'Storm',gusty:'Gusty'};   // the sheet (markup above), the pause pill's short names
+const WX_HOOKS=[];   // fns() the next item's rain, fog and wind push, run at the end of setWX (like TOD_HOOKS)
+const wxOK=id=>!!WX_SET[id]&&(id!=='haboob'||REGION.az);
+// o.random: the pill is on Random (the next start() rolls again); o.keep: for this run only, the saved choice stays
+// (the daily, the dogfight, a tasking, the night lesson); o.noLight: the caller sets the time of day right after
+function setWX(id,o){o=o||{};if(!WX_SET[id])id='scattered';
+  // the dust storm is Arizona's: clear in a world region, the saved Haboob kept for coming back
+  const fb=!wxOK(id),hb0=WX.id==='haboob',cl0=WX.clouds;
+  WX=Object.assign({random:!!o.random},WX_SET[fb?'clear':id]);
+  if(WX.id==='rain'&&WX_REG&&WX_REG.shower)WX.clouds='shower';   // Rio's rain: tropical showers, not a deck
+  // weather regions item: saved per region (kgeuWX_<region>) and as the last choice anywhere (kgeuWX)
+  if(!fb&&!o.keep)try{for(const k of ['kgeuWX','kgeuWX_'+REGION_ID]){localStorage.setItem(k,WX.id);localStorage.setItem(k.replace('WX','WXR'),WX.random?'1':'0');}}catch(e){}
+  if(!o.noLight){if(hb0!==(WX.id==='haboob'))setTOD(TOD.id);   // the haboob's own light by day, its wall on or off
+    else if(cl0!==WX.clouds&&cloudMat)cloudsAuto();}
+  if(typeof wxUI==='function')wxUI();
+  for(const f of WX_HOOKS)f();
+}
+// the old Time row's Haboob (saved kgeuTOD, a resume, the test hooks): day and the haboob weather
+function todLegacy(id){if(id==='haboob'){setWX('haboob',{noLight:true});setTOD('day');}else setTOD(id);}
+// Random: a believable weather for the region and the time of day (percent); never the haboob outside Arizona
+const WX_ODDS={
+  az_day:{clear:30,scattered:35,gusty:10,overcast:5,storm:10,rain:5,haboob:5},
+  az_sunset:{clear:24,scattered:31,gusty:10,overcast:5,storm:15,rain:5,haboob:10},
+  az_night:{clear:35,scattered:27,gusty:5,overcast:10,storm:10,rain:5,fog:8},
+  rjtt:{overcast:30,rain:25,fog:10,clear:15,scattered:15,gusty:5},
+  sbrj:{scattered:35,rain:25,clear:20,storm:10,overcast:10}};
+WX_ODDS.lfpg=WX_ODDS.rjtt;
+function wxOdds(reg,tod){return reg==='az'?WX_ODDS['az_'+tod]||WX_ODDS.az_day:WX_ODDS[reg]||WX_ODDS.rjtt;}
+// one weather from odds P for region reg, u a uniform 0..1 (Math.random, or a seeded one); skip: ids left out
+function wxPick(P,reg,u,skip){let n=0;const ok=k=>(k!=='haboob'||reg==='az')&&!(skip&&skip.indexOf(k)>=0);
+  for(const k in P)if(ok(k))n+=P[k];
+  let r=u*n,id='scattered';for(const k in P){if(!ok(k))continue;r-=P[k];if(r<0){id=k;break;}}return id;}
+function wxRoll(o){o=o||{};
+  const reg=!o.start&&FLY_LOC&&REGIONS[FLY_LOC.reg]?FLY_LOC.reg:REGION_ID,id=wxPick(wxOdds(reg,TOD.id),reg,Math.random());
+  setWX(id,{random:true,noLight:o.noLight,keep:o.keep});
+  if(!o.quiet)wxToast('Rolled: '+WX_SET[id].icon+' '+WX_SET[id].name);
+  return id;
+}
+// weather regions item: the first visit to a region with no saved weather (kgeuWX_<region>) rolls one from the region's
+// odds, seeded by the UTC day and the region (everyone landing in Tokyo today first sees the same sky)
+function wxFirst(reg,tod,day){return wxPick(wxOdds(reg,tod),reg,dayRng((day||todayKey())*31+Object.keys(REGIONS).indexOf(reg)*7+17)());}
+// The fixed weather of a run, so its board stays fair (wxOf(kind)): the landing challenges and the arcade as their scores
+// were set (clear), the missions, the dogfight, the taskings (from their briefs: Overwatch watches a compound and
+// Shepherd escorts at altitude in clear air, Lifeline drops on smoke and Finder searches the White Tanks under
+// fair weather cumulus), every flight school lesson clear but the crosswind lesson (the gusty look; lesWind's steady
+// wind stays the wind) and the night one. The daily's own is dailySpec's roll. 'random' rolls one for the region instead.
+// wxFix(kind): set for this run only (no save), the player's choice stashed in ARC.prevWX (as the daily since weather
+// item 2): back at the next start(), at the menu (wxBack, openMenu) or, for a lesson, at its end (LES_WX, lesRestore)
+const WX_FIX={landing:'clear',landing1:'clear',apt:'clear',drop:'scattered',range:'clear',gunrun:'clear',short:'clear',df:'clear',
+  les:'clear','les:xwind':'gusty','les:night':'clear','task:overwatch':'clear','task:lifeline':'scattered','task:shepherd':'clear','task:finder':'scattered'};
+function wxOf(kind){if(kind==='daily')return dailySpec().wx;
+  return WX_FIX[kind]||(/^les:/.test(kind)?WX_FIX.les:/^task:/.test(kind)?'clear':null);}
+function wxFix(kind){let id=wxOf(kind);if(!id)return null;
+  if(id==='random')id=wxPick(wxOdds(REGION_ID,TOD.id),REGION_ID,Math.random());
+  const hb0=WX.id==='haboob';ARC.prevWX=ARC.prevWX||{id:WX.id,random:WX.random};
+  if(WX.id!==id||WX.random)setWX(id,{keep:true});
+  if(hb0!==(WX.id==='haboob'))hbSync(true);
+  return ARC.prevWX;}
+// the player's weather back when a run ends at the menu (start() does it for the next flight)
+function wxBack(){const pw=ARC.prevWX;if(!pw)return;ARC.prevWX=null;setWX(pw.id,{random:pw.random});}
 let starField=null,cloudMat=null;
-// the cumulus puffs (7 squashed icosahedra a cluster, 2,900 to 3,470 m): seen from above inside the dogfight's
-// 5,000 to 30,000 ft they read as flat white polygons on the ground, so dfStart hides them and dfStop brings them back
-var CLOUD_MESH=null;
-// cloud colour and self-glow per preset: white by day, warm at sunset, dark
-// blue-grey at night so they never read as flat grey cutouts on the night sky
-const CLOUD_TOD={day:[0xffffff,0x6f7780],sunset:[0xffe2c8,0x5e4a48],night:[0x232a38,0x0d1119],haboob:[0xf0e2d0,0x6a5c50]};
+// the clouds (weather item 1): one instanced mesh of sun lit billboard puffs (CLD, built with the world). The dogfight
+// hides them (dfStart) and dfStop brings them back. cloudMat is CLD's one material (setTOD's cloudsAuto fires on it).
+var CLOUD_MESH=null,CLD=null;
 const _skyTop=new THREE.Color(),_skyCol=new THREE.Color(),HB_DUST=new THREE.Color(0xb8722e),HB_CAVE=new THREE.Color(0x4e3220);
 const _skyHS=new THREE.Color(),_skyHA=new THREE.Color(),_skyG=new THREE.Color(),_skyB=new THREE.Color(),_skyS=new THREE.Vector3(),_skyH=new THREE.Color();
 // The dome's colour toward the unit direction (x,y,z), an analytic sky in the Preetham spirit: the air's in scatter at
@@ -7504,18 +7667,20 @@ function skyPaint(k){
   for(let i=0;i<p.count;i++){const x=p.getX(i)/80000,y=p.getY(i)/80000,z=p.getZ(i)/80000;
     skyAt(x,y,z,top,_skyS,P,k,col);c.setXYZ(i,col.r,col.g,col.b);}
   c.needsUpdate=true;
+  if(WXL&&WXL.dome)wxDome(c);   // weather item 3: under a deck, in the fog, the storm
 }
 // things built later (the world regions) that change with the time of day: called at the end of setTOD
 const TOD_HOOKS=[];var TOD_N=0;   // setTOD calls, STALL's 'tod' tag
 function setTOD(id){TOD_N++;
-  // the dust storm is Arizona's: day in a world region, the saved Haboob kept for coming back
-  const fb=id==='haboob'&&!REGION.az;if(fb)id='day';
-  TOD=TOD_SET[id]||TOD_SET.day;
-  if(!fb)try{localStorage.setItem('kgeuTOD',TOD.id);}catch(e){}
+  // the light only (weather item 2): Day, Sunset or Night; the haboob is a weather now (todLegacy maps the old 'haboob'),
+  // and by day it lights the scene with its own dusty profile (TOD_HBDAY, still id 'day'; wxOK keeps it Arizona's)
+  if(!TOD_SET[id]||id==='haboob')id='day';
+  TOD=id==='day'&&WX.id==='haboob'?TOD_HBDAY:TOD_SET[id];
+  try{localStorage.setItem('kgeuTOD',TOD.id);}catch(e){}
   HAZE.setHex(TOD.haze);
   scene.fog.color.copy(HAZE);scene.fog.near=TOD.fog[0];scene.fog.far=TOD.fog[1];
   scene.background=HAZE;
-  pfsTone(TOD.id);
+  pfsTone(todKey());
   sun.color.setHex(TOD.sun);sun.intensity=TOD.sunI;
   sun.position.set(TOD.sunPos[0],TOD.sunPos[1],TOD.sunPos[2]);
   hemi.color.setHex(TOD.hemiSky);hemi.groundColor.setHex(TOD.hemiGnd);hemi.intensity=TOD.hemiI;
@@ -7528,6 +7693,7 @@ function setTOD(id){TOD_N++;
   AL_MAT.uniforms.uLights.value=TOD.lights;
   for(const L of AL_LAYERS)if(L.pts)L.pts.visible=TOD.lights>0;
   EGG.lit=TOD.lights>0;EGG.litMat.emissiveIntensity=TOD.night?1:TOD.lights*0.6;EGG.mat.emissiveIntensity=TOD.night?0:0.3*(1-TOD.lights);   // @OhRabah signs: off by day, dim at sunset
+  if(CLD)CLD.dirty=false;   // the fog, haze and sun above are the clean TOD values again (a fly through's are stale)
   if(cloudMat)cloudsAuto();   // the flight's cloud preset and its colours (graphics item 6)
   for(const f of TOD_HOOKS)f();
   // the gunmetal drones: a faint lift at dusk and night so the airframe still reads against a dark sky
@@ -7731,12 +7897,18 @@ void main(){
 // the wall's centre goes m metres upwind of the player (the front m metres ahead of them)
 function hbPlace(m){HB.C.copy(st.pos).addScaledVector(HB.T,-m);HB.C.y=0;HB.snap=true;}
 function hbSpawn(){
-  hbBuild();
+  hbBuild();hbTint();
   const h=HB.hdg*Math.PI/180;HB.T.set(Math.sin(h),0,-Math.cos(h));HB.Lat.set(Math.cos(h),0,Math.sin(h));
   HB.g.rotation.y=-h;
   HB.on=true;HB.st=st;HB.called=false;HB.t6=false;HB.d=0;HB.paintD=-1;HB.surge=0;HB.pd=1e9;
   HB.ktPrev=st.windKt;st.windKt=HB.kt0;st.dustDir=(HB.hdg+180)%360;
   hbPlace(4500);hbUpdate(0);
+}
+// how far the wall's front is from the field, metres (positive: still ahead of it); null before the wall is placed
+function hbFieldD(){
+  if(!HB.on||HB.st!==st)return null;
+  const px=APC.x-HB.C.x,pz=APC.z-HB.C.z,al=px*HB.T.x+pz*HB.T.z,s=clamp(px*HB.Lat.x+pz*HB.Lat.z,-HB.W/2,HB.W/2);
+  return al+s*s/(2*HB.R);
 }
 // put back the clear air values the storm pulled on
 function hbRestore(){
@@ -7746,14 +7918,22 @@ function hbRestore(){
   if(CLOUD_MESH&&!DF.on)CLOUD_MESH.visible=CLOUDS.vis;
 }
 function hbClear(){
-  if(HB.st===st&&HB.on){st.dust=0;st.gustAmp=0.35;st.windKt=HB.ktPrev;}
+  if(HB.st===st&&HB.on){st.dust=st.turb=0;st.gustAmp=0.35;st.windKt=HB.ktPrev;}
   HB.on=false;HB.st=null;HB.d=0;HB.dist=1e9;
   if(HB.built){HB.g.visible=false;HB.sun.visible=false;}
   hbRestore();
 }
+// weather item 2: the haboob flies at any time of day; at sunset and at night its wall and dust take the darker light
+// (the day's colours scaled, data only: no new program)
+const HB_DUST0=HB_DUST.clone(),HB_CAVE0=HB_CAVE.clone();
+function hbTint(){const k=TOD.night?0.16:TOD.id==='sunset'?0.78:1;
+  HB_DUST.copy(HB_DUST0).multiplyScalar(k);HB_CAVE.copy(HB_CAVE0).multiplyScalar(k);
+  if(HB.built)for(const m of HB.mats){const U=m.uniforms,c=m.userData.c0||(m.userData.c0=[U.uLit.value.clone(),U.uMid.value.clone(),U.uDark.value.clone()]);
+    U.uLit.value.copy(c[0]).multiplyScalar(k);U.uMid.value.copy(c[1]).multiplyScalar(k);U.uDark.value.copy(c[2]).multiplyScalar(k);}}
 function hbSync(force){
   // the dust storm is Arizona's: never in a world region
-  const want=TOD.id==='haboob'&&running&&REGION.az;HB.paintD=-1;if(!force)HB.dirty=false;   // setTOD has just put the clear values back
+  const want=WX.id==='haboob'&&running&&REGION.az;HB.paintD=-1;if(!force)HB.dirty=false;   // setTOD has just put the clear values back
+  if(want)hbTint();
   if(want&&(force||!HB.on||HB.st!==st))hbSpawn();
   else if(!want&&HB.on)hbClear();
 }
@@ -7783,7 +7963,7 @@ function hbUpdate(dt){
   tgt*=1-clamp((st.agl-1900)/600,0,1);
   let d=HB.snap?tgt:HB.d+(tgt-HB.d)*Math.min(1,dt*1.5);HB.snap0=HB.snap;HB.snap=false;
   if(tgt===0&&d<0.003)d=0;
-  HB.d=d;st.dust=d;st.dustDir=(HB.hdg+180)%360;
+  HB.d=d;st.dust=st.turb=d;st.dustDir=(HB.hdg+180)%360;   // the haboob owns the turbulence (wxFly leaves it)
   st.windKt=HB.kt0+(35-HB.kt0)*Math.sqrt(d);st.gustAmp=0.35+0.65*d;   // the outflow wind runs ahead of the dust
   const fn=5000+(150-5000)*d,ff=45000+(1200-45000)*Math.sqrt(d);
   scene.fog.near=fn;scene.fog.far=ff;
@@ -8093,6 +8273,16 @@ function rebuildTerrain(x,z){
 // ---------- KGEU runway ----------
 const PPM=128/30.5;
 function asphalt(x,w,h,base){x.fillStyle=base||'#3f4144';x.fillRect(0,0,w,h);speckle(x,w,h,w*h/40,0.05);}
+// weather item 3: the wet runway. wetReg lists a paved surface (its Lambert material); wetSet swaps every listed one to
+// its wet twin (made once: the same map, two thirds as bright, a glossy Phong that takes a sheen and a glint from the sun;
+// the image based sky of a Standard material is the time of day's blue, wrong under a rain deck) and back, by
+// reference: the twins' program is linked by the precompile queue (wxWarm), never in flight
+const WET={list:[],map:new Map(),on:false};
+function wetReg(m){if(!m||!m.material)return m;const d=m.material;let w=WET.map.get(d);
+  if(!w){w=new THREE.MeshPhongMaterial({map:d.map,color:new THREE.Color(d.color).multiplyScalar(0.66),specular:0x4a5058,shininess:60,
+    transparent:d.transparent,depthWrite:d.depthWrite,opacity:d.opacity});w.name='wet';WET.map.set(d,w);}
+  m.userData.dry=d;m.userData.wet=w;WET.list.push(m);if(WET.on)m.material=w;return m;}
+function wetSet(on){on=!!on;if(WET.on===on)return;WET.on=on;for(const m of WET.list)m.material=on?m.userData.wet:m.userData.dry;}
 function digits(x,str,cxp,cyTop,hPx,wPerDigitPx){
   x.save();x.font='800 100px '+F;x.textAlign='center';x.textBaseline='alphabetic';
   const mw=x.measureText(str).width;x.translate(cxp,cyTop+hPx);x.scale((wPerDigitPx*str.length)/mw,hPx/72);x.fillText(str,0,0);x.restore();
@@ -8100,7 +8290,7 @@ function digits(x,str,cxp,cyTop,hPx,wPerDigitPx){
 // Arizona only from here to the hold line signs (REGION.az): a world region builds its own field (buildWorld)
 if(REGION.az){
 const rwBase=tex(128,256,(x,w,h)=>{asphalt(x,w,h);x.fillStyle='#f1f1ec';x.fillRect(2,0,4,h);x.fillRect(w-6,0,4,h);x.fillRect(w/2-2,0,4,Math.round(36.6*PPM));},[1,RWY_LEN/61]);
-flatLocal(30.5,RWY_LEN,lam(0xffffff,{map:rwBase}),RWY_LEN/2,0,0.05);
+wetReg(flatLocal(30.5,RWY_LEN,lam(0xffffff,{map:rwBase}),RWY_LEN/2,0,0.05));
 function endTex(lenM,dispM,num,npi){
   const H=Math.round(lenM*PPM);
   return tex(128,H,(x,w,h)=>{
@@ -8115,24 +8305,24 @@ function endTex(lenM,dispM,num,npi){
     for(let s=m;s<lenM;s+=61){const L=Math.min(36.6,lenM-s);x.fillRect(w/2-2,Y(s+L),4,L*PPM);}
   });
 }
-flatLocal(30.5,330,lam(0xffffff,{map:endTex(330,THR01,'1',false)}),165,0,0.07);
-flatLocal(30.5,460,lam(0xffffff,{map:endTex(460,305.1,'19',true)}),RWY_LEN-230,0,0.07,180);
+wetReg(flatLocal(30.5,330,lam(0xffffff,{map:endTex(330,THR01,'1',false)}),165,0,0.07));
+wetReg(flatLocal(30.5,460,lam(0xffffff,{map:endTex(460,305.1,'19',true)}),RWY_LEN-230,0,0.07,180));
 const aimTex=tex(128,190,(x,w,h)=>{x.clearRect(0,0,w,h);x.fillStyle='#f1f1ec';x.fillRect(w/2-6*PPM-6*PPM,0,6*PPM,h);x.fillRect(w/2+6*PPM,0,6*PPM,h);});
 // renderOrder -1: first of the transparent things, so the ground decals (scorch, shadow) blend
 // over it; at 0 the distance sort put it after them some frames and a scorch on it flickered
-flatLocal(30.5,45,lam(0xffffff,{map:aimTex,transparent:true}),THR19-311-22,0,0.075,180).renderOrder=-1;
+wetReg(flatLocal(30.5,45,lam(0xffffff,{map:aimTex,transparent:true}),THR19-311-22,0,0.075,180)).renderOrder=-1;
 // taxiway, connectors, pads
 const twTex=tex(64,128,(x,w,h)=>{asphalt(x,w,h,'#45474a');x.fillStyle='#e8b923';x.fillRect(w/2-1.5,0,3,h);},[1,2300/30]);
-flatLocal(15.2,2300,lam(0xffffff,{map:twTex}),RWY_LEN/2,-120,0.05);
+wetReg(flatLocal(15.2,2300,lam(0xffffff,{map:twTex}),RWY_LEN/2,-120,0.05));
 const conTex=tex(108,630,(x,w,h)=>{asphalt(x,w,h,'#45474a');x.fillStyle='#e8b923';x.fillRect(w/2-1.5,0,3,h);
   const y0=60*6;x.fillRect(4,y0-10,w-8,2);x.fillRect(4,y0-6,w-8,2);for(let xx=4;xx<w-8;xx+=12){x.fillRect(xx,y0+2,7,2);x.fillRect(xx,y0+6,7,2);}});
-for(const c of CONNECT) flatLocal(18,105,lam(0xffffff,{map:conTex}),c,-67.5,0.055,90);
+for(const c of CONNECT) wetReg(flatLocal(18,105,lam(0xffffff,{map:conTex}),c,-67.5,0.055,90));
 const asphM=lam(0x55575a,{map:tex(128,128,(x,w,h)=>asphalt(x,w,h,'#5a5c5f'),[20,20])});
-flatLocal(62,130,asphM,5,-141,0.045);
-flatLocal(270,470,asphM,405,-257,0.04); flatLocal(270,490,asphM,1845,-257,0.04);
+wetReg(flatLocal(62,130,asphM,5,-141,0.045));
+wetReg(flatLocal(270,470,asphM,405,-257,0.04)); wetReg(flatLocal(270,490,asphM,1845,-257,0.04));
 const apronTex=tex(512,512,(x,w,h)=>{x.fillStyle='#7f7e79';x.fillRect(0,0,w,h);speckle(x,w,h,6000,0.06);x.strokeStyle='rgba(60,60,55,.18)';x.lineWidth=1;
   for(let i=0;i<=w;i+=38.4){x.beginPath();x.moveTo(i,0);x.lineTo(i,h);x.stroke();x.beginPath();x.moveTo(0,i);x.lineTo(w,i);x.stroke();}},[3.2,9.6]);
-flatLocal(320,960,lam(0xffffff,{map:apronTex}),1120,-282,0.045);
+wetReg(flatLocal(320,960,lam(0xffffff,{map:apronTex}),1120,-282,0.045));
 // signs at hold lines
 const signTex=tex(128,56,(x,w,h)=>{x.fillStyle='#c8102e';x.fillRect(0,0,w,h);x.strokeStyle='#fff';x.lineWidth=3;x.strokeRect(3,3,w-6,h-6);x.fillStyle='#fff';x.font='800 40px '+F;x.textAlign='center';x.textBaseline='middle';x.fillText('1-19',w/2,h/2+2);});
 const signM=[lam(0xc8102e),new THREE.MeshBasicMaterial({map:signTex}),lam(0x222222),lam(0x222222),lam(0xc8102e),lam(0xc8102e)];
@@ -8154,11 +8344,15 @@ const AL_K=700,AL_MIN=2.5,AL_MAX=7;       // CSS px: K/w clamped to [MIN,MAX], t
 const AL_LAYERS=[];
 let AL_TFREEZE=null;                     // test hook: a fixed light clock (s), null = real time
 const AL_MAT=new THREE.ShaderMaterial({
-  uniforms:{uLights:{value:0},uTime:{value:0},uCam:{value:new V3()},uPR:{value:1},uMono:{value:0}},
+  // weather item 3: uWx x the point size (fog 2), y the soft halo (fog), z 1 / the visibility (m) the lights fade
+  // over (0: none); uRef x 1 on the wet runway's reflection (AL_REF, the same program): drawn where the light's mirror
+  // image under the plane uRef.y falls on screen, at the depth of the surface over it (the runway in front hides it,
+  // the aircraft and the cockpit too), 40% as bright
+  uniforms:{uLights:{value:0},uTime:{value:0},uCam:{value:new V3()},uPR:{value:1},uMono:{value:0},uWx:{value:new THREE.Vector4(1,0,0,0)},uRef:{value:new THREE.Vector2()}},
   vertexShader:`#include <common>
 #include <logdepthbuf_pars_vertex>
 attribute vec3 aCol;attribute float kind;attribute vec3 aDir;attribute float flash;attribute float phase;
-uniform float uLights,uTime,uPR;uniform vec3 uCam;
+uniform float uLights,uTime,uPR;uniform vec3 uCam;uniform vec4 uWx;uniform vec2 uRef;
 varying vec3 vCol;varying float vI;
 void main(){
   float I=uLights,sz=1.0;
@@ -8169,16 +8363,19 @@ void main(){
     else{I*=pow(max(cos(6.2831853*fract(uTime*0.5+phase)),0.0),6.0)*1.6;sz=1.5;}
   }
   gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);
+  if(uRef.x>0.5){vec4 m=projectionMatrix*modelViewMatrix*vec4(position.x,2.0*uRef.y-position.y,position.z,1.0),
+    s=projectionMatrix*modelViewMatrix*vec4(position.x,uRef.y+0.12,position.z,1.0);
+    gl_Position=vec4(m.xy/max(m.w,1e-3)*s.w,s.z,s.w);I*=0.4*step(0.0,m.w);}
   float w=gl_Position.w;
-  I*=clamp(1.25-w/40000.0,0.35,1.0);
+  I*=clamp(1.25-w/40000.0,0.35,1.0)*exp(-w*uWx.z);
   vCol=aCol;vI=I;
   if(I<0.004){gl_Position=vec4(0.0,0.0,-2.0,1.0);gl_PointSize=0.0;}
-  else gl_PointSize=clamp(${AL_K.toFixed(1)}/w,${AL_MIN.toFixed(2)},${AL_MAX.toFixed(2)})*sz*uPR;
+  else gl_PointSize=clamp(${AL_K.toFixed(1)}/w,${AL_MIN.toFixed(2)},${AL_MAX.toFixed(2)})*sz*uPR*uWx.x;
   #include <logdepthbuf_vertex>
 }`,
   // uMono (IR sensor view): 1 white hot grey points, 2 black hot, drawn with multiply blending
   fragmentShader:`#include <logdepthbuf_pars_fragment>
-uniform float uMono;
+uniform float uMono;uniform vec4 uWx;
 varying vec3 vCol;varying float vI;
 void main(){
   #include <logdepthbuf_fragment>
@@ -8187,6 +8384,7 @@ void main(){
   float I=abs(vI),a;vec3 c;
   if(vI<0.0){a=r<0.14?1.0:exp(-(r-0.14)*9.0)*(1.0-smoothstep(0.4,0.5,r));c=mix(vCol,vec3(1.0),0.4*clamp(1.0-r/0.14,0.0,1.0));}
   else{a=r<0.35?1.0:1.0-(r-0.35)/0.15;a*=a;c=mix(vCol,vec3(1.0),0.35*clamp(1.0-r/0.3,0.0,1.0));}
+  if(uWx.y>0.0)a=mix(a,(r<0.12?1.0:exp(-(r-0.12)*7.0))*(1.0-smoothstep(0.42,0.5,r)),uWx.y);   // fog: a wide soft glow round a small core
   if(uMono>0.5){float g=clamp(max(c.r,max(c.g,c.b))*I,0.0,1.0);
     if(uMono>1.5){gl_FragColor=vec4(vec3(1.0-g*a),1.0);return;}
     c=vec3(g);gl_FragColor=vec4(c,a);return;}
@@ -8806,95 +9004,679 @@ csmScan(CSM_N1);BOOT.mark('world');   // the stadium, the arena, Westgate, Luke'
   trunks.forEach((t,k)=>{p.set(t[0],0,t[1]);s.set(1,t[2],1);m.compose(p,q,s);tm.setMatrixAt(k,m);p.set(t[0],t[2]+0.4,t[1]);s.set(3.6,1.1,3.6);q.setFromAxisAngle(_yUp,hash(k,2)*6);m.compose(p,q,s);cm.setMatrixAt(k,m);q.identity();});
   shr.forEach((b,k)=>{p.set(b[0],groundHeight(b[0],b[1])+b[2]*0.35,b[1]);s.set(b[2]*1.3,b[2]*0.75,b[2]*1.3);q.setFromAxisAngle(_yUp,hash(k,3)*6);m.compose(p,q,s);sm.setMatrixAt(k,m);});
   tm.userData.heat=0.05;tm.userData.irVar=0;cm.userData.heat=0.05;cm.userData.irVar=0;sm.userData.heat=0.07;sm.userData.irVar=0;if(REGION.az)scene.add(tm,cm,sm);
-  cloudMat=new THREE.MeshLambertMaterial({color:0xffffff,emissive:0x6f7780});
-  const cl=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,1),cloudMat,200);let i=0;q.identity();
-  for(let k=0;k<28;k++){const cx=APC.x+(hash(k,201)-0.5)*40000,cz=APC.z+(hash(k,202)-0.5)*40000,cy=2900+hash(k,203)*500;
-    for(let j=0;j<7;j++){const r=160+hash(k*9+j,5)*200;s.set(r*1.7,r*0.5,r);p.set(cx+(hash(k*9+j,1)-0.5)*600,cy+hash(k*9+j,2)*70,cz+(hash(k*9+j,3)-0.5)*400);m.compose(p,q,s);cl.setMatrixAt(i++,m);}}
-  cl.count=i;cl.userData.heat=0.1;cl.userData.irVar=0;scene.add(cl);CLOUD_MESH=cl;
 })();
-// ---------- cloud presets (graphics item 6) ----------
-// CLOUDS.preset: 'clear' | 'scattered' | 'monsoon'. Low: today's puffs as they were (clear hides them, monsoon only
-// darkens them). Medium and High (GFX.FX.clouds): the same 196 puffs on CLOUD_HD, a Lambert whose colour is worked out
-// per vertex from the sun: bright sunlit tops, grey blue flat bases (each puff's underside pressed flat in the vertex
-// shader), orange tops at sunset; never a shadow caster. Monsoon adds six cumulonimbus 18 to 34 km south and east of the
-// field (CLOUDS.cb, one draw: 18 squashed icosahedra each, 1,440 triangles: a flat base, a leaning body of 10 overlapping
-// pieces +-25% in size, two side lumps, an overshooting top, an anvil of 4 offset canted slabs spread north east; two
-// of the six tower to 9 km), dark grey blue bases and bright tops, and the haze thickens and warms toward them (AIR.mon).
-// High (GFX.FX.cloudRim): a silver lining on the silhouettes facing the sun, per vertex. The pick per flight, from
-// setTOD (cloudsAuto): day 70% scattered and 30% clear, sunset scattered, haboob monsoon, night scattered (dim), from the
-// daily seed (todayKey) so a day's flights and the tests agree; window.__kgeu.setClouds(p) forces one (null: back to
-// the pick). The dogfight hides them all as before (dfStart, dfStop puts back CLOUDS.vis).
-const CLOUD_HD_TOD={day:[0x97a4b6,0xffffff,0xfff0dc],sunset:[0x6c6276,0xffb27c,0xff9a52],night:[0x141a26,0x2a3242,0x000000],haboob:[0x8c7e72,0xf2dec6,0xffcf9c]};
-const CLOUDS={preset:'scattered',forced:null,vis:true,hd:null,cb:null,
-  U:{base:new THREE.Color(),top:new THREE.Color(),sunC:new THREE.Color(),sun:new V3(0,1,0),rim:{value:0}}};
-// the per instance shade (aCl: 0 at a cloud's base to 1 at its top) on a puff geometry
-function cloudAttr(g,n,f){const a=new Float32Array(n);for(let i=0;i<n;i++)a[i]=f(i);g.setAttribute('aCl',new THREE.InstancedBufferAttribute(a,1));}
-if(CLOUD_MESH){cloudAttr(CLOUD_MESH.geometry,CLOUD_MESH.count,i=>0.45+0.2*hash(i,77));
-  // three r128 culls an InstancedMesh by its one icosahedron at the origin: a sphere round the whole field of puffs
-  CLOUD_MESH.geometry.boundingSphere=new THREE.Sphere(new V3(APC.x,3150,APC.z),30000);CLOUD_MESH.userData.noRecv=true;CLOUD_MESH.receiveShadow=false;}
-function cloudHD(){
-  if(CLOUDS.hd)return CLOUDS.hd;
-  const U=CLOUDS.U,m=new THREE.MeshLambertMaterial({color:0xffffff});
-  m.onBeforeCompile=sh=>{
-    Object.assign(sh.uniforms,{cBase:{value:U.base},cTop:{value:U.top},cSunC:{value:U.sunC},cSun:{value:U.sun},cRim:U.rim});
-    sh.vertexShader='attribute float aCl;\nuniform vec3 cBase;uniform vec3 cTop;uniform vec3 cSunC;uniform vec3 cSun;uniform float cRim;\nvarying vec3 vClC;\n'+sh.vertexShader
-      .replace('#include <beginnormal_vertex>','#include <beginnormal_vertex>\n\tif ( position.y < -0.35 ) objectNormal = vec3( 0.0, -1.0, 0.0 );')
-      .replace('#include <begin_vertex>','#include <begin_vertex>\n\ttransformed.y = max( transformed.y, -0.35 );')
-      .replace('#include <fog_vertex>',`#include <fog_vertex>
-	{mat3 im = mat3( instanceMatrix );
-	vec3 s2 = vec3( dot( im[ 0 ], im[ 0 ] ), dot( im[ 1 ], im[ 1 ] ), dot( im[ 2 ], im[ 2 ] ) );
-	vec3 nW = normalize( mat3( modelMatrix ) * im * ( objectNormal / s2 ) );
-	float k = clamp( 0.05 + 0.65 * aCl + 0.45 * nW.y, 0.0, 1.0 );
-	vClC = mix( cBase, cTop, k ) + cSunC * ( max( dot( nW, cSun ), 0.0 ) * ( 0.3 + 0.5 * k ) );
-	vec3 wp = ( modelMatrix * instanceMatrix * vec4( transformed, 1.0 ) ).xyz, vd = normalize( cameraPosition - wp );
-	float r = 1.0 - abs( dot( nW, vd ) );
-	vClC += cTop * ( cRim * r * r * r * ( 0.3 + 0.7 * max( dot( - vd, cSun ), 0.0 ) ) );}`);
-    sh.fragmentShader='varying vec3 vClC;\n'+sh.fragmentShader.replace('vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;',
-      'vec3 outgoingLight = pfsLin( vClC );');};
-  m.customProgramCacheKey=()=>'cloudHD';
-  return CLOUDS.hd=m;
+// ---------- clouds (weather item 1) ----------
+// The flight sim impostor: every cloud is a cluster of soft camera facing quads (one InstancedMesh, CLD.mesh, two
+// triangles a puff, one draw), lit in the shader from the sun model, so nothing reads as a faceted slab. Per instance:
+// aP centre and in plane rotation, aS width, height, shade (0 the cloud's base, 1 its top; below 0 a storm's dark
+// underside) and opacity, aO the unit offset from the cluster's centre (its sun side), aX the atlas slot (0 to 3 puffs,
+// 4 the wisp, 5 a rain shaft, locked to the world's up, 6 an anvil sheet; 8 more: a deck puff, lying flat, weather item
+// 3) and the ground height under it.
+// Colour: mix(base, top, shade) plus the sun's colour on the cluster's sun side, a corner gradient toward the sun's
+// direction on each quad (+-0.15, the puff modelled) and a silver lining on the thin edges when the sun is behind it;
+// raw screen colours with a soft shoulder, like the haboob wall (custom ShaderMaterials skip the tone curve). The
+// aerial perspective is the terrain's own fog chunk (PFS_AIR, the same uniforms), the far ones also dissolve before
+// fog.far so no cut shows against the dome; a puff fades out as the camera comes within about half its radius (and
+// collapses to nothing, so a fly through never fills the screen with quads), and where it meets the ground (150 m).
+// Presets are data only (one material, one program): CLOUDS.preset 'clear' (6 to 10 high wisps), 'scattered' (34 fair
+// weather cumulus over the 40 km field on one cloud base a day, 1,350 to 1,900 m) and 'monsoon' (the six cells south
+// and east as towers with dark bases, anvils and rain shafts, the cumulus thinned to half; the haboob's). The pick per
+// flight from setTOD (cloudsAuto): day 70% scattered and 30% clear, sunset and night scattered, haboob monsoon, from
+// the daily seed; window.__kgeu.setClouds(p) forces one (null: back to the pick). Caps by tier (CLD_CAP; Low bigger
+// and fewer, CLD_LO skips the corner gradient and the rim); the buffers are made once at the High monsoon size.
+const CLD_CAP={low:[160,220],medium:[320,520],high:[480,700]},CLD_MAX=700,CLD_ST=13;
+// the mist inside a cloud by time of day
+const CLD_MIST={day:0xdcdfe4,sunset:0xb6a498,night:0x10131b,haboob:0xc2ae98};
+CLD={mesh:null,mat:null,U:null,n:0,cells:0,nE:0,E:new Float32Array(40*6),src:new Float32Array(CLD_MAX*CLD_ST),key:new Float32Array(CLD_MAX),
+  idx:new Uint16Array(CLD_MAX),prev:new Uint16Array(CLD_MAX),A:null,base:1600,tier:'',gk:'',sorts:0,sortT:0,sp:new V3(1e9,0,0),drift:new V3(),
+  inside:0,dirty:false,skyK:0,s0:{near:0,far:0,haze:0,sunI:0,airY:0,kw:0,ty:1,tz:1},cellC:new Float32Array(24),deck:0,deckY:0,shw:[]};
+// the atlas, made once: a 512 x 256 RGBA data texture (no image file, no canvas premultiply on the soft edges). Left
+// cell: the four puff variants, one per channel (a few dome shaped lumps, the low ones big, roughened by value noise,
+// a soft flat base), stored as a soft height (the shader maps it to alpha and reads its slope toward the sun for the
+// relief); right cell, red: the wisp (streaks along x), green: the rain shaft, blue: the anvil sheet. Everything reaches zero well inside its cell.
+function cldAtlas(){
+  const S=256,W=512,D=new Uint8Array(W*S*4),sm=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
+  const lat=sd=>{const L=new Float32Array(64*64);for(let i=0;i<L.length;i++)L[i]=hash(i,sd);return L;};
+  const vn=(L,x,y)=>{const xi=Math.floor(x),yi=Math.floor(y),fx=x-xi,fy=y-yi,u=fx*fx*(3-2*fx),v=fy*fy*(3-2*fy);
+    const x0=xi&63,x1=(xi+1)&63,y0=(yi&63)*64,y1=((yi+1)&63)*64,a=L[y0+x0],b=L[y0+x1],c=L[y1+x0],d=L[y1+x1];
+    return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;};
+  const fbm=(L,x,y)=>0.5*vn(L,x,y)+0.27*vn(L,x*2.03+17,y*2.03+9)+0.15*vn(L,x*4.1+31,y*4.1+5)+0.08*vn(L,x*8.3+3,y*8.3+41);
+  for(let v=0;v<4;v++){const L=lat(900+v),nl=6+(v&1)*2+(v>>1),lu=[];
+    for(let i=0;i<nl;i++){const t=i/(nl-1);lu.push([(hash(i,910+v)-0.5)*0.36*(1-0.4*t),-0.14+t*0.3+(hash(i,920+v)-0.5)*0.06,0.24-0.1*t+hash(i,930+v)*0.03]);}
+    for(let j=0;j<S;j++)for(let i=0;i<S;i++){const x=(i+0.5)/S-0.5,y=(j+0.5)/S-0.5;
+      let f=0;for(let k=0;k<nl;k++){const l=lu[k],dx=x-l[0],dy=y-l[1],q=(dx*dx+dy*dy)/(l[2]*l[2]);if(q<1&&1-q>f)f=1-q;}
+      const n=fbm(L,(x+0.5)*6,(y+0.5)*6);
+      let d=sm(0,1.5,f*1.6+(n-0.5)*1.1-0.15)*sm(-0.36,-0.26,y+(n-0.5)*0.05)*(1-sm(0.42,0.5,Math.hypot(x,y)));
+      D[(j*W+i)*4+v]=Math.round(d*(0.84+0.16*n)*255);}}
+  {const L=lat(950);for(let j=0;j<S;j++)for(let i=0;i<S;i++){const x=(i+0.5)/S-0.5,y=(j+0.5)/S-0.5;
+    const n=fbm(L,(x+0.5)*3,(y+0.5)*14),e=1-sm(0.2,1,(x/0.46)*(x/0.46)+(y/0.4)*(y/0.4));
+    D[(j*W+S+i)*4]=Math.round(e*sm(0.32,0.72,n)*255);}}
+  // green: the rain shaft, a soft column with fine vertical streaks, alpha 0.5 under the base to 0.2 at its foot
+  // (stored through the shader's smoothstep(0, 0.45) so the alpha comes out as drawn)
+  {const L=lat(960);for(let j=0;j<S;j++)for(let i=0;i<S;i++){const x=(i+0.5)/S-0.5,y=(j+0.5)/S-0.5,n=fbm(L,(x+0.5)*16,(y+0.5)*1.2);
+    const A=0.5*(0.4+0.6*(y+0.5))*(1-sm(0.2,0.46,Math.abs(x)+(n-0.5)*0.08))*(1-sm(0.42,0.49,y))*sm(-0.49,-0.4,y)*(0.75+0.25*n);
+    D[(j*W+S+i)*4+1]=Math.round(0.45*(0.5-Math.sin(Math.asin(clamp(1-2*A,-1,1))/3))*255);}}
+  // blue: the anvil sheet, a fibrous lens filling the quad's height (a flat underside, a low domed top, ragged ends)
+  {const L=lat(970);for(let j=0;j<S;j++)for(let i=0;i<S;i++){const x=(i+0.5)/S-0.5,y=(j+0.5)/S-0.5,n=fbm(L,(x+0.5)*4,(y+0.5)*10),
+      tp=0.1+0.33*(1-4*x*x),e=(1-sm(0.3,0.48,Math.abs(x)+(n-0.5)*0.12))*sm(-0.44,-0.32,y+(n-0.5)*0.04)*(1-sm(tp-0.1,tp,y+(n-0.5)*0.08));
+    D[(j*W+S+i)*4+2]=Math.round(e*(0.55+0.45*sm(0.3,0.7,n))*255);}}
+  const t=new THREE.DataTexture(D,W,S,THREE.RGBAFormat);t.magFilter=THREE.LinearFilter;t.minFilter=THREE.LinearMipmapLinearFilter;
+  t.generateMipmaps=true;t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;t.needsUpdate=true;return t;
 }
-// the cumulonimbus: built the first time a monsoon is shown on Medium or High
-const _cbE=new THREE.Euler();
-function cloudCB(){
-  const g=new THREE.IcosahedronGeometry(1,1),M=[],A=[],m=new THREE.Matrix4(),q=new Q4(),p=new V3(),s=new V3();
-  const add=(x,y,z,sx,sy,sz,a,rot,tx,tz)=>{q.setFromEuler(_cbE.set(tx||0,rot||0,tz||0,'YXZ'));m.compose(p.set(x,y,z),q,s.set(sx,sy,sz));M.push(m.clone());A.push(a);};
-  const N=6,yb=1800;
-  for(let k=0;k<N;k++){
-    // two of the six (k 1 and 4) tower to 8.5 to 9 km, the rest 4.5 to 7
-    const h=j=>hash(k*31+j,304),tall=k===1||k===4,H=tall?8500+h(0)*500:4500+h(1)*2500,
-      br=(100+(k+0.2+hash(k,301)*0.6)*100/N)*Math.PI/180,dist=18000+hash(k,302)*16000,
-      cx=APC.x+Math.sin(br)*dist,cz=APC.z-Math.cos(br)*dist,W=1500+H*0.22,Y=y=>clamp((y-yb)/(H-yb),0,1),
-      la=0.6+(h(2)-0.5)*0.8,lx=Math.cos(la)*W*0.35,lz=-Math.sin(la)*W*0.35;   // the lean: the top drifts this far north east
-    add(cx,yb+200,cz,W*1.25,420,W*1.1,0,h(3)*6);   // the dark flat base
-    for(let j=0;j<10;j++){const t=j/9,y=yb+350+t*(H*0.84-yb-350),r=W*(1-0.25*t)*(0.78+0.5*h(j+10));   // the body: 10 pieces, sizes +-25%, overlapping
-      add(cx+lx*t+(h(j+20)-0.5)*W*0.55,y,cz+lz*t+(h(j+30)-0.5)*W*0.55,r,r*(0.7+0.2*h(j+40)),r*(0.85+0.3*h(j+45)),Y(y),h(j+50)*6,(h(j+55)-0.5)*0.4,(h(j+57)-0.5)*0.4);}
-    for(let j=0;j<2;j++){const t=0.3+0.35*j+0.1*h(j+60),y=yb+(H-yb)*t,a=h(j+61)*6.283,r=W*(0.5+0.15*h(j+62));   // cauliflower lumps
-      add(cx+lx*t+Math.cos(a)*W*0.75,y,cz+lz*t+Math.sin(a)*W*0.75,r,r*0.8,r,Y(y),a,0.2,-0.15);}
-    // the anvil: four flattened pieces of different sizes spread mostly downwind, each turned and canted a little so its
-    // outline is ragged, never one disc
-    for(let j=0;j<4;j++){const a=-0.5+(j-1.5)*0.75+(h(j+70)-0.5)*0.5,d=W*(0.35+0.55*h(j+71)),sw=W*(1.0+0.7*h(j+72));
-      add(cx+lx+Math.cos(a)*d+W*0.3,H-150-260*h(j+73),cz+lz-Math.sin(a)*d-W*0.2,sw,280+320*h(j+74),sw*(0.55+0.35*h(j+75)),1,h(j+76)*6.283,(h(j+77)-0.5)*0.12,(h(j+78)-0.5)*0.12);}
-    add(cx+lx,H*0.93,cz+lz,W*0.6,W*0.38,W*0.55,1,h(90)*6);}   // the overshooting top
-  const im=new THREE.InstancedMesh(g,cloudHD(),M.length);M.forEach((x,i)=>im.setMatrixAt(i,x));cloudAttr(g,M.length,i=>A[i]);
-  im.frustumCulled=false;im.userData.heat=0.1;im.userData.irVar=0;im.userData.noRecv=true;im.name='cumulonimbus';
-  CLOUD_MESH.add(im);CLOUDS.cb=im;CLOUDS.tris=M.length*80;
+(function cldBuild(){
+  const C=CLD,g=new THREE.PlaneGeometry(1,1),A=C.A={};
+  for(const [k,n] of [['aP',4],['aS',4],['aO',3],['aX',2]]){const a=new THREE.InstancedBufferAttribute(new Float32Array(CLD_MAX*n),n);a.setUsage(THREE.DynamicDrawUsage);g.setAttribute(k,a);A[k]=a;}
+  const U=C.U=THREE.UniformsUtils.merge([THREE.UniformsLib.fog,{uTex:{value:null},uDrift:{value:new V3()},uSun:{value:new V3(0,1,0)},
+    uBase:{value:new THREE.Color()},uTop:{value:new THREE.Color()},uSunC:{value:new THREE.Color()},uRimC:{value:new THREE.Color()},uRel:{value:1},
+    uFl:{value:new THREE.Vector4(0,0,0,0)}}]);   // weather item 3: a lightning flash (world centre, strength)
+  U.uTex.value=cldAtlas();
+  // the terrain's air (pfsAirSetup): the same shared values, so a cloud fades exactly as the ground at its distance
+  Object.assign(U,{airK:{value:AIR_U.k},airSun:{value:AIR_U.sun},airS:{value:AIR_U.s},airA:{value:AIR_U.a},airT:{value:AIR_U.t},airM:{value:AIR_U.m},airMC:{value:AIR_U.mc}});
+  const vs=`#define PFS_AIR
+#include <common>
+#include <fog_pars_vertex>
+#include <logdepthbuf_pars_vertex>
+attribute vec4 aP;attribute vec4 aS;attribute vec3 aO;attribute vec2 aX;
+uniform vec3 uDrift,uSun,uBase,uTop,uSunC;uniform vec4 uFl;
+varying vec2 vUv,vSd;varying vec4 vMask;varying vec3 vCol;varying float vA,vG,vRim,vWY,vGr;
+void main(){
+  vec3 c=aP.xyz+uDrift,D=c-cameraPosition;float dc=length(D);D/=max(dc,1e-3);
+  vec3 R=cross(D,vec3(0.0,1.0,0.0));float rl=length(R);R=rl>1e-3?R/rl:vec3(1.0,0.0,0.0);
+  float dk=step(7.5,aX.x),slot=aX.x-8.0*dk,cell=step(3.5,slot);
+  vec3 Up=abs(slot-5.0)<0.5?vec3(0.0,1.0,0.0):cross(R,D);   // rain shafts hang plumb
+  if(dk>0.5){R=vec3(cameraPosition.y>c.y?-1.0:1.0,0.0,0.0);Up=vec3(0.0,0.0,1.0);}   // weather item 3: a deck puff lies flat, turned about the up axis (its front to the camera)
+  vec2 q=position.xy*2.0,cs=vec2(cos(aP.w),sin(aP.w)),o=q*0.5*aS.xy;
+  vec2 qr=vec2(cs.x*q.x-cs.y*q.y,cs.y*q.x+cs.x*q.y);o=vec2(cs.x*o.x-cs.y*o.y,cs.y*o.x+cs.x*o.y);
+  vec3 wp=c+R*o.x+Up*o.y;
+  vUv=vec2((uv.x+cell)*0.5,uv.y);
+  vMask=vec4(equal(vec4(slot-4.0*cell),vec4(0.0,1.0,2.0,3.0)));
+  // a deck: its base shade from below, its sunlit top from above (no sun on the underside, but at a low sun the side
+  // of the underside toward it takes its colour: the lit edge at sunset)
+  float up=smoothstep(-40.0,40.0,cameraPosition.y-c.y);
+  float sh=dk>0.5?mix(aS.z+qr.y*0.05,0.84+0.16*fract(aS.z*97.0)+qr.y*0.04,up):clamp(aS.z+qr.y*0.12,-0.45,1.0);   // a deck's top mottled
+  vCol=max(mix(uBase,uTop,sh),vec3(0.0))+uSunC*max(dot(aO,uSun),0.0)*(0.4+0.6*clamp(sh,0.0,1.0))*mix(1.0,up,dk);
+  if(dk>0.5)vCol+=(1.0-up)*uSunC*1.4*pow(max(dot(normalize(vec3(D.x,0.0,D.z)+1e-4),normalize(vec3(uSun.x,0.0,uSun.z)+1e-4)),0.0),4.0)*(1.0-smoothstep(0.05,0.35,uSun.y));
+  vCol+=vec3(0.82,0.88,1.0)*uFl.w*exp(-length(c-uFl.xyz)/3500.0);   // lightning: the cell lit from inside
+#ifdef CLD_LO
+  vG=0.0;vRim=0.0;vSd=vec2(0.0);
+#else
+  vec2 sq=vec2(dot(uSun,R),dot(uSun,Up));
+  vG=0.15*0.7071*dot(qr,sq);
+  vRim=smoothstep(0.6,0.97,dot(D,uSun));
+  vSd=vec2(cs.x*sq.x+cs.y*sq.y,cs.x*sq.y-cs.y*sq.x);vSd*=vec2(0.5,1.0)*0.04;   // toward the sun in the atlas
+#endif
+  float r=0.5*max(aS.x,aS.y);vA=aS.w*(dk>0.5?smoothstep(15.0,90.0,abs(cameraPosition.y-c.y)):smoothstep(0.5*r,1.4*r,dc));   // near fade: gone within half the radius (a deck: within 15 m of its plane)
+  vWY=wp.y;vGr=aX.y;
+  vec4 mvPosition=viewMatrix*vec4(wp,1.0);gl_Position=projectionMatrix*mvPosition;
+  #include <logdepthbuf_vertex>
+  #include <fog_vertex>
+  if(vA<0.002)gl_Position=vec4(2.0,2.0,2.0,1.0);   // faded out: all four corners off screen, no fill
+}`;
+  const fs=`#define PFS_AIR
+#include <common>
+#include <fog_pars_fragment>
+#include <logdepthbuf_pars_fragment>
+uniform sampler2D uTex;uniform vec3 uRimC;uniform float uRel;
+varying vec2 vUv,vSd;varying vec4 vMask;varying vec3 vCol;varying float vA,vG,vRim,vWY,vGr;
+void main(){
+  #include <logdepthbuf_fragment>
+  float d=dot(texture2D(uTex,vUv),vMask),a=smoothstep(0.0,0.45,d);
+  vec3 c=vCol*(1.0+vG);
+#ifndef CLD_LO
+  // relief: the lumps' slope toward the sun (one more tap), lit on the sun side and shaded away from it; backlit,
+  // the thick middle goes grey and the thin edges glow (the silver lining)
+  float d2=dot(texture2D(uTex,vUv+vSd),vMask);
+  c*=1.0+uRel*(1.0-0.85*vRim)*clamp((d-d2)*1.8,-0.22,0.2)-0.15*vRim*smoothstep(0.4,1.0,a);   // light through a backlit cloud diffuses: no relief
+  c+=uRimC*(0.35*vRim*smoothstep(0.02,0.1,a)*(1.0-smoothstep(0.12,0.35,a)));
+#endif
+  vec3 k=max(c-0.9,0.0);c=min(c,vec3(0.9))+0.1*(1.0-exp(-k*10.0));   // a soft shoulder, never a blown flat white
+  gl_FragColor=vec4(c,a*vA*smoothstep(0.0,150.0,vWY-vGr));
+  #include <fog_fragment>
+#ifdef USE_FOG
+  gl_FragColor.a*=(1.0-fogFactor*fogFactor)*(1.0-smoothstep(0.7*fogFar,1.5*fogFar,length(vAirW.xyz)));   // far ones melt into the haze
+#endif
+}`;
+  const m=C.mat=new THREE.ShaderMaterial({uniforms:U,vertexShader:vs,fragmentShader:fs,transparent:true,depthWrite:false,depthTest:true,fog:true});
+  if(GFX.tier==='low')m.defines.CLD_LO='';
+  const im=C.mesh=new THREE.InstancedMesh(g,m,CLD_MAX);im.count=0;im.frustumCulled=false;im.renderOrder=0.5;   // after the dome and the sun disc, before the haboob's layers
+  im.castShadow=false;im.receiveShadow=false;im.userData.noRecv=true;im.userData.heat=0.1;im.userData.irVar=0;im.name='clouds';
+  scene.add(im);CLOUD_MESH=im;cloudMat=m;
+})();
+const CLOUDS={preset:'scattered',forced:null,vis:true,hd:true,cb:false,tris:0};
+// one puff into the source list (generation order; cldSort writes them back to front into the attributes)
+function cldPuff(x,y,z,rot,w,h,sh,op,ox,oy,oz,slot,gnd){
+  const C=CLD;if(C.n>=CLD_MAX)return;const S=C.src,o=C.n*CLD_ST,l=Math.hypot(ox,oy,oz)||1;
+  S[o]=x;S[o+1]=y;S[o+2]=z;S[o+3]=rot;S[o+4]=w;S[o+5]=h;S[o+6]=sh;S[o+7]=op;S[o+8]=ox/l;S[o+9]=oy/l;S[o+10]=oz/l;S[o+11]=slot;S[o+12]=gnd===undefined?groundHeight(x,z):gnd;C.n++;}
+// a cluster's ellipsoid for the fly through (centre, radii)
+function cldEll(x,y,z,rx,ry,rz){const C=CLD;if(C.nE>=40)return;const E=C.E,o=C.nE*6;E[o]=x;E[o+1]=y;E[o+2]=z;E[o+3]=1/(rx*rx);E[o+4]=1/(ry*ry);E[o+5]=1/(rz*rz);C.nE++;}
+// fair weather cumulus k: n puffs (f scales the count, sm the size), bottoms on the day's base, the biggest low, the
+// smaller ones stacked higher and inward; a quarter are merged pairs (two lobes)
+// weather item 3, torn (gusty winds): smaller, flatter clusters of fewer puffs, sheared apart
+function cldCumulus(k,f,sm,torn){
+  const C=CLD,h=(j,q)=>hash(k*61+j,211+(q||0)),B=C.base,cx=APC.x+(h(0,0)-0.5)*40000,cz=APC.z+(h(0,1)-0.5)*40000;
+  if(torn){f*=0.55;sm*=0.7;}
+  const n=Math.max(3,Math.round((6+Math.floor(h(0,2)*9))*f)),W=(1500+h(0,3)*2000)*(torn?0.6:1),Ht=W*(0.4+0.35*h(0,4))*(torn?0.45:1);
+  const pr=h(0,5)<0.25,pa=h(0,6)*6.283,pd=W*(0.6+0.3*h(0,7)),mx=pr?Math.cos(pa)*pd:0,mz=pr?Math.sin(pa)*pd:0;
+  for(let j=0;j<n;j++){const t=n>1?j/(n-1):0,lob=pr&&(j&1)?1:0;
+    const w=sm*clamp((1400-800*t)*(0.8+0.4*h(j,10)),500,1400),hh=(t<0.4?w/1.5:w*(0.6+0.7*h(j,20)))*(torn?0.6:1),a=h(j,40)*6.283,r=W*0.5*(1-0.55*t)*Math.sqrt(h(j,30))*(torn?1.5:1);
+    const x=cx+lob*mx+Math.cos(a)*r,z=cz+lob*mz+Math.sin(a)*r,y=B+0.3*hh+(t<0.4?0:(t-0.3)*Ht*1.1);
+    cldPuff(x,y,z,(h(j,50)-0.5)*0.35,w,hh,clamp((y-B)/Math.max(Ht,1),0,1),0.95,x-cx-lob*mx,(y-B-Ht*0.4)*1.3,z-cz-lob*mz,Math.floor(h(j,60)*4));}
+  cldEll(cx+mx/2,B+Ht*0.45,cz+mz/2,W*0.42+Math.abs(mx)/2,Ht*0.5,W*0.42+Math.abs(mz)/2);
+}
+// monsoon cell k (the old six bearings and distances), N puffs: a flat dark base row at 1,800 m (1.7:1, bottoms
+// aligned), a solid leaning column to 4.5 to 7 km (k 1 and 4 to 8.5 to 9) in layers of puffs 0.6 of a puff apart, a
+// soft overshooting dome, an anvil of three very wide thin fibrous quads (the wisp) in one 150 m band spreading north
+// east, thinner downwind, and 2 or 3 overlapping rain shafts slanted downwind under the base (sometimes one virga)
+// weather item 3: at (at[0], at[1]) instead when given (the thunderstorm's near cells, the haboob's parent storm)
+function cldCell(k,N,at){
+  const C=CLD,h=(j,q)=>hash(k*131+j,304+(q||0)),yb=1800,tall=k===1||k===4,H=tall?8500+h(0,0)*500:4500+h(0,1)*2500;
+  const br=(100+(k+0.2+hash(k,301)*0.6)*100/6)*Math.PI/180,dist=18000+hash(k,302)*16000,cx=at?at[0]:APC.x+Math.sin(br)*dist,cz=at?at[1]:APC.z-Math.cos(br)*dist;
+  if(C.cells<8){const P=C.cellC,o=C.cells*3;P[o]=cx;P[o+1]=yb+(H-yb)*0.35;P[o+2]=cz;C.cells++;}
+  const W=2600+H*0.35,la=0.6+(h(0,2)-0.5)*0.8,lx=Math.cos(la)*W*0.35,lz=-Math.sin(la)*W*0.35,smc=clamp(Math.sqrt(60/N),0.85,1.6);
+  const S=2+(h(0,3)<0.5?1:0),Nr=Math.max(3,Math.round(N*0.16)),Nb=Math.max(4,N-S-Nr-4);
+  for(let j=0;j<Nr;j++){const a=(j+h(j,10)*0.6)/Nr*6.283,r=W*0.3*(0.7+0.3*h(j,20)),w=W*0.6*smc,hh=w/1.7;
+    cldPuff(cx+Math.cos(a)*r,yb+0.3*hh,cz+Math.sin(a)*r,(h(j,25)-0.5)*0.1,w,hh,0,1,Math.cos(a)*0.3,-1,Math.sin(a)*0.3,Math.floor(h(j,28)*4));}
+  // the column: Ly layers, each a centre puff and a ring, neighbours at most 0.6 of a puff apart across and up
+  const w0=W*0.55*smc,Ly=Math.max(2,Math.min(Nb,Math.round((H-yb-w0*0.9)/(0.54*w0))+1)),m=Math.max(1,Math.floor(Nb/Ly)),rc=W*0.22;
+  for(let l=0;l<Ly;l++){const t=l/(Ly-1);
+    for(let i=0;i<m;i++){const j=l*m+i,r=i?rc*(1-0.3*t)*(0.85+0.3*h(j,31)):0,a=(i+h(l,30))/Math.max(1,m-1)*6.283,
+        w=Math.max(w0*(1-0.15*t),i?2*r*Math.sin(Math.PI/Math.max(2,m-1))/0.6:0)*(0.92+0.16*h(j,35)),hh0=w*0.9,
+        y0=yb+0.3*hh0,dy=(H-0.35*hh0-y0)/(Ly-1),hh=Math.max(hh0,dy/0.6),y=y0+l*dy+(l?(h(j,33)-0.5)*0.5*dy:0),
+        x=cx+lx*t+Math.cos(a)*r,z=cz+lz*t+Math.sin(a)*r,sd=l?Math.max(w,hh):0;   // above the base row: square, turned on its side
+      cldPuff(x,y,z,l?(h(j,45)<0.5?1.571:-1.571)+(h(j,46)-0.5)*0.6:(h(j,45)-0.5)*0.1,sd||w,sd||hh,(y-yb)/(H-yb),1,Math.cos(a)*(r?1:0.2),(t-0.4)*1.6,Math.sin(a)*(r?1:0.2),Math.floor(h(j,55)*4));}}
+  {const w=W*0.5*smc,hh=w*0.75;cldPuff(cx+lx,H-0.1*hh,cz+lz,0,w,hh,1,1,0,1,0,Math.floor(h(0,70)*4));}   // the overshooting dome
+  for(let j=0;j<3;j++){const a=0.6+(h(j,60)-0.5)*0.6,w=W*(1.6+0.5*h(j,62)),d=w*(0.08+0.1*j),dx=Math.cos(a),dz=-Math.sin(a);
+    const hh=600+200*h(j,65);cldPuff(cx+lx+dx*d,H-0.25*hh+(h(j,63)-0.5)*150,cz+lz+dz*d,(h(j,64)-0.5)*0.03,w,hh,1,0.95-0.15*j,dx,0.6,dz,6);}   // 600 to 800 m: thinner reads as a contrail at 20 km
+  for(let j=0;j<S;j++){const x=cx+(j-(S-1)/2)*350+(h(j,80)-0.5)*300,z=cz+(h(j,81)-0.5)*500,g=groundHeight(x,z),top=yb+120,
+      bot=j===S-1&&h(j,82)<0.5?top-(top-g)*(0.4+0.15*h(j,83)):g-60;   // virga: gone 40 to 55% of the way down
+    cldPuff(x,(top+bot)/2,z,0.09+0.05*h(j,84),600+300*h(j,85),top-bot,0.19,1,0,-1,0,5);}
+  cldEll(cx+lx*0.5,(yb+H)/2,cz+lz*0.5,W*0.45,(H-yb)/2,W*0.45);
+  cldEll(cx+lx+Math.cos(0.6)*W*0.6,H-100,cz+lz-Math.sin(0.6)*W*0.6,W*1.2,250,W*1.2);
+}
+// weather item 3: a stratus deck. One flat layer of big flat puffs (the puff slots stretched 1.6:1, lying flat: slot + 8)
+// on the plane y, n of them on a sunflower spiral over the disc of radius R round cx, cz (an even cover with no grid in
+// it), a ragged ring of thinner ones out to 1.5 R, and a sparser layer o.up (150) m above so the underside has some texture.
+// About 90 puffs on Medium. sh: the underside's shade; o.gnd: the ground height handed to the shader (the fog's -1e4:
+// no ground fade), o.ell: one flat ellipsoid for the fly through (cldMist), o.k: the puffs' size
+function cldDeck(y,cx,cz,R,n,sh,o){
+  const h=(j,q)=>hash(j*17+(o.sd||0),401+(q||0)),s=R*Math.sqrt(Math.PI/n),g=o.gnd,k=o.k||1,up=o.up||150;
+  // rounded lumps 1.6:1, any rotation, in two close grey tones (the shade +-0.05; the shader takes the top's mottle from it)
+  const put=(j,x,yy,z,w,op,shd)=>cldPuff(x,yy,z,h(j,9)*6.283,w,w/1.6,clamp(shd+(h(j,7)<0.5?-0.05:0.05),0,1),op,0,1,0,8+Math.floor(h(j,8)*4),g);
+  for(let i=0;i<n;i++){const r=R*Math.sqrt((i+0.5)/n)+(h(i,1)-0.5)*s*0.5,a=i*2.39996+(h(i,2)-0.5)*0.5;
+    put(i,cx+Math.cos(a)*r,y+(h(i,4)-0.5)*24,cz+Math.sin(a)*r,s*3.1*k*(0.85+0.3*h(i,3)),1,sh);}
+  const nr=Math.round(n*0.26);
+  for(let i=0;i<nr;i++){const j=200+i,r=R*(1.02+0.45*h(j,1)),a=(i+h(j,2))/nr*6.283;
+    put(j,cx+Math.cos(a)*r,y+(h(j,4)-0.5)*24,cz+Math.sin(a)*r,s*2.2*k*(0.7+0.5*h(j,3)),0.5+0.4*h(j,5),sh);}
+  const n2=Math.round(n*0.22);
+  for(let i=0;i<n2;i++){const j=400+i,r=R*0.85*Math.sqrt(h(j,1)),a=h(j,2)*6.283;
+    put(j,cx+Math.cos(a)*r,y+up+(h(j,4)-0.5)*30,cz+Math.sin(a)*r,s*2.0*k*(0.8+0.4*h(j,3)),0.45+0.2*h(j,5),Math.min(1,sh+0.12));}
+  if(o.ell)cldEll(cx,y+75,cz,R*1.1,140,R*1.1);
+}
+// the bases of the decks (m above the valley floor, Arizona then a world region): overcast 3,000 to 3,600 ft, rain
+// lower; the fog's top over the field
+const wxBase=()=>{try{return st.base||BASE0;}catch(e){return BASE0;}};   // st is made later in the boot
+const CLD_DECK={overcast:[900,1100,500,800],rain:[600,800,400,600]},WX_FOGTOP=150;
+// the visibility in rain (statute miles): 3, a world region's 2 or 3 by the day (WX_REGS)
+const wxRainMi=()=>{const m=WX_REG&&WX_REG.rainMi;return m?(m[0]===m[1]||dayRng(todayKey()*7+13)()<0.5?m[0]:m[1]):3;};
+// the thunderstorm's cells (weather item 3): two over the approach path of the home runway (the nearest 6 to 10 km out,
+// the other within 15 km, either side of the centre line), the other four south and east 14 to 26 km
+function cldStormAt(k){
+  const h=q=>hash(k*29+q,505);
+  try{const B=BASES[wxBase()]||BASES[BASE0],hd=B.hdg*Math.PI/180,px=Math.cos(hd),pz=Math.sin(hd);
+    if(k<2){const P=B.fin(k?12500+h(1)*2000:7000+h(1)*2500),l=(k?-1:1)*(1800+h(2)*1200);return [P[0]+px*l,P[1]+pz*l];}}catch(e){}
+  const br=(100+(k+0.2+h(3)*0.6)*100/6)*Math.PI/180,d=14000+h(4)*12000;return [APC.x+Math.sin(br)*d,APC.z-Math.cos(br)*d];
+}
+// the preset into the source list (only when the preset, the tier or the day changed). Weather item 3 adds the
+// decks: 'overcast' and 'rain' (rain lower), 'fog' (a sheet of fog over the ground within 10 km, 70 and 125 m up, the
+// mountains standing out of it), 'haboob' (a dirty deck at 2,500 m ahead of and over the wall, three cells of its parent
+// storm far behind it), 'storm' (the monsoon's cells, two over the approach) and 'torn' (gusty winds' cumulus)
+function cldGen(){
+  const C=CLD,p=CLOUDS.preset,t=CLD_CAP[GFX.tier]?GFX.tier:'medium',day=todayKey(),gk=p+t+day+(p==='storm'?wxBase():'');
+  if(C.gk===gk)return;C.gk=gk;C.n=0;C.nE=0;C.cells=0;C.tier=t;C.deck=0;C.deckY=0;
+  C.base=1350+dayRng(day*7+5)()*550;   // the day's cloud base (4,500 to 6,200 ft), all flights agree
+  if(WX_REG){const u=WX_REG.cu;C.base=u[0]+(u[1]-u[0])*dayRng(day*7+5)();}C.shw.length=0;   // a world region's own (WX_REGS)
+  if(p==='clear'){const r=dayRng(day*7+9),n=6+Math.floor(r()*5);
+    for(let i=0;i<n;i++){const w=4000+r()*5000,x=APC.x+(r()-0.5)*50000,z=APC.z+(r()-0.5)*50000;cldPuff(x,7000+r()*2000,z,(r()-0.5)*0.3,w,w*(0.1+0.08*r()),1,0.25,0,1,0,4);}
+    return;}
+  const dn={low:0.75,medium:1,high:1.2}[t];
+  if(p==='overcast'||p==='rain'){const L=CLD_DECK[p],R=WX_REG&&WX_REG.deck[p],a=R?R[0]:REGION.az?L[0]:L[2],b=R?R[1]:REGION.az?L[1]:L[3];
+    C.deck=C.deckY=a+(b-a)*dayRng(day*7+11)();cldDeck(C.deck,APC.x,APC.z,12000,Math.round(62*dn),p==='rain'?0.12:0.22,{ell:true,sd:3,k:1.15});return;}
+  if(p==='fog'){const g=groundHeight(APC.x,APC.z);C.deckY=g+70;   // the sheet solid to 6.5 km, ragged to 9.5
+    cldDeck(g+70,APC.x,APC.z,6500,Math.round(60*dn),0.6,{gnd:-1e4,sd:7,up:40,k:1.2});return;}
+  const f={low:0.45,medium:0.9,high:1.35}[t],sm=clamp(Math.sqrt(1/f),0.86,1.5),big=p==='monsoon'||p==='storm'||p==='haboob',cap=CLD_CAP[t][big||p==='shower'?1:0];
+  if(p==='haboob'){const a=150*Math.PI/180;C.deck=C.deckY=2500;
+    cldDeck(2500,APC.x+Math.sin(a)*8000,APC.z-Math.cos(a)*8000,14000,Math.round(56*dn),0.18,{ell:true,sd:5});
+    const N=Math.min(70,Math.floor((cap-C.n)/3));
+    for(let k=0;k<3;k++){const b=(140+12*k+hash(k,506)*6)*Math.PI/180,d=36000+hash(k,507)*8000;cldCell(k+1,N,[APC.x+Math.sin(b)*d,APC.z-Math.cos(b)*d]);}
+    C.n=Math.min(C.n,cap);return;}
+  const torn=p==='torn';
+  if(p==='shower')cldShower(f,sm,day);   // first: the cap trims the fair weather field after it, never the showers
+  for(let k=0;k<(torn?44:p==='shower'?40:34);k++)if(!big||!(k&1))cldCumulus(k,f,sm,torn);   // the monsoon: half the fair weather field
+  if(p==='monsoon'){const N=Math.floor((cap-C.n)/6);for(let k=0;k<6;k++)cldCell(k,N);}
+  if(p==='storm'){const N=Math.floor((cap-C.n)/6);for(let k=0;k<6;k++)cldCell(k,N,cldStormAt(k));}
+  C.n=Math.min(C.n,cap);
+}
+// weather regions item, Rio's rain: 2 or 3 towering cumulus 4 to 9 km from the field (the day's), each over a rain shaft
+// (the cells' slot 5 quad hanging plumb from the base to the ground), the fair weather field round them and the sun
+// between; C.shw their centres (x, z pairs) for the streaks near a shower (wxShowerNear)
+function cldShower(f,sm,day){
+  const C=CLD,r=dayRng(day*7+21),S=2+(r()<0.5?1:0),B=C.base;
+  for(let j=0;j<S;j++){const a=(j/S+r()*0.25)*6.283,d=4000+r()*5000,cx=APC.x+Math.sin(a)*d,cz=APC.z-Math.cos(a)*d,W=2200+r()*800,Ht=2600+r()*1400,n=Math.max(6,Math.round(14*f));
+    // a flat dark base row (bottoms aligned), then the tower in puffs narrowing upward
+    for(let i=0;i<5;i++){const aa=(i+r()*0.5)/5*6.283,rr=W*0.26,w=W*0.55*sm,hh=w/1.7;
+      cldPuff(cx+Math.cos(aa)*rr,B+0.3*hh,cz+Math.sin(aa)*rr,(r()-0.5)*0.1,w,hh,0,1,Math.cos(aa)*0.3,-1,Math.sin(aa)*0.3,Math.floor(r()*4));}
+    for(let i=0;i<n;i++){const t=i/(n-1),w=sm*clamp((1500-700*t)*(0.85+0.3*r()),600,1500),hh=w*(0.8+0.5*r()),aa=r()*6.283,rr=W*0.35*(1-0.6*t)*Math.sqrt(r());
+      const x=cx+Math.cos(aa)*rr,z=cz+Math.sin(aa)*rr,y=B+0.45*hh+t*Ht*0.85;
+      cldPuff(x,y,z,(r()-0.5)*0.3,w,hh,clamp((y-B)/Ht,0,1),1,x-cx,(y-B-Ht*0.4)*1.2,z-cz,Math.floor(r()*4));}
+    // three overlapping shafts slanted a touch, denser than a cell's (op 1.6: the sprite's alpha doubled up)
+    const top=B+120,bot=groundHeight(cx,cz)-60;
+    for(let k=0;k<3;k++)cldPuff(cx+(k-1)*380+(r()-0.5)*200,(top+bot)/2,cz+(r()-0.5)*300,0.06+0.05*r(),800+300*r(),top-bot,0.05,1.6,0,-1,0,5);
+    cldEll(cx,B+Ht*0.5,cz,W*0.45,Ht*0.5,W*0.45);C.shw.push(cx,cz);}
+}
+// the nearest shower's distance (m) from (x, z), drifting with the clouds
+function wxShowerNear(x,z){const C=CLD,S=C.shw;let d=1e9;for(let i=0;i<S.length;i+=2)d=Math.min(d,Math.hypot(S[i]+C.drift.x-x,S[i+1]+C.drift.z-z));return d;}
+// back to front from the camera through a permutation of the source list; uploaded only when the order changed
+function cldSort(force){
+  const C=CLD,n=C.n,cp=camera.position,dx=C.drift.x,dz=C.drift.z,S=C.src,K=C.key,I=C.idx;
+  for(let i=0;i<n;i++){const o=i*CLD_ST,x=S[o]+dx-cp.x,y=S[o+1]-cp.y,z=S[o+2]+dz-cp.z;K[i]=x*x+y*y+z*z;I[i]=i;}
+  I.subarray(0,n).sort((a,b)=>K[b]-K[a]);
+  C.sp.copy(cp);C.sortT=performance.now();
+  let same=!force;for(let i=0;same&&i<n;i++)if(I[i]!==C.prev[i])same=false;
+  if(same)return;C.prev.set(I.subarray(0,n));C.sorts++;
+  const A=C.A,P=A.aP.array,Z=A.aS.array,O=A.aO.array,X=A.aX.array;
+  for(let i=0;i<n;i++){const o=I[i]*CLD_ST,a=i*4,b=i*3,c=i*2;
+    P[a]=S[o];P[a+1]=S[o+1];P[a+2]=S[o+2];P[a+3]=S[o+3];Z[a]=S[o+4];Z[a+1]=S[o+5];Z[a+2]=S[o+6];Z[a+3]=S[o+7];
+    O[b]=S[o+8];O[b+1]=S[o+9];O[b+2]=S[o+10];X[c]=S[o+11];X[c+1]=S[o+12];}
+  for(const k in A){A[k].updateRange.offset=0;A[k].updateRange.count=n*A[k].itemSize;A[k].needsUpdate=true;}
+}
+const _cldA=new THREE.Color(),_cldM=new THREE.Color();
+// the colours from the time of day: white tops and grey blue bases by day, orange tops and purple grey bases at
+// sunset, dark blue grey at night (no sun, no rim), the haboob's dirty warm greys; a storm's base bluish and darker
+function cldColours(){
+  const U=CLD.U,T=TOD,id=todKey(),b=U.uBase.value,tp=U.uTop.value,sc=U.uSunC.value,rc=U.uRimC.value;
+  U.uSun.value.copy(sun.position).normalize();U.uRel.value=T.night?0.25:1;
+  if(T.night){b.setHex(0x1a2030);tp.setHex(0x2a3444);sc.setRGB(0,0,0);rc.setRGB(0,0,0);}
+  else if(id==='sunset'){b.setHex(0x5c5470).lerp(_cldA.setHex(T.hemiSky),0.2);tp.setHex(0xfff0e2).lerp(_cldA.setHex(T.sun),0.5);sc.setHex(T.sun).multiplyScalar(0.35);rc.setHex(T.sun).multiplyScalar(0.9);}
+  else if(id==='haboob'){b.setHex(0x8c7e72);tp.setHex(0xf2dec6);sc.setHex(T.sun).multiplyScalar(0.2);rc.setHex(T.sun).multiplyScalar(0.6);}
+  else{b.setHex(T.hemiSky).lerp(_cldA.setHex(T.haze),0.3).multiplyScalar(0.66);tp.setHex(0xffffff);sc.setHex(T.sun).multiplyScalar(0.16);rc.setHex(T.sun).multiplyScalar(0.8);}
+  const p=CLOUDS.preset;
+  if(p==='monsoon'||p==='storm'){b.r*=0.76;b.g*=0.78;b.b*=0.81;}   // a storm's dark blue grey base (0x6f7784 by day)
+  else if(p==='shower'){b.r*=0.84;b.g*=0.86;b.b*=0.88;}   // Rio's showers: heavier bases
+  // weather item 3: the decks. Overcast: a flat grey underside (lit only from above: shade 1 is the sunlit top), the
+  // sunset's purple grey under an orange top, a dark lid at night; rain darker; the fog's sheet pale; the haboob's deck
+  // and cells a dirty warm grey brown, darkened with the light
+  if(p==='overcast'||p==='rain'){
+    if(T.night){b.setHex(0x12151c);tp.setHex(0x232a36);}
+    else if(id==='sunset'){b.setHex(0x625a64);sc.multiplyScalar(1.6);}
+    else{b.setHex(0x8f949b);sc.multiplyScalar(0.7);}
+    if(p==='rain'){b.multiplyScalar(0.78);tp.lerp(b,0.25);}}
+  else if(p==='fog'){if(T.night){b.setHex(0x22252c);tp.setHex(0x2e323a);}else if(id==='sunset'){b.setHex(0xa59a96);tp.setHex(0xf0d8c4);}else{b.setHex(0xd2d5d8);tp.setHex(0xf6f7f8);}rc.multiplyScalar(0.3);}
+  else if(p==='haboob'){const k=T.night?0.18:id==='sunset'?0.8:1;b.setHex(0x6f5d4e).multiplyScalar(k);tp.setHex(0xcdb497).multiplyScalar(k);}
 }
 function cloudsPick(tod,key){
   if(tod==='sunset'||tod==='night')return 'scattered';if(tod==='haboob')return 'monsoon';
   return dayRng((key||todayKey())*7+3)()<0.7?'scattered':'clear';}
-function cloudsAuto(){CLOUDS.preset=CLOUDS.forced||cloudsPick(TOD.id);cloudsApply();}
+// weather item 2: the weather's preset (WX.clouds); cloudsPick stays for the tools and the shots
+function cloudsAuto(){CLOUDS.preset=CLOUDS.forced||WX.clouds;cloudsApply();}
+// the preset, the tier and the colours onto the mesh: data only, never a new program in flight (CLD_LO flips only
+// on a tier change, which runs in the menu and requeues the precompile)
 function cloudsApply(){
   if(!CLOUD_MESH)return;
-  const p=CLOUDS.preset,hd=GFX.on('clouds'),c=CLOUD_TOD[TOD.id]||CLOUD_TOD.day,H=CLOUDS.U,T=CLOUD_HD_TOD[TOD.id]||CLOUD_HD_TOD.day;
-  cloudMat.color.setHex(c[0]);cloudMat.emissive.setHex(c[1]);
-  if(p==='monsoon'&&!hd){cloudMat.color.multiplyScalar(0.8);cloudMat.emissive.multiplyScalar(0.75);}
-  CLOUD_MESH.material=hd?cloudHD():cloudMat;
-  H.base.setHex(T[0]);H.top.setHex(T[1]);H.sunC.setHex(T[2]);if(p==='monsoon'){H.base.r*=0.74;H.base.g*=0.8;H.base.b*=0.92;}   // a storm's base: bluish grey
-  H.sun.copy(sun.position).normalize();H.rim.value=GFX.on('cloudRim')?0.55:0;
-  CLOUDS.vis=p!=='clear';if(!DF.on)CLOUD_MESH.visible=CLOUDS.vis;
-  const mon=p==='monsoon'&&hd;if(mon&&!CLOUDS.cb)cloudCB();if(CLOUDS.cb)CLOUDS.cb.visible=mon;
-  if(AIR.mon!==(mon?1:0)){AIR.mon=mon?1:0;airSet();if(HB.on)HB.paintD=-1;else skyPaint();}
+  const C=CLD,p=CLOUDS.preset,lo=GFX.tier==='low',m=C.mat;
+  if(C.dirty)cldRestore();C.inside=0;
+  if(('CLD_LO' in m.defines)!==lo){if(lo)m.defines.CLD_LO='';else delete m.defines.CLD_LO;m.needsUpdate=true;}
+  cldGen();C.drift.set(0,0,0);C.U.uDrift.value.set(0,0,0);
+  CLOUD_MESH.count=C.n;cldSort(true);cldColours();
+  CLOUDS.vis=C.n>0;if(!DF.on)CLOUD_MESH.visible=CLOUDS.vis;
+  CLOUDS.hd=!lo;CLOUDS.cb=p==='monsoon'||p==='storm';CLOUDS.tris=C.n*2;
+  const mon=p==='monsoon'||p==='storm'||p==='haboob';if(AIR.mon!==(mon?1:0)){AIR.mon=mon?1:0;airSet();if(HB.on)HB.paintD=-1;else skyPaint();}
+}
+// per frame, right after hbUpdate: the drift with the surface wind (0.4 x windKt, a uniform), the sort (every 0.3 s or
+// 150 m), and the fly through: the cloud density at the camera from the cluster ellipsoids, smoothed over 0.6 s into
+// CLD.inside, pulls the fog to 60 / 400 m, the haze and the dome to the mist and dims the sun by up to 60%. The haboob
+// owns the air whenever its dust is up; setTOD and cloudsApply drop or undo a fly through's values (CLD.dirty).
+function cldFrame(dt){
+  const C=CLD;if(!C||!C.mesh)return;const m=C.mesh;
+  if(dt>0&&running&&!paused){const wd=st.windDir*Math.PI/180,v=0.4*st.windKt*0.5144*dt;C.drift.x-=Math.sin(wd)*v;C.drift.z+=Math.cos(wd)*v;C.U.uDrift.value.copy(C.drift);}
+  if(m.visible&&C.n&&(performance.now()-C.sortT>300||camera.position.distanceToSquared(C.sp)>22500))cldSort(false);
+  let den=0;
+  if(m.visible){const E=C.E,p=camera.position;
+    for(let i=0;i<C.nE;i++){const o=i*6,x=p.x-C.drift.x-E[o],y=p.y-E[o+1],z=p.z-C.drift.z-E[o+2],q=1-(x*x*E[o+3]+y*y*E[o+4]+z*z*E[o+5]);if(q>den)den=q;}}
+  const tgt=clamp(den/0.35,0,1);
+  if(dt>0)C.inside+=(tgt-C.inside)*Math.min(1,dt/0.6);if(tgt===0&&C.inside<0.004)C.inside=0;
+  if(HB.on&&HB.d>0){C.dirty=false;C.skyK=0;return;}
+  if(C.inside>0)cldMist(C.inside);else if(C.dirty)cldRestore();
+}
+function cldMist(k){
+  const C=CLD,s=C.s0;
+  if(!C.dirty){C.dirty=true;s.near=scene.fog.near;s.far=scene.fog.far;s.haze=HAZE.getHex();s.sunI=sun.intensity;s.airY=AIR_U.sun.y;s.kw=AIR_U.k.w;s.ty=AIR_U.t.y;s.tz=AIR_U.t.z;}
+  scene.fog.near=s.near+(60-s.near)*k;scene.fog.far=Math.exp(Math.log(s.far)+(Math.log(400)-Math.log(s.far))*k);
+  _cldM.setHex(CLD_MIST[todKey()]||CLD_MIST.day);HAZE.setHex(s.haze).lerp(_cldM,k);scene.fog.color.copy(HAZE);
+  sun.intensity=s.sunI*(1-0.6*k);AIR_U.sun.y=s.airY*(1-k);AIR_U.k.w=s.kw+(4-s.kw)*k;   // denser air: the ground goes in a few hundred metres
+  AIR_U.t.y=s.ty+(1-s.ty)*k;AIR_U.t.z=s.tz+(1-s.tz)*k;   // no dust tint: the ground meets the dome in the one mist
+  if(Math.abs(k-C.skyK)>0.04){C.skyK=k;skyPaint();const c=sky.geometry.attributes.color,a=c.array,f=Math.min(1,k*1.25);
+    for(let i=0;i<a.length;i+=3){a[i]+=(_cldM.r-a[i])*f;a[i+1]+=(_cldM.g-a[i+1])*f;a[i+2]+=(_cldM.b-a[i+2])*f;}c.needsUpdate=true;}
+}
+function cldRestore(){
+  const C=CLD,s=C.s0;C.dirty=false;
+  scene.fog.near=s.near;scene.fog.far=s.far;HAZE.setHex(s.haze);scene.fog.color.copy(HAZE);sun.intensity=s.sunI;AIR_U.sun.y=s.airY;AIR_U.k.w=s.kw;AIR_U.t.y=s.ty;AIR_U.t.z=s.tz;
+  if(C.skyK>0){C.skyK=0;skyPaint(HB.on&&HB.paintD>0?HB.paintD:0);}
+}
+
+// ---------- the weather's look (weather item 3) ----------
+// What each WX type looks like, from the real thing (Arizona's monsoon at home), on top of the time of day's light and
+// always back to it: wxApply (WX_HOOKS, TOD_HOOKS, GFX_HOOKS) puts the TOD values back and lays the weather's over them
+// (haze, fog, sun, hemisphere, the sun disc, the dome, the airport lights, the wet runway); wxFrame (per frame, after
+// cldFrame) does what follows the camera (above or below a deck, in or over the fog, the rain streaks, the dust wisps,
+// the drops on the canopy, the lightning and its thunder). The cloud shapes are CLD presets (cldGen). Every new thing
+// that draws is built here at boot and drawn once in the precompile queue (wxWarm, its 'weather' job), so changing
+// the weather in flight swaps data only and never links a program.
+//   Overcast: the grey stratus deck (3,000 to 3,600 ft; a world region 1,600 to 2,600), flat light: the sun at 35%,
+//     the hemisphere up 15%, no cascaded shadows, no disc, the haze to a flat grey and the dome above 1 degree to the
+//     deck's underside (never a blue gap through it). Above the deck: the sun, its shadows and the blue sky again.
+//   Rain: the deck lower and darker, visibility 5 km, rain streaks round the camera that slant with the relative wind,
+//     drops on the canopy in the cockpit (Medium, High), a wet dark runway that takes the sky and, at night, the
+//     runway and approach lights' reflections (Medium, High).
+//   Thunderstorm: the monsoon's cells moved in (two over the approach), a darker blue grey air, the sun at 55%,
+//     lightning every 8 to 25 s from a random cell (the light and the dome jump for two frames, the cell lit from
+//     inside) and its thunder after distance / 340 s.
+//   Fog: under a 150 m top the fog closes to 800 m at night and at sunset (dawn's radiation fog), 1,200 m by day, a
+//     flat pale grey (dark at night) the dome takes too; over the top a white sheet within 10 km with the mountains
+//     standing out of it and the air clear; the lights' glow twice as wide and soft; the sun a pale disc.
+//   Gusty winds: the cumulus torn (smaller, flatter, sheared) and blowing dust wisps over the desert near the ground.
+//   Haboob: the wall as it was, under a dirty deck at 2,500 m with its parent storm's cells far behind it.
+var WXL={id:'',noSh:false,below:1,dome:0,domeC:new THREE.Color(),fogK:-1,base:{near:0,far:0,haze:0,sunI:0,hemiI:0,vis:0,top:0},
+  shW:false,discW:1,wet:false,vis:0,rm:null,dm:null,refl:[],rainN:{low:180,medium:300,high:450},rainOn:false,dustOn:false,dT:0,
+  fl:{t:-1e9,cell:-1,on:0,next:0,n:0,sI:0,hI:0,sc:new THREE.Color(),hold:false,d:0}};
+const _wxC=new THREE.Color(),_wxV=new V3(),_wxW=new V3();
+// the streaks: one InstancedMesh quad per streak (two triangles), in a box round the camera wrapped in the shader (the
+// positions modulo the box, so it never runs out), each stretched along uS (m: the relative wind times a shutter) and
+// turned to face the camera about it, at least uP.x wide (uP.y m per metre away, so a far one stays a pixel and fades
+// with it). uP.w 1: the dust wisps (y the ground height plus 2 to 10 m from aR.y, the box flat). One material each, one
+// program for both (the same source).
+function wxStreakMat(){
+  return new THREE.ShaderMaterial({uniforms:{uOrg:{value:new V3()},uBox:{value:new V3(60,60,60)},uDrift:{value:new V3()},uS:{value:new V3(0,-0.4,0)},
+    uP:{value:new THREE.Vector4(0.014,0.0022,0.28,0)},uCol:{value:new THREE.Color(0xb4b8be)},uNear:{value:0.4}},
+    vertexShader:`#include <common>
+#include <logdepthbuf_pars_vertex>
+attribute vec4 aR;
+uniform vec3 uOrg,uBox,uDrift,uS;uniform vec4 uP;uniform float uNear;
+varying vec2 vQ;varying float vA;
+void main(){
+  // rain: half the streaks in a quarter of the box, 30% in half of it, the rest in all of it (the near ones are the
+  // rain); the wisps: half within 600 m
+  vec3 bx=uBox*(uP.w>0.5?(aR.w<0.5?0.3:1.0):aR.w<0.5?0.25:aR.w<0.8?0.5:1.0);
+  vec3 o=mod(aR.xyz+uDrift-uOrg,bx)-0.5*bx;
+  if(uP.w>0.5)o.y=aR.y-uOrg.y;
+  vec3 c=uOrg+o,S=uS*(uP.w>0.5?0.6+0.8*fract(aR.w*7.31):0.8+0.4*aR.w),V=c-cameraPosition;float d=length(V);
+  vec3 X=cross(V,S);float xl=length(X);X=xl>1e-6?X/xl:vec3(1.0,0.0,0.0);
+  float w=max(uP.x,d*uP.y),e=uP.w>0.5?length(o.xz):length(o),r=0.5*bx.x;
+  vec3 wp=c+S*position.y+X*position.x*w;
+  vQ=position.xy*2.0;
+  vA=uP.z*smoothstep(uNear,2.0*uNear+0.5,d)*(1.0-smoothstep(0.55*r,0.95*r,e))*min(1.0,2.0*uP.x/w);
+  gl_Position=projectionMatrix*viewMatrix*vec4(wp,1.0);
+  #include <logdepthbuf_vertex>
+  if(vA<0.003)gl_Position=vec4(2.0,2.0,2.0,1.0);
+}`,
+    fragmentShader:`#include <logdepthbuf_pars_fragment>
+uniform vec3 uCol;uniform vec4 uP;
+varying vec2 vQ;varying float vA;
+void main(){
+  #include <logdepthbuf_fragment>
+  float y2=vQ.y*vQ.y,a=vA*(1.0-vQ.x*vQ.x)*(1.0-y2*y2);
+  if(uP.w>0.5)a*=0.65+0.35*sin(vQ.y*7.0+vQ.x*3.0);   // a wisp: ragged along
+  gl_FragColor=vec4(uCol,a);
+}`,transparent:true,depthWrite:false,fog:false});
+}
+function wxStreaks(n,box,dust){
+  const g=new THREE.PlaneGeometry(1,1);
+  const a=new Float32Array(n*4);for(let i=0;i<n;i++){a[i*4]=hash(i,611+dust)*box;a[i*4+1]=hash(i,612+dust)*(dust?10:box);a[i*4+2]=hash(i,613+dust)*box;a[i*4+3]=hash(i,614+dust);}
+  const at=new THREE.InstancedBufferAttribute(a,4);if(dust)at.setUsage(THREE.DynamicDrawUsage);g.setAttribute('aR',at);
+  const m=new THREE.InstancedMesh(g,wxStreakMat(),n);m.frustumCulled=false;m.visible=false;m.renderOrder=0.6;m.userData.noRecv=true;m.castShadow=m.receiveShadow=false;
+  m.userData.heat=0.1;m.userData.irVar=0;m.name=dust?'wxDust':'wxRain';scene.add(m);return m;
+}
+WXL.rm=wxStreaks(450,60,0);WXL.dm=wxStreaks(60,4000,1);
+{const U=WXL.dm.material.uniforms;U.uBox.value.set(4000,1,4000);U.uP.value.set(6,0,0.24,1);U.uNear.value=8;U.uCol.value.setHex(0xe8d6ba);}
+// the wet runway's reflections of the home field's lights: each a second Points over the layer's geometry with a clone
+// of AL_MAT (the same program), uRef on. Made once a layer exists (the world regions build theirs later)
+function wxRefl(){
+  for(const k of ['KGEU','KLUF',REGION.icao]){const L=AL[k];if(!L||!L.pts||L.ref)continue;
+    const m=AL_MAT.clone(),p=new THREE.Points(L.pts.geometry,m);m.uniforms.uRef.value.set(1,0.06);
+    p.name='airportLightsRef_'+L.name;p.renderOrder=2;p.visible=false;p.frustumCulled=L.pts.frustumCulled;
+    p.onBeforeRender=(r,sc,cam)=>{const u=m.uniforms,A=AL_MAT.uniforms;u.uCam.value.setFromMatrixPosition(cam.matrixWorld);u.uTime.value=AL_TFREEZE!==null?AL_TFREEZE:performance.now()/1000;
+      u.uPR.value=r.getPixelRatio()*GFX.rs;u.uLights.value=A.uLights.value;u.uWx.value.copy(A.uWx.value);u.uMono.value=0;};
+    scene.add(p);pfxBloomTag(p);L.ref=p;WXL.refl.push(p);}
+}
+// the dome after skyPaint: below a deck, from a degree up, the deck's underside (no blue through a gap); the fog: the
+// fog's colour from the horizon to 25 degrees (all of it from inside); the storm: darker, toward its blue grey
+function wxDome(c){
+  const m=WXL.dome;if(!m||(m===1&&!WXL.below))return;
+  const p=sky.geometry.attributes.position,a=c.array,col=m===1?WXL.domeC:HAZE;
+  for(let i=0,j=0;i<p.count;i++,j+=3){const y=p.getY(i)/80000;
+    const f=m===1?0.97*clamp((y-0.015)/0.11,0,1):m===2?(WXL.below?1:1-clamp(y/0.42,0,1)):0.45;
+    if(f<=0)continue;const r=m===3?col.r*0.8:col.r,g=m===3?col.g*0.8:col.g,b=m===3?col.b*0.8:col.b;
+    a[j]+=(r-a[j])*f;a[j+1]+=(g-a[j+1])*f;a[j+2]+=(b-a[j+2])*f;}
+  c.needsUpdate=true;
+}
+// the weather over the time of day (see above). The haboob's air stays hbUpdate's.
+function wxApply(){
+  if(!WXL||!WXL.rm)return;
+  if(WXL.fl.on)wxFlashEnd();
+  const W=WX.id,T=TOD,B=WXL.base,ss=T.id==='sunset',nt=T.night,hb=HB.on;
+  WXL.id=W;WXL.fogK=-1;WXL.below=1;
+  if(CLD&&CLD.dirty)cldRestore();
+  let near=T.fog[0],far=T.fog[1],hz=-1,hk=0,sI=T.sunI,hI=T.hemiI,air=1,disc=1,sh=false,dome=0;
+  const shw=W==='rain'&&WX.clouds==='shower';WXL.shower=shw;
+  // Rio's showers (weather regions item): the sun out between the towers, the air hazier and greyer, 8 km
+  if(shw){hz=nt?0x0d1016:ss?0x8a8288:0xa9b0b6;hk=nt?0.4:0.45;sI=T.sunI*0.8;hI=T.hemiI*0.95;air=0.7;near=500;far=Math.min(far,9000);}
+  else if(W==='overcast'||W==='rain'){const r=W==='rain';
+    hz=nt?0x0b0d12:ss?(r?0x6c676e:0x8a8088):(r?0x989ca2:0xb9bcc0);hk=nt?0.5:0.85;
+    sI=T.sunI*(r?0.28:0.35);hI=T.hemiI*1.15*(r?0.88:1);air=0.25;disc=0;sh=true;dome=1;
+    if(r){near=300;far=wxRainMi()*1650;}else far=Math.min(far,30000);}   // 3 miles: 5 km (a world region's 2 or 3 miles, WX_REGS)
+  else if(W==='storm'){hz=nt?0x0c0f16:ss?0x7c7884:0x8e98a6;hk=nt?0.4:0.6;sI=T.sunI*0.55;hI=T.hemiI*0.9;air=0.5;dome=3;}
+  else if(W==='fog'){hz=nt?0x2a2c30:ss?0xa8a29e:0xc9cbcd;hk=1;air=0;disc=nt?0:0.4;sh=true;dome=2;far=Math.min(far,ss||nt?14000:20000);near=40;
+    B.vis=nt||ss?800:1200;B.top=(CLD.deckY?CLD.deckY-70:groundHeight(APC.x,APC.z))+WX_FOGTOP;
+    // the air itself carries the fog: its dust layer becomes a 70 m deep one (AIR_U.k.y), so the valley floor goes
+    // white and the mountains stand out of it; extinction 3 / the visibility inside it, from above a thinner one that
+    // leaves the ground faint at 6 km (wxFrame blends the two over the 100 m above the top)
+    B.kwIn=3;B.kwTop=1.38e-3*(far-20);}
+  B.near=near;B.far=far;B.sunI=sI;B.hemiI=hI;WXL.shW=sh;WXL.discW=disc;WXL.dome=hb?0:dome;
+  if(!hb){HAZE.setHex(T.haze);if(hz>=0)HAZE.lerp(_wxC.setHex(hz),hk);scene.fog.color.copy(HAZE);
+    scene.fog.near=near;scene.fog.far=far;sun.intensity=sI;hemi.intensity=hI;airSet();AIR_U.sun.y*=air;
+    if(W==='fog'){AIR_U.k.x=0.04;AIR_U.k.y=1/70;}else AIR_U.k.y=1/1500;}
+  B.haze=HAZE.getHex();
+  if(dome===1){WXL.domeC.copy(CLD.U.uBase.value).lerp(CLD.U.uTop.value,0.22);}
+  // the sun's disc: none under a deck, pale in the fog
+  {const S=SUND;S.want=(T.discS||0)>0&&disc>0;S.sp.material.opacity=disc;S.sp.material.color.setHex(T.disc||0xffffff);if(disc<1)S.sp.material.color.lerp(_wxC.setHex(0xe4e4e4),0.6);if(!S.want)S.sp.visible=false;}
+  if(!hb){if(CLD)CLD.skyK=0;skyPaint();}
+  WXL.noSh=sh;if(starField)starField.visible=T.stars>0;   // wxFrame hides them under a deck and in the fog
+  // the airport lights: the fog's wide soft glow fading over the visibility, rain a little of both
+  AL_MAT.uniforms.uWx.value.set(W==='fog'?2:W==='rain'?1.25:1,W==='fog'?1:W==='rain'?0.35:0,W==='fog'?1/(B.vis*1.3):W==='rain'?1/9000:0,0);
+  // rain: the streaks (the tier's count), the wet runway; gusty: the wisps
+  WXL.rainOn=W==='rain';WXL.rm.count=WXL.rainN[GFX.tier]||300;
+  WXL.wet=W==='rain'&&GFX.on('wet');wetSet(WXL.wet);if(WXL.wet)wxRefl();
+  WXL.dustOn=W==='gusty'&&REGION.az;WXL.dT=0;
+  {const U=WXL.rm.material.uniforms,dz=WX_REG&&WX_REG.drizzle;U.uCol.value.setHex(nt?0x343842:ss?0x96928f:0xb4b8be);U.uP.value.z=(nt?0.22:0.28)*(dz?0.72:1);U.uP.value.x=dz?0.01:0.014;   // Tokyo and Paris: finer, fainter drizzle
+   const D=WXL.dm.material.uniforms;D.uCol.value.setHex(0xe8d6ba).multiplyScalar(nt?0.15:ss?0.75:1);}
+  const F=WXL.fl;F.next=performance.now()/1000+3+Math.random()*6;
+  WXL.vis=scene.fog.far;
+}
+// the light jump of a flash (2 frames, the sun and the hemisphere x1.8, at night at least to a dim day so it shows; the
+// cell itself lit from inside), held for the shots by wxFlash(true)
+function wxStrike(cell){
+  const C=CLD,F=WXL.fl;if(!C||!C.cells)return -1;
+  const k=cell!=null&&cell>=0&&cell<C.cells?cell:Math.floor(Math.random()*C.cells),P=C.cellC,o=k*3,x=P[o]+C.drift.x,y=P[o+1],z=P[o+2]+C.drift.z;
+  if(!F.on){F.sI=sun.intensity;F.hI=hemi.intensity;F.sc.copy(sun.color);}
+  F.on=2;F.t=performance.now()/1000;F.cell=k;F.n++;F.next=F.t+8+Math.random()*17;
+  sun.intensity=Math.max(F.sI*1.8,TOD.night?0.9:0);hemi.intensity=Math.max(F.hI*1.8,TOD.night?0.8:0);sun.color.setHex(0xdde6ff);
+  sky.material.color.setScalar(TOD.night?2.4:1.15);C.U.uFl.value.set(x,y,z,1.5);
+  const cp=camera.position;F.d=Math.hypot(x-cp.x,z-cp.z);wxThunder(F.d);
+  return k;
+}
+function wxFlashEnd(){const F=WXL.fl;F.on=0;F.hold=false;sun.intensity=F.sI;hemi.intensity=F.hI;sun.color.copy(F.sc);sky.material.color.setScalar(1);CLD.U.uFl.value.w=0;}
+// thunder: the explosions' rumble bed, D/340 s after the flash (to 40 s), quieter and duller with distance, the near
+// ones (under 3.5 km) cracking first
+function wxThunder(D){
+  if(!actx||muted)return;
+  try{boomBufs();const t=actx.currentTime+Math.min(D/340,40),v=clamp(1-D/32000,0.08,1),out=actx.destination;
+    if(D<3500){const c=actx.createBufferSource(),hp=actx.createBiquadFilter(),g=actx.createGain();
+      c.buffer=crackBuf;hp.type='highpass';hp.frequency.value=700;g.gain.value=0.75*v;c.connect(hp).connect(g).connect(out);c.start(t);}
+    for(const [rate,dl,k] of [[0.55,0.05,1],[0.42,0.7,0.8]]){const r=actx.createBufferSource(),f=actx.createBiquadFilter(),g=actx.createGain();
+      r.buffer=rumbleBuf;r.playbackRate.value=rate;f.type='lowpass';f.frequency.setValueAtTime(140+320*v,t+dl);f.frequency.exponentialRampToValueAtTime(50,t+dl+4);
+      g.gain.setValueAtTime(0.0001,t+dl);g.gain.exponentialRampToValueAtTime(0.6*v*k,t+dl+0.3);g.gain.exponentialRampToValueAtTime(0.0001,t+dl+5);
+      r.connect(f).connect(g).connect(out);r.start(t+dl);}
+  }catch(e){}
+}
+// per frame, after cldFrame
+function wxFrame(dt){
+  const W=WXL.id;if(!W||!WXL.rm)return;
+  const F=WXL.fl,B=WXL.base,cp=camera.position,live=running&&!menu.classList.contains('on'),hb=HB.on&&HB.d>0;
+  if(F.on&&!F.hold){F.on--;if(!F.on)wxFlashEnd();}
+  // a deck: below it or above it (40 m of hysteresis round the middle of its two layers)
+  if(CLD.deckY&&(W==='overcast'||W==='rain')){const y=CLD.deckY,k=clamp((cp.y-y+20)/200,0,1);
+    let bl=WXL.below;if(bl&&cp.y>y+150)bl=0;else if(!bl&&cp.y<y+110)bl=1;
+    if(!CLD.dirty&&!F.on&&!hb){sun.intensity=B.sunI+(TOD.sunI-B.sunI)*k;hemi.intensity=B.hemiI+(TOD.hemiI-B.hemiI)*k;}
+    WXL.noSh=!!bl;SUND.want=(TOD.discS||0)>0&&!bl;if(bl)SUND.sp.visible=false;
+    if(bl!==WXL.below){WXL.below=bl;if(!hb){skyPaint();CLD.skyK=-1;}}}
+  // the fog: in it below the top, clearing over the 100 m above
+  else if(W==='fog'){const k=clamp((cp.y-B.top)/100,0,1),bl=k<0.5?1:0;
+    if(Math.abs(k-WXL.fogK)>0.002&&!CLD.dirty){WXL.fogK=k;scene.fog.near=40;scene.fog.far=Math.exp(Math.log(B.vis)+(Math.log(B.far)-Math.log(B.vis))*k);AIR_U.k.w=B.kwIn+(B.kwTop-B.kwIn)*k;
+      if(!F.on)sun.intensity=B.sunI*(0.45+0.55*k);WXL.vis=scene.fog.far;}
+    WXL.noSh=k<0.5;if(bl!==WXL.below){WXL.below=bl;skyPaint();CLD.skyK=-1;}}
+  // rain: the streaks follow the camera, stretched along the air's motion past it (falling at 8 m/s, plus the wind,
+  // less the aircraft's velocity) over a 45 ms shutter: straight down parked, slanting back into streaks at speed
+  // Rio's showers: only within 3 km of a shaft (the sun between them)
+  const shr=!WXL.shower||wxShowerNear(cp.x,cp.z)<3000;
+  const rv=WXL.rainOn&&shr&&live&&camMode!==2&&!DF.on;WXL.rm.visible=rv;
+  if(rv){const U=WXL.rm.material.uniforms;U.uOrg.value.copy(cp);windVec(_wxW);_wxV.copy(_wxW).sub(st.vel);_wxV.y-=8;_wxV.multiplyScalar(0.045);
+    const l=_wxV.length();if(l<0.7)_wxV.multiplyScalar(0.7/Math.max(l,1e-3));U.uS.value.copy(_wxV);U.uNear.value=camMode===1?1.6:0.4;}
+  // the canopy drops (cockpit, Medium and High): running down the glass, faster with the airspeed
+  {const R=RAINFX,on=WXL.rainOn&&shr&&running&&camMode===1&&!menu.classList.contains('on')&&GFX.on('rain');
+    if(on){const V=st.ias||0;R.fr=PFX.frames;R.k=0.95;R.sm=0.05;if(!paused)R.ph=(R.ph+dt*(0.03+0.004*V))%1;}else R.k=0;}
+  // gusty: the dust wisps drift with the wind, 2 to 10 m over the ground within 2 km (heights every 0.4 s)
+  const dv=WXL.dustOn&&live&&camMode!==2&&!DF.on&&st.agl<900;WXL.dm.visible=dv;
+  if(dv){const U=WXL.dm.material.uniforms;windVec(_wxW);U.uOrg.value.copy(cp);if(!paused)U.uDrift.value.addScaledVector(_wxW,dt);
+    const wd=st.windDir*Math.PI/180;U.uS.value.set(-Math.sin(wd)*60,0,Math.cos(wd)*60);   // along the wind (its bearing, even in a lull)
+    if((WXL.dT-=dt)<=0){WXL.dT=0.4;const A=WXL.dm.geometry.attributes.aR,a=A.array,d=U.uDrift.value,bx=4000;
+      for(let i=0;i<60;i++){const o=i*4,b=a[o+3]<0.5?bx*0.3:bx,ox=((a[o]+d.x-cp.x)%b+b)%b-b/2,oz=((a[o+2]+d.z-cp.z)%b+b)%b-b/2;a[o+1]=groundHeight(cp.x+ox,cp.z+oz)+2+8*a[o+3];}
+      A.needsUpdate=true;}}
+  // no stars through a deck or the fog (above them, the stars)
+  if(starField&&WXL.dome&&WXL.dome<3)starField.visible=TOD.stars>0&&!WXL.below;
+  // the wet runway's reflections: at night and dusk, never in the sensor view
+  for(const p of WXL.refl)p.visible=WXL.wet&&TOD.lights>0&&camMode!==2;
+  // lightning from a random cell every 8 to 25 s
+  if(W==='storm'&&live&&!paused&&!DF.on&&CLD.cells&&performance.now()/1000>=F.next)wxStrike();
+  if(!CLD.dirty&&!hb)WXL.vis=scene.fog.far;
+}
+WX_HOOKS.push(wxApply);TOD_HOOKS.push(wxApply);GFX_HOOKS.push(()=>wxApply());
+// ---------- how each weather flies and what the tower says about it (weather item 4) ----------
+// The wind: wxWindDice (createState, over the free flight dice): WX_SET's knots and gust (a fraction of the wind,
+// st.gustAmp); the gusty winds blow from 40 to 70 degrees off the home runway, either side (a 10 to 20 kt crosswind).
+// Easy: 0.6 of the knots and half the gust, never under clear's, the gusty winds 20 to 30 degrees off. wxWindOff gives the starts that keep their own wind
+// (the challenges, the lessons, the taskings, the dogfight) the plain dice back. Per flight frame wxFly: the turbulence
+// (st.turb, the step's buffet; the haboob's own while HB.on), the storm's gust fronts (a 15 s surge out of a cell within
+// 6 km, every 30 to 60 s) and the wet runway (st.wet: rain, a storm cell within 5 km of the field and 60 s after it).
+// The radio: the conditions read ATIS style before the first clearance (atisSay), gusts in the clearances, the gusty
+// winds' wind check on short final, the storm's position once. Nothing here draws.
+const WXF={front:{on:0,t0:0,next:0,kt:0,k0:0,sw:0},wetT:0,atis:'',plain:'',al:{st:null,v:29.92},cell:{k:-1,d:0,x:0,z:0}};
+function wxWindDice(s,B){
+  const W=WX_SET[WX.id];s.wxW=0;if(!W||WX.id==='haboob')return;
+  let ez=false;try{ez=rookie();}catch(e){}   // rookie is defined after the boot's first createState
+  const C=WX_SET.clear.wind;let kt=W.wind.kt[0]+wRnd()*(W.wind.kt[1]-W.wind.kt[0]),g=W.wind.gust;
+  s.w0=[s.windBase,s.windKt];
+  // Easy: 20 to 30 degrees off (with the direction's wander the autoland's crosswind stays under about 10 kt)
+  if(WX.id==='gusty'){const off=(ez?20+wRnd()*10:40+wRnd()*30)*(wRnd()<0.5?-1:1);s.windBase=(Math.round((B.hdg+off)/10)*10%360+360)%360||360;}
+  if(ez){kt=Math.max(kt*0.6,Math.min(kt,C.kt[0]));g=Math.max(g*0.5,Math.min(g,C.gust));}
+  s.windKt=Math.round(kt);s.gustAmp=g;s.wxW=1;s.wxKt=s.windKt;s.wxBase=s.windBase;
+}
+WX_DICE=wxWindDice;
+function wxWindOff(){const s=st;if(!s||!s.wxW)return;const w=s.w0;
+  if(w){if(s.windKt===s.wxKt)s.windKt=w[1];if(s.windBase===s.wxBase)s.windBase=s.windDir=w[0];}
+  s.gustAmp=0.35;s.wxW=0;s.windOff=0;if(!HB.on)s.turb=0;WXF.front.on=0;}
+// the gust's peak (kt) and whether it is worth saying (8 kt or more over the wind)
+const gustKt=()=>Math.round(Math.max(0,st.windKt)*(1+(st.gustAmp||0)));
+const gustOn=()=>gustKt()-Math.max(1,Math.round(st.windKt))>=8;
+// the nearest storm cell to (x, z), drifting with the clouds (WXF.cell, null without cells)
+function wxCell(x,z){const C=CLD;if(!C||!C.cells||WX.id!=='storm')return null;let bd=1e18,bk=-1;
+  for(let k=0;k<C.cells;k++){const o=k*3,dx=C.cellC[o]+C.drift.x-x,dz=C.cellC[o+2]+C.drift.z-z,d=dx*dx+dz*dz;if(d<bd){bd=d;bk=k;}}
+  const c=WXF.cell;c.k=bk;c.d=Math.sqrt(bd);c.x=C.cellC[bk*3]+C.drift.x;c.z=C.cellC[bk*3+2]+C.drift.z;return c;}
+function wxFrontGo(c){const F=WXF.front,s=st;if(F.on)return;
+  const ez=rookie(),br=Math.atan2(c.x-s.pos.x,-(c.z-s.pos.z))*180/Math.PI,dd=((br-s.windDir)%360+540)%360-180;
+  F.on=1;F.t0=s.time;F.k0=s.windKt;F.kt=(15+wRnd()*10)*(ez?0.6:1);F.sw=clamp(dd,-40,40);F.next=s.time+15+30+wRnd()*30;
+  if(ez)toast('Gust front!',2.5);}
+function wxFly(dt){
+  const s=st;if(!s||s.crashed||DF.on)return;
+  // live: a free flight's weather. A run on a fixed weather (ARC.prevWX: the taskings, missions, lessons, challenges,
+  // the daily, the dogfight) flies as it did before the weather: no turbulence, no gust fronts, its own wind and gusts
+  const W=WX.id,F=WXF.front,live=s.wxW&&!s.windHold&&!LES.on&&!ARC.prevWX;
+  // the storm's fronts: 15 s (3 in, 7 held, 5 out) of 15 to 25 kt more, the wind swung up to 40 degrees toward the cell
+  if(F.on){const t=s.time-F.t0,e=t<3?t/3:t<10?1:t<15?(15-t)/5:0;
+    if(t>=15||!live||W!=='storm'){s.windKt=F.k0;s.windOff=0;F.on=0;}else{s.windKt=F.k0+F.kt*e;s.windOff=F.sw*e;}}
+  let c=null;
+  if(W==='storm'&&live){c=wxCell(s.pos.x,s.pos.z);
+    if(c&&c.d<6000){if(!F.next)F.next=s.time+30+wRnd()*30;else if(s.time>=F.next&&!F.on)wxFrontGo(c);}else if(!F.on)F.next=0;}
+  // the turbulence by type and height (Easy 0.4 of it); the haboob's is hbUpdate's
+  if(!HB.on){let tb=0;
+    if(live){const a=s.agl;
+      if(W==='gusty')tb=a<300?0.6:a<1000?0.6-0.5*(a-300)/700:0.1;   // mechanical, low over the ground
+      else if(W==='storm'){if(c)tb=c.d<3000?0.8:c.d<12000?0.3:0;}
+      else if(W==='scattered')tb=TOD.id==='day'&&CLD&&s.pos.y<CLD.base?0.15:0;   // thermals under the base, by day
+      else if(W==='rain')tb=0.2;else if(W==='overcast')tb=0.1;
+      if(rookie())tb*=0.4;}
+    s.turb+=(tb-s.turb)*Math.min(1,dt*0.8);if(tb===0&&s.turb<0.003)s.turb=0;}
+  // the wet runway: rain, a storm cell within 5 km of the field, and the first 60 s after one passed
+  if(W==='storm'){const f=wxCell(APC.x,APC.z);if(f&&f.d<5000)WXF.wetT=60;else WXF.wetT=Math.max(0,WXF.wetT-dt);}else WXF.wetT=0;
+  s.wet=W==='rain'||WXF.wetT>0?1:0;
+}
+// ---- the ATIS style readout ----
+const ATIS_PH=['alpha','bravo','charlie','delta','echo','foxtrot','golf'],DIR8=['north','north east','east','south east','south','south west','west','north west'],DIR8C=['n','ne','e','se','s','sw','w','nw'];
+const dir8=deg=>Math.round((((deg%360)+360)%360)/45)%8;
+const wxFt=m=>Math.max(100,Math.round(m*M2FT/100)*100);
+// a height in feet as the tower says it: three thousand two hundred
+function ftC(ft){const th=Math.floor(ft/1000),h=Math.round((ft-th*1000)/100);let c=[];if(th)c=c.concat(ktC(th),['t_thousand']);if(h)c.push('t_n_'+h,'t_hundred');return c;}
+// the altimeter (inHg): one per flight, low in storms and rain, high in clear air
+const WX_ALT={clear:[30.05,30.15],fog:[30.02,30.12],scattered:[29.98,30.08],overcast:[29.94,30.04],gusty:[29.9,30],rain:[29.88,29.96],storm:[29.85,29.92],haboob:[29.85,29.94]};
+function wxAltim(){const A=WXF.al;if(A.st!==st||A.wx!==WX.id){const r=WX_ALT[WX.id]||WX_ALT.scattered;A.st=st;A.wx=WX.id;A.v=Math.round((r[0]+wRnd()*(r[1]-r[0]))*100)/100;}return A.v;}
+// visibility (statute miles), the ceiling (ft above the field, null without one) and the sky, as text, clips and plain words
+function wxCond(){
+  const W=WX.id,g0=groundHeight(APC.x,APC.z);
+  const o={vis:10,ceil:null,vT:'visibility 10 miles',vC:['t_visibility','t_n_10','t_miles'],vP:'visibility 10 miles',sT:'sky clear',sC:['t_sky_clear'],sP:'clear sky'};
+  if(W==='fog'){const h=TOD.night||TOD.id==='sunset';o.vis=h?0.5:1;o.vT='visibility '+(h?'one half mile':'one mile')+' in fog';o.vC=['t_visibility',h?'t_one_half_mile':'t_one_mile','t_in_fog'];o.vP='visibility '+(h?'half a mile':'one mile')+' in fog';}
+  else if(W==='rain'){const mi=WX.clouds==='shower'?5:wxRainMi();o.vis=mi;o.vT='visibility '+mi+' miles in rain';o.vC=['t_visibility','t_n_'+mi,'t_miles','t_in_rain'];o.vP='visibility '+mi+' miles in rain';}
+  else if(W==='storm'){o.vis=5;o.vT=o.vP='visibility 5 miles';o.vC=['t_visibility','t_n_5','t_miles'];}
+  if(W==='rain'&&WX.clouds==='shower'){const c=o.ceil=wxFt((CLD&&CLD.base||700)-g0);   // Rio's showers: the towers' base, broken
+    o.sT='ceiling '+c.toLocaleString('en-US')+' broken';o.sC=['t_ceiling'].concat(ftC(c),['t_broken']);o.sP='cloud base '+c.toLocaleString('en-US')+' ft';}
+  else if(W==='overcast'||W==='rain'||W==='fog'){const c=o.ceil=CLD&&CLD.deckY?wxFt(CLD.deckY-g0):W==='fog'?200:3000;
+    o.sT='ceiling '+c.toLocaleString('en-US')+' overcast';o.sC=['t_ceiling'].concat(ftC(c),['t_overcast']);o.sP='cloud base '+c.toLocaleString('en-US')+' ft';}
+  else if(W==='storm'){const c=o.ceil=wxFt(1800-g0);
+    o.sT='ceiling '+c.toLocaleString('en-US')+' broken, thunderstorms in the vicinity';o.sC=['t_ceiling'].concat(ftC(c),['t_broken','t_ts_vicinity']);o.sP='thunderstorms nearby';}
+  else if(W==='scattered'||W==='gusty'){const c=wxFt((CLD&&CLD.base||1500)-g0);
+    o.sT='few clouds at '+c.toLocaleString('en-US');o.sC=['t_few_clouds_at'].concat(ftC(c));o.sP='cloud base '+c.toLocaleString('en-US')+' ft';}
+  else if(W==='haboob'){const hf=hbFieldD();   // the wall's distance from the field (ahead of it: positive)
+    if(hf!==null&&hf<=500){o.vis=0.5;o.vT=o.vP='visibility one half mile in blowing dust';o.vC=['t_visibility','t_one_half_mile','t_blowing_dust'];o.sT='';o.sC=[];o.sP='';}
+    else{const i=dir8(HB.hdg+180);o.vis=5;o.vT=o.vP='visibility 5 miles';o.vC=['t_visibility','t_n_5','t_miles'];
+      o.sT='blowing dust '+DIR8[i]+' of the field';o.sC=['t_blowing_dust','t_dir_'+DIR8C[i],'t_of_the_field'];o.sP='blowing dust to the '+DIR8[i];}}
+  return o;
+}
+const windTxtG=()=>windTxt()+(gustOn()?' gusting '+gustKt():'');
+const windCG=()=>windC().concat(gustOn()?['t_gusting'].concat(ktC(gustKt())):[]);
+// a free flight's runway, ramp or 3 mile final start (the challenges, lessons, taskings and missions run their own radio)
+function atisWant(s){return RUNSTART.k==='free'&&!LES.on&&!TASK.on&&!ARC.on&&!DF.on&&(s.mode==='runway'||s.mode==='ramp'||s.mode==='final'&&s.spawn!=='final1');}
+function atisSay(B,gnd){
+  const fld=B.twr.replace(/ Tower.*$/,''),fc='t_atis_'+B.twrClip.replace(/_tower$/,''),ph=ATIS_PH[Math.floor(Date.now()/3.6e6)%7],o=wxCond(),al=wxAltim(),ad=al.toFixed(2).replace('.','');
+  const w=windNow(),wd=+w[0]%360;
+  const text=AC.csS+', '+fld+' information '+ph[0].toUpperCase()+ph.slice(1)+', '+windTxtG()+', '+o.vT+', '+(o.sT?o.sT+', ':'')+'altimeter '+al.toFixed(2)+'.';
+  const clips=[csTs(),fc,'t_ph_'+ph].concat(windCG(),o.vC,o.sC,['t_altimeter'],ad.split('').map(d=>'t_n_'+d));
+  WXF.atis=text;WXF.plain='Weather: wind from the '+DIR8[dir8(wd)]+' at '+w[1]+(gustOn()?' gusting '+gustKt():'')+', '+o.vP+(o.sP?', '+o.sP:'')+'.';
+  return say(gnd?B.gnd:B.twr,text,clips);
+}
+// the precompile queue's 'weather' job: everything this draws, once, at the first flight's pose: the streak programs,
+// the wet runway's (Medium and High), the reflections' points
+function wxWarm(A){
+  const r=renderer,vis=[],sw=GFX.on('wet');if(sw)wetSet(true);wxRefl();
+  for(const o of [WXL.rm,WXL.dm,...WXL.refl]){vis.push([o,o.visible]);o.visible=true;}
+  try{r.compile(scene,camera);r.setRenderTarget(A);r.render(scene,camera);}
+  finally{for(const [o,v] of vis)o.visible=v;if(sw)wetSet(WXL.wet);}
 }
 
 // ---------- C-130 mission area: drop zone and assault strip ----------
@@ -10495,7 +11277,7 @@ function rwTdzTex(wid,long){const k=wid+'_'+(long?1:0);if(RW_TDZ[k])return RW_TD
 function rwStrip(map,wid,len,x,z,h,y,transparent){
   const g=new THREE.PlaneGeometry(wid,len);g.rotateX(-Math.PI/2);g.translate(0,0,-len/2);
   const m=new THREE.Mesh(g,lam(0xffffff,{map:map,transparent:!!transparent,depthWrite:!transparent}));m.position.set(x,y,z);m.rotation.y=-h;
-  if(transparent)m.renderOrder=-1;scene.add(m);WB.tris.runways=(WB.tris.runways||0)+2;return m;}
+  if(transparent)m.renderOrder=-1;scene.add(m);WB.tris.runways=(WB.tris.runways||0)+2;return wetReg(m);}
 const holdTex=tex(64,32,(x,w,h)=>{x.clearRect(0,0,w,h);x.fillStyle='#e8b923';
   for(let i=0;i<w;i+=10){x.fillRect(i,3,6,3);x.fillRect(i,10,6,3);}x.fillRect(0,18,w,3);x.fillRect(0,25,w,3);});
 function wbSignTex(letter,text){return tex(256,56,(x,w,h)=>{x.fillStyle='#111';x.fillRect(0,0,w,h);x.fillStyle='#f2c230';x.fillRect(64,3,w-67,h-6);
@@ -12006,7 +12788,7 @@ function onLanding(e){
   // the card is filled now (the grade badge opens it as the details) and slides in on its own once the aircraft stops
   const dashL=dash?(dash.secs<=150?'A':dash.secs<=180?'B':dash.secs<=210?'C':dash.secs<=240?'D':'F'):null;
   resFill(landOv,{letter:dash?dashL:g.letter,title:(dash?'Luke to Glendale dash, ':seg?(st.spawn==='final1'?'1 mile final segment, ':'3 mile final segment, '):free?'Free flight landing, ':'Landing, ')+g.where+
-    (g.xw>=10?'  ('+Math.round(g.xw)+' kt crosswind)':''),score:dash?fmtT(dash.secs):g.pts+' pts',sub:dash?g.letter+' landing, '+g.pts+' pts':g.line,
+    (g.xw>=10?'  ('+Math.round(g.xw)+' kt crosswind)':'')+(st.wet?'  (wet runway)':''),score:dash?fmtT(dash.secs):g.pts+' pts',sub:dash?g.letter+' landing, '+g.pts+' pts':g.line,
     lines:rows.join(''),board:dash?'mission:dash':free?'free:landing':'',retry:dash?'LUKE DASH':'',tip:dash&&dashL!=='A'?'F-16: full afterburner to 1,000 ft, then fly it level and straight to Glendale':landTip(Object.assign({},g,{letter:dash?dashL:g.letter}))});
   if(free||dash)resArm(()=>{if(!landOv.classList.contains('on')&&!menu.classList.contains('on')&&!pauseOv.classList.contains('on'))resShow(landOv,!seg);},20,true);
   // the full breakdown also goes to Records; the flight carries on through the rollout
@@ -13359,6 +14141,9 @@ function plainOf(l){
   if(/^Miss/.test(t))return 'Range says: you missed. Try again.';
   if(!mine&&who!=='Range')return 'Other pilots talking. Nothing for you.';
   let m;
+  if(/ information [A-Z][a-z]+, wind/.test(t))return WXF.plain;   // weather item 4: the ATIS readout
+  if(/wind check/.test(t))return 'Tower says: the wind is strong and gusty, keep the wings level and the nose straight.';
+  if(/thunderstorm \d+ miles? /.test(t))return 'Tower says: a thunderstorm is near the airport.';
   if(/cleared for takeoff/.test(t))return who+' says: you can take off now.';
   if(m=t.match(/runway (\S+?),? (check wheels down, )?cleared to land/))return who+' says: you can land on runway '+m[1]+'.';
   if(/taxi to the active/.test(t))return 'Ground says: drive to the runway along the yellow line.';
@@ -13627,23 +14412,47 @@ function readback(kind){
            tfc:['Looking for the traffic, ','p_rb_traffic']}[kind];
   vqAdd(L(AC.cs,'pilot',T[0]+AC.cs+'.',[T[1],csP()]),{dep:VQ.lastSay});   // dropped with the call it answers
 }
+// the conditions report (A.atis) still waiting in the queue or on the air
+function atisPending(){const l=A.atis;return !!l&&!l.dead&&(radioQ.indexOf(l)>=0||!!VQ.cur&&VQ.cur.line===l);}
+// a tower call queued behind the one on the air, never cutting it (the first clearance behind the conditions report);
+// the queue's clock stops while paused, so a long ttl only covers the report and a call that comes in meanwhile
+function sayAfter(who,text,clips,o){o=o||{};
+  for(let i=radioQ.length-1;i>=0;i--)if(radioQ[i].pri>=3){radioQ[i].dead=true;radioQ.splice(i,1);}
+  return VQ.lastSay=vqAdd({who:who,text:text,clips:clips},{ok:o.ok,ttl:o.ttl||90});
+}
 function atcUpdate(){
   const s=st,u=toU(s.pos.x,s.pos.z),v=toV(s.pos.x,s.pos.z);
   if(s.onGround) A.ground=1;
   const B=BASES[s.base]||BASES[BASE0];
   const twrC='t_'+B.twrClip, gndC='t_'+B.gndClip, rwyC='t_'+B.rwyClip;
-  if(s.mode==='runway'&&!A.tko&&s.time>0.6){A.tko=1;
-    say(B.twr,AC.cs+', '+B.twr.split(' ').slice(0,2).join(' ')+', '+windTxt()+', runway '+B.rwy+', cleared for takeoff.',
-        [csT(),twrC].concat(windC(),[rwyC,'t_cleared_to']),{ok:onGnd});readback('to');}
-  if(s.mode==='ramp'&&!A.taxi&&s.time>0.6){A.taxi=1;
-    say(B.gnd,AC.cs+', '+B.gnd.split(' ').slice(0,2).join(' ')+', runway '+B.rwy+', taxi to the active via Alpha.',
+  // weather item 4: a free flight's conditions, ATIS style, before its first clearance (which waits for it to end)
+  if(A.atis===undefined&&s.time>0.3)A.atis=atisWant(s)?atisSay(B,s.mode==='ramp'):0;
+  // While the report is queued or on the air the clearance goes into the queue behind it, at once (twrSay: no cut, so
+  // it waits for the report to end, and a pause keeps it queued and silent until Resume); once the report is done, a tower
+  // call that came in meanwhile (the haboob's) is not cut by it
+  const ap=atisPending(),ao=A.atis!==undefined&&(ap||!A.atis||(A.atis.dead||A.atis.aired)&&(!VQ.cur||VQ.cur.pri>2)||s.time>40);
+  const twrSay=ap?sayAfter:say;
+  if(s.mode==='runway'&&!A.tko&&(s.time>0.6||ap)&&ao){A.tko=1;
+    twrSay(B.twr,AC.cs+', '+B.twr.split(' ').slice(0,2).join(' ')+', '+windTxtG()+', runway '+B.rwy+', cleared for takeoff.',
+        [csT(),twrC].concat(windCG(),[rwyC,'t_cleared_to']),{ok:onGnd});readback('to');}
+  if(s.mode==='ramp'&&!A.taxi&&(s.time>0.6||ap)&&ao){A.taxi=1;
+    twrSay(B.gnd,AC.cs+', '+B.gnd.split(' ').slice(0,2).join(' ')+', runway '+B.rwy+', taxi to the active via Alpha.',
         [csT(),gndC,rwyC,'t_taxi_alpha']);readback('wilco');}
   // at the holding point: Glendale's runway 1 end of the parallel taxiway; a world region, near the home runway's first third
   if(s.mode==='ramp'&&A.taxi&&!A.tko&&s.onGround&&(s.base==='kgeu'?v>-70&&v<-20&&u<560:!REGION.az&&Math.abs(v)<120&&u<RWY_LEN/3)){A.tko=1;
     say(B.twr,AC.cs+', runway '+B.rwy+', cleared for takeoff.',[csT(),rwyC,'t_cleared_to'],{ok:onGnd});readback('to');}
-  if(s.mode==='final'&&!A.land&&s.time>0.6){A.land=1;
-    say(B.twr,AC.cs+', '+B.twr.split(' ').slice(0,2).join(' ')+', '+windTxt()+', runway '+B.rwy+', cleared to land.',
-        [csT(),twrC].concat(windC(),[rwyC,'t_cleared_land']),{ok:inAir});readback('land');}
+  if(s.mode==='final'&&!A.land&&(s.time>0.6||ap)&&ao){A.land=1;
+    twrSay(B.twr,AC.cs+', '+B.twr.split(' ').slice(0,2).join(' ')+', '+windTxtG()+', runway '+B.rwy+', cleared to land.',
+        [csT(),twrC].concat(windCG(),[rwyC,'t_cleared_land']),{ok:inAir});readback('land');}
+  // the storm's nearest cell from the field, once, when the first clearance is done
+  if(WX.id==='storm'&&!A.ts&&(A.tko||A.taxi||A.land)&&!VQ.cur&&!radioQ.length&&atisWant(s)){A.ts=1;const c=wxCell(APC.x,APC.z);
+    if(c){const n=Math.max(1,Math.round(c.d/1852)),i=dir8(Math.atan2(c.x-APC.x,-(c.z-APC.z))*180/Math.PI),j=dir8(s.windDir+180);
+      say(B.twr,AC.csS+', thunderstorm '+n+' mile'+(n>1?'s ':' ')+DIR8[i]+' of the field, moving '+DIR8[j]+'.',
+        [csTs(),'t_thunderstorm'].concat(ktC(n),[n>1?'t_miles':'t_mile','t_dir_'+DIR8C[i],'t_of_the_field','t_moving','t_dir_'+DIR8C[j]]));}}
+  // the gusty winds: a wind check on short final, once
+  if(WX.id==='gusty'&&A.land&&!A.wchk&&!s.onGround&&s.agl<150&&s.agl>20&&!LES.on&&!TASK.on&&!DF.on&&approachEnd()){A.wchk=1;const w=windNow();
+    say(B.twr,AC.csS+', wind check, '+w[0]+' at '+w[1]+(gustOn()?' gusting '+gustKt():'')+'.',
+      [csTs(),'t_wind_check'].concat(w[0].split('').map(d=>'t_n_'+d),['t_at'],ktC(w[1]),gustOn()?['t_gusting'].concat(ktC(gustKt())):[]),{ok:inAir});}
   if(!A.pattern&&A.ground&&!s.onGround&&s.agl>240){A.pattern=1;
     say(B.twr,AC.csS+', make right closed traffic, runway '+B.rwy+'.',[csTs(),'t_closed_traffic',rwyC],{ok:inAir});}
   const hdg=((-new THREE.Euler().setFromQuaternion(s.quat,'YXZ').y*180/Math.PI)%360+360)%360;
@@ -13737,7 +14546,7 @@ const endApt=e=>e.name||(e.rwy.code==='KGEU'?'Glendale':e.rwy.code==='KLUF'?'Luk
 // the board (and the records key) of an arcade kind
 const arcBoard=k=>k==='daily'?'daily':k==='landing1'?'arc:landing1':k==='apt'?aptBoard(REGION.id):'arc:landing';
 // start a world airport's challenge: in its region at once, from anywhere else after the region switch
-function aptStart(id){if(REGION.id!==id){pickRegion(id,{resume:{arc:'apt',region:id,type:savedType,tod:TOD.id}});return;}arcStart('apt');}
+function aptStart(id){if(REGION.id!==id){pickRegion(id,{resume:{arc:'apt',region:id,type:savedType,tod:TOD.id,wx:wxOf('apt')}});return;}arcStart('apt');}
 // the UTC date, so the daily challenge is the same worldwide and turns over at 00:00 UTC
 function todayKey(){const d=new Date();return d.getUTCFullYear()*10000+(d.getUTCMonth()+1)*100+d.getUTCDate();}
 function dayRng(k){let s=(k*2654435761)>>>0;return ()=>{s=(s+0x6D2B79F5)>>>0;let t=s;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
@@ -13750,7 +14559,11 @@ function dayRng(k){let s=(k*2654435761)>>>0;return ()=>{s=(s+0x6D2B79F5)>>>0;let
 function dailySpec(){const r=dayRng(todayKey()),d0=DAILY_REGIONS[Math.floor(r()*DAILY_REGIONS.length)],region=ARC.dailyRegion&&REGIONS[ARC.dailyRegion]?ARC.dailyRegion:d0,T=region==='az'?ARC_TARGETS():[aptEnd(region)];
   const o={region:region,type:DAILY_TYPES[Math.floor(r()*DAILY_TYPES.length)],end:T[Math.floor(r()*T.length)],dist:6500+r()*4000,off:(r()*2-1)*1.3,alt:1800+r()*1600};
   o.tod=['day','sunset','night'][Math.floor(r()*3)];o.wdir=10*(1+Math.floor(r()*36));o.wkt=2+Math.floor(r()*11);o.day=todayKey();
-  o.kind=ARC.dailyKind||(ARC.dailyRegion?'landing':dfDayOf(o.day)?'dogfight':'landing');return o;}
+  // weather regions item: the day's weather from the same seed with the region's odds: a thunderstorm 10% of days, else
+  // clear, scattered, overcast, rain or gusty winds, never the haboob or fog (one official attempt, fair for everyone).
+  // Cosmetic to the board: the Worker's daily score rule (server boards.js) does not read it. The daily keeps its own wind.
+  {const u=r();o.wx=u<0.1?'storm':wxPick(wxOdds(region,o.tod),region,(u-0.1)/0.9,['haboob','fog','storm']);}
+  o.kind=ARC.dailyKind||(ARC.dailyRegion?'landing':dfDayOf(o.day)?'dogfight':'landing');if(o.kind==='dogfight')o.wx='clear';return o;}
 // a dogfight day for the Daily challenge (the Worker has the same rule, boards.js dfDay): the UTC day number % 5 === 3
 const dfDayOf=k=>Math.floor(Date.UTC(Math.floor(k/10000),Math.floor(k/100)%100-1,k%100)/864e5)%5===3;
 function placeAir(x,z,aglFt,h,kt){
@@ -13764,24 +14577,26 @@ function arcStart(kind){
   const D=kind==='daily'?dailySpec():null,reg=kind==='apt'?REGION.id:D?D.region:'az';
   if(D&&D.kind==='dogfight'){dfStart({daily:1});return;}   // a dogfight day: the day's seeded fight over the Goldwater Range
   // the arcade is at Glendale and Luke, the daily wherever today's is: from elsewhere switch first, the run starts after the reload
-  if(REGION.id!==reg){pickRegion(reg,{resume:{arc:kind,region:reg,type:savedType,tod:TOD.id}});return;}
+  if(REGION.id!==reg){pickRegion(reg,{resume:{arc:kind,region:reg,type:savedType,tod:TOD.id,wx:wxOf(kind)}});return;}
   const g1=TYPES[savedType]&&TYPES[savedType].minRwy&&REGION.az?RWY_ENDS.find(e=>e.rwy.code==='KPHX'&&e.num==='7L'):RWY_ENDS.find(e=>e.rwy.code==='KGEU'&&e.num==='1');
   // the 1 mile challenge starts lined up on the centre line, on the 3 degree path, at approach speed
   const sp=D?D:kind==='landing1'?{type:savedType,end:g1,dist:1852,off:0,alt:1852*Math.tan(GS)*M2FT,gs:1}
     :{type:savedType,end:kind==='apt'?aptEnd(REGION.id):g1,dist:9000,off:0.9,alt:2500};
   if(sp.end&&sp.end.region)sp.end=sp.end.end;   // a world region's home runway end, by name: the end itself
   if(!sp.end)return;
-  const keepTod=kind==='daily'?(ARC.prevTod||TOD.id):null;
+  const keepTod=kind==='daily'?(ARC.prevTod||TOD.id):null,keepWX=kind==='daily'?(ARC.prevWX||{id:WX.id,random:WX.random}):null;
   pickType(sp.type,1);start('runway',!REGION.az?BASE0:sp.end.rwy.code==='KLUF'?'luke':sp.end.rwy.code==='KPHX'?'phx':'kgeu');
-  if(kind==='daily'){setTOD(sp.tod);try{localStorage.setItem('kgeuTOD',keepTod);}catch(e){}ARC.prevTod=keepTod;hbSync(true);
+  // the daily's own time and (weather item 2, for now) clear weather; the player's both come back on the next start()
+  if(kind==='daily'){setWX(sp.wx||'clear',{keep:true,noLight:true});setTOD(sp.tod);try{localStorage.setItem('kgeuTOD',keepTod);}catch(e){}ARC.prevTod=keepTod;ARC.prevWX=keepWX;hbSync(true);
     st.windBase=st.windDir=sp.wdir;st.windKt=sp.wkt;st.windPh=0;}
+  else wxFix(kind);   // the landing challenges' fixed weather (WX_FIX)
   const e=sp.end,back=Math.atan2(-Math.sin(e.h),Math.cos(e.h))+sp.off;         // bearing from the threshold out along the approach, swung aside
   const x=e.x+Math.sin(back)*sp.dist,z=e.z-Math.cos(back)*sp.dist,h=Math.atan2(e.x-x,-(e.z-z));
   placeAir(x,z,sp.alt,h,AC.vapp*MS2KT*(sp.gs?1:1.35));st.mode='arcade';A.land=1;A.tko=1;
   if(sp.gs){st.vel.y=-Math.hypot(st.vel.x,st.vel.z)*Math.tan(GS);st.throttle=st.power=AC.finalThr;st.trim=AC.finalTrim;
     if(easy){st.flapIdx=AC.landFlap;st.gearDown=true;st.gearPos=1;}else st.flapIdx=AC.finalFlap;
     trimSpawn(st,-GS);}
-  RUNSTART={k:'arc',kind:kind};
+  RUNSTART={k:'arc',kind:kind};wxWindOff();
   Object.assign(ARC,{on:true,kind:kind,t0:st.time,end:e,done:false,dist:sp.dist,par:Math.round((sp.dist+2500)/(AC.vapp*1.3)+25),practice:false});
   if(LB)LB.runStart(arcBoard(kind));
   DEST=e;document.body.classList.add('hasDest');destUI(true);
@@ -14076,11 +14891,11 @@ function dfFall(b,dt){
 function dfStart(o){
   const daily=!!(o&&o.daily);
   // the range is Arizona's: from a world region switch there first, the run starts after the reload
-  if(!REGION.az){pickRegion('az',{resume:{df:1,daily:daily?1:0,region:'az',type:'f16',tod:TOD.id}});return;}
+  if(!REGION.az){pickRegion('az',{resume:{df:1,daily:daily?1:0,region:'az',type:'f16',tod:TOD.id,wx:wxOf('df')}});return;}
   if(!WORLD.ready){toast('Loading '+REGION.city+'…');return;}
-  pickType('f16',1);start('runway','luke');RUNSTART={k:'df',daily:daily};
-  // no haboob over the range: the day sky for this run, the saved choice comes back on the next start()
-  if(TOD.id==='haboob'){const p=TOD.id;setTOD('day');try{localStorage.setItem('kgeuTOD',p);}catch(e){}ARC.prevTod=p;hbSync(true);}
+  pickType('f16',1);start('runway','luke');RUNSTART={k:'df',daily:daily};wxWindOff();
+  // clear weather over the range for this run (WX_FIX; the time of day stays), the saved choice comes back on the next start()
+  wxFix('df');
   dfBuild();
   // in over the range from the Luke side, 7 nm out from the centre, heading in
   const ux=LUKE.x-DF.C.x,uz=LUKE.z-DF.C.z,ul=Math.hypot(ux,uz),x=DF.C.x+ux/ul*13000,z=DF.C.z+uz/ul*13000,h=Math.atan2(DF.C.x-x,-(DF.C.z-z));
@@ -15347,13 +16162,13 @@ function tqClear(){for(const o of TASK.objs){scene.remove(o);o.traverse&&o.trave
 // ---- start, stop, the frame ----
 // id: a tasking; from a world region it switches to Arizona first (the taskings fly around Luke and the White Tanks)
 function taskStart(id,o){const D=TASKS[id];if(!D)return;
-  if(!REGION.az){pickRegion('az',{resume:{task:id,region:'az',type:D.ac,tod:TOD.id}});return;}
+  if(!REGION.az){pickRegion('az',{resume:{task:id,region:'az',type:D.ac,tod:TOD.id,wx:wxOf('task:'+id)}});return;}
   if(!WORLD.ready){toast('Loading '+REGION.city+'…');return;}
   const seed=(o&&o.seed!=null)?o.seed:TASK.test.seed!=null?TASK.test.seed:(Math.random()*4294967296)>>>0;
   pickType(D.ac,1);
-  start('runway',D.base||'luke');RUNSTART={k:'task',id:id};
-  // no haboob for a tasking: the day sky for this run, the saved choice comes back on the next start() (as the dogfight)
-  if(TOD.id==='haboob'){const p=TOD.id;setTOD('day');try{localStorage.setItem('kgeuTOD',p);}catch(e){}ARC.prevTod=p;hbSync(true);}
+  start('runway',D.base||'luke');RUNSTART={k:'task',id:id};wxWindOff();
+  // the weather its brief implies for this run (WX_FIX), the saved choice comes back on the next start() (as the dogfight)
+  wxFix('task:'+id);
   Object.assign(TASK,{on:true,id:id,def:D,seed:seed,R:tqRng(seed),si:0,stage:null,t:0,brief:false,ask:null,quiet:null,later:[],done:false,res:null,sens:false,log:[]});
   tqClear();
   const d=TASK.d={id:id,seed:seed,mode:runMode(),t0:0,replies:0,replyT:0,missed:0};
@@ -15429,7 +16244,9 @@ function tqBriefShow(d){const D=TASK.def,B=D.brief(d),ov=$('tkBrief');
   const h=$('tkbT');h.textContent=D.name.toUpperCase();const mt=document.createElement('span');mt.className='modeTag '+runMode();mt.textContent=runMode()==='easy'?'EASY':'HARD';h.appendChild(mt);
   $('tkbAc').textContent=B.ac;$('tkbSit').textContent=B.sit;
   $('tkbSt').innerHTML='';D.stages.forEach((s,i)=>{const li=document.createElement('li');li.innerHTML='<i></i><span></span>';li.firstChild.textContent=String(i+1);li.lastChild.textContent=s.name;$('tkbSt').appendChild(li);});
-  $('tkbF').innerHTML='';B.facts.forEach(f=>{const s=document.createElement('span');s.innerHTML='<b></b><i></i>';s.firstChild.textContent=f[0];s.lastChild.textContent=f[1];$('tkbF').appendChild(s);});
+  // weather regions item: the tasking's fixed weather next to its wind
+  const F=B.facts.some(f=>/^WIND/.test(f[0]))?B.facts.concat([['WEATHER',wxFact(wxOf('task:'+TASK.id))]]):B.facts;
+  $('tkbF').innerHTML='';F.forEach(f=>{const s=document.createElement('span');s.innerHTML='<b></b><i></i>';s.firstChild.textContent=f[0];s.lastChild.textContent=f[1];$('tkbF').appendChild(s);});
   $('tkbHow').textContent=B.how||'Mission Control calls on the radio. Answer with the buttons at the top of the screen.';
   TASK.brief=true;paused=true;pauseOv.classList.remove('on');ov.classList.add('on');
 }
@@ -16005,7 +16822,7 @@ function runRestart(){const R=RUNSTART;
   start(R.mode||'runway',R.base||undefined);}
 function start(mode,base){
   // missions, the strike and the Luke dash are Arizona's for now: from a world region they switch back
-  if(!REGION.az&&(mode==='range'||mode==='drop'||mode==='short'||base==='luke')){pickRegion('az',{resume:{mode:mode,base:base,type:acType,tod:TOD.id}});return;}
+  if(!REGION.az&&(mode==='range'||mode==='drop'||mode==='short'||base==='luke')){pickRegion('az',{resume:{mode:mode,base:base,type:acType,tod:TOD.id,wx:wxOf(mode==='range'&&acType==='a10'?'gunrun':mode)}});return;}
   if(!WORLD.ready){toast('Loading '+REGION.city+'\u2026');return;}
   if(!baseOK(acType,base||SPAWN_BASE)){const hb=HOME(acType);if(!REGION.az){pickRegion('az',{resume:{mode:mode,base:hb,type:acType,tod:TOD.id}});return;}base=hb;SPAWN_BASE=hb;locSel();}
   if(FM.on)fmClose();
@@ -16015,7 +16832,11 @@ function start(mode,base){
   // gfxfix item 3: the battery guard's drop if a restart skipped the menu, and the precompile queue drained before the
   // first flight frame (it runs again after a tier change; normally the menu's frames have drained it already)
   GFX.pendingApply();gfxDrain();
-  if(ARC.prevTod){const p=ARC.prevTod;ARC.prevTod=null;setTOD(p);}
+  // the player's time and weather back after a daily, a dogfight, a tasking or the night lesson; Random rolls again
+  {const pw=ARC.prevWX,pt=ARC.prevTod,hb0=WX.id==='haboob';ARC.prevWX=ARC.prevTod=null;
+    if(pw)setWX(pw.id,{random:pw.random,noLight:true});
+    if(WX.random)wxRoll({start:true,quiet:true,noLight:true});
+    if(pt||hb0!==(WX.id==='haboob'))setTOD(pt||TOD.id);else if(cloudMat&&CLOUDS.preset!==(CLOUDS.forced||WX.clouds))cloudsAuto();}
   setType(acType);useModel(acType);sizeShadow();vqReset();radioHush();radioFadeTok++;radioVolApply();chatT=9;atcT=0;TK.paused=false;
   const spawn=mode;if(mode==='final1')mode='final';RUNSTART={k:'free',mode:spawn,base:base||SPAWN_BASE,type:acType};
   st=createState(mode,base||SPAWN_BASE,spawn==='final1'?1852:0);st.type=acType;st.spawn=spawn;
@@ -16032,6 +16853,9 @@ function start(mode,base){
   if(mode==='range')strikeStart();
   if(mode==='drop'||mode==='short')missStart(mode==='drop'?'drop':'short');
   if(mode==='drop')dzStart();
+  // the missions' fixed weather (WX_FIX: the drop scattered, the strike range, the gun run and the short field clear),
+  // after hudClear (a lesson's end puts the player's back)
+  if(mode==='range'||mode==='drop'||mode==='short'){wxFix(mode==='range'&&acType==='a10'?'gunrun':mode);wxWindOff();}   // and the plain wind dice, as before the weather
   hbSync(true);
   csmRecv();   // the receivers once a flight, here at the tap rather than on its first frame
   if(LB){LB.reset();if(mode==='range'||mode==='drop'||mode==='short')LB.runStart(mode==='range'?(acType==='a10'?'arc:gunrun':'arc:strike'):mode==='drop'?'arc:drop':'mission:short');}
@@ -16062,7 +16886,7 @@ function hudClear(){
   if(window.layoutCtl)layoutCtl();   // the LOOK pad and DROP button go with the mission
 }
 const pauseOv=$('pauseOv');
-function openMenu(scr){GFX.pendingApply();if(BUG&&BUG.askHide)BUG.askHide();if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.forced=null;hudClear();pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
+function openMenu(scr){GFX.pendingApply();if(BUG&&BUG.askHide)BUG.askHide();if(running&&!st.crashed)paused=true;radioFade(120);MUSIC.forced=null;hudClear();wxBack();pauseOv.classList.remove('on');menu.classList.add('on');nav(scr||'sHome',true);}
 // the pause button, P and a backgrounded app all land here; the sheet shows while paused
 // bugs1 item 5: the bug report's screenshot. Going to paused asks for one frame: the render loop copies the WebGL canvas
 // right after its next render, in the same task, so preserveDrawingBuffer stays off and no other frame pays anything.
@@ -16091,7 +16915,7 @@ function togglePause(){if(DF.brief||TASK.brief||LES.brief)return;   // the dogfi
 $('pResume').onclick=()=>pzResume();   // fix2 item 3: waits while a tier change applies
 // Restart and Apply are one button: it restarts this flight (same start, mission or range) until
 // an aircraft, base or start is changed on the sheet, then it reads Apply and flies the new picks.
-// Time of day needs neither, it changes the sky at once.
+// Time of day and the weather need neither, they change the sky at once.
 var PZ0=null;
 function pzChanged(){return !!PZ_LOC||!!PZ0&&(PZ0.t!==savedType||PZ0.b!==SPAWN_BASE||PZ0.p!==SPAWN_POS);}
 function pzApplyUI(){const b=$('pApply');if(b)b.textContent=pzChanged()?'Apply':'Restart';}
@@ -17008,12 +17832,12 @@ function startLesson(id,force,o){   // o.brief false: a restart (pause Restart, 
   const L=lessonDef(id);if(L&&L.oral){if(!force&&!lessonOpen(id)){lockSay(id);return;}gradeOv.classList.remove('on');if(!menu.classList.contains('on')||curScr!=='sSchool')openMenu('sSchool');oralStart(id);return;}   // the oral exam: no flight, its sheet on the school screen
   if(!L||!L.fly)return;   // a lesson still to come has no flight yet
   if(!force&&!lessonOpen(id)){lockSay(id);return;}   // locked by the placement (force: a retry, a restart, the tests)
-  if(!REGION.az){pickRegion('az',{resume:{lesson:id,tod:TOD.id}});return;}   // flight school is at Glendale
+  if(!REGION.az){pickRegion('az',{resume:{lesson:id,tod:TOD.id,wx:wxOf('les:'+id)}});return;}   // flight school is at Glendale
   if(id==='first')pickType('cessna',1);else if(acType!==schoolAc)pickType(schoolAc,1);
   const S=SCH[acType];gradeOv.classList.remove('on');
-  start(L.fly.at||'final','kgeu');A.land=1;
+  start(L.fly.at||'final','kgeu');A.land=1;lesWX(id);
   lesEl.classList.toggle('tut',id==='first');$('lesQuit').textContent=id==='first'?'Skip':'End';
-  RUNSTART={k:'les',id:id};LES.on=id;LES.t=0;LES.ph=0;LES.d={};LES.name=L.name;LES.quiz=null;lesT.textContent=id==='first'?'Lesson 1: First flight':L.short||LES.name;   // the lesson's name alone (SLOW FLIGHT); the tutorial keeps its number
+  RUNSTART={k:'les',id:id};wxWindOff();LES.on=id;LES.t=0;LES.ph=0;LES.d={};LES.name=L.name;LES.quiz=null;lesT.textContent=id==='first'?'Lesson 1: First flight':L.short||LES.name;   // the lesson's name alone (SLOW FLIGHT); the tutorial keeps its number
   st.ezManFlap=0;navOff();L.fly.start(S,LES.d);
   if(o&&o.brief===false)lesGo(true);else brOpen(L);   // the briefing holds the sim; the lesson card, the clock and the opening line wait for LET'S FLY (lesGo)
 }
@@ -17831,11 +18655,18 @@ function hoodOn(){if(!HOOD.on){HOOD.on=true;HOOD.cam=camMode;}camMode=1;snapCame
 function lesRestore(){if(HOOD.on){HOOD.on=false;document.body.classList.remove('hoodOn');camMode=HOOD.cam;snapCamera=true;}
   if(LES_W){if(st){st.windBase=st.windDir=LES_W.base;st.windKt=LES_W.kt;st.windPh=LES_W.ph;st.gustAmp=LES_W.gust;st.windHold=0;}LES_W=null;}
   LES_FIELD=null;divClose();document.body.classList.remove('navMapOff');
-  if(LES_TOD){const p=LES_TOD;LES_TOD=null;if(ARC.prevTod===p)ARC.prevTod=null;if(TOD.id==='night')setTOD(p);}}   // the night lesson: the player's time of day back
+  const lw=LES_WX;if(lw){LES_WX=null;if(ARC.prevWX===lw)ARC.prevWX=null;setWX(lw.id,{random:lw.random,noLight:true});}
+  if(LES_TOD){const p=LES_TOD;LES_TOD=null;if(ARC.prevTod===p)ARC.prevTod=null;if(TOD.id==='night')setTOD(p);else if(lw)setTOD(TOD.id);}else if(lw)setTOD(TOD.id);}   // the night lesson: the player's time of day back
 // the night lesson's sky without saving it as the player's choice (as the daily does): the kept one stays in kgeuTOD and
 // ARC.prevTod (the next start() puts it back: a restart sets night again), LES_TOD for lesRestore
-let LES_TOD=null;
-function lesNight(){const k=LES_TOD||TOD.id;setTOD('night');try{localStorage.setItem('kgeuTOD',k);}catch(e){}ARC.prevTod=k;LES_TOD=k;hbSync(true);}
+// weather item 2: no haboob on the night lesson either (it was the old Time row's fourth chip): LES_WX, ARC.prevWX as the tod
+let LES_TOD=null,LES_WX=null;
+// weather regions item: a lesson's fixed weather (WX_FIX: clear, the crosswind lesson's gusty look under lesWind's steady
+// wind); the player's comes back at the lesson's end (lesRestore). The checkride's tasks each take their lesson's.
+function lesWX(id){const p=wxFix('les:'+id);if(p)LES_WX=p;}
+function lesNight(){const k=LES_TOD||TOD.id;
+  if(WX.id==='haboob'&&!LES_WX){LES_WX={id:WX.id,random:WX.random};ARC.prevWX=LES_WX;setWX('clear',{keep:true,noLight:true});}
+  setTOD('night');try{localStorage.setItem('kgeuTOD',k);}catch(e){}ARC.prevTod=k;LES_TOD=k;hbSync(true);}
 // the forced landing field: 600 by 150 m of flat open ground 1.5 to 2.5 nm downwind of us, its long side along the wind;
 // the first spot that is flat (under 5 m across it), dry, unpaved, clear of obstacles, the runway and the mission sites
 function emOK(cx,cz,ax,az){let lo=1e9,hi=-1e9;
@@ -17911,10 +18742,10 @@ function rideTick(dt){RIDE.t+=dt;
 // a task flown as its lesson starts, without the briefing: the same set up as startLesson and lesGo
 function rideRun(i){const id=RIDE.seq[i],L=lessonDef(id);if(!L||!L.fly){rideFinish(true);return;}
   const rr=LB&&LB.E.runs['lesson:ride'];   // the ride's board run outlives each task's start() (LB.reset, a new st)
-  RIDE.i=i;RIDE.gap=0;RIDE.busy=1;bannerWait=true;start(L.fly.at||'final','kgeu');bannerWait=false;RIDE.busy=0;A.land=1;   // start(): a clean flight, the ride kept (RIDE.busy), held pops held
+  RIDE.i=i;RIDE.gap=0;RIDE.busy=1;bannerWait=true;start(L.fly.at||'final','kgeu');bannerWait=false;RIDE.busy=0;A.land=1;lesWX(id);   // start(): a clean flight, the ride kept (RIDE.busy), held pops held
   if(rr){rr.st=st;LB.E.runs['lesson:ride']=rr;}
   const S=SCH[acType];lesEl.classList.remove('tut');$('lesQuit').textContent='End';
-  RUNSTART={k:'les',id:'ride'};LES.on=id;LES.t=0;LES.ph=0;LES.d={};LES.name=L.name;LES.quiz=null;LES.brief=false;LES.last='ride';rideTitle(rideName(id));
+  RUNSTART={k:'les',id:'ride'};wxWindOff();LES.on=id;LES.t=0;LES.ph=0;LES.d={};LES.name=L.name;LES.quiz=null;LES.brief=false;LES.last='ride';rideTitle(rideName(id));
   st.ezManFlap=0;navOff();L.fly.start(S,LES.d);
   paused=false;lesEl.classList.add('on');ezUI();
   gBegin(Object.assign({},L,{quiet:true}));   // the lesson's own tasks; no cues (quiet), Easy off (RIDE.on)
@@ -18041,9 +18872,47 @@ document.querySelectorAll('.locs').forEach(L=>L.addEventListener('scroll',()=>lo
 addEventListener('resize',()=>requestAnimationFrame(()=>document.querySelectorAll('.locs').forEach(locFade)));
 function pickBase(id){SPAWN_BASE=BASES[id]?id:HOME(acType);try{localStorage.setItem('kgeuBase',SPAWN_BASE);}catch(e){}
   locSel();sumUI();}
-// the haboob is Arizona's: no Haboob chip in a world region (setTOD falls back to day there)
-if(!REGION.az)document.querySelectorAll('.pick[data-tod="haboob"]').forEach(b=>{b.style.display='none';});
 document.querySelectorAll('.pick[data-tod]').forEach(b=>b.addEventListener('click',()=>{setTOD(b.dataset.tod);sumUI();}));
+// ---- weather item 2: the WEATHER pill (Fly tab #wxPill, pause sheet #wxPillP), the dice and the sheet (#wxOv) ----
+
+function wxSheetBuild(){const G=$('wxGrid');if(!G||G.childElementCount)return;
+  for(const id of [...Object.keys(WX_SET),'random']){const W=WX_SET[id],b=document.createElement('button');b.className='wxT'+(W?'':' rnd');b.dataset.wx=id;
+    b.setAttribute('role','radio');b.innerHTML='<i aria-hidden="true"></i><b></b><span></span>';
+    b.children[0].textContent=W?W.icon:'🎲';b.children[1].textContent=W?W.name:'Random';b.children[2].textContent=W?W.hint:'';
+    b.addEventListener('click',()=>wxTile(id));G.appendChild(b);}}
+function wxUI(){
+  for(const id of ['wxPill','wxPillP']){const b=$(id);if(!b)continue;
+    b.querySelector('i').textContent=WX.icon;b.querySelector('.lg').textContent=WX.name;b.querySelector('.sm').textContent=WX_SHORT[WX.id]||WX.name;
+    b.querySelector('small').hidden=!WX.random;
+    b.setAttribute('aria-label','Weather: '+WX.name+(WX.random?', random':'')+'. Change the weather');b.classList.toggle('rndOn',WX.random);}
+  wxOv.querySelectorAll('.wxT').forEach(b=>{const id=b.dataset.wx,on=id==='random'?WX.random:!WX.random&&id===WX.id,off=!!WX_SET[id]&&!wxOK(id);
+    b.classList.toggle('sel',on);b.setAttribute('aria-checked',String(on));b.classList.toggle('off',off);b.setAttribute('aria-disabled',String(off));
+    if(id==='haboob')b.children[2].textContent=off?'Arizona only':WX_SET.haboob.hint;});
+}
+function wxOpen(){wxSheetBuild();wxUI();clearTimeout(wxClose.t);clearTimeout(wxTile.t);$('wxT').textContent='WEATHER';wxOv.classList.remove('out');wxOv.classList.add('on');}
+function wxClose(now){clearTimeout(wxClose.t);if(!wxOv.classList.contains('on'))return;if(now){wxOv.classList.remove('on','out');return;}
+  wxOv.classList.add('out');wxClose.t=setTimeout(()=>wxOv.classList.remove('on','out'),150);}
+function wxTile(id){
+  // the sheet's Random tile: what it rolled in the sheet's title and ringed, then the sheet goes (no toast over the controls)
+  if(id==='random'){const r=wxRoll({quiet:true});sumUI();$('wxT').textContent='Rolled: '+WX_SET[r].icon+' '+WX_SET[r].name;
+    wxOv.querySelectorAll('.wxT').forEach(b=>b.classList.toggle('sel',b.dataset.wx===r||b.dataset.wx==='random'));
+    clearTimeout(wxTile.t);wxTile.t=setTimeout(()=>wxClose(),900);return;}
+  if(!wxOK(id)){wxToast('The haboob is Arizona only');return;}
+  setWX(id);sumUI();wxClose();}
+// what the dice rolled, where it covers no control: on the Fly tab its bottom just above the chip rows (over the
+// aircraft card's words), in the pause sheet at the foot of the left panel (under the music), 2 s
+function wxToast(msg){const t=$('wxToast');if(!t)return;t.textContent=msg;
+  let x=innerWidth/2,y=innerHeight/2,mw=innerWidth-32;
+  const L=pauseOv.classList.contains('on')&&pauseOv.querySelector('.pzL'),F=menu.classList.contains('on')&&$('sFly').querySelector('.frows');
+  if(L&&L.offsetWidth){const r=L.getBoundingClientRect();x=r.left+r.width/2;y=r.bottom-8;mw=r.width-16;}
+  else if(F&&F.offsetWidth){const r=F.getBoundingClientRect();y=r.top-6;}
+  t.style.left=Math.round(x)+'px';t.style.top=Math.round(y)+'px';t.style.maxWidth=Math.round(mw)+'px';
+  t.classList.add('on');clearTimeout(wxToast.t);wxToast.t=setTimeout(()=>t.classList.remove('on'),2000);}
+for(const id of ['wxPill','wxPillP'])$(id).addEventListener('click',wxOpen);
+for(const id of ['wxRnd','wxRndP'])$(id).addEventListener('click',()=>{wxRoll();sumUI();});
+$('wxX').addEventListener('click',()=>wxClose());
+wxOv.addEventListener('click',e=>{if(e.target===wxOv)wxClose();});
+wxUI();
 const POS_OK=['runway','ramp','final1','final'];
 let SPAWN_POS='runway';try{const v=localStorage.getItem('kgeuPos');if(POS_OK.includes(v))SPAWN_POS=v;}catch(e){}
 function pickPos(id){SPAWN_POS=POS_OK.includes(id)?id:'runway';try{localStorage.setItem('kgeuPos',SPAWN_POS);}catch(e){}
@@ -18092,7 +18961,7 @@ function navBack(){
   if(fromPause&&!NAV.length){fromPause=false;menuClose();pauseOv.classList.add('on');CARP.sync();return;}
   showScr(NAV.pop()||'sHome');
 }
-function menuClose(){plClose(true);fromPause=false;menu.classList.remove('on','see3d');SHOW.on=false;document.body.classList.remove('menuOn');}
+function menuClose(){plClose(true);wxClose(true);fromPause=false;menu.classList.remove('on','see3d');SHOW.on=false;document.body.classList.remove('menuOn');}
 document.querySelectorAll('#menu .back').forEach(b=>b.onclick=navBack);
 $('hFly').onclick=()=>tabGo('sFly');$('hSch').onclick=()=>tabGo('sSchool');$('hChal').onclick=()=>tabGo('sArc');
 $('hRec').onclick=()=>recOpen();$('bHelp').onclick=()=>nav('sHelp');
@@ -18206,7 +19075,7 @@ function showRender(dt,c){
   const x=c.pos*D;cam.aspect=r.width/r.height;cam.position.set(x,dist*Math.sin(el)-lift,dist*Math.cos(el));cam.lookAt(x,-lift,0);cam.updateProjectionMatrix();
   if(!SHOW.scene.environment)SHOW.scene.environment=envDay();   // before the scissor: a first build renders to its own targets
   renderer.setScissorTest(true);renderer.setScissor(r.left,H-r.bottom,r.width,r.height);renderer.setViewport(r.left,H-r.bottom,r.width,r.height);
-  pfsTone('show');renderer.render(SHOW.scene,cam);pfsTone(TOD.id);
+  pfsTone('show');renderer.render(SHOW.scene,cam);pfsTone(todKey());
   renderer.setScissorTest(false);renderer.setViewport(0,0,innerWidth,H);
 }
 
@@ -18302,7 +19171,9 @@ function dailyCard(wide){const D=dailySpec(),DI=AC_INFO[D.type];let used=false;t
   if(D.kind==='dogfight')return {id:'daily',lb:'daily',icon:'dogfight',ac:'Daily challenge',here:1,name:'Red Flag Dogfight',
     desc:'Barry M. Goldwater Range, F-16. '+(rookie()?'Easy':'Hard')+' mode, half the score counts. '+tail,go:()=>arcStart('daily')};
   return {id:'daily',lb:'daily',ac:'Daily challenge',here:1,name:endApt(D.end)+', runway '+D.end.num,
-    desc:DI[1]+', '+D.tod+', wind '+String(D.wdir).padStart(3,'0')+' at '+D.wkt+'. '+(used?'Official attempt flown, practice only. ':wide?'Same worldwide. One official attempt. ':'One official attempt. ')+'Next in <i class="cd">'+dailyLeft()+'</i>',go:()=>arcStart('daily')};}
+    desc:DI[1]+', '+D.tod+', '+wxFact(D.wx)+', wind '+String(D.wdir).padStart(3,'0')+' at '+D.wkt+'. '+(used?'Official attempt flown, practice only. ':wide?'Same worldwide. One official attempt. ':'One official attempt. ')+'Next in <i class="cd">'+dailyLeft()+'</i>',go:()=>arcStart('daily')};}
+// a weather as a fact: its icon and name (the daily card, the tasking brief's WEATHER)
+const wxFact=id=>{const W=WX_SET[id]||WX_SET.clear;return W.icon+'\u00a0'+W.name;};
 function dailyLeft(){const n=Date.now(),d=new Date(n),nx=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()+1),s=Math.max(0,Math.floor((nx-n)/1000));
   return Math.floor(s/3600)+':'+String(Math.floor(s/60)%60).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
 setInterval(()=>{if(!menu.classList.contains('on')||curScr!=='sArc')return;const t=dailyLeft();document.querySelectorAll('.mcard .cd').forEach(e=>e.textContent=t);},1000);
@@ -19223,7 +20094,7 @@ function irTag(){
       // r128 keeps one IR program for every instanced mesh, with or without instance colours;
       // give the plain ones white colours so the attribute is always there. Fix2 item 4: only for the IR pass (renderIR
       // puts them on and takes them off again): left on, the mesh's own material would need its USE_INSTANCING_COLOR
-      // program when drawn normally after the IR view (the cloud puffs' cloudHD linked in flight)
+      // program when drawn normally after the IR view (the old cloud puffs' material linked in flight)
       if(o.isInstancedMesh&&(!o.instanceColor||o.instanceColor===d.irIC)){
         if(!d.irIC)d.irIC=new THREE.InstancedBufferAttribute(new Float32Array(o.instanceMatrix.count*3).fill(1),3);
         IR.ic.push(o);}
@@ -19239,7 +20110,7 @@ function renderIR(){
   if(irDirty||performance.now()-IR.t>1000)irTag();
   const inv=SENSOR.mode==='irb',u=IR_MAT.uniforms,night=TOD.night;
   u.uInvert.value=inv?1:0;u.uTime.value=(performance.now()/1000)%97;
-  u.uAmb.value=night?0.06:TOD.id==='sunset'||TOD.id==='haboob'?0.1:0.13;u.uShade.value=night?0.05:0.14;u.uHot.value=0.8;
+  u.uAmb.value=night?0.06:TOD.id==='sunset'||TOD.hb?0.1:0.13;u.uShade.value=night?0.05:0.14;u.uHot.value=0.8;
   if(SENSOR.mode==='nir'){u.uInvert.value=0;u.uAmb.value=0.3;u.uShade.value=0.2;u.uHot.value=0.12;}   // sensor item 3: NIR at night
   camera.updateMatrixWorld();
   _irSun.copy(sun.position).normalize().transformDirection(camera.matrixWorldInverse);u.uSun.value.copy(_irSun);
@@ -19248,10 +20119,11 @@ function renderIR(){
   const bg=scene.background,skyV=sky.visible;_irFog.copy(scene.fog.color);
   scene.fog.color.setRGB(inv?1-sg-0.06:sg+0.06,inv?1-sg-0.06:sg+0.06,inv?1-sg-0.06:sg+0.06);
   scene.background=IR_BG;sky.visible=false;scene.overrideMaterial=IR_MAT;camera.layers.set(0);IR.pass=true;
+  const cldV=CLOUD_MESH?CLOUD_MESH.visible:false;if(CLOUD_MESH)CLOUD_MESH.visible=false;   // weather item 1: cold, and the override draws a billboard as a hard square
   const ic=IR.ic;for(let i=0;i<ic.length;i++)if(!ic[i].instanceColor)ic[i].instanceColor=ic[i].userData.irIC;
   try{pfxHold(()=>renderer.render(scene,camera));}   // fix2 item 9: resolved once, after the hot points
   finally{for(let i=0;i<ic.length;i++)if(ic[i].instanceColor===ic[i].userData.irIC)ic[i].instanceColor=null;}
-  IR.pass=false;scene.overrideMaterial=null;scene.background=null;scene.fog.color.copy(_irFog);
+  IR.pass=false;scene.overrideMaterial=null;scene.background=null;scene.fog.color.copy(_irFog);if(CLOUD_MESH)CLOUD_MESH.visible=cldV;
   // hot points: every airport light on, grey, over the frame
   const AU=AL_MAT.uniforms,lw=AU.uLights.value,bl=inv?THREE.MultiplyBlending:THREE.AdditiveBlending;
   AU.uLights.value=Math.max(lw,night?1:0.75);AU.uMono.value=inv?2:1;
@@ -19322,8 +20194,33 @@ DUSTFX.tex=(()=>{const c=document.createElement('canvas');c.width=c.height=512;c
   // grains: short bright dashes
   for(let i=0;i<900;i++){const X=Math.random()*512,Y=Math.random()*512,v=170+Math.random()*85;x.fillStyle=`rgba(${v|0},${v|0},${v|0},${0.25+Math.random()*0.55})`;x.fillRect(X,Y,1+Math.random()*0.8,2+Math.random()*5);}
   const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.generateMipmaps=false;t.minFilter=t.magFilter=THREE.LinearFilter;return t;})();
-const PFX_DUST=`uniform sampler2D tDust;uniform vec4 uDust,uDustF;uniform vec3 uDustC;
+// weather item 3: rain on the canopy, the same path (cockpit view, Medium and High: GFX.FX.rain). RAINFX.tex is one
+// 512 tile of small drops (2 to 6 px at 2x, about one screen high), each with a thin run tail above it (r: cover, the
+// tail fainter; g: the glint at the top of the drop; b: its dark lower rim). Two offset layers, the second sparser,
+// weighted to the upper third and the sides of the glass, run down the screen and faster with the airspeed (uRain.z),
+// each drop the scene behind it greyed a little with its glint, and a light smear toward grey at the edges (uRain.y).
+// uRain.x 0 skips it.
+const RAINFX={k:0,sm:0,ph:0,fr:-1,tex:null};
+RAINFX.tex=(()=>{const N=512,D=new Uint8Array(N*N*4),sm=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);},
+    put=(x,y,o,v)=>{const k=((((y|0)&(N-1))*N+((x|0)&(N-1)))*4)+o;D[k]=Math.max(D[k],v*255);};
+  for(let i=0;i<85;i++){const cx=hash(i,601)*N,cy=hash(i,602)*N,r=1.0+Math.pow(hash(i,603),1.6)*1.3,R=Math.ceil(r)+2,L=3+hash(i,605)*10*(r/2);
+    for(let y=-R;y<=R;y++)for(let x=-R;x<=R;x++){const dx=x/r,dy=y/r,q=Math.sqrt(dx*dx+dy*dy);if(q>1.25)continue;
+      const cv=1-sm(0.7,1.2,q);put(cx+x,cy+y,0,cv);put(cx+x,cy+y,1,cv*Math.max(0,1-Math.hypot(dx+0.3,dy-0.45)/0.6));put(cx+x,cy+y,2,cv*sm(0.4,1,q)*Math.max(0,-dy));}
+    for(let t=1;t<=L;t++){const f=0.6*(1-t/(L+1));put(cx,cy+r+t,0,f);put(cx+(hash(i,606)<0.5?-1:1)*0.5,cy+r+t,0,f*0.5);}}
+  const t=new THREE.DataTexture(D,N,N,THREE.RGBAFormat);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.magFilter=t.minFilter=THREE.LinearFilter;t.generateMipmaps=false;t.needsUpdate=true;return t;})();
+const PFX_DUST=`uniform sampler2D tDust,tRain;uniform vec4 uDust,uDustF,uRain;uniform vec3 uDustC;
+vec3 pfxRain(vec3 c){
+  if(uRain.x<=0.0)return c;
+  vec2 q=vScr*vec2(uRain.w,1.0);
+  vec4 a=texture2D(tRain,q+vec2(0.0,uRain.z)),b=texture2D(tRain,q*1.37+vec2(0.37,0.11+uRain.z*1.2));
+  float wt=0.25+0.75*max(smoothstep(0.6,0.95,vScr.y),smoothstep(0.28,0.48,abs(vScr.x-0.5)));
+  float m=max(a.r,b.r*0.6)*uRain.x*wt,l=dot(c,vec3(0.299,0.587,0.114));
+  vec3 d=c*0.5+vec3(l*0.08+0.03)+vec3(0.85)*max(a.g,b.g*0.6)-c*0.3*max(a.b,b.b*0.6);   // a small dark lens, its glint
+  c=mix(c,d,m);
+  return mix(c,vec3(l*0.85+0.06),uRain.y*smoothstep(0.35,0.85,length((vScr-0.5)*vec2(1.25,1.5))));
+}
 vec3 pfxDust(vec3 c){
+  c=pfxRain(c);
   if(uDust.x<=0.0)return c;
   vec2 d=(vScr-uDustF.xy)*vec2(uDustF.z,1.0);float r=length(d);
   vec4 s=texture2D(tDust,vec2(atan(d.y,d.x)*0.1591549*uDustF.w,log(r+0.03)*0.55-uDust.z));
@@ -19331,7 +20228,7 @@ vec3 pfxDust(vec3 c){
   return mix(c,uDustC*0.4,uDust.y*smoothstep(0.32,0.9,length((vScr-0.5)*vec2(1.25,1.5))));
 }
 `;
-const PFX_DU=()=>({tDust:{value:DUSTFX.tex},uDust:{value:new THREE.Vector4()},uDustF:{value:new THREE.Vector4(0.5,0.5,1,5)},uDustC:{value:new THREE.Color()}});
+const PFX_DU=()=>({tDust:{value:DUSTFX.tex},uDust:{value:new THREE.Vector4()},uDustF:{value:new THREE.Vector4(0.5,0.5,1,5)},uDustC:{value:new THREE.Color()},tRain:{value:RAINFX.tex},uRain:{value:new THREE.Vector4()}});
 // fix2 item 4: the sensor view's light unsharp mask, uniforms only (uSharp 0 is the plain composite): the centre less
 // the mean of its four neighbours (uTexel apart, held inside the drawn uUvS rectangle), times uSharp, the difference
 // clamped to 0.1 so an edge gains at most a one pixel lift, no halo or ringing
@@ -19553,7 +20450,7 @@ function pfxRender(ir){
   if(layer){
     if(s<1){   // the scaled world upscaled into FULL (no sharpening, dust or bloom), the layer over it there
       if(!PFX.full){PFX.full=pfxRT(W,H,false);PFX.allocN++;}
-      const u=PFX_CMP.uniforms;u.tColor.value=PFX.rt.texture;u.tBloom.value=PFX_BLACK;u.uStr.value=0;u.uSharp.value=0;u.uNir.value=0;u.uDust.value.set(0,0,0,0);
+      const u=PFX_CMP.uniforms;u.tColor.value=PFX.rt.texture;u.tBloom.value=PFX_BLACK;u.uStr.value=0;u.uSharp.value=0;u.uNir.value=0;u.uDust.value.set(0,0,0,0);u.uRain.value.x=0;
       pfxPass(PFX_CMP,PFX.full);src=PFX.full;
       PFX_UVS.value.set(1,1);for(const t of [PFX.ed,PFX.wt])t.viewport.set(0,0,W,H);}
     const L=PFX.lay,[x,y,w2,h2]=PFX_BOX,vp=src.viewport,v0=vp.clone();
@@ -19563,7 +20460,9 @@ function pfxRender(ir){
   const tb=bloom?PFX.b1.texture:PFX_BLACK,st=bloom?PFX_STR:0;
   {const D=DUSTFX,on=D.k>0.003&&D.fr===PFX.frames&&GFX.on('dust');   // fed this frame (a menu frame never is)
     for(const m of [PFX_FIN,PFX_CMP]){const u=m.uniforms;u.uDust.value.set(on?D.k:0,D.vg,D.ph,0);
-    if(on){u.uDustF.value.set(D.foe.x,D.foe.y,camera.aspect,5);u.uDustC.value.copy(D.col);}}}
+    if(on){u.uDustF.value.set(D.foe.x,D.foe.y,camera.aspect,5);u.uDustC.value.copy(D.col);}}
+    const R=RAINFX,rn=R.k>0.003&&R.fr===PFX.frames&&GFX.on('rain')&&!sv;   // weather item 3: the drops, fed this frame
+    for(const m of [PFX_FIN,PFX_CMP])m.uniforms.uRain.value.set(rn?R.k:0,R.sm,R.ph,camera.aspect);}
   const shp=sv&&!smaa&&!PFX_SHARP.off?(ir?PFX_SHARP.ir:PFX_SHARP.tv):0;
   if(smaa){
     PFX_EDGE.uniforms.tDiffuse.value=src.texture;pfxPass(PFX_EDGE,PFX.ed);
@@ -19642,14 +20541,14 @@ function preAt(f){
   Q.cp.copy(camera.position);Q.cq.copy(camera.quaternion);Q.M=null;Q.cv=null;
   try{const M=getModel(savedType).g;Q.M=M;Q.mv=M.visible;Q.mp.copy(M.position);Q.mq.copy(M.quaternion);
     M.visible=true;M.position.set(P.x,P.y,P.z);M.quaternion.setFromEuler(new THREE.Euler(0,-P.h,0,'YXZ'));M.updateMatrixWorld(true);}catch(e){Q.M=null;}
-  // the monsoon's cumulonimbus (Medium and High; the haboob's clouds) and the haboob wall, up for the draw
-  if(CLOUD_MESH&&CLOUDS.cb){Q.cv=CLOUD_MESH.visible;CLOUD_MESH.visible=true;CLOUDS.cb.visible=true;}
+  // the clouds' one material (weather item 1: its final defines, every preset is data only) and the haboob wall, up for the draw
+  if(CLOUD_MESH){Q.cv=CLOUD_MESH.visible;CLOUD_MESH.visible=true;}
   if(HB.g){HB.g.visible=true;HB.sun.visible=true;}
   camera.position.set(P.x-fx*16,P.y+4.5,P.z-fz*16);camera.lookAt(P.x+fx*80,P.y+1,P.z+fz*80);camera.updateMatrixWorld();
   rebuildTerrain(camera.position.x,camera.position.z);
   try{f(Q.M);}
   finally{r.setRenderTarget(prevT);r.autoClear=ac;camera.layers.mask=lm;if(HB.g){HB.g.visible=false;HB.sun.visible=false;}
-    if(Q.cv!==null){CLOUD_MESH.visible=Q.cv;CLOUDS.cb.visible=CLOUDS.preset==='monsoon';}
+    if(Q.cv!==null)CLOUD_MESH.visible=Q.cv;
     if(Q.M){Q.M.visible=Q.mv;Q.M.position.copy(Q.mp);Q.M.quaternion.copy(Q.mq);Q.M.updateMatrixWorld(true);}
     camera.position.copy(Q.cp);camera.quaternion.copy(Q.cq);camera.updateMatrixWorld();rebuildTerrain(camera.position.x,camera.position.z);}
 }
@@ -19700,7 +20599,7 @@ function preJobs(){
   const Q=PREQ,r=renderer;Q.A=pfxRT(16,16,true,pfxSamples());Q.B=pfxRT(16,16,false);Q.C=pfxRT(16,16,false);Q.D=pfxRT(16,16,false);Q.E=Q.A.isWebGLMultisampleRenderTarget?pfxRT(16,16,true):null;
   const A=Q.A,B=Q.B,C=Q.C,D=Q.D,E=Q.E||Q.A;
   return [
-    ['build',()=>{hbBuild();if(CLOUD_MESH&&GFX.on('clouds')&&!CLOUDS.cb)cloudCB();if(!DZ.built)dzBuild();dfWarmBuild();}],
+    ['build',()=>{hbBuild();if(!DZ.built)dzBuild();dfWarmBuild();}],
     ['compile',()=>preAt(()=>{r.compile(scene,camera);preSwap(()=>r.compile(scene,camera));})],
     ['frame',()=>preAt(M=>preFrame(M,A))],
     ['post chain',()=>{if(!GFX.post)return;preAt(M=>{
@@ -19720,6 +20619,7 @@ function preJobs(){
       u.tSrc.value=null;PFX_EDGE.uniforms.tDiffuse.value=PFX_WGT.uniforms.tDiffuse.value=null;
       for(const m of [PFX_FIN,PFX_CMP]){const f=m.uniforms;if(f.tDiffuse)f.tDiffuse.value=null;f.tColor.value=null;f.tBloom.value=PFX_BLACK;f.uStr.value=0;}});}],
     ['explosion',()=>preAt(()=>fxWarmLayer(A))],
+    ['weather',()=>preAt(()=>wxWarm(A))],   // weather item 3: the rain and dust streaks, the wet runway, the reflections
     ['dz smoke',()=>{const sp=DZ.smoke[0];if(!sp)return;const v=sp.visible,o=sp.material.opacity;sp.visible=true;sp.material.opacity=0.5;
       try{warmObj(sp,true);}finally{sp.visible=v;sp.material.opacity=o;}}],
     // the IR pass, its tagging undone after (irTag puts the points on layer 1 only; the white instance colours of the
@@ -19802,7 +20702,7 @@ function gfxBusyUI(){const ap=gfxApplying(),w=ap&&GFX.resumeWait,g=$('gfxBusy'),
   g.hidden=!ap;b.classList.toggle('busy',ap);g.dataset.w=String(w);gs.hidden=!ap;
   g.firstChild.textContent=w?'Applying graphics\u2026 resuming':'Applying graphics\u2026';}
 // the pause sheet's way back to the flight (Resume, the pause toggle); true if it resumed now
-function pzResume(){
+function pzResume(){wxClose(true);
   if(gfxApplying()){GFX.resumeWait=true;gfxBusyUI();return false;}   // taps while applying are idempotent
   GFX.resumeWait=false;gfxDrain();paused=false;pauseOv.classList.remove('on');initAudio();radioVolApply();gfxBusyUI();return true;}
 // each frame (tick): the wait, then the resume the player asked for; the pause sheet still up and no menu over it
@@ -20258,7 +21158,7 @@ function fxPack(){
 // how lit unlit smoke should look: full by day, dim at dusk, dark at night; flat grey in IR
 // 0 on the camera, 1 from 20 m out: fire and smoke never render on top of the lens
 function fxNearP(p){return clamp((p.distanceTo(camera.position)-8)/12,0,1);}
-function fxLit(){return camMode===2&&sensorIRPass()?-1:TOD.night?0.16:TOD.id==='sunset'||TOD.id==='haboob'?0.6:1;}
+function fxLit(){return camMode===2&&sensorIRPass()?-1:TOD.night?0.16:TOD.id==='sunset'||TOD.hb?0.6:1;}
 // fireball colour as it cools: white, yellow, orange, dark red, black smoke
 const FX_RAMP=[[1,1,0.95],[1,0.86,0.5],[1,0.5,0.16],[0.48,0.14,0.05],[0.08,0.07,0.065]];
 function fxRamp(u,c){u=clamp(u,0,1)*4;const i=Math.min(3,u|0),f=u-i,a=FX_RAMP[i],b=FX_RAMP[i+1];
@@ -21553,7 +22453,7 @@ function tick(t,skipRender){
   if(LES.brief&&running)paused=true;   // held under the lesson briefing, whatever else let go of the pause
   if(running&&!paused&&!st.crashed){
     if(st.easy)RUN.easyEver=true;
-    updateControls(dt);f16Flaps();lessonTick(dt);rookieAssist(dt,ts);acc+=dt;
+    updateControls(dt);f16Flaps();lessonTick(dt);rookieAssist(dt,ts);wxFly(dt);acc+=dt;
     if(_ipS!==st){_ipS=st;_ipPos.copy(st.pos);_ipQ.copy(st.quat);}
     while(acc>=DT){_ipPos.copy(st.pos);_ipQ.copy(st.quat);autopilot(st,DT,events);step(st,DT,events);acc-=DT;if(st.crashed)break;}
     if(st.crashed)onCrash();
@@ -21619,7 +22519,7 @@ function tick(t,skipRender){
    turretShow(!sv);
    // NIR: the composite turns it monochrome on Medium and High (uNir); Low has no post chain, so a CSS grey; at night it
    // goes through the IR pass instead (sensorIRPass), a little brighter at sunset and in the haboob
-   const nir=sv&&SENSOR.mode==='nir'&&!TOD.night,flt=sv&&SENSOR.mode==='tv'?'saturate(0.75) contrast(1.05)':nir?(GFX.post?'':'grayscale(1) contrast(1.4) brightness(0.9) ')+(TOD.id==='sunset'||TOD.id==='haboob'?'brightness(1.25)':''):'';
+   const nir=sv&&SENSOR.mode==='nir'&&!TOD.night,flt=sv&&SENSOR.mode==='tv'?'saturate(0.75) contrast(1.05)':nir?(GFX.post?'':'grayscale(1) contrast(1.4) brightness(0.9) ')+(TOD.id==='sunset'||TOD.hb?'brightness(1.25)':''):'';
    if(glc.style.filter!==flt.trim())glc.style.filter=flt.trim();
    sensorFxUpdate(sv,ts);strikeUI();}
   if(camMode!==0||PHOTO.on||FREECAM||DF.kc>0)DCAM.chLive=false;
@@ -21642,7 +22542,7 @@ function tick(t,skipRender){
     sensorHudUpdate();}
   if(camBump>0){camBump=Math.max(0,camBump-dt*2.4);const k=camBump*camBump*1.3;
     camera.position.x+=(Math.random()-0.5)*k;camera.position.y+=(Math.random()-0.5)*k*1.5;camera.position.z+=(Math.random()-0.5)*k;}
-  camera.updateProjectionMatrix();sky.position.copy(camera.position);hbUpdate(paused?0:dt);dustFxUpdate(paused?0:dt);fxLightFeed();sunDiscUpdate();farUpdate();
+  camera.updateProjectionMatrix();sky.position.copy(camera.position);hbUpdate(paused?0:dt);cldFrame(paused?0:dt);wxFrame(paused?0:dt);dustFxUpdate(paused?0:dt);fxLightFeed();sunDiscUpdate();farUpdate();
   if(sensOn){tgtMarkUpdate(dt);sensorGateUpdate(dt);}else if(TM.shown)tgtMarkHide();
   dfHudUpdate();hogUI();fdTick();
   // PAPI
@@ -21657,7 +22557,7 @@ function tick(t,skipRender){
   if(FM.on)fmFrame();
   hudT-=dt;
   if(hudT<=0){hudT=0.08;
-    {const wn=windNow();setTxt(hWindT,wn[0]+'\u00b0 '+wn[1]+' KT');   // the same wind the tower reads out
+    {const wn=windNow();setTxt(hWindT,wn[0]+'\u00b0 '+wn[1]+(gustOn()?'G'+gustKt():'')+' KT');   // the same wind the tower reads out
      // the arrow shows which way the wind is blowing, relative to your nose
      const rel=(s.windDir+180)-(-_euH.setFromQuaternion(s.quat,'YXZ').y*180/Math.PI);setSty(hWindA.parentNode,'transform','rotate('+rel.toFixed(0)+'deg)');}
     if(rookie()){setHTML(hIas,Math.round(s.ias*MS2KT)+'<small>kt</small>');
@@ -21706,7 +22606,7 @@ function tick(t,skipRender){
 // it switched off, so nothing is fetched and no request can fail in their console.
 var LB=null;
 LB=(function(){
-const APP_VER='2026-10-16-sensor';          // keep version.json in step when shipping
+const APP_VER='2026-10-16-weather';          // keep version.json in step when shipping
   const ORIGINS=['https://rabahharchaoui-design.github.io','http://localhost:8765'];
   let over='';try{over=localStorage.getItem('kgeuLBUrl')||'';}catch(e){}
   const E={url:over||'https://pfs-scores.rabahharchaoui.workers.dev',enabled:!!over||ORIGINS.includes(location.origin),online:null,
@@ -22350,11 +23250,13 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
       out.push({kind:names[g.kind.getX(i)],lx:lx,x:r.left+(v.x+1)/2*r.width,y:r.top+(1-v.y)/2*r.height,front:v.z<1,
         col:[g.aCol.getX(i),g.aCol.getY(i),g.aCol.getZ(i)]});}
     return out;},
-  cloudMat:()=>({color:cloudMat.color.getHex(),emissive:cloudMat.emissive.getHex()}),
+  cloudMat:()=>({color:CLD.U.uTop.value.getHex(),emissive:CLD.U.uBase.value.getHex()}),   // weather item 1: the tops and the base
   // graphics item 6: the cloud preset (setClouds(null) hands it back to the per flight pick), the cascades and the air
-  setClouds:p=>{CLOUDS.forced=/^(clear|scattered|monsoon)$/.test(p)?p:null;cloudsAuto();return CLOUDS.preset;},
-  clouds:()=>({preset:CLOUDS.preset,forced:CLOUDS.forced,visible:!!(CLOUD_MESH&&CLOUD_MESH.visible),hd:!!(CLOUD_MESH&&CLOUD_MESH.material===CLOUDS.hd),
-    cb:!!(CLOUDS.cb&&CLOUDS.cb.visible),cbTris:CLOUDS.tris||0,cbN:CLOUDS.cb?CLOUDS.cb.count:0,puffs:CLOUD_MESH?CLOUD_MESH.count:0,pick:(t,k)=>cloudsPick(t,k)}),
+  setClouds:p=>{CLOUDS.forced=/^(clear|scattered|monsoon|overcast|rain|storm|fog|torn|haboob|shower)$/.test(p)?p:null;cloudsAuto();return CLOUDS.preset;},
+  clouds:()=>({preset:CLOUDS.preset,forced:CLOUDS.forced,visible:!!(CLOUD_MESH&&CLOUD_MESH.visible),hd:CLOUDS.hd,
+    cb:CLOUDS.cb,cells:CLD.cells,inside:CLD.inside,tris:CLOUDS.tris,puffs:CLOUD_MESH?CLOUD_MESH.count:0,pick:(t,k)=>cloudsPick(t,k)}),
+  cld:()=>({puffs:CLD.n,cells:CLD.cells,inside:CLD.inside,base:CLD.base,tier:CLD.tier,sorted:CLD.sorts,drift:[CLD.drift.x,CLD.drift.z],ell:CLD.nE,dirty:CLD.dirty}),
+  cldEll:i=>{const E=CLD.E,o=i*6;return i<CLD.nE?[E[o]+CLD.drift.x,E[o+1],E[o+2]+CLD.drift.z,1/Math.sqrt(E[o+3]),1/Math.sqrt(E[o+4])]:null;},   // a cluster's centre and radii (the fly through tests)
   cloudsPick:cloudsPick,
   csm:()=>({n:CSM.n,recvMs:CSM.recvMs,lights:CSM.lights.length,inScene:CSM.lights.filter(l=>l.parent===scene).length,enabled:renderer.shadowMap.enabled,
     sizes:CSM.lights.map(l=>l.shadow.mapSize.x),act:CSM.act,renders:CSM.renders,skips:CSM.skips,recv:CSM.recv,strength:CSM_U.a.w,stat:CSM.stat.length,
@@ -22363,7 +23265,18 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
     aglS:CSM.aglS,F:CSM.F.slice(0,CSM.n),R:CSM.R.slice(0,CSM.n),NB:CSM.NB.slice(0,CSM.n),thr:Object.assign({},CSM.THR),fadeN:CSM.fadeN,
     cascades:CSM.lights.map((l,i)=>({drawn:CSM.drawn[i],pos:CSM.pos[i].slice(),lpos:[l.position.x,l.position.y,l.position.z]}))}),
   AIR:()=>({k:AIR_U.k,sun:AIR_U.sun,s:AIR_U.s,a:AIR_U.a,t:AIR_U.t,m:AIR_U.m,mon:AIR.mon,r0:AIR.r0}),
-  setTOD:setTOD,isNight:isNight,TOD:()=>TOD,
+  // weather item 2: setTOD('haboob') is day plus the haboob weather (haboob_check and the shots run unchanged), and the
+  // other times leave a haboob for the default weather the way the old Time row did; setWX(id[,random]) the weather itself
+  setTOD:id=>{if(id!=='haboob'&&WX.id==='haboob')setWX('scattered',{noLight:true});todLegacy(id);},isNight:isNight,TOD:()=>TOD,
+  setWX:(id,r)=>{setWX(id,{random:!!r});return WX.id;},
+  // weather item 3: the look's state; wxFlash() a lightning strike now (true: held until wxFlash(false), for the shots)
+  wx:()=>({id:WXL.id,deck:CLD.deck,deckY:CLD.deckY,fogTop:WX.id==='fog'?WXL.base.top:0,below:WXL.below,rain:{n:WXL.rm.visible?WXL.rm.count:0,drops:RAINFX.k},
+    flash:{t:WXL.fl.t,cell:WXL.fl.cell,n:WXL.fl.n,on:WXL.fl.on,d:WXL.fl.d},wet:WET.on,refl:WXL.refl.filter(p=>p.visible).length,vis:scene.fog.far,near:scene.fog.near,noSh:WXL.noSh,
+    sunI:sun.intensity,hemiI:hemi.intensity,dust:WXL.dm.visible,disc:SUND.want,cells:CLD.cells,puffs:CLD.n,preset:CLOUDS.preset}),
+  wxFlash:h=>{if(h===false){if(WXL.fl.on)wxFlashEnd();return -1;}const k=wxStrike();if(h&&k>=0)WXL.fl.hold=true;return k;},WX:()=>({id:WX.id,name:WX.name,icon:WX.icon,clouds:WX.clouds,wind:WX.wind,random:WX.random}),
+  wxFly:()=>{const c=wxCond(),F=WXF.front;return {windKt:st.windKt,gustKt:gustKt(),gustAmp:st.gustAmp,windDir:st.windDir,turb:st.turb,wet:st.wet,wxW:st.wxW,front:{t:F.on?+(st.time-F.t0).toFixed(2):0,on:F.on,next:F.next},vis:c.vis,ceil:c.ceil,altim:wxAltim()};},
+  atis:()=>WXF.atis,wxFront:()=>{const c=wxCell(st.pos.x,st.pos.z);if(c){WXF.front.on=0;wxFrontGo(c);}return WXF.front.on;},wxCell:(x,z)=>{const c=wxCell(x,z);return c&&{k:c.k,d:c.d,x:c.x,z:c.z};},
+  wxRoll:o=>wxRoll(o),wxOdds:wxOdds,WX_SET:WX_SET,wxOpen:wxOpen,wxClose:wxClose,
   haboob:()=>({on:HB.on,dist:HB.on?HB.dist:null,d:HB.d,windKt:st.windKt,gustAmp:st.gustAmp,fogNear:scene.fog.near,called:HB.called,
     wallVisible:!!(HB.g&&HB.g.visible),C:[HB.C.x,HB.C.z],T:[HB.T.x,HB.T.z],sunDisc:!!(HB.sun&&HB.sun.visible),dustDir:st.dustDir,windDir:st.windDir}),
   haboobJump:(m)=>{if(HB.on){hbPlace(m);hbUpdate(0);}},drawSixPack:drawSixPack,SP_CELL:SP_CELL,
@@ -22371,7 +23284,7 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
   RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,ticker:()=>{const e=document.getElementById('tk'),c=document.getElementById('tkCtl');return {on:e.classList.contains('on'),paused:e.classList.contains('paused'),anim:getComputedStyle(document.getElementById('tkT')).animationName,scroll:e.classList.contains('scroll'),open:c.classList.contains('on'),text:e.querySelector('#tkT i').textContent,vis:e.offsetParent!==null&&getComputedStyle(e).display!=='none',ctlVis:c.offsetParent!==null};},tickerForce:n=>{TK.force=n||null;tkUI();},tickerOpen:()=>tkOpen(),tickerClose:()=>{TK.open=false;tkUI();},musicTick:musicTick,MUSIC:MUSIC,actx:()=>actx,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,VQ:VQ,vqLog:clear=>{const r=VQ.log.map(e=>Object.assign({},e));if(clear)VQ.log.length=0;return r;},vqAdd:(who,kind,text,clips,o)=>vqAdd(L(who,kind,text,clips),o),coach2:coach2,chatNow:()=>chatNow(),atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),bannerShow:(k,t)=>bannerShow(k,t),badgeHide:()=>badgeHide(),auto:()=>autoSmart(),mission:k=>{if(k==='gunrun'){pickType('a10',1);start('range');return;}pickType(k==='range'?'reaper':'c130',1);start(k);},HOG:HOG,strikeScore:()=>strikeScore(),CRASH_FX:CRASH_FX,baseOK:baseOK,rwyLenOf:rwyLenOf,FD:FD,BASES:BASES,setThr:setThr,setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
-  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day,kind:d.kind}},dfDayOf:k=>dfDayOf(k),aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,NAV:NV,navPlan:navPlan,DIV:DIV,divSet:divSet,LES:LES,events:events,rwyFrame:()=>({thr:THR01,rh:RH*180/Math.PI,aim:AIM,field:FIELD_FT,gear:GEAR}),grSite:()=>grSite(),lesObjs:()=>LES_OBJ.map(o=>({name:o.name,type:o.geometry&&o.geometry.type,tri:o.geometry?(o.geometry.index?o.geometry.index.count:o.geometry.attributes.position.count)/3:0,col:o.material&&o.material.color&&o.material.color.getHex(),x:o.position.x,z:o.position.z,inScene:!!o.parent})),get lesBrief(){return {on:!!LES.brief,slide:BR.slide,quiz:LES.quiz};},lesBriefNext:()=>brNextTap(),lesBriefSkip:lesBriefSkip,lesBriefBack:lesBriefBack,lesBriefAnswer:k=>brAnswer(k),get ORAL(){return OR.draw;},ORAL_Q:ORAL_Q,oralSeed:oralSeed,rideSeed:rideSeed,rideDraw:rideDraw,rideName:rideName,get RIDE(){return RIDE;},certGet:certGet,dpe:dpe,oralStart:oralStart,oralAnswer:oralAnswer,oralNext:oralNext,get oral(){return {on:orOv.classList.contains('on'),n:OR.n,ans:OR.ans,right:OR.right,res:OR.res};},get G(){return G;},gBegin:gBegin,gHold:gHold,gHoldEnd:gHoldEnd,gTick:gTick,gRange:gRange,gEvent:gEvent,gEnd:gEnd,dbTip:dbTip,dbSay:dbSay,cfi:cfi,cfiCue:cfiCue,cfiSp:cfiSp,cfiVoice:cfiVoice,endorsements:endorsements,get LOGB(){return LOGB;},logbookAdd:logbookAdd,logSummary:logSummary,tqAnswer:tqAnswer,ezSet:ezSet,SCHOOL:SCHOOL,get PLACE(){return PLACE;},setPlace:(l,h)=>{setPlace(l,h);if(curScr==='sSchool')schoolList(true);},lessonOpen:lessonOpen,stageOpen:stageOpen,get schSel(){return SCH_SEL;},schSelect:schSelect,lessonDef:lessonDef,stageOf:stageOf,tolOf:tolOf,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day,kind:d.kind,wx:d.wx}},wxOf:wxOf,wxFirst:wxFirst,WX_FIX:WX_FIX,wxShowers:()=>CLD.shw.slice(),dfDayOf:k=>dfDayOf(k),aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,NAV:NV,navPlan:navPlan,DIV:DIV,divSet:divSet,LES:LES,events:events,rwyFrame:()=>({thr:THR01,rh:RH*180/Math.PI,aim:AIM,field:FIELD_FT,gear:GEAR}),grSite:()=>grSite(),lesObjs:()=>LES_OBJ.map(o=>({name:o.name,type:o.geometry&&o.geometry.type,tri:o.geometry?(o.geometry.index?o.geometry.index.count:o.geometry.attributes.position.count)/3:0,col:o.material&&o.material.color&&o.material.color.getHex(),x:o.position.x,z:o.position.z,inScene:!!o.parent})),get lesBrief(){return {on:!!LES.brief,slide:BR.slide,quiz:LES.quiz};},lesBriefNext:()=>brNextTap(),lesBriefSkip:lesBriefSkip,lesBriefBack:lesBriefBack,lesBriefAnswer:k=>brAnswer(k),get ORAL(){return OR.draw;},ORAL_Q:ORAL_Q,oralSeed:oralSeed,rideSeed:rideSeed,rideDraw:rideDraw,rideName:rideName,get RIDE(){return RIDE;},certGet:certGet,dpe:dpe,oralStart:oralStart,oralAnswer:oralAnswer,oralNext:oralNext,get oral(){return {on:orOv.classList.contains('on'),n:OR.n,ans:OR.ans,right:OR.right,res:OR.res};},get G(){return G;},gBegin:gBegin,gHold:gHold,gHoldEnd:gHoldEnd,gTick:gTick,gRange:gRange,gEvent:gEvent,gEnd:gEnd,dbTip:dbTip,dbSay:dbSay,cfi:cfi,cfiCue:cfiCue,cfiSp:cfiSp,cfiVoice:cfiVoice,endorsements:endorsements,get LOGB(){return LOGB;},logbookAdd:logbookAdd,logSummary:logSummary,tqAnswer:tqAnswer,ezSet:ezSet,SCHOOL:SCHOOL,get PLACE(){return PLACE;},setPlace:(l,h)=>{setPlace(l,h);if(curScr==='sSchool')schoolList(true);},lessonOpen:lessonOpen,stageOpen:stageOpen,get schSel(){return SCH_SEL;},schSelect:schSelect,lessonDef:lessonDef,stageOf:stageOf,tolOf:tolOf,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,wx:WX.id,wxRandom:WX.random,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   // @OhRabah easter eggs (3.10): where each one is, whether its lights are on, and the tow banner
   eggs:()=>EGG.list.map(o=>{const p=o.getWorldPosition(new V3()),r={name:o.name,x:p.x,y:p.y,z:p.z,ry:o.rotation.y,lit:(o.name==='egg_billboard'||o.name==='egg_rooftop')&&EGG.lit,visible:o.visible};
     if(o.name==='egg_tow'){const b=EGG.tow.ban.getWorldPosition(new V3()),f=new V3(0,0,-1).applyQuaternion(o.quaternion);r.banner={x:b.x,y:b.y,z:b.z};r.fwd=[f.x,f.y,f.z];}return r;}),
@@ -22448,7 +23361,18 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
     transparent:true,opacity:0,depthWrite:false,fog:false}));
   starField.visible=false;starField.renderOrder=-1;scene.add(starField);
 })();
-(function(){let t='day';try{const v=localStorage.getItem('kgeuTOD');if(v&&TOD_SET[v])t=v;}catch(e){}setTOD(t);})();
+// the time of day and (weather item 2) the weather; an old install's Haboob time (kgeuTOD 'haboob') reads as Day with the
+// haboob weather, both saved back. Weather regions item: the region's own saved weather (kgeuWX_<region>; Arizona falls
+// back to kgeuWX, an install from before it); a world region's first visit rolls one (wxFirst), saved as its own, the
+// Random setting carried over
+(function(){let t='day',w='scattered',r=false,first=false;try{const v=localStorage.getItem('kgeuTOD'),R=REGION_ID,x=localStorage.getItem('kgeuWX_'+R)||(REGION.az?localStorage.getItem('kgeuWX'):null);
+  if(v==='haboob'){w='haboob';localStorage.setItem('kgeuWX','haboob');localStorage.setItem('kgeuWXR','0');localStorage.setItem('kgeuTOD','day');}
+  else{if(v&&TOD_SET[v])t=v;const rr=localStorage.getItem('kgeuWXR_'+R);r=(rr!==null?rr:localStorage.getItem('kgeuWXR'))==='1';
+    if(x&&WX_SET[x])w=x;else if(!REGION.az){w=wxFirst(R,t);first=true;}}}catch(e){}
+  // the first visit's roll saved as the region's own only (kgeuWX stays Arizona's fallback)
+  setWX(w,{random:r,noLight:true,keep:first});
+  if(first)try{localStorage.setItem('kgeuWX_'+REGION_ID,WX.id);localStorage.setItem('kgeuWXR_'+REGION_ID,r?'1':'0');}catch(e){}
+  setTOD(t);})();
 window.__kgeu.dailyRegion=id=>{ARC.dailyRegion=id||null;return dailySpec().region;};window.__kgeu.dailyKind=k=>{ARC.dailyKind=k==='dogfight'||k==='landing'?k:null;return dailySpec().kind;};window.__kgeu.TFC=TFC;window.__kgeu.tfcList=tfcList;window.__kgeu.tfcSpawn=tfcSpawn;window.__kgeu.tfcClear=tfcClear;
 window.__kgeu.TCAS={levels:tcasLevels,state:()=>({ta:TCAS.list.some(o=>tcasLvl(o)>=2),ra:!!TCAS.ra,sense:TCAS.ra?(TCAS.sense>0?'climb':'descend'):null,clear:TCAS.clear,inhibit:TCAS.inhibit,
   shown:TCAS.shown,on:TCAS.on,raT:TCAS.raT}),tcasConflict:tcasConflict,setTcas:setTcas,T:TCAS,tcasVoiceLog:TCAS.voiceLog};
@@ -22669,7 +23593,11 @@ worldLoad();
 (function(){let r=null;try{r=JSON.parse(sessionStorage.getItem('kgeuResume')||'null');sessionStorage.removeItem('kgeuResume');}catch(e){}
   if(!r)return;
   const go=()=>{const sp=$('splash');if(!WORLD.ready||(sp&&!sp.classList.contains('done'))){if(!WORLD.err)setTimeout(go,200);return;}
-    if(r.start){const S=r.start;if(S.skill&&S.skill!==SKILL)setSkill(S.skill);if(S.tod&&TOD_SET[S.tod])setTOD(S.tod);
+    if(r.start){const S=r.start;if(S.skill&&S.skill!==SKILL)setSkill(S.skill);
+      // weather regions item: a run's fixed weather (the daily's, a challenge's) before its light; the region's own
+      // weather stashed to come back after it. A free flight keeps the region's own (saved per region, or rolled)
+      if(S.wx&&WX_SET[S.wx]&&S.mode!=='free'){ARC.prevWX=ARC.prevWX||{id:WX.id,random:WX.random};setWX(S.wx,{keep:true,noLight:true});if(!S.tod)setTOD(TOD.id);}
+      if(S.tod&&TOD_SET[S.tod])todLegacy(S.tod);
       if(S.df)dfStart(S.daily?{daily:1}:null);
       else if(S.task)taskStart(S.task);
       else if(S.arc){if(S.type&&TYPES[S.type])pickType(S.type);arcStart(S.arc);}
