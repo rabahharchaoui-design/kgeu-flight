@@ -21589,9 +21589,12 @@ const _ci=new V3(),_cd=new V3();
 function strImpact(hit){
   const rec=hit&&(hit.str||(hit.cls?hit:null)),o=hit&&!hit.cls?hit:(rec&&rec.obst)||null,inside=(x,y,z)=>rec?strInside(rec,x,y,z):obstInside(o,x,y,z);
   const spd=st.vel.length();_cd.copy(st.vel);if(spd<1)_cd.set(0,0,-1).applyQuaternion(st.quat);_cd.normalize();
-  const yb=st.pos.y-GEAR*0.5;let p=null;
+  const yb=st.pos.y-GEAR*0.5;let p=null,above=null;
   for(let d=0;d<=80;d+=0.25){_ci.copy(st.pos).addScaledVector(_cd,d);_ci.y=Math.max(_ci.y-GEAR*0.5,(rec?rec.y0:groundHeight(_ci.x,_ci.z))+0.5);
-    if(inside(_ci.x,_ci.y,_ci.z)){p=_ci.clone();break;}}
+    if(inside(_ci.x,_ci.y,_ci.z)){p=_ci.clone();
+      // in through the top when the step before was already over the footprint (only too high); a wall when it was beside it
+      if(d>0){_ci.addScaledVector(_cd,-0.25);above=rec?strInside(rec,_ci.x,rec.y0+0.2,_ci.z):o.kind==='circ'&&Math.hypot(_ci.x-o.x,_ci.z-o.z)<o.r;}
+      break;}}
   // glancing: the nearest point of the volume at the aircraft's height
   if(!p){p=new V3(st.pos.x,yb,st.pos.z);
     if(rec){const dx=p.x-rec.x,dz=p.z-rec.z;let lx=dx*rec.c-dz*rec.s,lz=dx*rec.s+dz*rec.c;
@@ -21602,13 +21605,13 @@ function strImpact(hit){
   // else the wall facing the path (box: the face its local point is nearest; drum: the radial direction)
   const n=new V3();let roof=false;
   if(rec){const dx=p.x-rec.x,dz=p.z-rec.z,lx=dx*rec.c-dz*rec.s,lz=dx*rec.s+dz*rec.c,top=strTop(rec,lx,lz);
-    roof=p.y>top-1.5&&_cd.y<0.05||rec.poly&&p.y>top-1.5;
+    roof=above!==null?above:p.y>top-1.5&&_cd.y<0.05;
     if(roof)n.set(0,1,0);
     else if(rec.shape==='ell'){const nx=lx/(rec.hx*rec.hx),nz=lz/(rec.hz*rec.hz);n.set(nx*rec.c+nz*rec.s,0,-nx*rec.s+nz*rec.c).normalize();}
     else if(rec.poly){const e=wbNearEdge(rec.P,p.x,p.z);n.set(p.x-e[1],0,p.z-e[2]);if(n.lengthSq()<1e-6)n.set(-_cd.x,0,-_cd.z);n.normalize();
       if(pipXZ(rec.P,p.x+n.x*0.5,p.z+n.z*0.5))n.negate();}
     else{const fx=rec.hx-Math.abs(lx),fz=rec.hz-Math.abs(lz);if(fx<fz){const sg=Math.sign(lx)||1;n.set(sg*rec.c,0,-sg*rec.s);}else{const sg=Math.sign(lz)||1;n.set(sg*rec.s,0,sg*rec.c);}}}
-  else if(o.kind==='circ'){roof=p.y>o.h-1.5&&_cd.y<0.05;if(roof)n.set(0,1,0);else n.set(p.x-o.x,0,p.z-o.z).normalize();}
+  else if(o.kind==='circ'){roof=above!==null?above:p.y>o.h-1.5&&_cd.y<0.05;if(roof)n.set(0,1,0);else n.set(p.x-o.x,0,p.z-o.z).normalize();}
   else n.set(-_cd.x,0,-_cd.z).normalize();
   const mass=AC.mass,fuel=fuelNow();
   return {rec:rec,o:o,name:(rec||o).name,cls:rec?rec.cls:(/billboard/.test(o.name)?'sign':/tower|Tower|Skytree|Christ|skyscraper/.test(o.name)?'tower':'building'),

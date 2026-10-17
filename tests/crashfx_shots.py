@@ -17,6 +17,7 @@ NOFX = '--nofx' in args
 SEQ = '--seq' in args   # the crash camera itself: frames at 0.3, 1, 2 and 3.5 s, no fixed camera
 SECS = float(opt('--secs', '6'))
 ROOT = opt('--root', None)
+REGION = opt('--region', None)
 # name: type, record selector, approach axis and side, distance back, height fraction, speed m/s, views [(dist out, up, side, look up)]
 CASES = {
     'hangar':  ('cessna', "r.name==='a hangar'&&Math.abs(r.x-K.STR.list.filter(q=>q.name==='a hangar')[2].x)<1", 'x', 1, 40, 0.5, 50, [(45, 10, 22, 2), (160, 45, -60, 4)]),
@@ -26,12 +27,20 @@ CASES = {
     'tower':   ('f16', "r.name==='a tower'&&r.y1>120", 'x', 1, 80, 0.5, 220, [(140, 10, 60, 0), (600, 120, -200, 40)]),
     'house':   ('cessna', "r.name==='a house'&&Math.hypot(r.x+2473,r.z+1767.5)<1", 'x', -1, 30, 0.5, 45, [(35, 12, 16, 1)]),
     'terminal': ('a320', "r.name==='the terminal'&&r.y1>20", 'z', -1, 60, 0.5, 75, [(120, 25, 50, 4)]),
+    'city': ('a320', "r.name==='a building'&&r.y1-r.y0>25&&r.hx>12", 'x', 1, 60, 0.5, 75, [(120, 30, 50, 4)]),
+    'rhangar': ('cessna', "r.name==='a hangar'", 'x', 1, 40, 0.5, 50, [(70, 15, 30, 2)]),
+    'billboard': ('cessna', "O:r.name==='a billboard'&&Math.hypot(r.x-2830,r.z+1000)<2", 'x', 1, 40, 0.75, 45, [(40, 8, 25, 4)]),
+    'thangar': ('archer', "r.name==='a T-hangar'", 'x', 1, 40, 0.5, 45, [(60, 14, 30, 1), (25, 3, 0, 1)]),
+    'shelter': ('f16', "r.name==='an aircraft shelter'", 'x', 1, 80, 0.5, 150, [(80, 18, 40, 2)]),
+    'mall': ('c130', "r.name==='a strip mall'", 'z', 1, 80, 0.5, 70, [(120, 25, 60, 3)]),
 }
 SEL = opt('--cases', ','.join(CASES)).split(',')
 
 FLY = """([type,sel,ax,sg,back,frac,spd])=>{const K=window.__kgeu;K.pick(type);K.pickBase(K.baseOK(type,'kgeu')?'kgeu':'phx');K.start('runway');K.freeCam(null);
   for(let i=0;i<3;i++)K.stepFrame(1/30,false,true);
-  const S=K.STR.list,f=new Function('r','K','return '+sel),r=S.find(q=>f(q,K));if(!r)return {err:'no record'};
+  let r;if(sel.startsWith('O:')){const f=new Function('r','K','return '+sel.slice(2)),o=K.OBST.find(q=>f(q,K));if(!o)return {err:'no obstacle'};
+    r={x:o.x,z:o.z,c:1,s:0,hx:o.r,hz:o.r,y0:K.groundHeight(o.x,o.z),y1:o.h};}
+  else{const S=K.STR.list,f=new Function('r','K','return '+sel);r=S.find(q=>f(q,K));}if(!r)return {err:'no record'};
   const st=K.state();let lx=0,lz=0;if(ax==='x')lx=sg*(r.hx+back);else lz=sg*(r.hz+back);
   const x=r.x+lx*r.c+lz*r.s,z=r.z-lx*r.s+lz*r.c,y=r.y0+frac*(r.y1-r.y0)+2;
   const d=new THREE.Vector3(r.x-x,0,r.z-z).normalize();
@@ -44,7 +53,9 @@ async def main():
     srv, url = serve() if not ROOT else serve_root(ROOT)
     async with async_playwright() as p:
         b = await launch(p)
-        pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'})
+        st0 = {'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'}
+        if REGION: st0['kgeuRegion'] = REGION
+        pg = await page(b, url, vp=IPHONE_15, storage=st0)
         await pg.evaluate(f"()=>{{{K}.setSkill('pilot');{K}.setRadioOn&&{K}.setRadioOn(false);{K}.WST.off=true;{K}.fxHide({'true' if NOFX else 'false'});}}")
         info = {}
         for tod in TODS:
