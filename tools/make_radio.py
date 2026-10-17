@@ -72,6 +72,11 @@ BOTH = {
     'cs_pocket737':     'Pocket seven three seven',
     'cs_pocket320':     'Pocket three two zero',
     'cs_pocket747':     'Pocket seven four seven',
+    # runways item 6: the AI traffic's fictional airlines (the tower calls them, the AI pilot reads back), stitched with
+    # the n_* digits and the rwy_* runways (both moved to this list below, so the pilot voice has them too)
+    'al_cactus': 'Cactus', 'al_sonoran': 'Sonoran', 'al_pacific': 'Pacific', 'al_sakura': 'Sakura',
+    'al_lutece': 'Lutece', 'al_tricolore': 'Tricolore', 'al_guanabara': 'Guanabara', 'al_sugarloaf': 'Sugarloaf',
+    'al_bolt': 'Bolt', 'al_cessna': 'Cessna',
 }
 
 # ---- controller only ----
@@ -91,6 +96,11 @@ TOWER = {
     'rwy_09l': 'runway zero niner left',  'rwy_09r': 'runway zero niner right',
     'rwy_20l': 'runway two zero left',    'rwy_20r': 'runway two zero right',
     'rwy_02l': 'runway zero two left',    'rwy_02r': 'runway zero two right',
+    # runways item 6: Sky Harbor's other four ends, for the tower's calls to the AI traffic
+    'rwy_07r': 'runway zero seven right', 'rwy_25l': 'runway two five left',
+    'rwy_08':  'runway eight',            'rwy_26':  'runway two six',
+    'hold_short_tfc': 'hold short, traffic on short final.',
+    'left_360':       'make a left three sixty for spacing.',
 
     'cleared_to':     'cleared for takeoff.',
     'cleared_land':   'cleared to land.',
@@ -184,11 +194,19 @@ TOWER = {
     'radar_contact':  'radar contact,',
     'glendale_is':    'Glendale is at your'
 }
+# runways item 6: the runways and the digits are said by the AI pilots too (their readbacks)
+for _k in [k for k in TOWER if k.startswith('rwy_') or (k.startswith('n_') and k != 'n_10')]:
+    BOTH[_k] = TOWER.pop(_k)
 
 # ---- pilot only ----
 PILOT = {
     'rb_cleared_to':   'Cleared for takeoff,',
     'rb_cleared_land': 'Cleared to land,',
+    # runways item 6: the AI pilots' readbacks to the tower
+    'rb_lineup':        'Line up and wait,',
+    'rb_going_around':  'Going around,',
+    'rb_holding_short': 'Holding short,',
+    'rb_left_360':      'Left three sixty,',
     'rb_wilco':        'Wilco,',
     'rb_roger':        'Roger,',
     'rb_traffic':      'Looking for the traffic,',

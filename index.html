@@ -10654,18 +10654,25 @@ const TFC_T={
   f16:{bank:70,bn:45,vApp:80,vFin:85,vPat:103,vClimb:180,vCruise:200,vr:82,vTaxi:10,acc:6,dec:3,aAir:4,dAir:4,vsUp:30,vsDn:14,vsA:6,gam:3,aim:300,flare:6,sink:0.9,patAlt:457,patD:2000,finD:2600,upX:1500,kind:'an F-16',call:'F-16'},
   heli:{bank:30,bn:25,vPat:50,vTaxi:0,acc:2,dec:2,aAir:1.6,dAir:2,vsUp:5,vsDn:4,vsA:1.5,kind:'a helicopter',call:'helicopter'}
 };
-const TFC={plans:[],list:[],pool:{},spawns:[],want:[],next:[],frame:0,chk:0,seq:0,need:true,auto:true,shown:true,ms:0,update:null};
+const TFC={plans:[],list:[],pool:{},spawns:[],want:[],next:[],frame:0,chk:0,seq:0,need:true,auto:true,shown:true,ms:0,update:null,dbg:false,dbgN:0,dbgLog:[]};
 // the model pool, built once: up to 5 airliners, 2 Cessnas, 2 F-16s and 2 helicopters at a time
 function tfcMake(type,i){
   const h=new THREE.Group();h.name='tfc_'+type;let full,gear=null,rotor=null,trot=null,gy;
-  if(type==='airliner'){const a=buildAirliner(i);full=a.g;gear=a.gear;gy=3.9;}
+  if(type==='airliner'){const a=buildAirliner(i);full=a.g;gear=a.gear;gy=3.9*tfcAK();full.scale.setScalar(TFC_K);}
   else if(type==='heli'){const a=buildHeli(i);full=a.g;rotor=a.rotor;trot=a.trot;gy=1.74;}
   else if(type==='cessna'){const L=liveries[(i+3)%liveries.length],p=buildPlane({stripe:L[0],accent:L[1],reg:L[2],regColor:'#222',full:false});trafficProps(p,'cessna');full=p.g;gy=1.37;}
   else{const f=hdModel('f16')||buildF16();full=f.g;gear=f.gear||null;if(f.ab)f.ab.visible=false;gy=f.hd?TYPES.f16.gear:1.5;}
   h.add(full);const lod=tfcLod(type,i);h.add(lod);scene.add(h);h.visible=false;h.userData.heat=0.8;
-  const M={g:h,full:full,lod:lod,gear:gear,rotor:rotor,trot:trot,gy:gy,busy:false,lodOn:false,type:type},t=TL[type];
+  const M={g:h,full:full,lod:lod,gear:gear,rotor:rotor,trot:trot,gy:gy,gy0:gy,k0:type==='airliner'?TFC_K:1,ks:1,i:i,busy:false,lodOn:false,type:type},t=TL[type];
   M.lights=makeAircraftLights(h,AC_LIGHTS[t[0]],{mat:ACL_MAT_T,only:['nav','strobe','beacon','glow'],dy:t[1]});
-  return M;
+  if(type==='airliner'){lod.scale.setScalar(TFC_K);if(M.lights.pts)M.lights.pts.scale.setScalar(TFC_K);}
+  return M;}
+// runways item 6: the generic airliner (a 737 class lathe model, 34.0 m across as built) scaled to a 737-800's 35.8 m span;
+// tfcScale: 0.8 of that for Santos Dumont's regional jets (plan.regional)
+let TFC_K=1;
+function tfcAK(){if(TFC_K===1){const b=new THREE.Box3().setFromObject(buildAirliner(0).g);TFC_K=35.8/Math.max(1,b.max.x-b.min.x);}return TFC_K;}
+function tfcScale(M,k){if(M.type!=='airliner'||M.ks===k)return;M.ks=k;const s=M.k0*k;M.full.scale.setScalar(s);M.lod.scale.setScalar(s);
+  if(M.lights.pts)M.lights.pts.scale.setScalar(s);M.gy=M.gy0*k;
 }
 [['airliner',5],['cessna',2],['f16',2],['heli',2]].forEach(([type,n])=>{TFC.pool[type]=[];
   for(let i=0;i<n;i++){const M=tfcMake(type,i);TFC.pool[type].push(M);farAdd(M.g);const f=FAR[FAR.length-1];WARM_STEPS.push(()=>farWarm(f,M));}});
@@ -10682,7 +10689,9 @@ if(REGION.az)(function(){
   TFC.plans.push(
     {type:'airliner',apt:'KPHX',ends:[tfcEnd('KPHX','08'),tfcEnd('KPHX','26')],depEnds:[tfcEnd('KPHX','07L'),tfcEnd('KPHX','25R')],pattern:'straightin',
      park:{x:sh[0][0],z:sh[0][1],hdg:0,spots:sh},twy:122,depTwy:126,exitU:2000,climbOut:{hdg:0,alt:2500},count:{min:3,max:5},every:[60,120],fin:18520,surf:0.06},
-    {type:'cessna',apt:'KGEU',ends:[tfcEnd('KGEU','1'),tfcEnd('KGEU','19')],pattern:'left',park:null,twy:78,exitU:0,climbOut:null,count:{min:1,max:2},surf:0.06},
+    // runways item 6: two tie downs on the main apron for the Cessnas' full stop every third circuit
+    {type:'cessna',apt:'KGEU',ends:[tfcEnd('KGEU','1'),tfcEnd('KGEU','19')],pattern:'left',park:{x:wX(740,-195),z:wZ(740,-195),hdg:116,spots:[[wX(740,-195),wZ(740,-195)],[wX(800,-195),wZ(800,-195)]]},
+     twy:78,exitU:0,climbOut:null,count:{min:1,max:2},surf:0.06},
     {type:'f16',apt:'KLUF',ends:[tfcEnd('KLUF','03L'),tfcEnd('KLUF','21R')],depEnds:[tfcEnd('KLUF','03R'),tfcEnd('KLUF','21L')],pattern:'overhead',
      park:{x:lk[0][0],z:lk[0][1],hdg:312.6,spots:lk},twy:152,depTwy:100,exitU:1800,climbOut:{hdg:0,alt:1500},count:{min:2,max:2},surf:0.06},
     {type:'heli',apt:'Phoenix',ends:[],pattern:'roam',park:null,count:{min:1,max:2},roam:roam,surf:0});
@@ -10717,7 +10726,9 @@ function tfcAhead(o,R,onlyPlayer){
       if(f2>0&&f2<160&&Math.abs(dx*qz-dz*qx)<35&&q.gs>0.2&&o.id<q.id)continue;
       return 2;}}
   return 0;}
-function tfcSpot(plan){const P=plan.park;if(!P)return -1;for(let i=0;i<P.spots.length;i++)if(!P.taken[i])return i;return -1;}
+function tfcSpot(plan){const P=plan.park;if(!P)return -1;const G=tfcGraph(plan);
+  if(G&&!P.ok)P.ok=P.spots.map(sp=>twgSpot(G,sp)>=0);   // runways item 6: only the stands the taxiway graph reaches
+  for(let i=0;i<P.spots.length;i++)if(!P.taken[i]&&(!P.ok||P.ok[i]))return i;return -1;}
 function tfcFree(o){if(o.spotI!=null&&o.plan.park){if(o.plan.park.taken[o.spotI]===o)o.plan.park.taken[o.spotI]=null;}o.spotI=null;}
 function tfcClaim(o,i){if(i<0)return;o.plan.park.taken[i]=o;o.spotI=i;o.spot=o.plan.park.spots[i];}
 // taxi in: off the runway at the exit, out to the parallel taxiway, along it, into the spot
@@ -10726,6 +10737,324 @@ function tfcRouteIn(o){const E=o.E,P=o.plan,sp=o.spot,s0=tfcAB(E,sp[0],sp[1]),s=
 // taxi out: from the spot to the departure taxiway, along it to the end, to the hold short line
 function tfcRouteOut(o,sp){const E=o.E,P=o.plan,s0=tfcAB(E,sp[0],sp[1]),s=s0.b>0?1:-1,apk=s0.a,t=P.depTwy||P.twy;
   return [tfcP(E,apk,s*t),tfcP(E,40,s*t),tfcP(E,40,s*55)];}
+// ---------- the taxiway graph (runways item 6) ----------
+// TWG[code]: one graph per airport, built by buildAirport from the same taxiway and taxilane centre lines it paves
+// (assets/world/az_apt.json in Arizona, the region's own data elsewhere): a node at every polyline vertex and at
+// every crossing of two segments (nodes within TWG_SNAP metres are one; a polyline end within TWG_SNAP of another
+// segment splits it), the runway centre lines as segments too (k 2), so a taxiway that meets or crosses a runway
+// meets it in a runway node (rn); a taxiway ending at the runway edge is joined to its centre line. Hold nodes: where
+// a taxiway crosses its runway's hold line (buildAirport's holds, rwpHoldD). Edges carry len, w, ref, k (0 taxiway,
+// 1 taxilane, 2 runway, 3 stand stub) and rs: the runway whose strip (inside the hold lines) they are in. Entrances
+// (G.ent per runway): a hold node and the strip path from it to its runway node. Stands (k 3 stubs): parking positions
+// and gates (Arizona), REGION.park and the parked airliners (a world region), and the traffic plans' own spots
+// (twgSpot, on demand), each joined to the nearest taxiway or taxilane by a straight stub that stays on pavement and
+// clear of every terminal and hangar. Routing (twgRoute): A* over (edge, direction), turn penalties past 100 degrees,
+// a strip costs 400 m to enter (crossing a runway) unless it is the route's own runway, runways themselves 30 times
+// their length; computed once per route, cached per (from, goals, home, blocked).
+const TWG={},TWG_SNAP=3;
+function twgBuild(code,tws,holds,rws,blds,pvg){
+  const t0=performance.now(),S=[];
+  for(const t of tws)for(let k=0;k+1<t.P.length;k++)S.push({a:t.P[k],b:t.P[k+1],w:t.w,ref:t.ref,k:t.lane?1:0,r:null,ts:[0,1]});
+  for(const r of rws){const e=r.ends[0],h=r.len/2;S.push({a:[r.x-e.dx*h,r.z-e.dz*h],b:[r.x+e.dx*h,r.z+e.dz*h],w:r.wid,ref:r.num,k:2,r:r,ts:[0,1]});}
+  const C=64,grid=new Map(),key=(i,j)=>(i+4096)*8192+(j+4096);
+  S.forEach((s,n)=>{const m=s.k===2?s.w/2+6:TWG_SNAP;
+    for(let i=Math.floor((Math.min(s.a[0],s.b[0])-m)/C);i<=Math.floor((Math.max(s.a[0],s.b[0])+m)/C);i++)
+      for(let j=Math.floor((Math.min(s.a[1],s.b[1])-m)/C);j<=Math.floor((Math.max(s.a[1],s.b[1])+m)/C);j++){const k=key(i,j);let a=grid.get(k);if(!a)grid.set(k,a=[]);a.push(n);}});
+  const proj=(s,x,z)=>{const ex=s.b[0]-s.a[0],ez=s.b[1]-s.a[1],l2=ex*ex+ez*ez;return l2>0?clamp(((x-s.a[0])*ex+(z-s.a[1])*ez)/l2,0,1):0;};
+  const at=(s,t)=>[s.a[0]+(s.b[0]-s.a[0])*t,s.a[1]+(s.b[1]-s.a[1])*t];
+  const joins=[],seen=new Set(),NS=S.length;
+  for(const list of grid.values())for(let p=0;p<list.length;p++)for(let q=p+1;q<list.length;q++){
+    const i=Math.min(list[p],list[q]),j=Math.max(list[p],list[q]),pk=i*NS+j;if(seen.has(pk))continue;seen.add(pk);
+    const A=S[i],B=S[j];if(A.k===2&&B.k===2)continue;
+    const rx=A.b[0]-A.a[0],rz=A.b[1]-A.a[1],sx=B.b[0]-B.a[0],sz=B.b[1]-B.a[1],den=rx*sz-rz*sx;
+    if(Math.abs(den)>1e-9){const qx=B.a[0]-A.a[0],qz=B.a[1]-A.a[1],t=(qx*sz-qz*sx)/den,u=(qx*rz-qz*rx)/den;
+      if(t>=0&&t<=1&&u>=0&&u<=1){A.ts.push(t);B.ts.push(u);}}
+    for(const [P,Q] of [[A,B],[B,A]])for(const e of [P.a,P.b]){const t=proj(Q,e[0],e[1]),c=at(Q,t),d=Math.hypot(c[0]-e[0],c[1]-e[1]);
+      if(d<TWG_SNAP)Q.ts.push(t);
+      else if(Q.k===2&&P.k!==2&&d<Q.w/2+5&&t>0&&t<1){Q.ts.push(t);joins.push([e,c]);}}}   // a taxiway that stops at the runway edge
+  // the hold lines split their taxiway
+  for(const h of holds){const a=grid.get(key(Math.floor(h.x/C),Math.floor(h.z/C)))||[];
+    for(const n of a){const s=S[n];if(s.k===2)continue;const t=proj(s,h.x,h.z),c=at(s,t);if(Math.hypot(c[0]-h.x,c[1]-h.z)<0.5)s.ts.push(t);}}
+  // nodes, snapped
+  const N=[],ng=new Map(),G4=4;
+  const node=(x,z)=>{const i=Math.floor(x/G4),j=Math.floor(z/G4);let best=-1,bd=TWG_SNAP;
+    for(let di=-1;di<=1;di++)for(let dj=-1;dj<=1;dj++){const l=ng.get(key(i+di,j+dj));if(l)for(const n of l){const d=Math.hypot(N[n].x-x,N[n].z-z);if(d<bd){bd=d;best=n;}}}
+    if(best>=0)return best;N.push({x:x,z:z,e:[],rn:null,hold:null});const k=key(i,j);let l=ng.get(k);if(!l)ng.set(k,l=[]);l.push(N.length-1);return N.length-1;};
+  const E=[],em=new Map();
+  const edge=(a,b,w,ref,k,r)=>{if(a===b)return -1;const mk=Math.min(a,b)*1e6+Math.max(a,b);const o=em.get(mk);
+    if(o!=null){if(E[o].k===2&&k!==2)Object.assign(E[o],{w:w,ref:ref,k:k,r:null});return o;}
+    E.push({a:a,b:b,len:Math.hypot(N[b].x-N[a].x,N[b].z-N[a].z),w:w,ref:ref,k:k,r:r,rs:null});N[a].e.push(E.length-1);N[b].e.push(E.length-1);em.set(mk,E.length-1);return E.length-1;};
+  for(const s of S){s.ts.sort((p,q)=>p-q);let pv=-1,pt=-1;
+    for(const t of s.ts){if(pv>=0&&t-pt<1e-7)continue;const c=at(s,t),n=node(c[0],c[1]);if(s.k===2)N[n].rn=s.r;if(pv>=0)edge(pv,n,s.w,s.ref,s.k,s.r);pv=n;pt=t;}}
+  for(const [e,c] of joins){const a=node(e[0],e[1]),b=node(c[0],c[1]);N[b].rn=N[b].rn||rws.find(r=>Math.abs((c[0]-r.x)*r.ends[0].dz-(c[1]-r.z)*r.ends[0].dx)<1)||null;edge(a,b,23,'',0,null);}
+  // strips: an edge whose middle is inside a runway's hold lines
+  const G={code:code,N:N,E:E,rws:rws,blds:blds,pvg:pvg,grid:null,cache:new Map(),ent:new Map(),spots:new Map(),stands:[],ms:0};
+  const hd=new Map(rws.map(r=>[r,rwpHoldD(r)]));
+  G.inStrip=(x,z)=>{for(const r of rws){const e=r.ends[0],dx=x-r.x,dz=z-r.z;if(Math.abs(dx*e.dx+dz*e.dz)<=r.len/2+30&&Math.abs(dz*e.dx-dx*e.dz)<hd.get(r)-0.5)return r;}return null;};
+  for(const e of E){if(e.k===2){e.rs=e.r;continue;}e.rs=G.inStrip((N[e.a].x+N[e.b].x)/2,(N[e.a].z+N[e.b].z)/2);}
+  for(const h of holds){let best=-1,bd=TWG_SNAP+0.5;const ci=Math.floor(h.x/G4),cj=Math.floor(h.z/G4);
+    for(let di=-1;di<=1;di++)for(let dj=-1;dj<=1;dj++)for(const n of ng.get(key(ci+di,cj+dj))||[]){const d=Math.hypot(N[n].x-h.x,N[n].z-h.z);if(d<bd){bd=d;best=n;}}
+    if(best>=0)N[best].hold=h.r;}
+  // entrances: from each hold node through its runway's strip to the runway node
+  for(const r of rws)G.ent.set(r,[]);
+  N.forEach((n,i)=>{if(!n.hold)return;const r=n.hold,prev=new Map([[i,-1]]),Q=[i];let rn=-1;
+    while(Q.length&&rn<0){const v=Q.shift();for(const ei of N[v].e){const e=E[ei];if(e.rs!==r||e.k===2)continue;const w=e.a===v?e.b:e.a;if(prev.has(w))continue;prev.set(w,v);
+      if(N[w].rn===r){rn=w;break;}if(prev.size<60)Q.push(w);}}
+    if(rn<0)return;const lp=[];for(let v=rn;v>=0;v=prev.get(v))lp.unshift(v);
+    const e0=r.ends[0],p=N[lp[lp.length-2]],q=N[rn];
+    G.ent.get(r).push({h:i,rn:rn,lp:lp,s:(q.x-r.x)*e0.dx+(q.z-r.z)*e0.dz,dx:(q.x-p.x),dz:(q.z-p.z)});});
+  twgGrid(G);
+  G.ms=Math.round(performance.now()-t0);
+  return G;
+}
+// a 100 m grid of the taxiway and taxilane edges, for the stand stubs
+function twgGrid(G){const C=100,m=new Map(),key=(i,j)=>(i+4096)*8192+(j+4096);G.grid={C:C,m:m,key:key};
+  G.E.forEach((e,n)=>{if(e.k>=2||e.rs)return;const A=G.N[e.a],B=G.N[e.b];
+    for(let i=Math.floor(Math.min(A.x,B.x)/C);i<=Math.floor(Math.max(A.x,B.x)/C);i++)for(let j=Math.floor(Math.min(A.z,B.z)/C);j<=Math.floor(Math.max(A.z,B.z)/C);j++){
+      const k=key(i,j);let a=m.get(k);if(!a)m.set(k,a=[]);a.push(n);}});}
+// a stand at x,z (hdg deg or null): its node, joined by a stub to the nearest taxiway or taxilane point it can reach in a
+// straight line on pavement without crossing a building (a world region's aprons have no taxilanes: up to 300 m across
+// the apron); -1 when there is none
+function twgStand(G,x,z,hdg){
+  const N=G.N,E=G.E,g=G.grid,c=[],R=300,seen=new Set();
+  for(let i=Math.floor((x-R)/g.C);i<=Math.floor((x+R)/g.C);i++)for(let j=Math.floor((z-R)/g.C);j<=Math.floor((z+R)/g.C);j++)for(const n of g.m.get(g.key(i,j))||[]){
+    if(seen.has(n))continue;seen.add(n);const e=E[n],A=N[e.a],B=N[e.b];if(e.k>=2||e.rs)continue;const ex=B.x-A.x,ez=B.z-A.z,l2=ex*ex+ez*ez,L=Math.sqrt(l2);
+    // the foot of the perpendicular, and points every 15 m along the edge (an apron stand may only see part of it)
+    const ts=[l2>0?clamp(((x-A.x)*ex+(z-A.z)*ez)/l2,0,1):0];for(let u=0;u<=L;u+=15)ts.push(L>0?u/L:0);ts.push(1);
+    for(const t of ts){const qx=A.x+ex*t,qz=A.z+ez*t,d=Math.hypot(qx-x,qz-z);if(d<R)c.push({n:n,t:t,x:qx,z:qz,d:d});}}
+  c.sort((p,q)=>p.d-q.d);
+  const paved=(px,pz)=>!G.pvg||aptPvAt(G.pvg,px,pz,0)||isPaved(px,pz);
+  for(const q of c.slice(0,80)){let ok=true;const n=Math.max(1,Math.ceil(q.d/4));
+    for(let k=1;k<n&&ok;k++){const px=x+(q.x-x)*k/n,pz=z+(q.z-z)*k/n;if(!paved(px,pz)||G.blds.some(P=>pipXZ(P,px,pz)))ok=false;}
+    if(!ok)continue;
+    // split the edge at the stub's foot (or take its end node when the foot is within 3 m of it)
+    const e=E[q.n],A=N[e.a],B=N[e.b];let f;
+    if(Math.hypot(A.x-q.x,A.z-q.z)<TWG_SNAP)f=e.a;else if(Math.hypot(B.x-q.x,B.z-q.z)<TWG_SNAP)f=e.b;
+    else{f=N.length;N.push({x:q.x,z:q.z,e:[],rn:null,hold:null});const b=e.b;e.b=f;e.len=Math.hypot(q.x-A.x,q.z-A.z);
+      const bi=N[b].e.indexOf(q.n);N[b].e.splice(bi,1);N[f].e.push(q.n);
+      const n2=E.length;E.push({a:f,b:b,len:Math.hypot(N[b].x-q.x,N[b].z-q.z),w:e.w,ref:e.ref,k:e.k,r:null,rs:null});N[f].e.push(n2);N[b].e.push(n2);
+      const C2=g.C;for(let i=Math.floor(Math.min(q.x,N[b].x)/C2);i<=Math.floor(Math.max(q.x,N[b].x)/C2);i++)for(let j=Math.floor(Math.min(q.z,N[b].z)/C2);j<=Math.floor(Math.max(q.z,N[b].z)/C2);j++){
+        const k=g.key(i,j);let a=g.m.get(k);if(!a)g.m.set(k,a=[]);a.push(n2);}}
+    let s=f;
+    if(q.d>=1){s=N.length;N.push({x:x,z:z,e:[],rn:null,hold:null});const n3=E.length;E.push({a:f,b:s,len:q.d,w:20,ref:'',k:3,r:null,rs:null});N[f].e.push(n3);N[s].e.push(n3);}
+    N[s].st={x:x,z:z,hdg:hdg};G.cache.clear();return s;}
+  return -1;
+}
+// a traffic plan's spot as a stand node, made once
+function twgSpot(G,sp){const k=sp[0].toFixed(1)+','+sp[1].toFixed(1);if(G.spots.has(k))return G.spots.get(k);const n=twgStand(G,sp[0],sp[1],sp[2]);G.spots.set(k,n);return n;}
+// A*: from node to the nearest of goals (node indices); opt: home (a runway whose strip and centre line are ours),
+// block (runways not to cross: 20 km extra). Returns the node list or null.
+function twgRoute(G,from,goals,opt){
+  opt=opt||{};const home=opt.home||null,block=opt.block||[];
+  const ck=from+'>'+goals.join(',')+'|'+(home?home.num:'')+'|'+block.map(r=>r.num).join(',');
+  if(G.cache.has(ck))return G.cache.get(ck);
+  const N=G.N,E=G.E,NE=E.length,ST=2*NE,gs=new Set(goals),gn=goals.map(i=>N[i]);
+  const g=new Float64Array(ST+1).fill(Infinity),came=new Int32Array(ST+1).fill(-1),done=new Uint8Array(ST+1);
+  const h=v=>{let m=Infinity;for(const q of gn){const d=Math.hypot(q.x-N[v].x,q.z-N[v].z);if(d<m)m=d;}return m;};
+  const H=[];   // binary heap of [f, state]
+  const push=(f,s)=>{H.push([f,s]);let i=H.length-1;while(i>0){const p=(i-1)>>1;if(H[p][0]<=H[i][0])break;const t=H[p];H[p]=H[i];H[i]=t;i=p;}};
+  const pop=()=>{const top=H[0],l=H.pop();if(H.length){H[0]=l;let i=0;for(;;){const a=2*i+1,b=a+1;let m=i;if(a<H.length&&H[a][0]<H[m][0])m=a;if(b<H.length&&H[b][0]<H[m][0])m=b;if(m===i)break;const t=H[m];H[m]=H[i];H[i]=t;i=m;}}return top;};
+  const nodeOf=s=>s===ST?from:(s&1?E[s>>1].a:E[s>>1].b);
+  g[ST]=0;push(h(from),ST);let end=-1,it=0;
+  while(H.length&&it++<60000){const [,s]=pop();if(done[s])continue;done[s]=1;const v=nodeOf(s);
+    if(gs.has(v)&&s!==ST||(s===ST&&gs.has(from))){end=s;break;}
+    let ix=0,iz=0,rsIn=null;if(s!==ST){const e=E[s>>1],u=s&1?e.b:e.a;ix=N[v].x-N[u].x;iz=N[v].z-N[u].z;const l=Math.hypot(ix,iz)||1;ix/=l;iz/=l;rsIn=e.rs;}
+    for(const ei of N[v].e){if(s!==ST&&ei===(s>>1))continue;const e=E[ei],w=e.a===v?e.b:e.a,ns=2*ei+(e.a===v?0:1);if(done[ns])continue;
+      if(e.k===3&&w!==from&&!gs.has(w)&&v!==from)continue;   // never through somebody else's stand
+      let c=e.len;
+      if(e.k===2)c*=e.r===home?1.5:30;
+      if(e.rs&&e.rs!==rsIn&&e.rs!==home)c+=400+(block.indexOf(e.rs)>=0?20000:0);
+      if(s!==ST){const ox=(N[w].x-N[v].x)/(e.len||1),oz=(N[w].z-N[v].z)/(e.len||1),cs=ix*ox+iz*oz;if(cs<-0.17)c+=cs<-0.85?3000:300;}
+      const ng=g[s]+c;if(ng<g[ns]){g[ns]=ng;came[ns]=s;push(ng+h(w),ns);}}}
+  let R=null;
+  if(end>=0){R=[];for(let s=end;s>=0;s=came[s]){R.unshift(nodeOf(s));if(s===ST)break;}}
+  if(G.cache.size>300)G.cache.clear();G.cache.set(ck,R);return R;
+}
+// nodes that reach no runway entrance, and stands that miss some runway's entrances (tests: __kgeu.twg)
+function twgAudit(G){
+  const N=G.N,E=G.E,comp=new Int32Array(N.length).fill(-1);let nc=0;
+  for(let i=0;i<N.length;i++){if(comp[i]>=0)continue;const Q=[i];comp[i]=nc;while(Q.length){const v=Q.pop();for(const ei of N[v].e){const e=E[ei],w=e.a===v?e.b:e.a;if(comp[w]<0){comp[w]=nc;Q.push(w);}}}nc++;}
+  const hasHold=new Set();for(const [,L] of G.ent)for(const en of L)hasHold.add(comp[en.h]);
+  let iso=0;for(let i=0;i<N.length;i++)if(!hasHold.has(comp[i]))iso++;
+  const bad=[];for(const s of G.stands.concat([...G.spots.values()].filter(n=>n>=0))){for(const [r,L] of G.ent)if(L.length&&!L.some(en=>comp[en.h]===comp[s])){bad.push({x:Math.round(N[s].x),z:Math.round(N[s].z),rwy:r.num});break;}}
+  return {iso:iso,bad:bad};
+}
+// ---------- the tower: one runway token each, a departure queue at the holds (runways item 6) ----------
+// TWR per runway: tok (the one aircraft allowed on it: a departure from 'line up and wait' until airborne, an arrival
+// from 400 m out until it is past the hold line, a crossing until it is across; o.tk is the runway an aircraft holds)
+// and q, the departures holding short in the order they got there. A departure lines up when the runway is free, the
+// player is neither on it nor on a final to it inside 3 nm, and the next arrival is beyond 3 nm (2.5 nm once it has
+// held TWR_PRI s: the arrivals still beyond 2.5 nm then make a left 360 until it is airborne); it is cleared for takeoff
+// with no arrival inside 2 nm. An arrival is cleared to land inside 5 nm when the runway is or will be clear, orbits
+// once at 2.5 nm for the player or a departure going first, goes around inside 1.2 nm when the runway will not be clear,
+// and takes the token 400 m out (or goes around). TWR_PRI is 60 s, not 150: the hold and the line up together must stay
+// under 3 minutes, and the arrival already inside 2.5 nm still lands and vacates first.
+const TWR=new Map(),TWR_PRI=60,TWRP={f:-1,m:new Map()};
+function twrOf(r){let t=TWR.get(r);if(!t)TWR.set(r,t={tok:null,q:[]});return t;}
+function twrTok(r){const t=twrOf(r);if(t.tok&&(t.tok.tk!==r||TFC.list.indexOf(t.tok)<0))t.tok=null;return t.tok;}
+function twrTake(o,r){const t=twrOf(r),k=twrTok(r);if(k&&k!==o)return false;if(o.tk&&o.tk!==r)twrFree(o);t.tok=o;if(o.tk!==r)o.tkIn=false;o.tk=r;return true;}
+function twrFree(o){if(o.tk){const t=twrOf(o.tk);if(t.tok===o)t.tok=null;o.tk=null;o.tkIn=false;}}
+// the player on the runway (on the ground, on the pavement or within 40 m of it) or on a final to it inside 3 nm and 1,500 ft
+function twrPlayer(r){
+  if(TWRP.f!==TFC.frame){TWRP.f=TFC.frame;TWRP.m.clear();}
+  let v=TWRP.m.get(r);if(v!==undefined)return v;v=false;
+  if(running&&!st.crashed){const e=r.ends[0],dx=st.pos.x-r.x,dz=st.pos.z-r.z;
+    if(st.onGround||st.agl<15)v=Math.abs(dx*e.dx+dz*e.dz)<r.len/2+30&&Math.abs(dz*e.dx-dx*e.dz)<r.wid/2+40;
+    else if(st.agl<460){const hd=Math.atan2(st.vel.x,-st.vel.z);
+      for(const E of r.ends){const p=tfcAB(E,st.pos.x,st.pos.z),a=p.a,b=p.b;if(a>-5556&&a<tfcLen(E)&&Math.abs(b)<250+Math.max(0,-a)*0.1&&Math.abs(wrapPi(hd-E.h))<0.6){v=true;break;}}}}
+  TWRP.m.set(r,v);return v;}
+// the nearest arrival to r still in the air on its final (or base), metres to its threshold; Infinity when none
+function twrArr(r,skip){let d=Infinity;for(const q of TFC.list){if(q===skip||!q.E||q.E.rwy!==r||q.onGround||(q.state!=='final'&&q.state!=='base'))continue;
+  const p=tfcAB(q.E,q.pos.x,q.pos.z),x=p.a<0?Math.hypot(p.a,p.b):0;if(x<d)d=x;}return d;}
+// the runway is or will be clear for an arrival
+function twrLandOK(o,r){if(twrPlayer(r))return false;const t=twrTok(r);if(!t||t===o)return true;
+  return !t.onGround||t.state==='rollout'||t.state==='taxi_in'||t.state==='touchgo'||(t.state==='takeoff'&&t.gs>12);}
+// a departure goes before the arrivals still beyond 2.5 nm: lined up or rolling, or first in the queue for TWR_PRI s
+function twrDepFirst(r){const t=twrTok(r);if(t&&t.onGround&&(t.state==='lineup'||t.state==='takeoff'))return true;
+  const q=twrOf(r).q.find(q=>q.state==='hold'&&TFC.list.indexOf(q)>=0);return !!q&&q.holdT>=TWR_PRI;}
+// crossing a runway (or entering one that is not ours) on the way: free, no player, no arrival inside 2.5 nm
+function twrCross(o,r){if(twrTok(r)&&twrTok(r)!==o)return false;if(twrPlayer(r)||twrArr(r)<4630)return false;return twrTake(o,r);}
+// the runways the player is on (or on a final to): routes keep off them
+function tfcBlocked(G){return G.rws.filter(r=>twrPlayer(r));}
+const tfcGraph=P=>{const e=P.ends[0];return e?TWG[e.rwy.code]||null:null;};
+// the runway end in use for landing (k 'land') or departure ('dep'): the plan's pick (the wind, or the region's flow),
+// moved to another end of the same direction when the player is on it or the graph has no way onto it
+function tfcPick(P,k){
+  const list=k==='dep'?(P.depEnds||P.ends):P.ends,G=tfcGraph(P);
+  const ok=E=>!!E&&!twrPlayer(E.rwy)&&(!G||(G.ent.get(E.rwy)||[]).length>0);
+  const E=P.pick?P.pick(k):tfcWind(list);if(ok(E))return E;
+  const all=(P.flowEnds?P.flowEnds(k):list).concat(list).filter(e=>ok(e)&&(!E||Math.abs(wrapPi(e.h-E.h))<0.6));
+  return all.length?all[Math.floor(Math.random()*all.length)]:E;}
+// a taxi path through points {x,z}: legs, their lengths and the strip each leg is in
+function tfcPath(G,pts){
+  const X=[],Z=[];for(const p of pts){if(X.length&&Math.hypot(p.x-X[X.length-1],p.z-Z[Z.length-1])<0.5)continue;X.push(p.x);Z.push(p.z);}
+  if(X.length<2){X.push(X[0]);Z.push(Z[0]);}
+  const C=[0],RS=[];for(let i=0;i+1<X.length;i++){C.push(C[i]+Math.hypot(X[i+1]-X[i],Z[i+1]-Z[i]));RS.push(G.inStrip((X[i]+X[i+1])/2,(Z[i]+Z[i+1])/2));}
+  return {x:X,z:Z,c:C,rs:RS,n:X.length,L:C[C.length-1]};}
+// how far along o's path ahead (within max m) a point lies within 18 m of it; null if not
+function tfcAlong(P,o,x,z,max){
+  for(let i=o.pi;i<P.n-1&&P.c[i]-o.ps<max;i++){const ax=P.x[i],az=P.z[i],ex=P.x[i+1]-ax,ez=P.z[i+1]-az,l=P.c[i+1]-P.c[i];if(l<1e-6)continue;
+    const t=clamp(((x-ax)*ex+(z-az)*ez)/(l*l),0,1);if(Math.hypot(ax+ex*t-x,az+ez*t-z)<18){const s=P.c[i]+t*l-o.ps;if(s>0)return s;}}
+  return null;}
+// straight taxi speed (m/s: 20 kt, 10 kt, 15 kt) and the look ahead (m) the steering aims at
+const TFC_TX={airliner:[10.3,25],cessna:[5.1,12],f16:[7.7,12]};
+// follow o.pa: pure pursuit to a point Ld ahead on the path (smooth arcs through the bends), 6 kt through any turn over 30
+// degrees, a turn on the spot when the path lies far off the nose at a standstill, stop 50 m behind anyone on the path
+// ahead (the one that waits longest gives way after a minute), stop short of a runway strip until the tower clears the
+// crossing, release the runway once off its strip. o.dr: {rate, vT, dec}; true at the end of the path.
+function tfcDrive(o,dt){
+  const P=o.pa,k=TFC_TX[o.type]||TFC_TX.airliner,Ld=k[1],R=o.dr||(o.dr={rate:0,vT:0,dec:0});
+  let bi=o.pi,bs=o.ps,bd=1e9;
+  for(let i=o.pi;i<Math.min(P.n-1,o.pi+4);i++){const ax=P.x[i],az=P.z[i],ex=P.x[i+1]-ax,ez=P.z[i+1]-az,l=P.c[i+1]-P.c[i],t=l>1e-6?clamp(((o.pos.x-ax)*ex+(o.pos.z-az)*ez)/(l*l),0,1):1;
+    const d=Math.hypot(ax+ex*t-o.pos.x,az+ez*t-o.pos.z);if(d<bd-0.5){bd=d;bi=i;bs=P.c[i]+t*l;}}
+  o.pi=bi;o.ps=Math.max(o.ps,bs);
+  const cur=P.rs[Math.min(o.pi,P.n-2)];
+  if(o.tk&&o.state!=='lineup'){if(cur===o.tk)o.tkIn=true;else if(o.tkIn)twrFree(o);}
+  const rem=P.L-o.ps;
+  if(rem<1.5||(rem<4&&o.gs<0.3)){R.vT=0;R.rate=0;R.dec=2.5;return true;}
+  const cs=Math.min(P.L,o.ps+Ld);let j=o.pi;while(j<P.n-2&&P.c[j+1]<cs)j++;
+  const f=(cs-P.c[j])/Math.max(1e-6,P.c[j+1]-P.c[j]),cx=P.x[j]+(P.x[j+1]-P.x[j])*f,cz=P.z[j]+(P.z[j+1]-P.z[j])*f;
+  const al=wrapPi(Math.atan2(cx-o.pos.x,-(cz-o.pos.z))-o.hdg),ld=Math.max(Ld*0.5,Math.hypot(cx-o.pos.x,cz-o.pos.z));
+  let v=k[0];const look=Ld+12+o.gs*o.gs/2.4;
+  for(let i=o.pi+1;i<P.n-1&&P.c[i]-o.ps<look;i++){const h=Math.atan2(P.x[i+1]-P.x[i],-(P.z[i+1]-P.z[i]));
+    if(Math.abs(wrapPi(h-o.hdg))>0.52)v=Math.min(v,Math.sqrt(9.6+2.4*Math.max(0,P.c[i]-o.ps-Ld*0.4)));}
+  v=Math.min(v,Math.sqrt(0.25+2.0*Math.max(0,rem-1.5)));
+  // a strip ahead that is not ours
+  for(let i=o.pi;i<P.n-1&&P.c[i]-o.ps<look+25;i++){const rs=P.rs[i];if(!rs||rs===o.tk)continue;
+    if(i>o.pi&&P.rs[i-1]===rs)continue;
+    if(!twrCross(o,rs)){v=Math.min(v,Math.sqrt(2.4*Math.max(0,P.c[i]-o.ps-3)));if(i===o.pi)v=0;}
+    break;}
+  let wait=null;
+  if(!(o.ign>0)){
+    for(const q of TFC.list){if(q===o||!q.onGround||q.state==='parked')continue;if(q.waitOn===o.id&&o.id<q.id)continue;
+      const d=tfcAlong(P,o,q.pos.x,q.pos.z,120);if(d!==null){v=Math.min(v,Math.sqrt(3*Math.max(0,d-50)));if(d<70)wait=q.id;}}
+    if(running&&!st.crashed&&(st.onGround||st.agl<15)){const d=tfcAlong(P,o,st.pos.x,st.pos.z,150);if(d!==null)v=Math.min(v,Math.sqrt(3*Math.max(0,d-60)));}}
+  o.waitOn=wait;
+  if(wait!==null&&o.gs<0.3){o.stuck=(o.stuck||0)+dt;if(o.stuck>60){o.ign=20;o.stuck=0;}}else o.stuck=0;
+  if(o.ign>0)o.ign-=dt;
+  let rate;
+  if(Math.abs(al)>0.8&&o.gs<1){v=0;rate=Math.sign(al)*0.3;}
+  else{if(Math.abs(al)>1.2)v=0;else if(Math.abs(al)>0.52)v=Math.min(v,3.1);
+    rate=clamp(2*Math.sin(al)*Math.max(o.gs,0.5)/ld,-0.5,0.5);}
+  R.vT=v;R.rate=rate;R.dec=v<o.gs?2.2:0;
+  return false;}
+// rollout: under 30 kt, the first runway entrance ahead it can still slow down for and turn off at (no more than 100
+// degrees off the landing direction), then the graph to its stand (or, with none free, off the runway and gone)
+function tfcVacate(o){
+  const E=o.E,G=TWG[E.rwy.code];if(!G)return false;const ent=G.ent.get(E.rwy)||[];
+  const a0=tfcAB(E,o.pos.x,o.pos.z).a,need=Math.max(0,o.gs*o.gs-9.6)/3+15,c=[];
+  for(const en of ent){const n=G.N[en.rn],A=tfcAB(E,n.x,n.z).a;if(A<a0+need)continue;
+    const p=G.N[en.lp[en.lp.length-2]],ex=p.x-n.x,ez=p.z-n.z,l=Math.hypot(ex,ez)||1;if((ex*E.dx+ez*E.dz)/l<-0.17)continue;c.push([A,en]);}
+  c.sort((p,q)=>p[0]-q[0]);
+  if(o.spotI==null&&o.plan.park){const si=tfcSpot(o.plan);if(si>=0)tfcClaim(o,si);}
+  const sn=o.spot?twgSpot(G,o.spot):-1;
+  o.whyV='a0='+(a0|0)+' gs='+(o.gs|0)+' need='+(need|0)+' ent='+ent.length+' c='+c.length+' sn='+sn;
+  for(const [A,en] of c.slice(0,4)){
+    const R=sn>=0?twgRoute(G,en.h,[sn],{home:E.rwy,block:tfcBlocked(G)}):null;if(sn>=0&&!R){o.whyV+=' noroute@'+(A|0);continue;}
+    const pts=[{x:o.pos.x,z:o.pos.z}];for(let i=en.lp.length-1;i>=0;i--)pts.push(G.N[en.lp[i]]);
+    if(R)for(let i=1;i<R.length;i++)pts.push(G.N[R[i]]);
+    o.pa=tfcPath(G,pts);o.pi=0;o.ps=0;o.tkIn=true;o.gone=!R;o.whyV+=' ->A='+(A|0)+' R='+(R?R.length:'-')+' L='+(o.pa.L|0);return true;}
+  return false;}
+// from the stand to the hold short of the departure end in use: the entrances that leave at least 70 percent of the
+// runway ahead (then 50, then any) and need no more than a 110 degree turn onto it; the graph picks the nearest
+function tfcOut(o){
+  const P=o.plan,G=tfcGraph(P);if(!G||!o.spot){o.why=G?'nospot':'nograph';return false;}
+  const E0=tfcPick(P,'dep');if(!E0){o.why='noend';return false;}
+  // the departure ends in use (the flow's, or the plan's pick): the one with the shortest taxi from this stand, as ground
+  // control would assign it (Haneda's 05 is 5 km from the Terminal 1 stands, 34R 2 km)
+  const sn=twgSpot(G,o.spot);if(sn<0){o.why='nostand';return false;}
+  const cands=(P.flowEnds?P.flowEnds('dep'):[]).filter(e=>!twrPlayer(e.rwy)&&(G.ent.get(e.rwy)||[]).length);if(cands.indexOf(E0)<0)cands.push(E0);
+  let best=null;
+  for(const E of cands){const L=tfcLen(E),ent=G.ent.get(E.rwy)||[];let goals=[];
+    for(const f of [0.7,0.5,0]){goals=ent.filter(en=>{const n=G.N[en.rn],A=tfcAB(E,n.x,n.z).a,l=Math.hypot(en.dx,en.dz)||1;
+      return A>=-E.thr-5&&L-A>=f*L&&(en.dx*E.dx+en.dz*E.dz)/l>-0.34;});if(goals.length)break;}
+    if(!goals.length)continue;
+    const R=twgRoute(G,sn,[...new Set(goals.map(en=>en.h))],{block:tfcBlocked(G)});if(!R)continue;
+    let len=0;for(let i=1;i<R.length;i++)len+=Math.hypot(G.N[R[i]].x-G.N[R[i-1]].x,G.N[R[i]].z-G.N[R[i-1]].z);
+    if(!best||len<best.len)best={E:E,R:R,goals:goals,len:len};}
+  if(!best){o.why='noroute:'+E0.num;return false;}
+  const {E,R,goals}=best;
+  o.why='ok:'+E.num;o.E=E;o.en=goals.find(q=>q.h===R[R.length-1]);o.pa=tfcPath(G,[{x:o.pos.x,z:o.pos.z}].concat(R.map(i=>G.N[i])));o.pi=0;o.ps=0;return true;}
+// from the hold short onto the runway: the entrance's own strip path, then 40 m along the centre line
+function tfcLineupPath(o){const G=tfcGraph(o.plan),en=o.en,E=o.E,pts=en.lp.map(i=>G.N[i]),n=G.N[en.rn];
+  pts.push({x:n.x+E.dx*40,z:n.z+E.dz*40});o.pa=tfcPath(G,pts);o.pi=0;o.ps=0;o.lined=false;}
+function tfcGoAround(o){o.state='goaround';o.ga=(o.ga||0)+1;o.clr=false;o.orb=0;twrFree(o);twrSay(o,'goaround');
+  // another runway the same way when the player is on this one
+  if(twrPlayer(o.E.rwy)){const E=tfcPick(o.plan,'land');if(E&&E.rwy!==o.E.rwy&&Math.abs(wrapPi(E.h-o.E.h))<0.3)o.E=E;}}
+// ---------- the tower's calls to the AI traffic (runways item 6) ----------
+// Through the voice queue as other traffic (priority 3, the chatter's: the player's own calls go first and drop them),
+// at most one every 12 s of flight, none while anything else is on the air or waiting, none before the player's own
+// opening call, none in the dogfight (DF_QUIET), the strike, missions or lessons (TFC.shown false), and only for an
+// airport within 25 km. The tower line, then the AI's short readback in its own voice. Clips: t_al_* / p_al_* (the
+// airline), t_n_* / p_n_* (the flight number digit by digit), t_rwy_* / p_rwy_*, the phrases (tools/make_radio.py).
+const TWR_AL={Cactus:'cactus',Sonoran:'sonoran',Pacific:'pacific',Sakura:'sakura',Lutece:'lutece',Tricolore:'tricolore',Guanabara:'guanabara',Sugarloaf:'sugarloaf',Bolt:'bolt',Cessna:'cessna'};
+const TWR_SAY={t:-99,n:0,log:[]};
+function twrName(r){if(!REGION.az)return BASES[BASE0].twr;return (r.code==='KPHX'?BASES.phx:r.code==='KLUF'?BASES.luke:BASES.kgeu).twr;}
+function twrSay(o,kind){
+  const E=o.E;if(!o.cs||!E)return;
+  const ok=running&&TFC.shown&&!DF_QUIET&&!st.crashed&&radioLive()&&st.time-TWR_SAY.t>=12&&!VQ.cur&&!radioQ.length
+    &&!!(st.mode==='runway'?A.tko:st.mode==='ramp'?A.taxi:st.mode==='final'?A.land:1)&&Math.hypot(E.rwy.x-st.pos.x,E.rwy.z-st.pos.z)<25000;
+  TWR_SAY.log.push({t:+st.time.toFixed(1),cs:o.cs,kind:kind,rwy:E.num,said:ok});if(TWR_SAY.log.length>80)TWR_SAY.log.shift();
+  if(!ok)return;TWR_SAY.t=st.time;TWR_SAY.n++;
+  const sp=o.cs.split(' '),al=TWR_AL[sp[0]]||'cessna',dg=(sp[1]||'').split(''),n=E.num,rc=n.toLowerCase();
+  const W={lineup:[`${o.cs}, runway ${n}, line up and wait.`,['t_rwy_'+rc,'t_lineup_wait'],`Line up and wait ${n}, ${o.cs}.`,['p_rb_lineup','p_rwy_'+rc]],
+    takeoff:[`${o.cs}, runway ${n}, cleared for takeoff.`,['t_rwy_'+rc,'t_cleared_to'],`Cleared for takeoff ${n}, ${o.cs}.`,['p_rb_cleared_to','p_rwy_'+rc]],
+    land:[`${o.cs}, runway ${n}, cleared to land.`,['t_rwy_'+rc,'t_cleared_land'],`Cleared to land ${n}, ${o.cs}.`,['p_rb_cleared_land','p_rwy_'+rc]],
+    goaround:[`${o.cs}, go around, I say again, go around.`,['t_go_around'],`Going around, ${o.cs}.`,['p_rb_going_around']],
+    holdshort:[`${o.cs}, hold short, traffic on short final.`,['t_hold_short_tfc'],`Holding short, ${o.cs}.`,['p_rb_holding_short']],
+    orbit:[`${o.cs}, make a left three sixty for spacing.`,['t_left_360'],`Left three sixty, ${o.cs}.`,['p_rb_left_360']]}[kind];
+  if(!W)return;
+  const l1=L(twrName(E.rwy),'tower',W[0],['t_al_'+al].concat(dg.map(d=>'t_n_'+d),W[1]));l1.amb=true;
+  const l2=L(o.cs,o.type==='airliner'?'heavy':o.type==='f16'?'fighter':'ga',W[2],W[3].concat(['p_al_'+al],dg.map(d=>'p_n_'+d)));l2.amb=true;
+  const p1=vqAdd(l1,{pri:3,ttl:6});vqAdd(l2,{pri:3,ttl:12,dep:p1});}
+// the fleet: fictional airlines only, two per airport, the livery from the pool model (its palette); AI F-16s are Bolt
+// flights, the Glendale Cessnas their tail numbers
+const TFC_AL={KPHX:['Cactus','Sonoran'],RJTT:['Pacific','Sakura'],LFPG:['Lutece','Tricolore'],SBRJ:['Guanabara','Sugarloaf']};
+function tfcCs(plan,M){const r=Math.random();
+  if(plan.type==='airliner'){const A=TFC_AL[plan.apt]||TFC_AL.KPHX;return A[[0,1,0,1,0][M.i%5]]+' '+(REGION.az?100+Math.floor(r*900):1+Math.floor(r*(r<0.4?9:299)));}
+  if(plan.type==='cessna')return 'Cessna '+(100+Math.floor(r*900));
+  if(plan.type==='f16')return 'Bolt '+(10*(1+Math.floor(r*8))+1);
+  return '';}
 function tfcHeliTgt(o){const R=o.plan.roam;let c=R.filter(p=>tfcOK(p[0],p[1])&&Math.hypot(p[0]-o.pos.x,p[1]-o.pos.z)>1500);if(!c.length)c=R;o.tgt=c[Math.floor(Math.random()*c.length)];}
 function tfcStep(o,dt){
   const T=o.T,E=o.E,P=o.plan,gh=groundHeight(o.pos.x,o.pos.z)+(P.surf||0);
@@ -10745,9 +11074,17 @@ function tfcStep(o,dt){
     case 'final':
       hT=tfcLine(E,b,o.gs);vT=a<-6000?T.vFin:T.vApp;altT=gh+Math.max(0,T.aim-a)*tg;ff=-o.gs*tg;
       if(o.alt-gh<T.flare&&a>-800)vsT=-T.sink;
-      if(a>-1852&&a<T.aim+300&&(tfcOnRwy(E)||tfcRwyBusy(o,E.rwy,false))){o.state='goaround';o.ga=(o.ga||0)+1;}
+      {const r=E.rwy,d=-a,air=o.type==='airliner';   // the tower (TWR): cleared to land, a 360 for spacing, go around, the token
+        if(!o.clr&&d<(air?9260:o.type==='f16'?3000:1600)&&twrLandOK(o,r)){o.clr=true;twrSay(o,'land');}
+        if(air&&d<4630&&d>3000&&(o.orb||0)<2&&(twrPlayer(r)?!o.orb:twrDepFirst(r))){o.state='orbit';o.orb=(o.orb||0)+1;o.oT=0;o.oA=o.alt;twrSay(o,'orbit');break;}
+        if(d<2222&&a<T.aim&&!twrLandOK(o,r)){tfcGoAround(o);break;}
+        if(d<400&&!twrTake(o,r)){tfcGoAround(o);break;}}
+      break;
+    case 'orbit':   // a left 360 at its height on the final, then the final again
+      {const rr=TFC_G*Math.tan(25*TFC_D2R)/Math.max(o.gs,20);rate=-rr;vT=T.vApp+8;altT=o.oA;o.oT+=rr*dt;if(o.oT>=2*Math.PI-0.03)o.state='final';}
       break;
     case 'goaround':
+      if(o.tk)twrFree(o);
       hT=tfcLine(E,b,o.gs);vT=T.vPat;altT=gh+T.patAlt;
       if(a>tfcLen(E)+T.upX*0.5){o.state='crosswind';o.pat='left';o.side=-1;o.cwA=a+R;}
       break;
@@ -10780,34 +11117,47 @@ function tfcStep(o,dt){
     case 'touchgo':
       o.timer+=dt;hT=tfcLine(E,b,Math.max(o.gs,10));vT=o.timer<4?22:T.vr+4;
       if(tfcAhead(o,150+o.gs*o.gs/(2*T.dec),true)){vT=0;dec=T.dec*1.6;o.timer=Math.min(o.timer,3.9);}
-      if(o.timer>=4&&o.gs>=T.vr){o.onGround=false;o.vs=1.5;o.state='upwind';}
+      if(o.timer>=4&&o.gs>=T.vr){o.onGround=false;o.vs=1.5;o.state='upwind';twrFree(o);o.clr=false;}
       break;
     case 'rollout':
       hT=tfcLine(E,b,Math.max(o.gs,10));vT=12;dec=clamp((o.gs*o.gs-144)/(2*Math.max(40,P.exitU-a)),0.6,T.dec*1.4);
+      if(tfcGraph(P)){vT=10;dec=T.dec;}
       if(tfcAhead(o,150+o.gs*o.gs/(2*T.dec),true)){vT=0;dec=T.dec*1.6;}
-      if(o.gs<=13&&a>=P.exitU-30){if(o.spot){o.wp=tfcRouteIn(o);o.wi=0;o.state='taxi_in';}else o.state='gone';}
+      if(tfcGraph(P)){if(o.gs<15.4){if(tfcVacate(o)){o.pa.rs[0]=E.rwy;o.state='taxi_in';}else if(a>tfcLen(E)-60){o.why='rollout-end a='+(a|0);o.state='gone';}}}
+      else if(o.gs<=13&&a>=P.exitU-30){if(o.spot){o.wp=tfcRouteIn(o);o.wi=0;o.state='taxi_in';}else o.state='gone';}
       break;
     case 'taxi_in':
-      if(follow()){o.state='parked';o.gs=0;o.timer=o.wait!=null?o.wait:60+Math.random()*120;}
+      if(o.pa){if(tfcDrive(o,dt)){if(o.gone){o.why='taxi-gone';o.state='gone';break;}twrFree(o);o.state='parked';o.gs=0;o.timer=o.wait!=null?o.wait:60+Math.random()*120;}rate=o.dr.rate;vT=o.dr.vT;dec=o.dr.dec;}
+      else if(follow()){o.state='parked';o.gs=0;o.timer=o.wait!=null?o.wait:60+Math.random()*120;}
       break;
     case 'parked':
       vT=0;hT=(o.spot&&o.spot[2]!=null?o.spot[2]:P.park.hdg)*TFC_D2R;o.timer-=dt;
-      if(o.timer<=0&&Math.abs(wrapPi(o.hdg-hT))<0.1){const sp=o.spot||[o.pos.x,o.pos.z];o.E=P.pick?P.pick('dep'):tfcWind(P.depEnds||P.ends);o.wp=tfcRouteOut(o,sp);o.wi=0;tfcFree(o);o.spot=null;o.state='taxi_out';}
+      if(o.timer<=0&&Math.abs(wrapPi(o.hdg-hT))<0.1){
+        if(tfcGraph(P)){if(tfcOut(o)){tfcFree(o);o.spot=null;o.state='taxi_out';}else o.timer=20;}   // no way out now (the player on the runway): later
+        else{const sp=o.spot||[o.pos.x,o.pos.z];o.E=P.pick?P.pick('dep'):tfcWind(P.depEnds||P.ends);o.wp=tfcRouteOut(o,sp);o.wi=0;tfcFree(o);o.spot=null;o.state='taxi_out';}}
       break;
     case 'taxi_out':
-      if(follow()){o.state='hold';o.gs=0;}
+      if(o.pa){if(tfcDrive(o,dt)){o.state='hold';o.gs=0;o.holdT=0;o.hs=0;}rate=o.dr.rate;vT=o.dr.vT;dec=o.dr.dec;}
+      else if(follow()){o.state='hold';o.gs=0;}
       break;
-    case 'hold':   // lines up only with the player clear of the runway and nobody else on it
+    case 'hold':   // the departure queue (TWR): the first one lines up when the tower says so
       vT=0;
-      if(!tfcOnRwy(E)&&!tfcRwyBusy(o,E.rwy,true)){const s=b>0?1:-1;o.wp=[tfcP(E,70,s*20),tfcP(E,110,0)];o.wi=0;o.state='lineup';}
+      if(o.pa){const r=E.rwy,t=twrOf(r);o.holdT=(o.holdT||0)+dt;t.q=t.q.filter(q=>q.state==='hold'&&TFC.list.indexOf(q)>=0);if(t.q.indexOf(o)<0)t.q.push(o);
+        if(t.q[0]===o){const pb=twrPlayer(r);
+          if(!pb&&!twrTok(r)&&twrArr(r)>(o.holdT>=TWR_PRI?4630:5556)&&twrTake(o,r)){t.q.shift();tfcLineupPath(o);o.state='lineup';twrSay(o,'lineup');}
+          else if(pb&&!st.onGround&&!o.hs){o.hs=1;twrSay(o,'holdshort');}}}
+      else if(!tfcOnRwy(E)&&!tfcRwyBusy(o,E.rwy,true)){const s=b>0?1:-1;o.wp=[tfcP(E,70,s*20),tfcP(E,110,0)];o.wi=0;o.state='lineup';}
       break;
     case 'lineup':
-      if(follow()){hT=E.h;vT=0;if(Math.abs(wrapPi(o.hdg-E.h))<0.05&&o.gs<0.5&&!tfcOnRwy(E))o.state='takeoff';}
+      if(o.pa){if(!o.lined){if(tfcDrive(o,dt))o.lined=true;else{rate=o.dr.rate;vT=o.dr.vT;dec=o.dr.dec;break;}}
+        hT=E.h;vT=0;if(Math.abs(wrapPi(o.hdg-E.h))<0.05&&o.gs<0.5&&!twrPlayer(E.rwy)&&twrArr(E.rwy)>3704){o.state='takeoff';twrSay(o,'takeoff');}}
+      else if(follow()){hT=E.h;vT=0;if(Math.abs(wrapPi(o.hdg-E.h))<0.05&&o.gs<0.5&&!tfcOnRwy(E))o.state='takeoff';}
       break;
     case 'takeoff':
       hT=tfcLine(E,b,Math.max(o.gs,10));vT=T.vr+6;
       if(o.gs<0.8*T.vr&&tfcAhead(o,tfcLen(E)-a,true))o.state='reject';
-      else if(o.gs>=T.vr){o.onGround=false;o.vs=T.vsUp*0.4;o.state='climb';}
+      else if(o.gs>=T.vr){o.onGround=false;o.vs=T.vsUp*0.4;twrFree(o);o.pa=null;
+        if(o.type==='cessna'){o.state='upwind';o.pat='left';o.side=-1;}else o.state='climb';}
       break;
     case 'reject':
       hT=tfcLine(E,b,Math.max(o.gs,10));vT=0;dec=T.dec*1.5;if(o.gs<0.5){o.state='lineup';o.wi=o.wp.length;}
@@ -10849,7 +11199,9 @@ function tfcStep(o,dt){
     const t=vsT!==null?vsT:altT!==null?clamp(ff+(altT-o.alt)*0.25,-T.vsDn,T.vsUp):0;
     o.vs+=clamp(t-o.vs,-T.vsA*dt,T.vsA*dt);o.alt+=o.vs*dt;
     if(o.alt<=gh){o.alt=gh;
-      if(o.state==='final'){o.onGround=true;o.vs=0;o.timer=0;o.tdA=a;o.state=o.type==='cessna'?'touchgo':'rollout';}
+      if(o.state==='final'){o.onGround=true;o.vs=0;o.timer=0;o.tdA=a;o.clr=false;
+        let full=o.type!=='cessna';if(!full){o.circ=(o.circ||0)+1;if(o.circ%3===0&&tfcGraph(P)&&P.park){const si=tfcSpot(P);if(si>=0){tfcClaim(o,si);full=true;}}}
+        o.state=full?'rollout':'touchgo';}
       else o.vs=Math.max(0,o.vs);}
   }
   o.pos.x+=Math.sin(o.hdg)*o.gs*dt;o.pos.z-=Math.cos(o.hdg)*o.gs*dt;o.pos.y=o.alt;o.agl=o.alt-gh;
@@ -10868,26 +11220,28 @@ function tfcPose(o,dt){
   o.vel.set(Math.sin(o.hdg)*o.gs,o.vs,-Math.cos(o.hdg)*o.gs);o.v=o.gs;
 }
 function tfcAdd(plan,M,init){
-  const T=TFC_T[plan.type],o=Object.assign({m:M,type:plan.type,plan:plan,T:T,kind:T.kind,callName:T.call,id:++TFC.seq,pos:new V3(),vel:new V3(),
-    hdg:0,alt:0,vs:0,gs:0,bank:0,agl:0,acc:0,timer:0,cool:0,onGround:false,state:'',E:null,side:-1,pat:plan.pattern,spot:null,spotI:null,wp:[],wi:0},init);
+  const T=plan.T||TFC_T[plan.type],o=Object.assign({m:M,type:plan.type,plan:plan,T:T,kind:T.kind,callName:T.call,id:++TFC.seq,pos:new V3(),vel:new V3(),
+    hdg:0,alt:0,vs:0,gs:0,bank:0,agl:0,acc:0,timer:0,cool:0,onGround:false,state:'',E:null,side:-1,pat:plan.pattern,spot:null,spotI:null,wp:[],wi:0,
+    pa:null,pi:0,ps:0,tk:null,tkIn:false,cs:''},init);
+  if(!o.cs)o.cs=tfcCs(plan,M);tfcScale(M,plan.regional?0.8:1);
   if(!o.grp)o.grp='t'+o.id;
   o.pos.y=o.alt;o.agl=o.alt-groundHeight(o.pos.x,o.pos.z)-(plan.surf||0);
   M.busy=true;M.g.visible=TFC.shown;TRAFFIC.push(o);TFC.list.push(o);tfcPose(o,0);
   TFC.spawns.push({type:o.type,state:o.state,d:Math.round(Math.hypot(o.pos.x-st.pos.x,o.pos.z-st.pos.z)),forced:!!init.forced});if(TFC.spawns.length>60)TFC.spawns.shift();
   return o;}
-function tfcDrop(o){o.m.busy=false;o.m.g.visible=false;tfcFree(o);let i=TRAFFIC.indexOf(o);if(i>=0)TRAFFIC.splice(i,1);i=TFC.list.indexOf(o);if(i>=0)TFC.list.splice(i,1);}
+function tfcDrop(o){o.m.busy=false;o.m.g.visible=false;tfcFree(o);twrFree(o);if(o.E){const t=twrOf(o.E.rwy),i=t.q.indexOf(o);if(i>=0)t.q.splice(i,1);}let i=TRAFFIC.indexOf(o);if(i>=0)TRAFFIC.splice(i,1);i=TFC.list.indexOf(o);if(i>=0)TFC.list.splice(i,1);}
 const tfcTake=type=>{const p=TFC.pool[type];return p?p.filter(M=>!M.busy):[];};
 const tfcRnd=(a,b)=>a+Math.random()*(b-a),TFC_SEP={airliner:4000,cessna:1200,f16:2500,heli:1500};
 // opts (tests): state ('script': x, z, y world, hdg rad, gs m/s for tcasConflict), end (index into plan.ends), dist (m before the threshold), alt (m above the field),
 // wait (s parked); force skips the bubble and 1 km rules. mid: the first population, spread through the cycle.
 function tfcSpawnPlan(plan,opts,mid){
-  opts=opts||{};const T=TFC_T[plan.type],forced=!!opts.force,free=tfcTake(plan.type),sep=TFC_SEP[plan.type];
+  opts=opts||{};const T=plan.T||TFC_T[plan.type],forced=!!opts.force,free=tfcTake(plan.type),sep=TFC_SEP[plan.type];
   // airborne spawns also keep clear of every other aircraft (the apron spots are exclusive already)
   const ok=(x,z,gnd)=>forced||(tfcOK(x,z)&&(gnd||TFC.list.every(q=>Math.hypot(q.pos.x-x,q.pos.z-z)>sep)));
   if(!free.length)return null;
   if(opts.state==='script')   // tcasConflict: anywhere, any height (world y), straight and level
     return tfcAdd(plan,free[0],{pos:new V3(opts.x,0,opts.z),alt:opts.y,hdg:opts.hdg||0,gs:opts.gs||T.vCruise||50,vS:opts.gs||T.vCruise||50,aS:opts.y,state:'script',forced:true});
-  const E=plan.ends.length?(opts.end!=null?plan.ends[opts.end]:plan.pick?plan.pick('land'):tfcWind(plan.ends)):null;
+  const E=plan.ends.length?(opts.end!=null?plan.ends[opts.end]:tfcPick(plan,'land')):null;
   const fe=E?groundHeight(E.x,E.z)+(plan.surf||0):0,at=(x,z,y)=>({pos:new V3(x,0,z),alt:y});
   if(plan.type==='airliner'){
     let s0=opts.state||(mid&&Math.random()<0.35?'parked':'final');const si=tfcSpot(plan);
@@ -10919,12 +11273,15 @@ function tfcSpawnPlan(plan,opts,mid){
     if(s0==='parked'){const sp=[];for(let i=0;i<plan.park.spots.length&&sp.length<n;i++)if(!plan.park.taken[i])sp.push(i);
       if(sp.length<n||sp.some(i=>!ok(plan.park.spots[i][0],plan.park.spots[i][1],1)))return null;
       let lead=null;sp.forEach((si,k)=>{const q=plan.park.spots[si];const o=tfcAdd(plan,free[k],Object.assign(at(q[0],q[1],groundHeight(q[0],q[1])+plan.surf),
-        {hdg:plan.park.hdg*TFC_D2R,state:'parked',onGround:true,timer:(opts.wait!=null?opts.wait:mid?tfcRnd(20,120):tfcRnd(60,180))+k*20,grp:grp,kind:k?'':kind,forced:forced}));tfcClaim(o,si);lead=lead||o;});
+        {hdg:plan.park.hdg*TFC_D2R,state:'parked',onGround:true,timer:(opts.wait!=null?opts.wait:mid?tfcRnd(20,120):tfcRnd(60,180))+k*20,grp:grp,kind:k?'':kind,forced:forced}));tfcClaim(o,si);
+        if(lead)o.cs=lead.cs.replace(/1$/,'2');lead=lead||o;});
       return lead;}
-    const D=opts.dist||(mid?tfcRnd(3000,9260):9260),pts=[];for(let k=0;k<n;k++)pts.push(tfcP(E,-D-k*5*154,0));
+    const D=opts.dist||(mid?tfcRnd(3000,9260):9260),pts=[];for(let k=0;k<n;k++)pts.push(tfcP(E,-D-k*3*154,0));
     if(pts.some(p=>!ok(p[0],p[1])))return null;
+    // runways item 6: one aircraft on a runway at a time, so the wingman lands on the parallel runway (Luke's 03R/21L)
+    const E2=(plan.depEnds||[]).find(e=>e.rwy!==E.rwy&&Math.abs(wrapPi(e.h-E.h))<0.3&&!twrPlayer(e.rwy))||E,cs=tfcCs(plan,free[0]);
     let lead=null;pts.forEach((p,k)=>{const o=tfcAdd(plan,free[k],Object.assign(at(p[0],p[1],fe+(opts.alt!=null?opts.alt:T.patAlt)),
-      {hdg:E.h,gs:154,state:'initial',E:E,side:-1,pat:'overhead',grp:grp,kind:k?'':kind,wait:opts.wait,forced:forced}));tfcClaim(o,tfcSpot(plan));lead=lead||o;});
+      {hdg:E.h,gs:154,state:'initial',E:k?E2:E,side:-1,pat:'overhead',grp:grp,kind:k?'':kind,wait:opts.wait,forced:forced,cs:cs.replace(/1$/,String(1+k))}));tfcClaim(o,tfcSpot(plan));lead=lead||o;});
     return lead;
   }
   if(plan.type==='heli'){
@@ -10968,17 +11325,20 @@ TFC.update=function(dt){
     o.acc+=dt;if(d>TFC_FAR&&(TFC.frame+o.id)%4)continue;
     let h=o.acc;o.acc=0;while(h>1e-6&&o.state!=='gone'){const s=Math.min(h,0.25);tfcStep(o,s);h-=s;}
     if(o.state==='gone'){tfcDrop(o);continue;}
+    if(TFC.dbg&&o.onGround){const x=o.pos.x,z=o.pos.z;   // __kgeu.tfcDebug: the wheels on pavement, always
+      if(!(isPaved(x,z)||isPaved(x+2,z)||isPaved(x-2,z)||isPaved(x,z+2)||isPaved(x,z-2))){TFC.dbgN++;if(TFC.dbgLog.length<50){TFC.dbgLog.push({id:o.id,type:o.type,state:o.state,x:Math.round(x),z:Math.round(z),pi:o.pi});console.warn('tfc off pavement',o.id,o.state,Math.round(x),Math.round(z));}}}
     tfcPose(o,dt);
   }
   TFC.ms=performance.now()-t0;
 };
 // a new flight starts with a fresh sky, populated on its first running frame
-function tfcReset(){for(let i=TFC.list.length-1;i>=0;i--)tfcDrop(TFC.list[i]);TFC.need=true;TFC.chk=0;}
-function tfcClear(){for(let i=TFC.list.length-1;i>=0;i--)tfcDrop(TFC.list[i]);TFC.need=false;}
+function tfcReset(){for(let i=TFC.list.length-1;i>=0;i--)tfcDrop(TFC.list[i]);TFC.need=true;TFC.chk=0;TWR.clear();}
+function tfcClear(){for(let i=TFC.list.length-1;i>=0;i--)tfcDrop(TFC.list[i]);TFC.need=false;TWR.clear();}
 function tfcSpawn(type,opts){const p=TFC.plans.find(q=>q.type===type);if(!p)return null;TFC.need=false;
   const o=tfcSpawnPlan(p,Object.assign({},opts||{},{force:true}),false);return o?o.id:null;}
 function tfcList(){return TFC.list.map(o=>({id:o.id,type:o.type,state:o.state,x:o.pos.x,y:o.alt,z:o.pos.z,hdg:((o.hdg/TFC_D2R)%360+360)%360,gs:o.gs,vs:o.vs,
-  onGround:o.onGround,callName:o.callName,kind:o.kind,agl:o.agl,end:o.E?o.E.rwy.code+' '+o.E.num:null,tdA:o.tdA==null?null:o.tdA,ga:o.ga||0,
+  onGround:o.onGround,callName:o.callName,cs:o.cs,tk:o.tk?o.tk.num:null,kind:o.kind,agl:o.agl,end:o.E?o.E.rwy.code+' '+o.E.num:null,tdA:o.tdA==null?null:o.tdA,ga:o.ga||0,
+  why:o.why||null,whyV:o.whyV||null,timer:+o.timer.toFixed(0),ps:o.pa?+o.ps.toFixed(0):null,L:o.pa?+o.pa.L.toFixed(0):null,waitOn:o.waitOn==null?null:o.waitOn,spotH:o.spot&&o.spot[2]!=null?+o.spot[2].toFixed(0):(o.plan.park?o.plan.park.hdg:null),holdT:o.holdT==null?null:+o.holdT.toFixed(0),
   lights:o.m.lights?o.m.lights.count:0,visible:o.m.g.visible,lod:o.m.lodOn}));}
 // the curve traffic (the banner tow); the AI traffic runs in TFC.update
 function updateTraffic(dt){
@@ -11694,6 +12054,7 @@ function buildAirport(D,o){
           const x=a[0]+(b[0]-a[0])*f,z=a[1]+(b[1]-a[1])*f;if(rwyIn(x,z,5)||holds.some(h=>Math.hypot(h.x-x,h.z-z)<12))continue;
           // tx,tz: toward the runway; ax,az: along it; w: across the taxiway, parallel to the runway
           holds.push({x:x,z:z,tx:sg*e.dz,tz:-sg*e.dx,ax:e.dx,az:e.dz,w:Math.min(2*t.w,t.w*sl/Math.abs(B[1]-A[1])),y:gh(x,z)+YL,r:r,ref:t.ref,hw:t.hw});}}}}
+  const holdsAll=holds.slice();
   holds.length=Math.min(holds.length,120);E.holds=holds.length;
   rwPaint(rws,holds);
   // ---- stands (fine): a lead-in line from the nearest taxilane or taxiway centre line to the stop point, and a stop bar ----
@@ -11781,8 +12142,9 @@ function buildAirport(D,o){
         if(!onAp(x,z)||!clearOf(x,z,20)||rwyIn(x,z,60))continue;
         if(Math.hypot(x-ramp[0],z-ramp[1])<110||spots.some(s=>Math.hypot(x-s[0],z-s[1])<85)||parked.some(p=>Math.hypot(x-p[0],z-p[1])<65))continue;
         parked.push([x,z,Math.atan2(q.ex-x,-(q.ez-z))]);break;}}
+    const pk=tfcAK()*(REGION.id==='sbrj'?0.8:1);
     parked.forEach((p,k)=>{let pg;if(hash(k,77)<0.2){pg=buildAirliner(k).g;}else{pg=tfcLod('airliner',k);pg.visible=true;scene.add(pg);}
-      pg.position.set(p[0],gh(p[0],p[1])+3.9,p[1]);pg.rotation.y=-p[2];pg.name='parkedAirliner';
+      pg.scale.setScalar(pk);pg.position.set(p[0],gh(p[0],p[1])+3.9*pk,p[1]);pg.rotation.y=-p[2];pg.name='parkedAirliner';
       OBST.push({kind:'circ',x:p[0],z:p[1],r:17,h:gh(p[0],p[1])+12,name:'a parked airliner'});});
     if(o.wb){WB.n.parked=parked.length;WB.tris.parked=parked.length*400;}}
   // ---- apron vehicles, white and yellow (fine) ----
@@ -11794,6 +12156,12 @@ function buildAirport(D,o){
     if(vs.length){const m=im(new THREE.BoxGeometry(2.3,2.1,5.2).translate(0,1.05,0),M.veh,vs.length,'apronVehicles',E.fine),Mx=new THREE.Matrix4(),Q=new Q4(),Sc=new V3(1,1,1),Pp=new V3(),c=new THREE.Color();
       vs.forEach((v,i)=>{Q.setFromAxisAngle(_yUp,v[2]);Pp.set(v[0],gh(v[0],v[1])+0.04,v[1]);Mx.compose(Pp,Q,Sc);m.setMatrixAt(i,Mx);m.setColorAt(i,c.set(i%2?'#f2c230':'#f2f2ee'));});
       m.userData.heat=0.7;if(o.wb)WB.n.vehicles=vs.length;}}
+  // ---- the taxiway graph the AI traffic taxis on (runways item 6): the stands joined by stubs ----
+  {const G=twgBuild(code,tws,holdsAll,rws,terms.concat(hangs),g),sp=[];
+    for(const s of (D.parking_positions||[]).concat(D.gates||[])){const p=s.p;if(p&&!sp.some(q=>Math.hypot(q[0]-p[0],q[1]-p[1])<8))sp.push(p);}
+    for(const p of sp.concat(parked)){const n=twgStand(G,p[0],p[1],p[2]!=null?p[2]*180/Math.PI:null);if(n>=0)G.stands.push(n);}
+    for(const p of spots)twgSpot(G,p);
+    E.twg=G;TWG[code]=G;}
   E.tris=Math.round(E.tris);E.ms=Math.round(performance.now()-t0);
   return E;
 }
@@ -12608,8 +12976,11 @@ function tfcRegion(){
   if(U&&WORLD.urb)for(let j=2;j<U.h;j+=4)for(let i=2;i<U.w;i+=4){if(WORLD.urb[j*U.w+i]<120)continue;const x=U.x0+(i+0.5)*U.cell-WOFF[0],z=U.z0+(j+0.5)*U.cell-WOFF[1];
     if(!isWater(x,z)&&terrZoneD(x,z)>2500)roam.push([x,z]);}
   if(roam.length<4)for(const [dx,dz] of [[6000,0],[-6000,0],[0,6000],[0,-6000]])roam.push([APC.x+dx,APC.z+dz]);
-  if(land.length)TFC.plans.push({type:'airliner',apt:REGION.icao,ends:land,depEnds:dep.length?dep:land,
-    pick:k=>{const f=flow()[k==='dep'?1:0],e=E(f[Math.floor(Math.random()*f.length)]);return e||land[0];},pattern:'straightin',
+  // runways item 6: Santos Dumont's are regional jets (the pool airliner at 0.8, slower and shorter on the 1,260 m runway)
+  // (a short flare and a firm touchdown about 350 m in, braking at 3 m/s2: down to 30 kt by 950 m, in time for the end turn off)
+  const reg=REGION.id==='sbrj',T=reg?Object.assign({},TFC_T.airliner,{vApp:62,vFin:70,vPat:95,vr:66,dec:3.0,aim:200,flare:4,sink:1.6}):null;
+  if(land.length)TFC.plans.push({type:'airliner',apt:REGION.icao,ends:land,depEnds:dep.length?dep:land,regional:reg,T:T,
+    pick:k=>{const f=flow()[k==='dep'?1:0],e=E(f[Math.floor(Math.random()*f.length)]);return e||land[0];},flowEnds:k=>flow()[k==='dep'?1:0].map(E).filter(Boolean),pattern:'straightin',
     park:spots.length?{x:spots[0][0],z:spots[0][1],hdg:spots[0][2],spots:spots}:null,twy:REGION.id==='sbrj'?110:170,depTwy:REGION.id==='sbrj'?110:170,
     exitU:Math.round(short*0.6),climbOut:{hdg:0,alt:1500},count:{min:4,max:5},every:[45,90],fin:18520,surf:0.06});
   TFC.plans.push({type:'heli',apt:REGION.city,ends:[],pattern:'roam',park:null,count:{min:1,max:1},roam:roam,surf:0});
@@ -14683,7 +15054,7 @@ function vqPump(){
 function playLine(l){
   l.cut=false;l.dead=false;l.aired=true;
   const live=radioLive(),sp=isCFI(l);
-  RADIO.log.push({who:l.who,kind:l.kind,text:l.text,clips:Array.isArray(l.clips)?l.clips.slice():l.clips,t:st?+st.time.toFixed(2):0,amb:(REGION.az?CHAT:CHAT_R[REGION.id]||[]).some(p=>p.indexOf(l)>=0),type:AC.id});
+  RADIO.log.push({who:l.who,kind:l.kind,text:l.text,clips:Array.isArray(l.clips)?l.clips.slice():l.clips,t:st?+st.time.toFixed(2):0,amb:!!l.amb||(REGION.az?CHAT:CHAT_R[REGION.id]||[]).some(p=>p.indexOf(l)>=0),type:AC.id});
   if(RADIO.log.length>200)RADIO.log.shift();
   if(live&&!l.df){                                                 // the grade card speaks without a subtitle; the dogfight's go to its strip (below)
     atcEl.innerHTML='';const tx=document.createElement('span');tx.className='tx';atcEl.appendChild(tx);   // .tx clamps at three lines
@@ -24488,6 +24859,19 @@ window.__kgeu.rwyPaint=()=>RWP.info.map(i=>({code:i.code,num:i.num,surface:i.sur
   thresholdStripes:i.thresholdStripes.slice(),tdzPairs:i.tdzPairs.slice(),tdzStripes:i.tdzStripes.slice(),aimDist:i.aimDist.slice(),
   holdLines:i.holdLines,centreline:i.centreline,side:!!i.side,len:i.r.len,wid:i.r.wid,thr:i.r.ends.map(e=>e.thr)}));
 window.__kgeu.RWP=RWP;
+// runways item 6: the taxiway graph of an airport (TWG) for the tests
+window.__kgeu.TWG=TWG;window.__kgeu.isPaved=window.__kgeu.isPaved||isPaved;window.__kgeu.TWR_SAY=TWR_SAY;window.__kgeu.TWR=TWR;
+window.__kgeu.twg=code=>{const G=TWG[code];if(!G)return null;const A=twgAudit(G),holds=[];for(const [r,L] of G.ent)for(const en of L)holds.push({x:+G.N[en.h].x.toFixed(1),z:+G.N[en.h].z.toFixed(1),rwy:r.num});
+  return {nodes:G.N.length,edges:G.E.length,holds:holds,stands:G.stands.length+[...G.spots.values()].filter(n=>n>=0).length,spotsMissed:[...G.spots.entries()].filter(e=>e[1]<0).map(e=>e[0]),isolated:A.iso,unreached:A.bad,ms:G.ms};};
+// runways item 8: a taxi path on the nearest airport's graph from the node nearest (x0,z0) to the node nearest (x1,z1), as [[x,z],...]; null when there is none
+window.__kgeu.twgPath=(x0,z0,x1,z1)=>{let G=null,bd=1e9;for(const k in TWG){const g=TWG[k];for(const r of g.rws){const d=Math.hypot(r.x-x0,r.z-z0);if(d<bd){bd=d;G=g;}}}if(!G)return null;
+  const near=(x,z)=>{let b=-1,d=1e9;G.N.forEach((n,i)=>{const e=Math.hypot(n.x-x,n.z-z);if(e<d){d=e;b=i;}});return b;};
+  const a=near(x0,z0),b=near(x1,z1);if(a<0||b<0)return null;const R=twgRoute(G,a,[b],{});return R?R.map(i=>[G.N[i].x,G.N[i].z]):null;};
+// every stand against every runway's entrances: a route in (from a hold) and out (to a hold)
+window.__kgeu.twgDiag=code=>{const G=TWG[code];if(!G)return null;const stands=G.stands.concat([...G.spots.values()].filter(n=>n>=0)),out=[];
+  for(const [r,L] of G.ent){let okIn=0,okOut=0;const fail=[];for(const s of stands){const i=L.some(en=>twgRoute(G,en.h,[s],{home:r})),o=L.some(en=>twgRoute(G,s,[en.h],{}));if(i)okIn++;if(o)okOut++;if(!i||!o)fail.push({x:Math.round(G.N[s].x),z:Math.round(G.N[s].z),in:i,out:o});}
+    const e0=r.ends[0];out.push({rwy:r.num,len:Math.round(r.len),ent:L.map(en=>Math.round((G.N[en.rn].x-r.x)*e0.dx+(G.N[en.rn].z-r.z)*e0.dz)).sort((p,q)=>p-q),stands:stands.length,okIn:okIn,okOut:okOut,fail:fail.slice(0,5)});}
+  G.cache.clear();return out;};
 window.__kgeu.rwyAudit=()=>{const v0=st.vel.clone();try{return RWY_ENDS.map(e=>{const r=e.rwy,aimD=r.code==='LZ'?91:300,
     ax=e.x+e.dx*aimD,az=e.z+e.dz*aimD,fx=r.x+e.dx*(r.len/2-5),fz=r.z+e.dz*(r.len/2-5),P=[[e.x,e.z],[ax,az],[r.x,r.z],[fx,fz]];
     st.vel.set(e.dx*60,0,e.dz*60);const f=runwayFix(ax,az);

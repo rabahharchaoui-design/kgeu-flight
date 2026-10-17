@@ -51,8 +51,13 @@ RUN_JS = """([simSeconds, sampleDt, holdThresh])=>{
   let longestHold=0,offPaveSamples=0,simTime=0;
   const lastState={},lastGround={};
   const departures=new Set(),arrivals=new Set();
+  // the game clamps a stepped frame's dt (about 0.1 s), so a sample is taken every sampleDt of the GAME clock, not of
+  // the requested physDt: simSeconds really are sim seconds (runways item 6)
+  const t0=K.state().time;
   for(let s=0;s<nSamples;s++){
-    for(let k=0;k<stepsPerSample;k++){K.stepFrame(physDt,false,true);simTime+=physDt;}
+    const tEnd=t0+(s+1)*sampleDt;let guard=0;
+    while(K.state().time<tEnd&&guard++<400)K.stepFrame(physDt,false,true);
+    simTime=K.state().time-t0;
     const L=K.tfcList();
     sampleCounts.push(L.length);
     for(const o of L){
