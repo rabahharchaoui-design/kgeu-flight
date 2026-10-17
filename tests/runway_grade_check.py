@@ -34,15 +34,17 @@ SPY_INSTALL = """()=>{
 ENDS_META = "()=>window.__kgeu.RWY_ENDS.map((e,i)=>({i:i,num:e.num,code:e.rwy.code,apt:e.rwy.apt,len:e.rwy.len}))"
 
 # teleport onto a runway end given either an index into RWY_ENDS (kind 'i') or K.ARC.end (kind 'arc'),
-# at V m/s down the runway, gentle sink, gear down, flaps out; step physics (held, no render) until the
-# wheels are down or 60 frames (1 s) pass; release the hold.
-LAND_JS = """([kind,i,V])=>{
+# at V m/s down the runway, gentle sink, gear down, flaps out, pitch (radians, nose up a touch more for
+# a faster type); step physics (held, no render) until the wheels are down or 60 frames (1 s) pass;
+# release the hold. The gear height is read from K.rwyFrame().gear AFTER the caller has picked the type
+# (setType sets the global GEAR), so this always teleports just above THIS aircraft's own gear leg.
+LAND_JS = """([kind,i,V,pitch])=>{
   const K=window.__kgeu, e=kind==='arc'?K.ARC.end:K.RWY_ENDS[i], s=K.state();
   const gear=K.rwyFrame().gear;
   const x=e.x+e.dx*300, z=e.z+e.dz*300;
   s.pos.set(x, K.groundHeight(x,z)+gear+0.6, z);
   s.vel.set(e.dx*V, -1.0, e.dz*V);
-  s.quat.setFromEuler(new THREE.Euler(0.03, -e.h, 0, 'YXZ'));
+  s.quat.setFromEuler(new THREE.Euler(pitch==null?0.03:pitch, -e.h, 0, 'YXZ'));
   s.w.set(0,0,0);
   s.onGround=false; s.airTime=30; s.flapIdx=3; s.gearDown=true; s.gearPos=1;
   s.ap=null; s.throttle=s.power=0;
@@ -50,8 +52,30 @@ LAND_JS = """([kind,i,V])=>{
   let n=0;
   for(;n<60;n++){ K.stepFrame(1/60); if(K.state().onGround) break; }
   K.stepFrame(0,true);
-  return {onGround:K.state().onGround, crashed:K.state().crashed, n:n,
+  return {onGround:K.state().onGround, crashed:K.state().crashed, n:n, gear:gear,
     end:{num:e.num,apt:e.rwy.apt,code:e.rwy.code}};
+}"""
+
+# after touchdown: kill the drift (resArm's "stopped" test is onGround && speed < 1.5 m/s) and give the
+# sim a few more fixed steps so resTick (inside tick(), run from stepFrame too) sees it and fires the
+# pending result card right away, instead of waiting on ff() + wall time.
+STOP_SETTLE_JS = """()=>{
+  const K=window.__kgeu, s=K.state();
+  s.vel.set(0,0,0); s.throttle=s.power=0;
+  for(let i=0;i<3;i++) K.stepFrame(1/30);
+  K.stepFrame(0,true);
+}"""
+
+# between challenges, leave the way a player would: close whatever result card is open, back to the
+# main menu, give the UI a tick to settle. The next arcStart() (which calls start() internally) sets
+# running/paused itself, so this only has to clear the stale card and screen.
+TO_MENU_JS = """()=>{
+  const K=window.__kgeu;
+  for(const id of ['arcOv','missOv','landOv','gradeOv']){
+    const el=document.getElementById(id);
+    if(el&&el.classList.contains('on'))K.resClose(el);
+  }
+  K.openMenu();
 }"""
 
 READ_JS = """()=>{
@@ -64,14 +88,6 @@ READ_JS = """()=>{
 }"""
 
 LAST_WHEN_JS = "()=>{const r=(window.__kgeu.SCORE.recent||[])[0];return r?r.when:null;}"
-
-CLOSE_CARDS_JS = """()=>{
-  const K=window.__kgeu;
-  for(const id of ['arcOv','missOv','landOv','gradeOv']){
-    const el=document.getElementById(id);
-    if(el&&el.classList.contains('on'))K.resClose(el);
-  }
-}"""
 
 
 def expected_where(e, is_az):
@@ -88,10 +104,10 @@ def expected_where(e, is_az):
     return f"{e['apt']} runway {e['num']}"        # world region: rwy.apt is already REGION.short
 
 
-async def land_and_check(pg, tag, kind, i, end_desc, V, is_az):
+async def land_and_check(pg, tag, kind, i, end_desc, V, is_az, pitch=0.03):
     """Teleport onto one runway end (RWY_ENDS[i] or K.ARC.end), step to touchdown, and check the grade."""
     before = await pg.evaluate(LAST_WHEN_JS)
-    res = await pg.evaluate(LAND_JS, [kind, i, V])
+    res = await pg.evaluate(LAND_JS, [kind, i, V, pitch])
     label = f"{tag} {end_desc}"
     landed = res['onGround'] and not res['crashed']
     ok(f"{label}: touches down without crashing", landed, res)
@@ -127,20 +143,26 @@ async def free_flight_all_ends(pg, region, is_az):
             await land_and_check(pg, region + ':b737', 'i', e['i'], f"{e['code']} {e['num']}", 70, is_az)
 
 
-async def challenge_land(pg, tag, board, V=30):
-    res = await pg.evaluate(LAND_JS, ['arc', 0, V])
+async def challenge_land(pg, tag, board, V=30, pitch=0.03):
+    res = await pg.evaluate(LAND_JS, ['arc', 0, V, pitch])
     landed = res['onGround'] and not res['crashed']
     ok(f"{tag}: touches down on the target end without crashing", landed, res)
-    await pg.evaluate("()=>window.__kgeu.ff(25)")
-    await pg.wait_for_timeout(600)
+    if landed:
+        # settle in place (zero speed) so resArm's "stopped" test fires on the very next tick instead
+        # of waiting up to resArm's 20 s timeout
+        await pg.evaluate(STOP_SETTLE_JS)
+        await pg.wait_for_timeout(500)
     seen = await pg.evaluate("()=>window.__kgeu.LB.__calls.slice()")
     arc_on = await pg.evaluate("()=>document.getElementById('arcOv').classList.contains('on')")
     board_ok = any(c['fn'] == 'runEnd' and str(c['board']).startswith(board) for c in seen)
     ok(f"{tag}: results card is up and LB.runEnd({board!r}) was called", arc_on and board_ok, seen)
     await pg.evaluate("()=>{window.__kgeu.LB.__calls.length=0;}")
-    await pg.evaluate(CLOSE_CARDS_JS)
-    ROWS.append((tag, '-', board, arc_on, '-', board, board_ok, arc_on and board_ok))
-    return arc_on and board_ok
+    # back to the menu like a player would, so the next arcStart() starts clean
+    await pg.evaluate(TO_MENU_JS)
+    await pg.wait_for_timeout(300)
+    row_ok = landed and arc_on and board_ok
+    ROWS.append((tag, '-', board, arc_on, '-', board, board_ok, row_ok))
+    return row_ok
 
 
 async def az_challenges(pg):
@@ -152,13 +174,26 @@ async def az_challenges(pg):
     await pg.wait_for_timeout(600)
     await challenge_land(pg, 'arc:landing1 (cessna, Glendale 1)', 'arc:landing1')
 
-    await pg.evaluate("()=>{window.__kgeu.pick('b737');window.__kgeu.arcStart('landing');}")
+    # the 737: pick in its own evaluate (pickType writes savedType; arcStart reads it right after, so
+    # it must already be set), confirm it stuck, pick the long-runway base, then start
+    await pg.evaluate("()=>window.__kgeu.pick('b737')")
+    t = await pg.evaluate("()=>window.__kgeu.prefs().type")
+    ok("b737 challenge: pick persisted (K.prefs().type is 'b737')", t == 'b737', t)
+    await pg.evaluate("()=>window.__kgeu.pickBase('phx')")
+    await pg.evaluate("()=>window.__kgeu.arcStart('landing')")
     await pg.wait_for_timeout(600)
-    await challenge_land(pg, 'arc:landing (b737, Sky Harbor 7L)', 'arc:landing', V=70)
+    end = await pg.evaluate("()=>({code:window.__kgeu.ARC.end.rwy.code,num:window.__kgeu.ARC.end.num})")
+    ok("b737 challenge: targets Sky Harbor (KPHX), not Glendale", end['code'] == 'KPHX', end)
+    await challenge_land(pg, f"arc:landing (b737, {end['code']} {end['num']})", 'arc:landing', V=70, pitch=0.03)
 
+    # the daily, forced to az/landing: its aircraft is whatever today's draw picked (DAILY_TYPES), a
+    # temp pickType(id,1) that does not touch savedType, so read it back from state() rather than assume
     await pg.evaluate("()=>{window.__kgeu.pick('cessna');window.__kgeu.ARC.dailyRegion='az';window.__kgeu.ARC.dailyKind='landing';window.__kgeu.arcStart('daily');}")
     await pg.wait_for_timeout(600)
-    await challenge_land(pg, 'daily (az, forced landing)', 'daily')
+    dtype = await pg.evaluate("()=>window.__kgeu.state().type")
+    dend = await pg.evaluate("()=>({code:window.__kgeu.ARC.end.rwy.code,num:window.__kgeu.ARC.end.num})")
+    V, pitch = {'f16': (75, 0.05), 'b737': (70, 0.03)}.get(dtype, (30, 0.03))
+    await challenge_land(pg, f"daily (az, type={dtype}, end={dend['code']} {dend['num']})", 'daily', V=V, pitch=pitch)
 
 
 async def world_apt_challenge(pg, region, icao):
@@ -167,7 +202,7 @@ async def world_apt_challenge(pg, region, icao):
     await challenge_land(pg, f'apt:{icao} ({region})', f'apt:{icao}')
 
 
-async def run_region(region):
+async def run_region(region, arc_only):
     srv, url = serve()
     async with async_playwright() as p:
         b = await launch(p)
@@ -181,7 +216,8 @@ async def run_region(region):
             await pg.wait_for_timeout(1500)
         await pg.evaluate(SPY_INSTALL)
 
-        await free_flight_all_ends(pg, region, is_az)
+        if not arc_only:
+            await free_flight_all_ends(pg, region, is_az)
 
         if is_az:
             await az_challenges(pg)
@@ -189,30 +225,33 @@ async def run_region(region):
             icao = await pg.evaluate(f"()=>window.__kgeu.REGIONS['{region}'].icao")
             await world_apt_challenge(pg, region, icao)
 
-        audit_note = ''
-        try:
-            audit = await pg.evaluate("()=>window.__kgeu.rwyAudit?window.__kgeu.rwyAudit():null")
-            if audit:
-                bad = [r for r in audit if not r.get('fix')]
-                print(f"  [rwyAudit] {region}: {len(audit)} ends audited, {len(bad)} with no runwayFix "
-                      f"at their aim point: {[(r['code'], r['num']) for r in bad]}")
-            else:
-                audit_note = 'rwyAudit not present yet'
-        except Exception as e:
-            audit_note = f'rwyAudit threw: {e}'
-        if audit_note:
-            print(f"  [rwyAudit] {region}: {audit_note} (not failing on it)")
+        if not arc_only:
+            audit_note = ''
+            try:
+                audit = await pg.evaluate("()=>window.__kgeu.rwyAudit?window.__kgeu.rwyAudit():null")
+                if audit:
+                    bad = [r for r in audit if not r.get('fix')]
+                    print(f"  [rwyAudit] {region}: {len(audit)} ends audited, {len(bad)} with no runwayFix "
+                          f"at their aim point: {[(r['code'], r['num']) for r in bad]}")
+                else:
+                    audit_note = 'rwyAudit not present yet'
+            except Exception as e:
+                audit_note = f'rwyAudit threw: {e}'
+            if audit_note:
+                print(f"  [rwyAudit] {region}: {audit_note} (not failing on it)")
 
         ok(f'{region}: no page errors', not pg.errs, pg.errs[:5])
         await b.close()
 
 
 async def main():
-    only = [a for a in sys.argv[1:] if not a.startswith('-')]
+    args = sys.argv[1:]
+    arc_only = '--arc' in args
+    only = [a for a in args if not a.startswith('-')]
     regions = only if only else REGIONS
     for region in regions:
-        print(f"\n== {region} ==")
-        await run_region(region)
+        print(f"\n== {region} ==" + (" (--arc: challenges only)" if arc_only else ""))
+        await run_region(region, arc_only)
 
     print("\n%-14s %-6s %-8s %-6s %-6s %-30s %-6s" % ('region', 'code', 'num', 'badge', 'letter', 'where', 'lb'))
     for tag, code, num, badge, letter, where, lb, row_ok in ROWS:
