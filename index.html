@@ -13548,7 +13548,7 @@ function pollPad(dt){
   } else if(crashEl.classList.contains('on')&&edge(0))crashRetry();
   touchIn.padBrake=B(1)>0.5;padPrev=g.buttons.map(b=>b.value||(b.pressed?1:0));
 }
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&running&&!paused&&!st.crashed){togglePause();spkCancel(true);}if(typeof musicTick==='function')musicTick();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&running&&!paused&&!st.crashed){togglePause();cfiStop(0.01);}if(typeof musicTick==='function')musicTick();});
 document.addEventListener('gesturestart',e=>e.preventDefault());document.addEventListener('dblclick',e=>e.preventDefault());
 // No document wide touch handlers: a second finger must always reach its button. Zoom is
 // off through the viewport meta and touch-action:none on the scene and the controls.
@@ -15231,8 +15231,8 @@ function radioLive(){return running&&!paused&&!menu.classList.contains('on');}
 let radioFadeTok=0,radioWasLive=false;
 function radioFade(ms){
   radioWasLive=false;
-  const c=VQ.cur;if(c&&!c.line.offAir){if(c.speech)spkCancel(true);vqClose(c,vqNow()+(ms||120)/1000);}
-  if(!c||!c.line.offAir)spkCancel(true);
+  const c=VQ.cur;if(c&&!c.line.offAir)vqClose(c,vqNow()+(ms||120)/1000);
+  if(!c||!c.line.offAir)cfiStop((ms||120)/4000);
   if(!actx||!radioGain){radioHush();return;}
   const now=actx.currentTime,tc=(ms||120)/4000;          // four time constants in ms: ~2% left
   radioGain.gain.cancelScheduledValues(now);radioGain.gain.setTargetAtTime(0,now,tc);
@@ -15323,7 +15323,7 @@ function vqClose(c,a1){const e=c.rec;if(e&&e.a1==null)e.a1=a1!=null?a1:c.speech?
 // cut the line on the air: an 80 ms fade on the radio, a cancel on the synthesised voice
 function vqCut(requeue){
   const c=VQ.cur;if(!c)return;const n=vqNow();
-  if(c.speech){spkCancel();musicUnduck();vqClose(c,n);}
+  if(c.speech){cfiStop(0.02);vqClose(c,n+0.1);}
   else{const g=RADIO.lineG;
     if(g&&actx){try{g.gain.setTargetAtTime(0,n,0.02);}catch(e){}
       if(staticG){staticG.gain.cancelScheduledValues(n);staticG.gain.setTargetAtTime(0,n,0.02);}
@@ -15336,7 +15336,7 @@ function vqCut(requeue){
   radioBusy=0;
 }
 function vqPump(){
-  const live=radioLive(),c=VQ.cur;
+  const live=radioLive(),c=VQ.cur;if(c&&c.pend)cfiPend(c);
   if(c&&vqDone(c))vqClose(c);
   // drop what went stale while it waited
   for(let i=0;i<radioQ.length;i++){const l=radioQ[i];if(l.pri==null)l.pri=2;if(l.exp==null)l.exp=VQ.clock+25;
@@ -15364,66 +15364,78 @@ function playLine(l){
   const c={line:l,pri:l.pri,t0:VQ.clock,speech:sp,tok:++VQ.tok,fin:false};
   c.rec={pri:l.pri,who:l.who,text:l.text,speech:sp,a0:vqNow(),a1:null};VQ.log.push(c.rec);if(VQ.log.length>100)VQ.log.shift();
   let d;
-  if(sp){d=coachSpeak(c,l.sp||l.text);c.estEnd=VQ.clock+d;c.end=VQ.clock+(c.voiced?d*1.6+1:d);c.rEnd=performance.now()/1000+d*1.6+1;}
-  else{if(SPK.job||(window.speechSynthesis&&speechSynthesis.speaking))spkCancel();
+  if(sp){d=coachSpeak(c,l.sp||l.text);c.estEnd=c.end=VQ.clock+d;c.rEnd=performance.now()/1000+d;}
+  else{if(CFIV.src.length)cfiStop(0.02);
     d=radioSpeak(l.clips,l.text.length);c.aEnd=RADIO.aEnd;if(RADIO.aEnd)c.rec.a0=RADIO.aStart;c.estEnd=c.end=VQ.clock+d;}
   VQ.cur=c;radioBusy=d;
   // fix2 item 11: the caption stays until 4 s after the call ends (vqClose brings it down to 4 s when it does)
   if(l.df){if(live)dfSay(l.sub,d+0.8);dfVlog(l.clips&&l.clips[0],false,l.who);}else atcT=Math.max(5,c.end-VQ.clock+4);
 }
-// The instructor sits beside you rather than transmitting, so this one voice is
-// still synthesised and deliberately bypasses the radio filter. Its lines are
-// built at runtime from measured numbers and cannot be pre-recorded. It holds the
-// air until the speech engine says it ended, or a generous estimate if it never does.
+// schoolhud item 1: the instructors are recordings. Dana (the CFI) and Frank (the checkride examiner) sit beside you rather
+// than transmitting, so their clips play dry (no radio filter), through the same queue and priorities as every voice. No
+// speech engine runs anywhere in the game: on an iPhone speechSynthesis takes over the audio session (WebKit bug 218815)
+// and can hold the main thread for seconds, which froze every lesson step. tools/make_cfi.py records every line the lesson
+// code can say, cut at sentence marks (radio/cfi/voice.json: the key, a sentence or a piece of one, to its clip, and the
+// sets: Dana's common clips and one set a lesson, Frank's ride). A line is covered by the fewest clips (cfiClips): a whole
+// sentence when it was recorded whole, else the pieces either side of a spliced-in value and the value's words ("you are",
+// "six hundred fifty", "feet high"). The lesson's sets are decoded when it starts (cfiPrep, a menu moment: the briefing, or
+// the restart before the flight) and the others dropped, so a phone never holds every clip decoded.
+const CFIV={man:null,mp:null,buf:Object.create(null),sets:[],want:0,got:0,err:0,miss:[],plays:0,src:[],lineG:null};
+// a lesson's Dana set (the solo cross country flies the pilotage lesson's code); the ride is Frank's
+const CFI_SET={soloxc:'pilotage'};
+function cfiSets(id){return id==='ride'?['f:ride']:['d:common','d:'+(CFI_SET[id]||id)];}
+function cfiMan(){if(!CFIV.mp)CFIV.mp=fetch('radio/cfi/voice.json?v='+(stallVer()||'1')).then(r=>r.json()).then(m=>{CFIV.man=m;return m;}).catch(()=>{CFIV.mp=null;CFIV.err++;return null;});return CFIV.mp;}
+function cfiPrep(id){if(!actx)return;const want=cfiSets(id);CFIV.sets=want;
+  cfiMan().then(m=>{if(!m||CFIV.sets!==want)return;
+    const ids=new Set();for(const s of want)for(const c of (m.sets[s]||[]))ids.add(c);
+    for(const c in CFIV.buf)if(!ids.has(c))delete CFIV.buf[c];   // another lesson's clips: dropped (a playing source keeps its own)
+    const q=[...ids].filter(c=>!CFIV.buf[c]);CFIV.want=ids.size;CFIV.got=ids.size-q.length;let i=0;
+    const next=()=>{if(i>=q.length||CFIV.sets!==want)return;const c=q[i++];
+      fetch('radio/cfi/'+c+'.m4a').then(r=>{if(!r.ok)throw 0;return r.arrayBuffer();})
+        .then(a=>new Promise((res,rej)=>{try{const p=actx.decodeAudioData(a,res,rej);if(p&&p.catch)p.catch(rej);}catch(e){rej(e);}}))
+        .then(b=>{if(CFIV.sets===want){CFIV.buf[c]=b;CFIV.got++;}}).catch(()=>{CFIV.err++;}).then(next);};
+    for(let k=0;k<6;k++)next();});}
+let CFI_NUMW=null;   // the number words (NW1, NW10 come later in the script)
+function cfiNorm(s){return String(s).toLowerCase().replace(/’/g,"'").replace(/[^a-z0-9']+/g,' ').split(' ').map(w=>w.replace(/^'+|'+$/g,'')).filter(Boolean).join(' ');}
+// pieces at . ! ? : ; followed by a space or the end (tools/make_cfi.py cuts the same way)
+function cfiCut(t){const o=[];let c='';for(let i=0;i<t.length;i++){const h=t[i];c+=h;if('.!?:;'.indexOf(h)>=0&&(i+1===t.length||/\s/.test(t[i+1]))){o.push(c);c='';}}
+  if(c.trim())o.push(c);return o.filter(p=>cfiNorm(p));}
+// the clips for a spoken line: [{id, gap after}], or miss: the first words no clip covers (then the line is shown, not voiced)
+function cfiClips(who,sp){const m=CFIV.man;if(!m)return {ids:[],miss:'no manifest'};const M=who==='Frank'?m.f:m.d,out=[];if(!CFI_NUMW)CFI_NUMW=new Set(NW1.concat(NW10.slice(2),['hundred','thousand','niner','point']));
+  const t=cfiSp(sp).replace(/\b([a-z]+)\.([a-z]+)\b/gi,(x,a,b)=>CFI_NUMW.has(a.toLowerCase())&&CFI_NUMW.has(b.toLowerCase())?a+' point '+b:x);   // 1.5 miles
+  for(const p of cfiCut(t)){const w=cfiNorm(p).split(' '),n=w.length,best=new Array(n+1).fill(1e9),nx=new Array(n+1);best[n]=0;
+    for(let i=n-1;i>=0;i--)for(let j=Math.min(n,i+24);j>i;j--){const c=M[w.slice(i,j).join(' ')];if(c&&1+best[j]<best[i]){best[i]=1+best[j];nx[i]=[j,c];}}
+    if(best[0]>=1e9){let i=0;while(i<n&&best[i]>=1e9)i++;return {ids:[],miss:p.trim()};}
+    for(let i=0;i<n;){const [j,c]=nx[i];out.push({id:c,gap:j<n?0.03:0.24});i=j;}}
+  return {ids:out,miss:null};}
+// cut the line on the air: an 80 ms fade, its sources stopped (pause, a superseding line, leaving the flight)
+function cfiStop(fade){const g=CFIV.lineG,src=CFIV.src.splice(0);CFIV.lineG=null;if(!actx)return;const n=actx.currentTime,f=fade==null?0.02:fade;
+  if(g){try{g.gain.cancelScheduledValues(n);g.gain.setTargetAtTime(0,n,f);}catch(e){}}
+  for(const s of src){try{s.stop(n+f*4);}catch(e){}}musicUnduck();}
+// a line's voice: its clips scheduled back to back, the music ducked under it. Returns the seconds it holds the air.
+// Not loaded yet (the decode still running): the voice joins within 2 s or the line stays a caption (c.pend, cfiPend)
 function coachSpeak(c,text){
   const est=0.4+text.length*0.062;c.voiced=false;
-  radioHush();                                                     // belt and braces: no clip left under the voice
-  if(muted||!RADIO.on||!window.speechSynthesis)return est;         // silent: the subtitle still gets its time
-  try{const u=new SpeechSynthesisUtterance(text);
-    u.rate=1.02;u.volume=0.9*RADIO.vol;const v=c.line&&c.line.who==='Frank'?dpeVoice():cfiVoice();if(v){u.voice=v;if(v.lang)u.lang=v.lang;}
-    u.onend=u.onerror=()=>{if(VQ.cur===c){c.fin=true;if(c.rec.a1==null)c.rec.a1=vqNow();musicUnduck();}};
-    spkSay(u);c.voiced=true;
-    if(actx){const n=actx.currentTime;musicDuck(n,n+est*1.6+1);}}catch(e){}
-  return est;
-}
-// stepstall item 2: the speech engine is never called inside a frame. On an iPhone speechSynthesis.cancel() and speak() take
-// over the audio session (WebKit bug 218815: the other media is interrupted while an utterance plays) and can hold the main thread,
-// so a step change, which always comes with Dana's line, froze the frame that showed it. The line's utterance is built in the
-// frame; the calls run in a task queued after it (setTimeout 0 from the rAF callback runs once the frame is painted), cancel
-// only when something is speaking, and a newer job replaces one not yet run (a cut line never starts).
-const SPK={job:null,t:0,warm:false,runs:0,ms:0,worst:0};
-function spkRun(){SPK.t=0;const j=SPK.job;SPK.job=null;if(!j||!window.speechSynthesis)return;const t0=performance.now();
-  try{const S=speechSynthesis;if(S.speaking||S.pending)S.cancel();if(j.u)S.speak(j.u);}catch(e){}
-  const d=performance.now()-t0;SPK.runs++;SPK.ms+=d;if(d>SPK.worst)SPK.worst=d;}
-function spkSay(u){SPK.job={u:u};if(!SPK.t)SPK.t=setTimeout(spkRun,0);}
-// now: leaving the flight (pause, menu, hidden), where nothing is drawn; else after the frame like a line
-function spkCancel(now){if(!window.speechSynthesis)return;
-  if(now){SPK.job=null;try{speechSynthesis.cancel();}catch(e){}return;}
-  SPK.job={u:null};if(!SPK.t)SPK.t=setTimeout(spkRun,0);}
-// at a lesson's or a tasking's start (a menu moment, never in flight): the voice list read and both voices picked now, and
-// once a session a silent utterance so the engine is up before the first line in flight
-function spkWarm(){if(!window.speechSynthesis)return;cfiVoice();dpeVoice();
-  if(SPK.warm||muted||!RADIO.on)return;SPK.warm=true;
-  try{const u=new SpeechSynthesisUtterance(' ');u.volume=0;u.rate=2;const v=cfiVoice();if(v){u.voice=v;if(v.lang)u.lang=v.lang;}spkSay(u);}catch(e){}}
-// Dana's voice: an English female voice when the device has one (Samantha, Karen, Moira, Ava...), else the default.
-// The list can be empty until the engine loads it, so a miss is not cached
-let CFI_V=null;
-function cfiVoice(){if(CFI_V)return CFI_V;if(CFI_V===false)return null;
-  try{const vs=(window.speechSynthesis&&speechSynthesis.getVoices&&speechSynthesis.getVoices())||[],en=vs.filter(v=>v&&/^en/i.test(v.lang||''));
-    const by=n=>en.find(v=>v.name===n)||en.find(v=>(v.name||'').indexOf(n)===0);
-    CFI_V=['Samantha','Karen','Moira','Ava'].map(by).find(Boolean)||en.find(v=>/female|samantha|karen|moira|ava|allison|susan|zira/i.test(v.name||''))||(vs.length?false:null);}catch(e){CFI_V=null;}
-  return CFI_V||null;}
-// Frank's voice (school2 item 6, the examiner): an English male voice picked the same way (Daniel, Alex, Tom, Nathan, Aaron,
-// Fred), else any English voice that is not on Dana's female list
-let DPE_V=null;
-function dpeVoice(){if(DPE_V)return DPE_V;if(DPE_V===false)return null;
-  try{const vs=(window.speechSynthesis&&speechSynthesis.getVoices&&speechSynthesis.getVoices())||[],en=vs.filter(v=>v&&/^en/i.test(v.lang||''));
-    const by=n=>en.find(v=>v.name===n)||en.find(v=>(v.name||'').indexOf(n)===0);
-    DPE_V=['Daniel','Alex','Tom','Nathan','Aaron','Fred'].map(by).find(Boolean)||en.find(v=>!/female|samantha|karen|moira|ava|allison|susan|zira/i.test(v.name||''))||(vs.length?false:null);}catch(e){DPE_V=null;}
-  return DPE_V||null;}
+  radioHush();cfiStop(0.01);                                       // belt and braces: no clip left under the voice
+  if(muted||!RADIO.on||!actx)return est;                           // silent: the caption still gets its time
+  const r=cfiClips(c.line&&c.line.who,text);
+  if(r.miss){if(CFIV.miss.length<50)CFIV.miss.push({who:c.line&&c.line.who,text:text,miss:r.miss});return est;}
+  if(r.ids.some(x=>!CFIV.buf[x.id])){c.pend={ids:r.ids,until:performance.now()+2000};return est;}
+  return cfiStart(c,r.ids);}
+function cfiStart(c,ids){
+  const lg=actx.createGain();lg.gain.value=0.9*RADIO.vol;lg.connect(actx.destination);
+  const t0=actx.currentTime+0.04;let t=t0;
+  for(const x of ids){const b=CFIV.buf[x.id];if(!b)continue;const s=actx.createBufferSource();s.buffer=b;s.connect(lg);s.start(t);CFIV.src.push(s);
+    s.onended=()=>{const i=CFIV.src.indexOf(s);if(i>=0)CFIV.src.splice(i,1);};t+=b.duration+x.gap;}
+  CFIV.lineG=lg;CFIV.plays++;c.voiced=true;c.pend=null;const d=t-actx.currentTime+0.15;
+  musicDuck(t0,t+0.1);c.rec.a0=t0;c.aEnd=t;
+  return d;}
+// every frame (vqPump): a line waiting for its clips starts once they are in, or gives up and stays a caption
+function cfiPend(c){const p=c.pend;if(!p)return;
+  if(p.ids.every(x=>CFIV.buf[x.id])&&!muted&&RADIO.on&&actx&&radioLive()){const d=cfiStart(c,p.ids);c.estEnd=c.end=VQ.clock+d;c.rEnd=performance.now()/1000+d;}
+  else if(performance.now()>p.until)c.pend=null;}
 // every instructor line in the game is Dana Reyes, CFI (SCHOOL.cfi): she sits beside you, so her lines are spoken, not radioed.
 // Frank Delgado, the DPE on the mock checkride (SCHOOL.dpe), sits there too: his lines follow the same queue rules
-try{if(window.speechSynthesis&&speechSynthesis.addEventListener)speechSynthesis.addEventListener('voiceschanged',()=>{CFI_V=null;DPE_V=null;});}catch(e){}
 const isCFI=l=>!!l&&(l.who==='Dana'||l.who==='Frank');
 // a new instruction replaces the one before it; tower calls waiting behind it keep waiting
 function coach2(t,sp,o,who){o=o||{};
@@ -15444,7 +15456,7 @@ function nWords(n){n=Math.round(Math.abs(n));if(n<20)return NW1[n];if(n<100)retu
   if(n<1e6)return nWords(n/1000|0)+' thousand'+(n%1000?' '+nWords(n%1000):'');return String(n);}
 function cfiSp(t){return String(t).replace(/\bft\b/g,'feet').replace(/\bkt\b/g,'knots').replace(/\bfpm\b/g,'feet a minute').replace(/\u00b0/g,' degrees')
   .replace(/\b\d[\d,]*\b/g,m=>nWords(+m.replace(/,/g,'')));}
-function vqReset(){radioQ.length=0;if(VQ.cur){const c=VQ.cur;if(c.speech)spkCancel(true);vqClose(c,vqNow());}radioBusy=0;}
+function vqReset(){radioQ.length=0;if(VQ.cur){const c=VQ.cur;if(c.speech)cfiStop(0.01);vqClose(c,vqNow());}radioBusy=0;}
 // a tower call to us: it drops pending chatter, supersedes a tower line on the air (whose
 // readback goes with it), and goes ahead of other tower lines, but waits for an instruction
 function say(who,text,clips,o){o=o||{};
@@ -17325,7 +17337,7 @@ function taskStart(id,o){const D=TASKS[id];if(!D)return;
   if(!REGION.az){pickRegion('az',{resume:{task:id,region:'az',type:D.ac,tod:TOD.id,wx:wxOf('task:'+id)}});return;}
   if(!WORLD.ready){toast('Loading '+REGION.city+'…');return;}
   const seed=(o&&o.seed!=null)?o.seed:TASK.test.seed!=null?TASK.test.seed:(Math.random()*4294967296)>>>0;
-  spkWarm();stepPrep();   // stepstall: the voices and the stage change's chime ready before the flight
+  stepPrep();   // stepstall: the stage change's chime ready before the flight (a tasking has no instructor voice)
   pickType(D.ac,1);
   start('runway',D.base||'luke');RUNSTART={k:'task',id:id};wxWindOff();
   // the weather its brief implies for this run (WX_FIX), the saved choice comes back on the next start() (as the dogfight)
@@ -18118,7 +18130,7 @@ document.getElementById('oCap').onclick=()=>setCap(!CAPS.on);
 document.getElementById('oRvol').addEventListener('input',e=>{initAudio();setRadioVol(+e.target.value/10);});
 function soundUI(){document.querySelectorAll('.oSound').forEach(b=>{if(b.classList.contains('qs'))b.querySelector('b').textContent=muted?'Off':'On';else b.textContent='Sound: '+(muted?'Off':'On');b.classList.toggle('on',!muted);});}
 try{muted=localStorage.getItem('kgeuMuted')==='1';}catch(e){}
-function setMuted(v){muted=!!v;if(muted)spkCancel(true);try{localStorage.setItem('kgeuMuted',muted?'1':'0');}catch(e){}soundUI();}
+function setMuted(v){muted=!!v;if(muted)cfiStop(0.01);try{localStorage.setItem('kgeuMuted',muted?'1':'0');}catch(e){}soundUI();}
 document.querySelectorAll('.oSound').forEach(b=>b.onclick=()=>{initAudio();setMuted(!muted);});
 // ================= haptics =================
 // One small module: hapPattern(name) and hapTick(strength). iOS Safari has no navigator.vibrate.
@@ -18560,15 +18572,17 @@ function ezUI(){document.querySelectorAll('[data-ez]').forEach(b=>{const on=(b.d
 document.querySelectorAll('[data-ez]').forEach(b=>b.onclick=()=>ezSet(b.dataset.ez==='1'));
 addEventListener('resize',()=>{if(G.holds.length)gCue();});   // a rotation can change the bar's width
 // Dana's live corrections (gTick): kind alt, spd, hdg, bank or trk, dev the signed deviation (above, fast, right, steep);
-// feet to the nearest ten, knots and degrees to the unit
-function cfiCue(kind,dev){const ft=Math.round(Math.abs(dev)/10)*10,n=Math.round(Math.abs(dev));
+// rounded the way an instructor says them (schoolhud): feet to the nearest 10 under 100, else 50; knots and degrees to the unit
+// under 10, else 5; meters to 5 under 50, else 10; a vertical speed to 50. Never "0 feet": the smallest step is said
+function cfiCue(kind,dev){const a=Math.abs(dev),ft=a<100?Math.max(10,Math.round(a/10)*10):Math.round(a/50)*50,n=a<10?Math.max(1,Math.round(a)):Math.round(a/5)*5,
+  fpm=Math.max(50,Math.round(a/50)*50),m=a<50?Math.max(5,Math.round(a/5)*5):Math.round(a/10)*10;
   if(kind==='alt')return dev>0?'You are '+ft+' feet high. Ease the power back a touch.':'You are '+ft+' feet low. A touch more power and back pressure.';
   if(kind==='spd')return dev>0?'You are '+n+' knots fast. Raise the nose a little.':'Nose down a little, you are '+n+' knots slow.';
   if(kind==='hdg')return dev>0?'Bring the heading back left, you are '+n+' degrees right.':'Bring the heading back right, you are '+n+' degrees left.';
   if(kind==='bank')return dev>0?'A little less bank, you are '+n+' degrees steep.':'A little more bank, you are '+n+' degrees shallow.';
-  if(kind==='trk')return 'Back to the centerline, you are '+n+' meters off.';
+  if(kind==='trk')return 'Back to the centerline, you are '+m+' meters off.';
   if(kind==='route'){const nm=Math.max(1,Math.round(Math.abs(dev)));return 'You are '+nm+(nm===1?' mile':' miles')+' off the route, come '+(dev>0?'left':'right')+'.';}   // dev: right of course positive
-  if(kind==='vs')return dev>0?'A touch more power, you are coming down '+ft+' feet a minute fast.':'Ease the power back, you are coming down '+ft+' feet a minute slow.';
+  if(kind==='vs')return dev>0?'A touch more power, you are coming down '+fpm+' feet a minute fast.':'Ease the power back, you are coming down '+fpm+' feet a minute slow.';
   return null;}
 // the debrief's line from Dana: the lowest scoring failed task when there is one (else the lowest), the fail reason on an F
 function dbPick(r){const T=r.lines.filter(l=>!l.why&&l.w>0),by=(a,b)=>a.pts/a.w-b.pts/b.w,low=T.slice().sort(by)[0],bad=T.filter(l=>!l.ok).sort(by)[0];
@@ -19042,7 +19056,7 @@ function startLesson(id,force,o){   // o.brief false: a restart (pause Restart, 
   const L=lessonDef(id);if(L&&L.oral){if(!force&&!lessonOpen(id)){lockSay(id);return;}gradeOv.classList.remove('on');if(!menu.classList.contains('on')||curScr!=='sSchool')openMenu('sSchool');oralStart(id);return;}   // the oral exam: no flight, its sheet on the school screen
   if(!L||!L.fly)return;   // a lesson still to come has no flight yet
   if(!force&&!lessonOpen(id)){lockSay(id);return;}   // locked by the placement (force: a retry, a restart, the tests)
-  spkWarm();stepPrep();   // stepstall: the voices and the step change's chime and card ready before the flight
+  cfiPrep(id);stepPrep();   // schoolhud: the lesson's instructor clips decoded now (a menu moment); stepstall: the step's chime
   if(!REGION.az){pickRegion('az',{resume:{lesson:id,tod:TOD.id,wx:wxOf('les:'+id)}});return;}   // flight school is at Glendale
   if(id==='first')pickType('cessna',1);else if(acType!==schoolAc)pickType(schoolAc,1);
   const S=SCH[acType];gradeOv.classList.remove('on');
@@ -25008,7 +25022,7 @@ const APP_VER='2026-10-18-runways';          // keep version.json in step when s
     get P(){return E.P;}};
 })();
 
-window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.holdF=n|0;},pfx:()=>{const L=PFX.last||{};return {w:L.w,h:L.h,sw:L.sw,sh:L.sh,bloomed:!!L.bloomed,smaa:!!L.smaa,sharp:L.sharp||0,samples:L.samples||0,layer:!!L.layer,box:L.box||null,split:!!L.split,full:L.full||null,webgl2:renderer.capabilities.isWebGL2,msaaRT:!!(PFX.rt&&PFX.rt.isWebGLMultisampleRenderTarget),allocN:PFX.allocN,scale:GFX.scale,rs:L.rs!=null?L.rs:GFX.rs,post:GFX.post,sens:GFX.sens};},setScale:s=>GFX.setScale(+s),sharpOff:v=>{PFX_SHARP.off=!!v;},msaaOff:v=>{PFX.msOff=!!v;},csmNBT:a=>{if(a)CSM.NBT=a.slice();if(CSM.n)csmRadii();return CSM.NBT.slice();},layerOff:v=>{PFX.layerOff=!!v;},splitOff:v=>{PFX.layerOff=!!v;},gfxBusy:()=>({applying:gfxApplying(),resumeWait:GFX.resumeWait,preDone:PRE.done,warmDone:WARM.done,busy:GFX.busy}),stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>({id:p.id,name:p.name,cacheKey:p.cacheKey,usedTimes:p.usedTimes})),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),tqStage:i=>tqStageGo(i),inFrame:()=>FRAME_IN,stepx:()=>({spk:{runs:SPK.runs,ms:+SPK.ms.toFixed(1),worst:+SPK.worst.toFixed(1),pend:!!SPK.job,warm:SPK.warm},ls:{n:LSQ.n,pend:LSQ.m.size},chime:!!STEPX.buf,last:STEPX.last,ghost:!!(STEPX.les.ghost&&STEPX.les.ghost.parentNode),geo:STEPX.les.geo&&{el:STEPX.les.geo.el.id,p:STEPX.les.geo.p.id,x:STEPX.les.geo.x,y:STEPX.les.geo.y,w:STEPX.les.geo.w,h:STEPX.les.geo.h},key:STEPX.les.key.slice(0,40)}),lsFlush:lsFlush,taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
+window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.holdF=n|0;},pfx:()=>{const L=PFX.last||{};return {w:L.w,h:L.h,sw:L.sw,sh:L.sh,bloomed:!!L.bloomed,smaa:!!L.smaa,sharp:L.sharp||0,samples:L.samples||0,layer:!!L.layer,box:L.box||null,split:!!L.split,full:L.full||null,webgl2:renderer.capabilities.isWebGL2,msaaRT:!!(PFX.rt&&PFX.rt.isWebGLMultisampleRenderTarget),allocN:PFX.allocN,scale:GFX.scale,rs:L.rs!=null?L.rs:GFX.rs,post:GFX.post,sens:GFX.sens};},setScale:s=>GFX.setScale(+s),sharpOff:v=>{PFX_SHARP.off=!!v;},msaaOff:v=>{PFX.msOff=!!v;},csmNBT:a=>{if(a)CSM.NBT=a.slice();if(CSM.n)csmRadii();return CSM.NBT.slice();},layerOff:v=>{PFX.layerOff=!!v;},splitOff:v=>{PFX.layerOff=!!v;},gfxBusy:()=>({applying:gfxApplying(),resumeWait:GFX.resumeWait,preDone:PRE.done,warmDone:WARM.done,busy:GFX.busy}),stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>({id:p.id,name:p.name,cacheKey:p.cacheKey,usedTimes:p.usedTimes})),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),tqStage:i=>tqStageGo(i),inFrame:()=>FRAME_IN,stepx:()=>({cfi:{plays:CFIV.plays,want:CFIV.want,got:CFIV.got,err:CFIV.err,miss:CFIV.miss.length,sets:CFIV.sets.slice()},ls:{n:LSQ.n,pend:LSQ.m.size},chime:!!STEPX.buf,last:STEPX.last,ghost:!!(STEPX.les.ghost&&STEPX.les.ghost.parentNode),geo:STEPX.les.geo&&{el:STEPX.les.geo.el.id,p:STEPX.les.geo.p.id,x:STEPX.les.geo.x,y:STEPX.les.geo.y,w:STEPX.les.geo.w,h:STEPX.les.geo.h},key:STEPX.les.key.slice(0,40)}),lsFlush:lsFlush,taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
   task:()=>({on:TASK.on,id:TASK.id,stage:TASK.stage&&TASK.stage.id,si:TASK.si,brief:TASK.brief,done:TASK.done,res:TASK.res,ask:TASK.ask&&{shown:TASK.ask.shown,opts:TASK.ask.opts.map(o=>o.k),t:TASK.ask.t},d:TASK.d,log:TASK.log.slice(),seed:TASK.seed}),
   tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzBuild:()=>dzBuild(),dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
@@ -25069,7 +25083,7 @@ window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.hol
   RADIO:RADIO,radioQ:()=>radioQ,radioState:()=>({live:radioLive(),srcCount:RADIO.src.length,gain:radioGain?radioGain.gain.value:null,staticGain:staticG?staticG.gain.value:null,queued:radioQ.length,busy:radioBusy,vol:RADIO.on?RADIO.vol:0}),radioFade:radioFade,CHAT:CHAT,radioLog:clear=>{const r=RADIO.log.slice();if(clear)RADIO.log.length=0;return r;},radioChain:radioChain,setRadioOn:setRadioOn,setRadioVol:setRadioVol,music:musicState,musicNext:musicNext,musicPrev:musicPrev,musicLoad:musicLoadList,ticker:()=>{const e=document.getElementById('tk'),c=document.getElementById('tkCtl');return {on:e.classList.contains('on'),paused:e.classList.contains('paused'),anim:getComputedStyle(document.getElementById('tkT')).animationName,scroll:e.classList.contains('scroll'),open:c.classList.contains('on'),text:e.querySelector('#tkT i').textContent,vis:e.offsetParent!==null&&getComputedStyle(e).display!=='none',ctlVis:c.offsetParent!==null};},tickerForce:n=>{TK.force=n||null;tkUI();},tickerOpen:()=>tkOpen(),tickerClose:()=>{TK.open=false;tkUI();},musicTick:musicTick,MUSIC:MUSIC,actx:()=>actx,setMusicOn:setMusicOn,setMusicVol:setMusicVol,setMusicFree:setMusicFree,musicForce:n=>{MUSIC.forced=n||null;musicTick();},radioSpeak:radioSpeak,say:say,VQ:VQ,vqLog:clear=>{const r=VQ.log.map(e=>Object.assign({},e));if(clear)VQ.log.length=0;return r;},vqAdd:(who,kind,text,clips,o)=>vqAdd(L(who,kind,text,clips),o),coach2:coach2,chatNow:()=>chatNow(),atcUpdate:atcUpdate,atcTouchdown:atcTouchdown,initAudio:initAudio,
   ff:sec=>{acc+=sec;},paused:()=>paused,gradeBadge:g=>gradeBadge(g),bannerShow:(k,t)=>bannerShow(k,t),badgeHide:()=>badgeHide(),auto:()=>autoSmart(),mission:k=>{if(k==='gunrun'){pickType('a10',1);start('range');return;}pickType(k==='range'?'reaper':'c130',1);start(k);},HOG:HOG,strikeScore:()=>strikeScore(),CRASH_FX:CRASH_FX,baseOK:baseOK,rwyLenOf:rwyLenOf,FD:FD,BASES:BASES,setThr:setThr,setSkill:setSkill,photoOpen:photoOpen,photoClose:photoClose,PHOTO:PHOTO,camPos:()=>camera.position.toArray(),camQuat:()=>camera.quaternion.toArray(),camUp:()=>camera.up.toArray(),snapCam:()=>{snapCamera=true;},
   // hold the rAF loop and run exactly one tick of dt seconds; stepFrame(0,true) hands the loop back
-  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day,kind:d.kind,wx:d.wx}},wxOf:wxOf,wxFirst:wxFirst,WX_FIX:WX_FIX,wxShowers:()=>CLD.shw.slice(),dfDayOf:k=>dfDayOf(k),aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,NAV:NV,navPlan:navPlan,DIV:DIV,divSet:divSet,LES:LES,events:events,rwyFrame:()=>({thr:THR01,rh:RH*180/Math.PI,aim:AIM,field:FIELD_FT,gear:GEAR}),grSite:()=>grSite(),lesObjs:()=>LES_OBJ.map(o=>({name:o.name,type:o.geometry&&o.geometry.type,tri:o.geometry?(o.geometry.index?o.geometry.index.count:o.geometry.attributes.position.count)/3:0,col:o.material&&o.material.color&&o.material.color.getHex(),x:o.position.x,z:o.position.z,inScene:!!o.parent})),get lesBrief(){return {on:!!LES.brief,slide:BR.slide,quiz:LES.quiz};},lesBriefNext:()=>brNextTap(),lesBriefSkip:lesBriefSkip,lesBriefBack:lesBriefBack,lesBriefAnswer:k=>brAnswer(k),get ORAL(){return OR.draw;},ORAL_Q:ORAL_Q,oralSeed:oralSeed,rideSeed:rideSeed,rideDraw:rideDraw,rideName:rideName,get RIDE(){return RIDE;},certGet:certGet,dpe:dpe,oralStart:oralStart,oralAnswer:oralAnswer,oralNext:oralNext,get oral(){return {on:orOv.classList.contains('on'),n:OR.n,ans:OR.ans,right:OR.right,res:OR.res};},get G(){return G;},gBegin:gBegin,gHold:gHold,gHoldEnd:gHoldEnd,gTick:gTick,gRange:gRange,gEvent:gEvent,gEnd:gEnd,dbTip:dbTip,dbSay:dbSay,cfi:cfi,cfiCue:cfiCue,cfiSp:cfiSp,cfiVoice:cfiVoice,endorsements:endorsements,get LOGB(){return LOGB;},logbookAdd:logbookAdd,logSummary:logSummary,tqAnswer:tqAnswer,ezSet:ezSet,SCHOOL:SCHOOL,get PLACE(){return PLACE;},setPlace:(l,h)=>{setPlace(l,h);if(curScr==='sSchool')schoolList(true);},lessonOpen:lessonOpen,stageOpen:stageOpen,get schSel(){return SCH_SEL;},schSelect:schSelect,lessonDef:lessonDef,stageOf:stageOf,tolOf:tolOf,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,wx:WX.id,wxRandom:WX.random,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
+  stepFrame:(dt,release,skipRender)=>{if(release){loopHeld=false;last=performance.now();return;}loopHeld=true;tick(last+dt*1000,!!skipRender);},arcStart:arcStart,ARC:ARC,RES:RES,sideCfg:sideCfg,HAP:HAP,hap:hapPattern,hapTick:hapTick,setHaptics:setHaptics,hapLog:clear=>{const r=HAP.log.slice();if(clear)HAP.log.length=0;return r;},resOpen:resOpen,resClose:resClose,dailySpec:()=>{const d=dailySpec();return {type:d.type,end:d.end.rwy.code+' '+d.end.num,region:d.region,name:endApt(d.end),num:d.end.num,tod:d.tod,wdir:d.wdir,wkt:d.wkt,day:d.day,kind:d.kind,wx:d.wx}},wxOf:wxOf,wxFirst:wxFirst,WX_FIX:WX_FIX,wxShowers:()=>CLD.shw.slice(),dfDayOf:k=>dfDayOf(k),aptStart:aptStart,setDest:e=>setDest(e),dest:()=>DEST&&(DEST.rwy?{apt:DEST.rwy.apt,num:DEST.num}:{name:DEST.name,x:DEST.x,z:DEST.z}),fmOpen:fmOpen,fmClose:fmClose,LBL:()=>({placed:LBL.placed.map(P=>({box:P.box,kind:P.c.kind})),ui:LBL.ui}),legPick:legPick,mapPOIs:mapPOIs,fmFlush:()=>{let n=0;do{mtPump(1e9);fmDraw();}while(MT.queue.length&&++n<20);},MT:MT,FM:FM,fmP:fmP,startLesson:startLesson,NAV:NV,navPlan:navPlan,DIV:DIV,divSet:divSet,LES:LES,events:events,rwyFrame:()=>({thr:THR01,rh:RH*180/Math.PI,aim:AIM,field:FIELD_FT,gear:GEAR}),grSite:()=>grSite(),lesObjs:()=>LES_OBJ.map(o=>({name:o.name,type:o.geometry&&o.geometry.type,tri:o.geometry?(o.geometry.index?o.geometry.index.count:o.geometry.attributes.position.count)/3:0,col:o.material&&o.material.color&&o.material.color.getHex(),x:o.position.x,z:o.position.z,inScene:!!o.parent})),get lesBrief(){return {on:!!LES.brief,slide:BR.slide,quiz:LES.quiz};},lesBriefNext:()=>brNextTap(),lesBriefSkip:lesBriefSkip,lesBriefBack:lesBriefBack,lesBriefAnswer:k=>brAnswer(k),get ORAL(){return OR.draw;},ORAL_Q:ORAL_Q,oralSeed:oralSeed,rideSeed:rideSeed,rideDraw:rideDraw,rideName:rideName,get RIDE(){return RIDE;},certGet:certGet,dpe:dpe,oralStart:oralStart,oralAnswer:oralAnswer,oralNext:oralNext,get oral(){return {on:orOv.classList.contains('on'),n:OR.n,ans:OR.ans,right:OR.right,res:OR.res};},get G(){return G;},gBegin:gBegin,gHold:gHold,gHoldEnd:gHoldEnd,gTick:gTick,gRange:gRange,gEvent:gEvent,gEnd:gEnd,dbTip:dbTip,dbSay:dbSay,cfi:cfi,cfiCue:cfiCue,cfiSp:cfiSp,CFIV:CFIV,cfiClips:cfiClips,setMuted:v=>setMuted(v),rideTaskLine:(id)=>rideTaskLine(id,SCH.cessna),RIDE_POOL:RIDE_POOL,cfiPrep:cfiPrep,cfiCut:cfiCut,cfiNorm:cfiNorm,endorsements:endorsements,get LOGB(){return LOGB;},logbookAdd:logbookAdd,logSummary:logSummary,tqAnswer:tqAnswer,ezSet:ezSet,SCHOOL:SCHOOL,get PLACE(){return PLACE;},setPlace:(l,h)=>{setPlace(l,h);if(curScr==='sSchool')schoolList(true);},lessonOpen:lessonOpen,stageOpen:stageOpen,get schSel(){return SCH_SEL;},schSelect:schSelect,lessonDef:lessonDef,stageOf:stageOf,tolOf:tolOf,nextLesson:()=>{const n=nextLesson();return n&&n.id},skill:()=>SKILL,plainOf:plainOf,GUIDE:GUIDE,RWY_ENDS:RWY_ENDS,approachEnd:approachEnd,ROOK:ROOK,pick:pickType,pickBase:pickBase,pickPos:pickPos,openFly:()=>{openMenu();nav('sFly');},CARM:()=>({pos:CARM.pos,idx:CARM.idx}),CARP:()=>({pos:CARP.pos,idx:CARP.idx}),nav:nav,curScr:()=>curScr,prefs:()=>({type:savedType,base:SPAWN_BASE,tod:TOD.id,wx:WX.id,wxRandom:WX.random,pos:SPAWN_POS,acType:acType}),togglePause:togglePause,base:()=>SPAWN_BASE,BASES:BASES,lukeUV:lukeUV,openMenu:openMenu,TYPES:TYPES,cycleCam:cycleCam,
   // @OhRabah easter eggs (3.10): where each one is, whether its lights are on, and the tow banner
   eggs:()=>EGG.list.map(o=>{const p=o.getWorldPosition(new V3()),r={name:o.name,x:p.x,y:p.y,z:p.z,ry:o.rotation.y,lit:(o.name==='egg_billboard'||o.name==='egg_rooftop')&&EGG.lit,visible:o.visible};
     if(o.name==='egg_tow'){const b=EGG.tow.ban.getWorldPosition(new V3()),f=new V3(0,0,-1).applyQuaternion(o.quaternion);r.banner={x:b.x,y:b.y,z:b.z};r.fwd=[f.x,f.y,f.z];}return r;}),

@@ -1,9 +1,9 @@
 # School1 item 5: the instructor, Dana Reyes, CFI.
 # (a) slow flight (briefing skipped): the opening line is Dana's in RADIO.log and the subtitle reads Dana; (b) a correction
-# cue: 250 ft high for 5 s gives one Dana line about being high, and no second one within 12 s; (c) the debrief tip is
+# cue: 250 ft high for 6.5 s gives one Dana line about being high, and no second one within 12 s; (c) the debrief tip is
 # hers (a full stop, a task named on B to D); (d) a passed solo run: kgeuEndorse.solo saved, the Endorsement row, the
 # offAir line says endorsement; (e) the pattern: CALL on the ground within 3 s, no clearance before it, the tap sends our
-# request then the tower's takeoff clearance with closed traffic; (f) no page errors; (g) no voices: nothing throws.
+# request then the tower's takeoff clearance with closed traffic; (f) no page errors; (g) no speech engine: no audio yet, a caption; with audio, the lesson's clip sets (schoolhud).
 # Run: .venv/bin/python tests/school_cfi_check.py
 import asyncio, sys, json
 from playwright.async_api import async_playwright
@@ -39,15 +39,16 @@ async def main():
           T.spd.get=()=>typeof T.spd.target==='function'?T.spd.target():T.spd.target;T.hdg.get=()=>360;K.radioLog(true);}}""")
         c0 = await pg.evaluate(PIN, [35, 0])
         ok('(b) on altitude for 3.5 s: no correction', not c0, c0)
-        c1 = await pg.evaluate(PIN, [50, 250])
-        ok('(b) 250 ft high for 5 s: Dana says one line about being high', len(c1) == 1 and 'high' in c1[0][1], c1)
-        c2 = await pg.evaluate(PIN, [105, 250])
+        c1 = await pg.evaluate(PIN, [65, 250])   # 4 s out, plus a tower call under 1.5 s from its end that she lets finish
+        ok('(b) 250 ft high for 6.5 s: Dana says one line about being high', len(c1) == 1 and 'high' in c1[0][1], c1)
+        c2 = await pg.evaluate(PIN, [90, 250])
         ok('(b) still high: no second correction within 12 s', len(c2) == 1, c2)
         c3 = await pg.evaluate(PIN, [40, 250])
         ok('(b) after 12 s she corrects again', len(c3) == 2 and c3[1][0] - c3[0][0] >= 11.9, c3)
-        cue = await pg.evaluate(f"()=>[{K}.cfiCue('alt',154),{K}.cfiCue('spd',-6.4),{K}.cfiCue('hdg',-15.2),{K}.cfiCue('bank',-8)]")
-        ok('(b) the cue strings, feet to tens, knots and degrees to units', cue == ['You are 150 feet high. Ease the power back a touch.', 'Nose down a little, you are 6 knots slow.',
-           'Bring the heading back right, you are 15 degrees left.', 'A little more bank, you are 8 degrees shallow.'], cue)
+        cue = await pg.evaluate(f"()=>[{K}.cfiCue('alt',154),{K}.cfiCue('spd',-6.4),{K}.cfiCue('hdg',-15.2),{K}.cfiCue('bank',-8),{K}.cfiCue('alt',67),{K}.cfiCue('alt',3),{K}.cfiCue('spd',13)]")
+        ok('(b) the cue strings, feet to 50 (10 under 100), knots and degrees to units under 10, else 5', cue == ['You are 150 feet high. Ease the power back a touch.', 'Nose down a little, you are 6 knots slow.',
+           'Bring the heading back right, you are 15 degrees left.', 'A little more bank, you are 8 degrees shallow.',
+           'You are 70 feet high. Ease the power back a touch.', 'You are 10 feet high. Ease the power back a touch.', 'You are 15 knots fast. Raise the nose a little.'], cue)
         # (c) the debrief tip
         T = [{'ok': True, 'name': 'Altitude within 100 ft', 'pts': 30, 'w': 35}, {'ok': False, 'name': 'Airspeed on target', 'pts': 10, 'w': 35}, {'ok': True, 'name': 'No stall', 'pts': 10, 'w': 10}]
         tips = await pg.evaluate(f"(T)=>['A','B','C','D','F'].map(L=>{K}.dbTip({{letter:L,lines:T}})).concat([{K}.dbTip({{letter:'F',failWhy:'stalled',lines:[{{ok:false,why:true,name:'Stalled during slow flight'}}].concat(T)}})])", T)
@@ -107,14 +108,15 @@ async def main():
         ok('(f) no page errors', not pg.errs, pg.errs[:3])
         await pg.context.close()
 
-        # (g) a device with no voices: nothing throws
+        # (g) schoolhud: no speech engine. A lesson started with no audio context yet (no tap): nothing throws, her lines
+        # are captions; with audio, the lesson's clip sets are the ones asked for and window.speechSynthesis is never read
         pg = await page(b, url, vp=IPHONE_15, storage=BASE)
-        await pg.evaluate("()=>{if(window.speechSynthesis){speechSynthesis.getVoices=()=>[];}}")
+        await pg.evaluate("()=>{window.__ss=0;Object.defineProperty(window,'speechSynthesis',{configurable:true,get(){window.__ss++;return undefined;}});}")
         await pg.evaluate(f"()=>{{{K}.startLesson('slow',true,{{brief:false}})}}"); await pg.wait_for_timeout(300)
-        v = await pg.evaluate(f"()=>{{const K={K};const v=K.cfiVoice();K.cfi('Hold 3,500. Small moves.');for(let i=0;i<20;i++)K.stepFrame(0.1,false,true);K.stepFrame(0,true);return v}}")
-        ok('(g) no voices: the default voice, no pick', v is None, v)
-        pk = await pg.evaluate(f"()=>{{speechSynthesis.getVoices=()=>[{{name:'Alex',lang:'en-US'}},{{name:'Thomas',lang:'fr-FR'}},{{name:'Karen',lang:'en-AU'}}];const v={K}.cfiVoice();return v&&v.name}}")
-        ok('(g) with voices: an English female voice is preferred', pk == 'Karen', pk)
+        v = await pg.evaluate(f"()=>{{const K={K};K.cfi('Hold 3,500. Small moves.');for(let i=0;i<20;i++)K.stepFrame(0.1,false,true);K.stepFrame(0,true);return {{cap:document.getElementById('atc').textContent,ss:window.__ss}}}}")
+        ok('(g) no audio yet: the line is a caption, nothing read from speechSynthesis', 'Small moves' in v['cap'] and v['ss'] == 0, v)
+        pk = await pg.evaluate(f"()=>{{const K={K};K.initAudio();K.startLesson('slow',true,{{brief:false}});return {{sets:K.CFIV.sets,ss:window.__ss}}}}")
+        ok('(g) with audio: the slow flight lesson asks for Dana common and slow', pk['sets'] == ['d:common', 'd:slow'] and pk['ss'] == 0, pk)
         ok('(f) (g) no page errors', not pg.errs, pg.errs[:3])
         await pg.context.close()
         await b.close()

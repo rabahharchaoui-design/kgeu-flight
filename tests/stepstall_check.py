@@ -164,6 +164,9 @@ async def wait(pg, cond, sec):
     except Exception: return False
 
 async def b_pattern(pg, T):
+    # schoolhud: Dana's clips decoded on the menu first (a flight's 300 ms headless frames starve the decode), as the briefing does
+    await pg.evaluate(f"()=>{K}.cfiPrep&&{K}.cfiPrep('pattern')")
+    await wait(pg, f"()=>!{K}.CFIV||({K}.CFIV.want>0&&{K}.CFIV.got>={K}.CFIV.want)", 90)
     await T.leg_begin('pattern')
     await pg.evaluate(f"()=>{{const K={K};K.radioLog(true);K.startLesson('pattern',true,{{brief:false}});K.lesBriefSkip&&K.lesBriefSkip();}}")
     F = await pg.evaluate(f"()=>{K}.rwyFrame()")
@@ -191,7 +194,8 @@ async def b_pattern(pg, T):
     await pg.evaluate(UNPIN)
     st = await T.leg_end(4)
     sx = await pg.evaluate(f"()=>{K}.stepx?{K}.stepx():null")
-    ok('(B) pattern: the speech jobs ran after their frames, nothing left waiting, the step chime ready', bool(sx) and sx['spk']['runs'] > 0 and not sx['spk']['pend'] and sx['chime'] and sx['ls']['pend'] == 0, sx)
+    ok("(B) pattern: Dana's lines played from her clips (schoolhud), none missed, the step chime ready, no storage write waiting",
+       bool(sx) and sx['cfi']['plays'] > 0 and sx['cfi']['miss'] == 0 and sx['chime'] and sx['ls']['pend'] == 0, sx)
     await pg.evaluate(f"()=>{{const K={K};if(K.LES.on)document.getElementById('lesQuit').click();}}")
     return st
 
