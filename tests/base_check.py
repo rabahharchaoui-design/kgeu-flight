@@ -42,7 +42,7 @@ async def main():
 
     r=await spawn('f16','luke')
     chk('F-16 can be sent to Luke', r['base']=='luke' and r['distLuke']<2000, json.dumps({k:round(v,0) if isinstance(v,float) else v for k,v in r.items()}))
-    chk('F-16 sits on Luke runway 03L', abs(r['lukeV']+152.5)<30 and r['lukeU']<-1400, f"u {r['lukeU']:.0f} v {r['lukeV']:.0f}")
+    chk('F-16 sits on Luke runway 03L', abs(r['lukeV']+177)<30 and r['lukeU']<-1800, f"u {r['lukeU']:.0f} v {r['lukeV']:.0f}")
     await pg.screenshot(path=f'{SHOTS}/base_f16_luke.png')
 
     r=await spawn('cessna','kgeu')
@@ -69,7 +69,7 @@ async def main():
     await pg.wait_for_timeout(1400)
     r=await pg.evaluate("""()=>{const K=window.__kgeu,s=K.state();const L=K.lukeUV(s.pos.x,s.pos.z);
       return {agl:s.agl,lukeU:L[0],lukeV:L[1],crashed:s.crashed};}""")
-    chk('Luke 3 mile final is lined up on 03L', abs(r['lukeV']+152.5)<60 and -7200<r['lukeU']<-6300 and not r['crashed'],
+    chk('Luke 3 mile final is lined up on 03L', abs(r['lukeV']+177)<60 and -7650<r['lukeU']<-6700 and not r['crashed'],
         f"u {r['lukeU']:.0f} v {r['lukeV']:.0f} agl {r['agl']:.0f} m")
     chk('Luke final is above the ground', 250<r['agl']<330, f"{r['agl']:.0f} m")
     await pg.screenshot(path=f'{SHOTS}/base_luke_final.png')

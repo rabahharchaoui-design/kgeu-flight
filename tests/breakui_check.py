@@ -87,6 +87,10 @@ async def main():
                     await pg.evaluate(f"""()=>{{const K={K};try{{K.resBoardHook&&K.resBoardHook({{b:'daily',rank:12345,total:123456,gain:250,pb:1,
                       df:{{kills:{{pb:1,rank:12345}},clear:{{pb:1,rank:3,top10:1}},guns:{{pb:1,rank:99999}}}},ach:[{{id:'greaser',xp:250}},{{id:'night',xp:100}}],rankUp:'Weapons School'}});}}catch(e){{}}}}""")
                     await pg.wait_for_timeout(350)
+                    # the sheet slides in from 28 px down on the next paint, and a headless frame is 250 to 400 ms: wait for
+                    # the slide to end (its transform back to identity) rather than race it with a fixed delay (runways)
+                    try: await pg.wait_for_function("()=>{const t=getComputedStyle(document.querySelector('#arcOv .sheet')).transform;return t==='none'||t==='matrix(1, 0, 0, 1, 0, 0)';}", timeout=4000)
+                    except Exception: pass
                     a = await pg.evaluate(AUDIT, ['#arcOv', '.sheet'])
                     f = await pg.evaluate(CARD_FIT, 'arcOv')
                     n = await pg.evaluate(NUMS, '#arcOv .rScore, #arcOv .lbLine b, #arcOv .rLines .gl b')

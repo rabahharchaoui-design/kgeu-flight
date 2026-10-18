@@ -19,7 +19,7 @@ return {createState,step,setType,autopilot,trimSpawn,groundHeight,isPaved,TYPES,
     add('KGEU','1',c[0]-d[0]*(RWY_LEN/2-THR01),c[1]-d[1]*(RWY_LEN/2-THR01),H,RWY_LEN,THR01);
     add('KGEU','19',c[0]+d[0]*(RWY_LEN/2-(RWY_LEN-THR19)),c[1]+d[1]*(RWY_LEN/2-(RWY_LEN-THR19)),H+Math.PI,RWY_LEN,RWY_LEN-THR19);
     const L=42.6*Math.PI/180,ld=[Math.sin(L),-Math.cos(L)];
-    for(const r of LUKE_RWY){const cx=lkX(0,r.v),cz=lkZ(0,r.v);
+    for(const r of LUKE_RWY){const cx=lkX(r.u0,r.v),cz=lkZ(r.u0,r.v);
       add('KLUF',r.lo,cx-ld[0]*r.len/2,cz-ld[1]*r.len/2,L,r.len,0);
       add('KLUF',r.hi,cx+ld[0]*r.len/2,cz+ld[1]*r.len/2,L+Math.PI,r.len,0);}
     return out;}};`)(THREE);

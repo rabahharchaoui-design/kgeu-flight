@@ -335,10 +335,24 @@ async def submit_section(b, url):
     ok('no console errors (568 results)', not pg.errs, pg.errs[:3])
     await pg.context.close()
 
+PART = (sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith('-') else 'abc')   # runways: a (the card, picks, Easy), b (MRM, multiplier, balance, submit), c (the small phones): the whole run is over 10 minutes
+
 async def main():
     srv, url = serve()
     async with async_playwright() as p:
         b = await launch(p)
+        if 'a' in PART: await card_section(b, url)
+        if 'b' in PART:
+            await mrm_section(b, url)
+            await mult_section(b, url)
+            await balance_section(b, url)
+            await submit_section(b, url)
+        if 'c' in PART: await phones_section(b, url)
+        await b.close()
+    srv.shutdown()
+    return ok.done('arsenal_check')
+
+async def card_section(b, url):
         pg = await page(b, url, vp=IPHONE_15, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuType': 'f16'})
         # ---- 1. the card between the briefing and FIGHT'S ON ----
         await open_brief(pg, 'pilot')
@@ -394,10 +408,8 @@ async def main():
         ok("Easy STANDARD with the full gun: today's Easy fight (10 FOX 2, 510 rounds, 30 flares)", s['fox'] == 10 and s['rounds'] == 510 and s['flares'] == 30, s)
         ok('no console errors (844x390)', not pg.errs, pg.errs[:3])
         await pg.context.close()
-        await mrm_section(b, url)
-        await mult_section(b, url)
-        await balance_section(b, url)
-        await submit_section(b, url)
+
+async def phones_section(b, url):
         # ---- the small phones ----
         for vp, nm in (({'width': 667, 'height': 375}, '667'), ({'width': 568, 'height': 320}, '568'), ({'width': 932, 'height': 430}, '932')):
             pg = await page(b, url, vp=vp, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuType': 'f16'})
@@ -411,9 +423,6 @@ async def main():
             await shot(pg, f'a1_card_{nm}.png')
             ok(f'no console errors ({nm})', not pg.errs, pg.errs[:3])
             await pg.context.close()
-        await b.close()
-    srv.shutdown()
-    return ok.done('arsenal_check')
 
 if __name__ == '__main__':
     sys.exit(asyncio.run(main()))

@@ -15,7 +15,7 @@ except ImportError:
     HAVE_PIL = False
 
 PLACE = """()=>{const K=window.__kgeu,s=K.state(),L=K.LUKE,sn=Math.sin(L.h),cs=Math.cos(L.h);
-  const cx=L.x+(-152.5)*cs,cz=L.z+(-152.5)*sn;window.__rc=[cx,cz];
+  const cx=L.x+(-177)*cs,cz=L.z+(-177)*sn;window.__rc=[cx,cz];
   const d=8000/Math.SQRT2,x=cx-d,z=cz+d,hdg=-Math.PI/4,V=80;
   s.pos.set(x,4570+K.groundHeight(x,z),z);s.vel.set(Math.sin(hdg)*V,0,-Math.cos(hdg)*V);
   s.quat.setFromEuler(new THREE.Euler(0,-hdg,0,'YXZ'));s.w.set(0,0,0);

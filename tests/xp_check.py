@@ -76,6 +76,11 @@ async def main():
                 if await pg.evaluate(f"(b)=>!!{K}.LB.E.runs[b]", board): break
                 await pg.evaluate(f"()=>{{for(let i=0;i<3;i++){K}.stepFrame(1/30,false,true)}}")
             await pg.wait_for_timeout(300)
+            # the run's token (its /token answer, or a pooled one): a headless boot blocks the main thread for 20 s and
+            # more, and the API's abort timers can beat the mock's boot answers, so the pool can be empty here and the
+            # first /token answer still on its way; the game then declines to submit (runways)
+            try: await pg.wait_for_function(f"(b)=>{{const E={K}.LB.E,r=E.runs[b];return !!(r&&r.tok)||E.pool.length>0;}}", arg=board, timeout=8000)
+            except Exception: pass
             await pg.evaluate(f"([b,s])=>{K}.LB.runEnd(b,s,{opt})", [board, score])
             for _ in range(30):
                 await pg.wait_for_timeout(200)

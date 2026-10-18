@@ -23,7 +23,7 @@ console.log('distance KGEU to Luke   ', (Math.hypot(east,north)/1852).toFixed(2)
 const hTrue=30.6+a.MAGVAR;   // runway 03 magnetic 030.6, plus east variation
 console.log('runway 03 true heading  ', hTrue.toFixed(1), 'deg    code has', (a.LUKE.h*180/Math.PI).toFixed(1));
 // each runway, measured through isPaved the way the game sees it
-const PUB={'03L':9910,'03R':10012};
+const PUB={'03L':10000,'03R':9912};   // FAA 5010 (runways 2: the lengths were swapped)
 let bad=0;
 for(const r of a.LUKE_RWY){
   let minU=1e9,maxU=-1e9;
@@ -36,6 +36,10 @@ for(const r of a.LUKE_RWY){
 }
 const sep=Math.abs(a.LUKE_RWY[1].v-a.LUKE_RWY[0].v);
 console.log('runway separation       ', sep.toFixed(0),'m =',(sep*3.28084).toFixed(0),'ft   published about 1,000 ft');
+// runways 2: staggered, 03R's pavement starts 838 m further northeast than 03L's (OSM)
+const stag=(a.LUKE_RWY[1].u0-a.LUKE_RWY[1].len/2)-(a.LUKE_RWY[0].u0-a.LUKE_RWY[0].len/2);
+console.log('03R starts past 03L by  ', stag.toFixed(0),'m   OSM 838');
+if(Math.abs(stag-838)>30)bad++;
 if(err>60)bad++;
 console.log(bad?('FAIL '+bad+' runway(s) off by more than 60 ft'):'luke OK');
 process.exit(bad?1:0);

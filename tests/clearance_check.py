@@ -32,7 +32,7 @@ MEASURE = r"""
   // the paved layer over the terrain mesh here: one ray down, the aircraft and the decals left out
   const {scene}=k.R3(),rc=new T.Raycaster(new T.Vector3(g.position.x,g.position.y+60,g.position.z),new T.Vector3(0,-1,0),0,200);
   const cand=[];scene.traverse(o=>{if(!o.isMesh||!o.visible)return;let p=o;while(p){if(p===g)return;p=p.parent;}
-    const m=o.material;if(!m||m.depthWrite===false||m.transparent)return;cand.push(o);});
+    const m=o.material;if(!m||((m.depthWrite===false||m.transparent)&&!/^(runway$|taxiways|aprons)/.test(o.name)))return;cand.push(o);});   // runways 3: the pavement writes no depth (the paint lies on it by draw order), but it is the surface
   const hits=rc.intersectObjects(cand,false);
   const tm=k.terrainMeshH(g.position.x,g.position.z);
   let lay=0;for(const h of hits){const d=h.point.y-tm;if(d>-0.01&&d<0.3){lay=d;break;}}
@@ -191,7 +191,7 @@ async def main():
             for(let i=0;i<P.count;i++){v.fromBufferAttribute(P,i).applyMatrix4(o.matrixWorld);const h=v.y-k.terrainMeshH(v.x,v.z);if(h<lo)lo=h;}});
             // less the apron paint under it (one ray down, the parked aircraft left out)
             const {scene}=k.R3(),rc=new T.Raycaster(new T.Vector3(g.position.x,60,g.position.z),new T.Vector3(0,-1,0),0,200),cand=[];
-            scene.traverse(o=>{if(!o.isMesh||!o.visible)return;for(let p=o;p;p=p.parent)if(k.PARKED().includes(p))return;const m=o.material;if(!m||m.depthWrite===false||m.transparent)return;cand.push(o);});
+            scene.traverse(o=>{if(!o.isMesh||!o.visible)return;for(let p=o;p;p=p.parent)if(k.PARKED().includes(p))return;const m=o.material;if(!m||((m.depthWrite===false||m.transparent)&&!/^(runway$|taxiways|aprons)/.test(o.name)))return;cand.push(o);});   // runways 3: the pavement writes no depth (the paint lies on it by draw order), but it is the surface
             const tm=k.terrainMeshH(g.position.x,g.position.z);let lay=0;for(const h of rc.intersectObjects(cand,false)){const d=h.point.y-tm;if(d>-0.01&&d<0.3){lay=d;break;}}
             out.push(+(lo-lay).toFixed(3));}return out;}""")
         print('  parked lowest points', pk)
