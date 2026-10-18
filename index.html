@@ -10639,6 +10639,10 @@ function farWarm(f,M){for(const m of f.ms)m.layers.mask=1;
   const v=M?[M.full.visible,M.lod.visible,M.gear?M.gear.visible:false]:null;if(M){M.full.visible=M.lod.visible=true;if(M.gear)M.gear.visible=true;}
   try{warmObj(f.g);}finally{for(const m of f.ms)m.layers.mask=f.off?0:1;if(M){M.full.visible=v[0];M.lod.visible=v[1];if(M.gear)M.gear.visible=v[2];}}}
 FAR.forEach(f=>WARM_STEPS.push(()=>farWarm(f)));
+// runways item 9: the airdrop's parachute is a double sided plain Lambert, hidden until the load is away, and nothing
+// else drawn at boot shares its program any more (the old hard coded airport parts did), so it linked at the drop, in
+// flight. One pallet warmed with the models (the chute and its line shown for the draw), then thrown away.
+WARM_STEPS.push(()=>{const p=makePallet();p.chute.visible=p.line.visible=true;try{warmObj(p.g);}finally{scene.remove(p.g);p.g.traverse(o=>{if(o.geometry)o.geometry.dispose();});}});
 // device pixels per metre of size, per metre of distance, in the current view
 function farK(){return Math.max(1,glcH)*renderer.getPixelRatio()/(2*Math.tan(camera.fov*Math.PI/360));}
 function farUpdate(){
@@ -24379,7 +24383,7 @@ function tick(t,skipRender){
 // it switched off, so nothing is fetched and no request can fail in their console.
 var LB=null;
 LB=(function(){
-const APP_VER='2026-10-17-stepstall';          // keep version.json in step when shipping
+const APP_VER='2026-10-18-runways';          // keep version.json in step when shipping
   const ORIGINS=['https://rabahharchaoui-design.github.io','http://localhost:8765'];
   let over='';try{over=localStorage.getItem('kgeuLBUrl')||'';}catch(e){}
   const E={url:over||'https://pfs-scores.rabahharchaoui.workers.dev',enabled:!!over||ORIGINS.includes(location.origin),online:null,
