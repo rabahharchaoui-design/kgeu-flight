@@ -3014,6 +3014,17 @@ const BASES=!REGION.az?{[REGION.id]:{id:REGION.id,name:REGION.base,rwy:REGION.ma
         ramp:[()=>shX(1250,60),()=>shZ(1250,60)],rampHdg:0,
         fin:d=>[shX(-1142.5-d,361),shZ(-1142.5-d,361)]}
 };
+// runways item 8: the ramp start by aircraft class. RAMP[code] (aptRamp, made with the airport): gate (an airline gate,
+// nose in to the terminal, on the taxiway graph), near (the neighbouring gates the AI airliners get) and apron (a stand
+// away from the gates for every other type). Glendale's tie downs and Luke's flight line are fixed (RAMP_FIX: OSM has no
+// stands there). BASES[b].ramp and rampHdg read rampStand for the type flying (the tables' spots until RAMP is made).
+const RAMP={},AIRLINE_T={b737:1,a320:1,b747:1};
+const RAMP_FIX=REGION.az?{kgeu:{x:wX(1300,-160),z:wZ(1300,-160),h:116,kind:'tie'},luke:{x:lkX(-300,430),z:lkZ(-300,430),h:312.6,kind:'line'}}:{};
+const baseCode=b=>b==='kgeu'?'KGEU':b==='luke'?'KLUF':b==='phx'?'KPHX':REGION.icao;
+function rampStand(b,t){if(RAMP_FIX[b])return RAMP_FIX[b];const R=RAMP[baseCode(b)];if(!R)return null;return AIRLINE_T[t]?(R.gate||R.apron):(R.apron||R.gate);}
+for(const b in BASES){const B=BASES[b],r0=B.ramp,h0=B.rampHdg;
+  B.ramp=[()=>{const S=rampStand(b,AC.id);return S?S.x:r0[0]();},()=>{const S=rampStand(b,AC.id);return S?S.z:r0[1]();}];
+  Object.defineProperty(B,'rampHdg',{get:()=>{const S=rampStand(b,AC.id);return S?S.h:h0;},enumerable:true,configurable:true});}
 // the longest runway of a base, metres: the long runway rule for the airliners (TYPES.minRwy)
 const BASE_RWY={kgeu:RWY_LEN,luke:3048,phx:3502};   // Luke 03L/21R, Sky Harbor 8/26
 function rwyLenOf(b){if(BASE_RWY[b])return BASE_RWY[b];const R=REGIONS[b];if(R&&R.rw){const r=R.rw.find(r=>r[0]===R.main||r[1]===R.main);return r?r[2]:1e9;}return 1e9;}
@@ -3330,7 +3341,9 @@ function step(st,dt,ev){
       if(st.airTime>2&&ev) ev.push({type:'touchdown',fpm:Math.round(sink*196.85),paved:paved,x:st.pos.x,z:st.pos.z,ias:st.ias,bank:_e.z,wdir:st.windDir,wkt:st.windKt});
       st.onGround=true; st.airTime=0;
     }
-    if(!paved&&spd>16){crash(st,'Ran off the pavement at speed.');return;}
+    // runways item 8: off the pavement at 30 kt or more is still a crash; under it, rough ground (below)
+    if(!paved&&spd>=15.4){crash(st,'Ran off the pavement at speed.');return;}
+    st.rough=!paved;
     st.pos.y=gh+GEAR; if(st.vel.y<0) st.vel.y=0;
     _e.z=0; let p=_e.x;
     if(p<0){p=0;if(st.w.x<0)st.w.x=0;}
@@ -3350,11 +3363,17 @@ function step(st,dt,ev){
     st.w.y+=(target-st.w.y)*Math.min(1,dt*8);
     // a wet runway (st.wet, wxFly): less lateral grip (a crosswind landing drifts), braking 0.3 g (Easy 0.4), water drag
     const wet=st.wet&&paved, latx=st.vel.x-_hf.x*along, latz=st.vel.z-_hf.z*along, k=1-Math.exp(-(wet?7:12)*dt);
+    // runways item 8: sliding sideways at 30 kt or more (more than 63 degrees off the nose: no crabbed touchdown gets there)
+    // is no taxi: the gear gives way, as rolling off the pavement at that speed would
+    {const lt=Math.hypot(latx,latz);if(lt>=15.4&&lt>2*Math.abs(along)){crash(st,'Skidded sideways at speed. The gear gave way.');return;}}
     st.vel.x-=latx*k; st.vel.z-=latz*k;
     const nf=clamp(1-liftY/mg,0,1);
     const dec=((paved?0.02:0.08)+(wet?0.03:0)+(st.brake?(wet?(st.easy?0.4:0.3):0.55):0))*AC.g*nf*dt;
     const na=Math.max(0,Math.abs(along)-dec)*Math.sign(along);
     st.vel.x+=_hf.x*(na-along); st.vel.z+=_hf.z*(na-along);
+    // rough ground: 3.2 m/s2 more drag above a walking pace, whatever the power (it can only creep, at 3 m/s at most), and
+    // the ordinary unpaved rolling drag below it, so it comes to a stop (roughTick: the bumps, and stuck once stopped)
+    if(!paved){const h1=Math.hypot(st.vel.x,st.vel.z);if(h1>3){const k=Math.max(3,h1-(3.2+st.power*Tav/AC.mass)*dt)/h1;st.vel.x*=k;st.vel.z*=k;}}
   } else if(st.pos.y-GEAR>gh+0.05){
     if(st.onGround&&ev&&st.ias>18) ev.push({type:'liftoff'});
     st.onGround=false; st.airTime+=dt;
@@ -8358,9 +8377,17 @@ function terrainColor(h,x,z){
 }
 // open water by the sea (REGION.sea): one shiny plane a little under the runway's height that follows
 // the terrain; the water cells of the mesh drop 1.5 m below it, so it shows there and nowhere else
-const waterPlane=REGION.sea?(function(){const g=new THREE.PlaneGeometry(T_SIZE,T_SIZE);g.rotateX(-Math.PI/2);
+// runways item 8: a log polar disc that follows the camera (radii 8 m doubling to 65 km, 32 spokes, 900 triangles),
+// not one 90 km plane of two triangles: across a triangle spanning 17 m to 64 km the log depth lands 1 to 2 m off near
+// the camera, and the sea showed through the apron of Haneda's reclaimed land from some headings. Each triangle of the
+// disc spans a factor two in distance and its depth stays true to the centimetre.
+const waterPlane=REGION.sea?(function(){const S=32,R=[],P=[0,0,0],I=[];for(let r=8;r<=70000;r*=2)R.push(r);
+  for(const r of R)for(let i=0;i<S;i++){const a=i/S*2*Math.PI;P.push(Math.cos(a)*r,0,Math.sin(a)*r);}
+  for(let i=0;i<S;i++)I.push(0,1+(i+1)%S,1+i);
+  for(let k=1;k<R.length;k++)for(let i=0;i<S;i++){const a=1+(k-1)*S+i,b=1+(k-1)*S+(i+1)%S,c=1+k*S+i,d=1+k*S+(i+1)%S;I.push(a,b,d,a,d,c);}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));g.setIndex(I);g.computeVertexNormals();
   const m=new THREE.Mesh(g,new THREE.MeshPhongMaterial({color:0x1d4a66,specular:0x8fa3b5,shininess:70,transparent:true,opacity:0.86}));
-  m.position.y=-0.4;m.name='water';m.userData.heat=0.05;m.userData.irVar=0;scene.add(m);return m;})():null;
+  m.position.y=-0.4;m.name='water';m.frustumCulled=false;m.userData.heat=0.05;m.userData.irVar=0;scene.add(m);return m;})():null;
 // write the rings whose lattice snapped (a ring's hole is the ring inside it, so that one too); TLS.all (tlReset, the
 // time of day) rewrites all three. x,z: the camera.
 function rebuildTerrain(x,z){
@@ -10969,6 +10996,8 @@ function tfcDrive(o,dt){
     for(const q of TFC.list){if(q===o||!q.onGround||q.state==='parked')continue;if(q.waitOn===o.id&&o.id<q.id)continue;
       const d=tfcAlong(P,o,q.pos.x,q.pos.z,120);if(d!==null){v=Math.min(v,Math.sqrt(3*Math.max(0,d-50)));if(d<70)wait=q.id;}}
     if(running&&!st.crashed&&(st.onGround||st.agl<15)){const d=tfcAlong(P,o,st.pos.x,st.pos.z,150);if(d!==null)v=Math.min(v,Math.sqrt(3*Math.max(0,d-60)));}}
+  // runways item 8: never into 60 m of the player on the apron or a taxiway (on a runway the tower keeps them off)
+  if(running&&!st.crashed&&st.onGround){const G=tfcGraph(o.plan);if(G&&!G.inStrip(st.pos.x,st.pos.z)){const d=tfcNear(P,o,st.pos.x,st.pos.z,60,140);if(d!==null)v=Math.min(v,Math.sqrt(3*Math.max(0,d-4)));}}
   o.waitOn=wait;
   if(wait!==null&&o.gs<0.3){o.stuck=(o.stuck||0)+dt;if(o.stuck>60){o.ign=20;o.stuck=0;}}else o.stuck=0;
   if(o.ign>0)o.ign-=dt;
@@ -11013,7 +11042,7 @@ function tfcOut(o){
     let len=0;for(let i=1;i<R.length;i++)len+=Math.hypot(G.N[R[i]].x-G.N[R[i-1]].x,G.N[R[i]].z-G.N[R[i-1]].z);
     if(!best||len<best.len)best={E:E,R:R,goals:goals,len:len};}
   if(!best){o.why='noroute:'+E0.num;return false;}
-  const {E,R,goals}=best;
+  const {E,R,goals}=best;o.R=R;
   o.why='ok:'+E.num;o.E=E;o.en=goals.find(q=>q.h===R[R.length-1]);o.pa=tfcPath(G,[{x:o.pos.x,z:o.pos.z}].concat(R.map(i=>G.N[i])));o.pi=0;o.ps=0;return true;}
 // from the hold short onto the runway: the entrance's own strip path, then 40 m along the centre line
 function tfcLineupPath(o){const G=tfcGraph(o.plan),en=o.en,E=o.E,pts=en.lp.map(i=>G.N[i]),n=G.N[en.rn];
@@ -11030,10 +11059,11 @@ function tfcGoAround(o){o.state='goaround';o.ga=(o.ga||0)+1;o.clr=false;o.orb=0;
 const TWR_AL={Cactus:'cactus',Sonoran:'sonoran',Pacific:'pacific',Sakura:'sakura',Lutece:'lutece',Tricolore:'tricolore',Guanabara:'guanabara',Sugarloaf:'sugarloaf',Bolt:'bolt',Cessna:'cessna'};
 const TWR_SAY={t:-99,n:0,log:[]};
 function twrName(r){if(!REGION.az)return BASES[BASE0].twr;return (r.code==='KPHX'?BASES.phx:r.code==='KLUF'?BASES.luke:BASES.kgeu).twr;}
+function gndName(r){if(!REGION.az)return BASES[BASE0].gnd;return (r.code==='KPHX'?BASES.phx:r.code==='KLUF'?BASES.luke:BASES.kgeu).gnd;}
 function twrSay(o,kind){
   const E=o.E;if(!o.cs||!E)return;
   const ok=running&&TFC.shown&&!DF_QUIET&&!st.crashed&&radioLive()&&st.time-TWR_SAY.t>=12&&!VQ.cur&&!radioQ.length
-    &&!!(st.mode==='runway'?A.tko:st.mode==='ramp'?A.taxi:st.mode==='final'?A.land:1)&&Math.hypot(E.rwy.x-st.pos.x,E.rwy.z-st.pos.z)<25000;
+    &&!!(st.mode==='runway'?A.tko:st.mode==='ramp'?A.taxi||(kind==='push'&&(A.pbAsk||PB.done)):st.mode==='final'?A.land:1)&&Math.hypot(E.rwy.x-st.pos.x,E.rwy.z-st.pos.z)<25000;
   TWR_SAY.log.push({t:+st.time.toFixed(1),cs:o.cs,kind:kind,rwy:E.num,said:ok});if(TWR_SAY.log.length>80)TWR_SAY.log.shift();
   if(!ok)return;TWR_SAY.t=st.time;TWR_SAY.n++;
   const sp=o.cs.split(' '),al=TWR_AL[sp[0]]||'cessna',dg=(sp[1]||'').split(''),n=E.num,rc=n.toLowerCase();
@@ -11042,9 +11072,10 @@ function twrSay(o,kind){
     land:[`${o.cs}, runway ${n}, cleared to land.`,['t_rwy_'+rc,'t_cleared_land'],`Cleared to land ${n}, ${o.cs}.`,['p_rb_cleared_land','p_rwy_'+rc]],
     goaround:[`${o.cs}, go around, I say again, go around.`,['t_go_around'],`Going around, ${o.cs}.`,['p_rb_going_around']],
     holdshort:[`${o.cs}, hold short, traffic on short final.`,['t_hold_short_tfc'],`Holding short, ${o.cs}.`,['p_rb_holding_short']],
-    orbit:[`${o.cs}, make a left three sixty for spacing.`,['t_left_360'],`Left three sixty, ${o.cs}.`,['p_rb_left_360']]}[kind];
+    orbit:[`${o.cs}, make a left three sixty for spacing.`,['t_left_360'],`Left three sixty, ${o.cs}.`,['p_rb_left_360']],
+    push:[`${o.cs}, pushback approved.`,['t_pushback_ok'],`Pushing back, ${o.cs}.`,['p_rb_pushback']]}[kind];
   if(!W)return;
-  const l1=L(twrName(E.rwy),'tower',W[0],['t_al_'+al].concat(dg.map(d=>'t_n_'+d),W[1]));l1.amb=true;
+  const l1=L(kind==='push'?gndName(E.rwy):twrName(E.rwy),'tower',W[0],['t_al_'+al].concat(dg.map(d=>'t_n_'+d),W[1]));l1.amb=true;
   const l2=L(o.cs,o.type==='airliner'?'heavy':o.type==='f16'?'fighter':'ga',W[2],W[3].concat(['p_al_'+al],dg.map(d=>'p_n_'+d)));l2.amb=true;
   const p1=vqAdd(l1,{pri:3,ttl:6});vqAdd(l2,{pri:3,ttl:12,dep:p1});}
 // the fleet: fictional airlines only, two per airport, the livery from the pool model (its palette); AI F-16s are Bolt
@@ -11057,6 +11088,7 @@ function tfcCs(plan,M){const r=Math.random();
   return '';}
 function tfcHeliTgt(o){const R=o.plan.roam;let c=R.filter(p=>tfcOK(p[0],p[1])&&Math.hypot(p[0]-o.pos.x,p[1]-o.pos.z)>1500);if(!c.length)c=R;o.tgt=c[Math.floor(Math.random()*c.length)];}
 function tfcStep(o,dt){
+  if(o.state==='push'||o.state==='pushed'){tfcPushStep(o,dt);return;}   // runways item 8
   const T=o.T,E=o.E,P=o.plan,gh=groundHeight(o.pos.x,o.pos.z)+(P.surf||0);
   let hT=o.hdg,vT=o.gs,altT=null,ff=0,vsT=null,rate=null,dec=0,a=0,b=0;
   if(E){const p=tfcAB(E,o.pos.x,o.pos.z);a=p.a;b=p.b;}
@@ -11133,7 +11165,8 @@ function tfcStep(o,dt){
     case 'parked':
       vT=0;hT=(o.spot&&o.spot[2]!=null?o.spot[2]:P.park.hdg)*TFC_D2R;o.timer-=dt;
       if(o.timer<=0&&Math.abs(wrapPi(o.hdg-hT))<0.1){
-        if(tfcGraph(P)){if(tfcOut(o)){tfcFree(o);o.spot=null;o.state='taxi_out';}else o.timer=20;}   // no way out now (the player on the runway): later
+        if(tfcGraph(P)&&o.spot&&o.spot[3]&&o.spot[3].gate){if(!tfcPushGo(o))o.timer=5;}   // runways item 8: a gate stand pushes back first
+        else if(tfcGraph(P)){if(tfcOut(o)){tfcFree(o);o.spot=null;o.state='taxi_out';}else o.timer=20;}   // no way out now (the player on the runway): later
         else{const sp=o.spot||[o.pos.x,o.pos.z];o.E=P.pick?P.pick('dep'):tfcWind(P.depEnds||P.ends);o.wp=tfcRouteOut(o,sp);o.wi=0;tfcFree(o);o.spot=null;o.state='taxi_out';}}
       break;
     case 'taxi_out':
@@ -11244,7 +11277,7 @@ function tfcSpawnPlan(plan,opts,mid){
   const E=plan.ends.length?(opts.end!=null?plan.ends[opts.end]:tfcPick(plan,'land')):null;
   const fe=E?groundHeight(E.x,E.z)+(plan.surf||0):0,at=(x,z,y)=>({pos:new V3(x,0,z),alt:y});
   if(plan.type==='airliner'){
-    let s0=opts.state||(mid&&Math.random()<0.35?'parked':'final');const si=tfcSpot(plan);
+    let s0=opts.state||(mid&&Math.random()<0.35?'parked':'final');const si=opts.spot!=null?(plan.park.taken[opts.spot]?-1:opts.spot):tfcSpot(plan);
     if(s0==='final'){
       let D=opts.dist||(mid?tfcRnd(6000,plan.fin):plan.fin),q=null;const Dmin=Math.min(5000,D);
       for(;D>=Dmin;D-=1000){const p=tfcP(E,-D,0);if(ok(p[0],p[1])){q=p;break;}}
@@ -11315,7 +11348,7 @@ TFC.update=function(dt){
   if(on!==TFC.shown){TFC.shown=on;for(const o of TFC.list)o.m.g.visible=on;}
   if(!on||!(dt>0))return;
   const t0=performance.now();
-  if(TFC.need){TFC.need=false;if(TFC.auto)tfcPopulate();}
+  if(TFC.need){TFC.need=false;if(TFC.auto){tfcRampSeed();tfcPopulate();}tfcRampClear();}   // runways item 8: the ramp start's neighbours, its stand clear
   TFC.frame++;
   if(TFC.auto&&(TFC.chk-=dt)<=0){TFC.chk=1;tfcSchedule();}
   const px=st.pos.x,pz=st.pos.z;
@@ -11340,6 +11373,203 @@ function tfcList(){return TFC.list.map(o=>({id:o.id,type:o.type,state:o.state,x:
   onGround:o.onGround,callName:o.callName,cs:o.cs,tk:o.tk?o.tk.num:null,kind:o.kind,agl:o.agl,end:o.E?o.E.rwy.code+' '+o.E.num:null,tdA:o.tdA==null?null:o.tdA,ga:o.ga||0,
   why:o.why||null,whyV:o.whyV||null,timer:+o.timer.toFixed(0),ps:o.pa?+o.ps.toFixed(0):null,L:o.pa?+o.pa.L.toFixed(0):null,waitOn:o.waitOn==null?null:o.waitOn,spotH:o.spot&&o.spot[2]!=null?+o.spot[2].toFixed(0):(o.plan.park?o.plan.park.hdg:null),holdT:o.holdT==null?null:+o.holdT.toFixed(0),
   lights:o.m.lights?o.m.lights.count:0,visible:o.m.g.visible,lod:o.m.lodOn}));}
+// ---------- runways item 8: ramp starts at a real stand, the pushback, the taxi route ----------
+// PR: this flight's ramp start (rampStand's stand, its taxiway graph node, an airline gate or not, the route the ground
+// gave). PB (window.__kgeu.PB): the pushback at an airline gate. A tug at the nose pushes the aircraft straight back
+// along its lead-in line to where that line meets a taxilane or taxiway (pbFoot) and round onto it tail first, so it
+// ends facing along it the way the route to the runway goes (pbPlan: a polyline every 0.5 m, flown kinematically, the
+// throttle held at 0 and the controls ignored, about half a minute), then the tug drives back to the gate and Ground
+// gives the taxi clearance. TXR: Easy's dashed line along that route on the pavement (and on the minimap). TUG: the
+// two tugs (the player's, an AI airliner's), one instanced box in the apron vehicles' material.
+const PR={on:false,code:'',x:0,z:0,h:0,n:-1,gate:false,route:null},
+  PB={on:false,ph:'',t:0,s:0,v:0,plan:null,line:null,done:false,clrT:0,tx:0,tz:0,th:0},TUG={m:null,ai:null,aiT:0,ax:0,az:0,ah:0,gx:0,gz:0},TXR={mesh:null,pts:null,goal:null,mat:null,tris:0};
+const NATO={a:'alpha',b:'bravo',c:'charlie',d:'delta',e:'echo',f:'foxtrot',g:'golf',h:'hotel',i:'india',j:'juliett',k:'kilo',l:'lima',m:'mike',n:'november',
+  o:'oscar',p:'papa',q:'quebec',r:'romeo',s:'sierra',t:'tango',u:'uniform',v:'victor',w:'whiskey',x:'xray',y:'yankee',z:'zulu'};
+// the first taxilane or taxiway centre line straight behind a stand (x,z, nose heading h rad) within 200 m, on pavement
+function pbFoot(G,x,z,h){
+  const bx=-Math.sin(h),bz=Math.cos(h);let best=null;
+  for(const e of G.E){if(e.k>=2||e.rs)continue;const A=G.N[e.a],B=G.N[e.b];if(segD(x,z,A.x,A.z,B.x,B.z)>200)continue;
+    const ex=B.x-A.x,ez=B.z-A.z,den=bx*ez-bz*ex;if(Math.abs(den)<1e-6)continue;
+    const qx=A.x-x,qz=A.z-z,s=(qx*ez-qz*ex)/den,t=(qx*bz-qz*bx)/den;
+    if(s<6||s>200||t<0||t>1)continue;if(!best||s<best.s)best={s:s,e:e,x:x+bx*s,z:z+bz*s};}
+  if(!best)return null;
+  for(let d=4;d<best.s;d+=4)if(!isPaved(x+bx*d,z+bz*d))return null;
+  return best;}
+// the push: straight back (at most 40 m), then an arc of radius r that leaves the tail pointing away from T (the route
+// a little way on), so the nose faces along the line toward it. flip: the other way round. pts {x,z,h (nose, rad)} every
+// 0.5 m; ahead: the graph node the aircraft then taxis to; face: the ground's word for the final heading.
+function pbPlan(G,x,z,h,T,r,flip){
+  const bx=-Math.sin(h),bz=Math.cos(h),F=pbFoot(G,x,z,h),hd=(vx,vz)=>Math.atan2(vx,-vz);
+  let Ls=30,ph=Math.PI/2,sg=1,ahead=-1;
+  if(F){const A=G.N[F.e.a],B=G.N[F.e.b],l=Math.hypot(B.x-A.x,B.z-A.z)||1;let dx=(B.x-A.x)/l,dz=(B.z-A.z)/l;ahead=F.e.b;
+    if(T&&(T.x-F.x)*dx+(T.z-F.z)*dz<0){dx=-dx;dz=-dz;ahead=F.e.a;}
+    const a=wrapPi(hd(-dx,-dz)-hd(bx,bz));ph=Math.abs(a);sg=Math.sign(a)||1;
+    if(ph<0.35)ph=0;else if(ph>2.4)ph=Math.PI/2;
+    Ls=F.s-r*Math.tan(ph/2);if(ph>0&&Ls<4){r=Math.max(8,(F.s-4)/Math.tan(ph/2));Ls=Math.max(0,F.s-r*Math.tan(ph/2));}
+    if(ph===0)Ls=Math.min(F.s,30);}
+  else if(T){const cx=(T.x-x)*bz-(T.z-z)*bx;sg=cx>0?-1:1;}
+  if(flip)sg=-sg;Ls=Math.min(Ls,40);
+  const pts=[{x:x,z:z,h:h}],ds=0.5;let px=x,pz=z,ps=hd(bx,bz);
+  for(let d=ds;d<=Ls+1e-6;d+=ds){px=x+bx*d;pz=z+bz*d;pts.push({x:px,z:pz,h:h});}
+  const arc=r*ph;for(let d=ds;d<=arc+1e-6;d+=ds){ps+=sg*ds/r;px+=Math.sin(ps)*ds;pz-=Math.cos(ps)*ds;pts.push({x:px,z:pz,h:ps+Math.PI});}
+  const L=(pts.length-1)*ds,end=pts[pts.length-1],fh=((end.h*180/Math.PI)%360+360)%360;
+  if(ahead<0){let bd=1e9;const fx=Math.sin(end.h),fz=-Math.cos(end.h);
+    G.N.forEach((n,i)=>{if(!n.e.some(ei=>G.E[ei].k<2))return;const ex=n.x-end.x,ez=n.z-end.z,d=Math.hypot(ex,ez);if(d<bd&&ex*fx+ez*fz>-5){bd=d;ahead=i;}});}
+  return {pts:pts,L:L,ok:pts.every(p=>isPaved(p.x,p.z)),face:['north','east','south','west'][Math.round(fh/90)%4],ahead:ahead,foot:!!F};}
+function pbAt(pl,s){const n=pl.pts.length,f=s/0.5,i=Math.min(n-2,Math.max(0,Math.floor(f))),t=clamp(f-i,0,1),a=pl.pts[i],b=pl.pts[i+1]||a;
+  return {x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t,h:a.h+wrapPi(b.h-a.h)*t};}
+// a point D metres along a route (graph node list)
+function tfcAlongPt(G,R,D){let s=0;for(let i=1;i<R.length;i++){const a=G.N[R[i-1]],b=G.N[R[i]],l=Math.hypot(b.x-a.x,b.z-a.z);
+  if(s+l>=D){const f=(D-s)/(l||1);return {x:a.x+(b.x-a.x)*f,z:a.z+(b.z-a.z)*f};}s+=l;}const e=G.N[R[R.length-1]];return {x:e.x,z:e.z};}
+// the holds of the base's runway end (the entrances that leave most of the runway ahead, as tfcOut picks them), and the
+// route there from a graph node
+function prGoals(G){const B=BASES[st.base]||BASES[BASE0],rn=s=>String(s).replace(/^0+/,'');
+  const E=RWY_ENDS.find(e=>e.rwy.code===PR.code&&rn(e.num)===rn(B.rwy))||RWY_ENDS.find(e=>e.rwy.code===PR.code);if(!E)return null;
+  const ent=G.ent.get(E.rwy)||[],L=tfcLen(E);let goals=[];
+  for(const f of [0.7,0.5,0]){goals=ent.filter(en=>{const n=G.N[en.rn],A=tfcAB(E,n.x,n.z).a,l=Math.hypot(en.dx,en.dz)||1;
+    return A>=-E.thr-5&&L-A>=f*L&&(en.dx*E.dx+en.dz*E.dz)/l>-0.34;});if(goals.length)break;}
+  return goals.length?{E:E,goals:[...new Set(goals.map(en=>en.h))]}:null;}
+function prRoute(from){const G=TWG[PR.code];if(!G||from==null||from<0)return null;const g=prGoals(G);if(!g)return null;
+  const R=twgRoute(G,from,g.goals,{});return R?{R:R,E:g.E,G:G}:null;}
+// the taxiway names along a route, in order (no stubs, no runways), at most five
+function prRefs(G,R){const out=[];
+  for(let i=0;i+1<R.length;i++){const a=R[i],b=R[i+1];let ref='';
+    for(const ei of G.N[a].e){const e=G.E[ei];if((e.a===a&&e.b===b)||(e.a===b&&e.b===a)){if(e.k<2)ref=String(e.ref||'').trim().toUpperCase();break;}}
+    if(ref&&/^[A-Z][A-Z0-9]{0,3}$/.test(ref)&&out[out.length-1]!==ref&&out.length<5)out.push(ref);}
+  return out;}
+const refClips=ref=>ref.split('').map(c=>/\d/.test(c)?'t_n_'+c:NATO[c.toLowerCase()]?'t_ph_'+NATO[c.toLowerCase()]:null).filter(Boolean);
+// a new flight: the ramp start's stand claimed (no AI parks within 70 m), the pushback and route reset
+function rampStart(mode){
+  for(const P of TFC.plans)if(P.park)P.park.taken.forEach((q,i)=>{if(q==='P')P.park.taken[i]=null;});
+  Object.assign(PB,{on:false,ph:'',t:0,s:0,v:0,plan:null,line:null,done:false,clrT:0});TUG.ai=null;tugSet(0,null);tugSet(1,null);txrClear();pbAskOff();
+  PR.on=false;PR.route=null;PR.n=-1;if(mode!=='ramp')return;
+  const S=rampStand(st.base,AC.id),code=baseCode(st.base),G=TWG[code];if(!S||!G)return;
+  const n=S.n!=null&&S.n>=0?S.n:twgSpot(G,[S.x,S.z,S.h]);
+  Object.assign(PR,{on:true,code:code,x:S.x,z:S.z,h:S.h,n:n,gate:!!S.gate&&!!AIRLINE_T[AC.id]});
+  for(const P of TFC.plans)if(P.park)P.park.spots.forEach((sp,i)=>{if(!P.park.taken[i]&&Math.hypot(sp[0]-S.x,sp[1]-S.z)<70)P.park.taken[i]='P';});
+  tugMake();}
+// a busy airport's ramp start at a gate: AI airliners at two neighbouring gates, the farther one pushing back in the
+// first minute or so (tfcRampSeed, with the first population); none on the ground within 40 m of the player
+function tfcRampSpots(){
+  for(const P of TFC.plans){if(P.type!=='airliner'||!P.park||P.rampSp)continue;const R=RAMP[P.apt];if(!R)continue;P.rampSp=[];
+    for(const s of R.near){P.park.spots.push([s.x,s.z,s.h,{gate:true}]);P.park.taken.push(null);P.rampSp.push(P.park.spots.length-1);}P.park.ok=null;}}
+function tfcRampSeed(){
+  if(!PR.on||!PR.gate)return;const P=TFC.plans.find(p=>p.type==='airliner'&&p.apt===PR.code&&p.rampSp&&p.rampSp.length);if(!P)return;
+  const d=i=>Math.hypot(P.park.spots[i][0]-PR.x,P.park.spots[i][1]-PR.z);
+  P.rampSp.filter(i=>!P.park.taken[i]).sort((a,b)=>d(b)-d(a)).slice(0,2).forEach((i,k)=>
+    tfcSpawnPlan(P,{state:'parked',spot:i,wait:k?900+Math.random()*300:35+Math.random()*40,force:true},false));}
+function tfcRampClear(){if(!PR.on)return;for(let i=TFC.list.length-1;i>=0;i--){const o=TFC.list[i];if(o.onGround&&Math.hypot(o.pos.x-st.pos.x,o.pos.z-st.pos.z)<40)tfcDrop(o);}}
+// how far ahead along o's taxi path (within max m) it would come within R m of x,z (no closer than it is now): null if not
+function tfcNear(P,o,x,z,R,max){const d0=Math.hypot(o.pos.x-x,o.pos.z-z),lim=Math.min(R,d0-1);if(lim<=0)return null;let j=Math.min(o.pi,P.n-2);
+  for(let s=o.ps+5;s<=Math.min(P.L,o.ps+max);s+=5){while(j<P.n-2&&P.c[j+1]<s)j++;const l=P.c[j+1]-P.c[j],f=l>1e-6?clamp((s-P.c[j])/l,0,1):0;
+    if(Math.hypot(P.x[j]+(P.x[j+1]-P.x[j])*f-x,P.z[j]+(P.z[j+1]-P.z[j])*f-z)<lim)return s-o.ps;}
+  return null;}
+// the player on the ground within R m of a push path's points from i0 on
+function tfcPlayerNear(pts,i0,R){if(!running||st.crashed||!st.onGround)return false;
+  for(let i=i0;i<pts.length;i+=4)if(Math.hypot(pts[i].x-st.pos.x,pts[i].z-st.pos.z)<R)return true;return false;}
+// an AI airliner at a gate stand: its route out (tfcOut), then a pushback onto the taxilane before it taxis
+function tfcPushGo(o){
+  if(TUG.ai&&TUG.ai!==o)return false;if(!tfcOut(o))return false;
+  const G=tfcGraph(o.plan),pl=pbPlan(G,o.pos.x,o.pos.z,o.hdg,tfcAlongPt(G,o.R,150),22,0);
+  if(!pl.ok){tfcFree(o);o.spot=null;o.state='taxi_out';return true;}   // no room to push: it taxis out as before
+  if(tfcPlayerNear(pl.pts,0,60))return false;   // never pushes into 60 m of the player: it waits
+  o.pb=pl;o.pbS=0;o.pbV=0;o.state='push';TUG.ai=o;twrSay(o,'push');return true;}
+function tfcPushStep(o,dt){
+  if(o.state==='pushed'){o.timer-=dt;o.gs=0;if(o.timer<=0)o.state='taxi_out';return;}
+  const pl=o.pb,rem=pl.L-o.pbS,hold=tfcPlayerNear(pl.pts,Math.floor(o.pbS/0.5),60);
+  const vt=hold?0:Math.min(2.5,Math.sqrt(1.4*Math.max(0,rem)));o.pbV+=clamp(vt-o.pbV,-1.2*dt,0.6*dt);if(!hold&&o.pbV<0.15)o.pbV=0.15;
+  o.pbS=Math.min(pl.L,o.pbS+o.pbV*dt);
+  const p=pbAt(pl,o.pbS);o.pos.x=p.x;o.pos.z=p.z;o.hdg=wrapPi(p.h);o.gs=0;o.vs=0;o.alt=groundHeight(p.x,p.z)+(o.plan.surf||0);o.pos.y=o.alt;o.agl=0;
+  if(pl.L-o.pbS<0.02){const G=tfcGraph(o.plan);let pts=[{x:o.pos.x,z:o.pos.z}];
+    const R2=pl.ahead>=0&&o.en?twgRoute(G,pl.ahead,[o.en.h],{block:tfcBlocked(G)}):null;
+    pts=pts.concat((R2||o.R.slice(1)).map(i=>G.N[i]));
+    o.pa=tfcPath(G,pts);o.pi=0;o.ps=0;tfcFree(o);o.spot=null;o.pb=null;o.state='pushed';o.timer=7;
+    TUG.aiT=9;TUG.gx=pl.pts[0].x;TUG.gz=pl.pts[0].z;}}
+// the tugs: two instances of one box (the apron vehicles' material and colours: no new program)
+const _tgM=new THREE.Matrix4(),_tgQ=new Q4(),_tgS=new V3(1,1,1),_tgP=new V3(),_tgF=new V3();
+function tugMake(){if(TUG.m||!APT_MAT)return;const m=new THREE.InstancedMesh(new THREE.BoxGeometry(2.6,1.3,6).translate(0,0.65,0),APT_MAT.veh,2),c=new THREE.Color('#f2c230');
+  m.name='pushTugs';m.frustumCulled=false;m.userData.heat=0.7;m.setColorAt(0,c);m.setColorAt(1,c);scene.add(m);TUG.m=m;tugSet(0,null);tugSet(1,null);}
+function tugSet(i,p){const m=TUG.m;if(!m)return;
+  if(!p)_tgM.makeScale(0,0,0);else{_tgQ.setFromAxisAngle(_yUp,-p.h);_tgP.set(p.x,groundHeight(p.x,p.z)+0.04,p.z);_tgM.compose(_tgP,_tgQ,_tgS);}
+  m.setMatrixAt(i,_tgM);m.instanceMatrix.needsUpdate=true;}
+// every frame: the tugs follow their aircraft's nose, then drive back to the gate; Easy's route line goes at the hold
+function pbFrame(dt,dp,q){
+  if(TUG.m){
+    if(PB.on){_tgF.set(0,0,-1).applyQuaternion(q);const h=Math.atan2(_tgF.x,-_tgF.z),k=AC.len/2+3.6;PB.tx=dp.x+Math.sin(h)*k;PB.tz=dp.z-Math.cos(h)*k;PB.th=h;tugSet(0,{x:PB.tx,z:PB.tz,h:h});}
+    else if(PB.ph==='clear'){PB.clrT+=dt;const dx=PR.x-PB.tx,dz=PR.z-PB.tz,d=Math.hypot(dx,dz);
+      if(PB.clrT>9||d<4){PB.ph='done';tugSet(0,null);}else{const s=Math.min(d,4*dt);PB.tx+=dx/d*s;PB.tz+=dz/d*s;PB.th=Math.atan2(dx,-dz);tugSet(0,{x:PB.tx,z:PB.tz,h:PB.th});}}
+    const o=TUG.ai;
+    if(o){if(TFC.list.indexOf(o)<0||!TFC.shown){TUG.ai=null;tugSet(1,null);}
+      else if(o.state==='push'){const k=20.5*(o.m.ks||1);TUG.ax=o.pos.x+Math.sin(o.hdg)*k;TUG.az=o.pos.z-Math.cos(o.hdg)*k;TUG.ah=o.hdg;tugSet(1,{x:TUG.ax,z:TUG.az,h:o.hdg});}
+      else{TUG.aiT-=dt;const dx=TUG.gx-TUG.ax,dz=TUG.gz-TUG.az,d=Math.hypot(dx,dz);
+        if(TUG.aiT<=0||d<4){TUG.ai=null;tugSet(1,null);}else{const s=Math.min(d,4*dt);TUG.ax+=dx/d*s;TUG.az+=dz/d*s;TUG.ah=Math.atan2(dx,-dz);tugSet(1,{x:TUG.ax,z:TUG.az,h:TUG.ah});}}}}
+  if(TXR.mesh){TXR.mesh.visible=rookie();const g=TXR.goal,r=PR.route&&PR.route.E.rwy;
+    let off=!running||st.crashed||(g&&Math.hypot(st.pos.x-g.x,st.pos.z-g.z)<30)||!!A.tko;
+    if(!off&&r&&st.onGround){const e=r.ends[0],dx=st.pos.x-r.x,dz=st.pos.z-r.z;off=Math.abs(dx*e.dx+dz*e.dz)<r.len/2&&Math.abs(dz*e.dx-dx*e.dz)<r.wid/2+3;}
+    if(off)txrClear();}
+}
+function pbStep(s,dt){const P=PB,pl=P.plan;s.throttle=s.power=0;s.brake=false;s.w.set(0,0,0);s.apW=null;s.vel.set(0,0,0);
+  if(P.ph==="attach"){P.t+=dt;if(P.t>=1.2&&(!P.line||P.line.dead||(P.line.aired&&P.t>=4)||P.t>10))P.ph='push';}
+  else{const rem=pl.L-P.s,vt=Math.min(3,Math.sqrt(1.6*Math.max(0,rem)));P.v+=clamp(vt-P.v,-1.2*dt,0.9*dt);if(P.v<0.15)P.v=0.15;P.s=Math.min(pl.L,P.s+P.v*dt);
+    const p=pbAt(pl,P.s),x0=s.pos.x,z0=s.pos.z;s.pos.set(p.x,groundHeight(p.x,p.z)+GEAR,p.z);s.vel.set((p.x-x0)/dt,0,(p.z-z0)/dt);
+    _pbE.set(0,-p.h,0,'YXZ');s.quat.setFromEuler(_pbE);
+    if(pl.L-P.s<0.02){P.on=false;P.done=true;P.ph='clear';P.clrT=0;s.vel.set(0,0,0);}}
+  s.onGround=true;s.agl=0;s.time+=dt;}
+const _pbE=new THREE.Euler(0,0,0,'YXZ');
+// the push for the player's stand: radius by size, a tighter one, then the other way round, if the first leaves the pavement
+function pbMake(){if(PB.plan)return PB.plan;const G=TWG[PR.code];if(!G||!PR.on)return null;
+  const r=prRoute(PR.n),T=r?tfcAlongPt(G,r.R,150):null,h=PR.h*Math.PI/180,rr=AC.span>50?28:22;
+  for(const [k,fl] of [[1,0],[0.6,0],[1,1],[0.6,1]]){const p=pbPlan(G,PR.x,PR.z,h,T,rr*k,fl);if(p.ok)return PB.plan=p;}
+  return null;}
+// window.__kgeu.pushback and the CALL: true when it starts (a ramp start at an airline gate, at the stand, PB idle)
+function pbStart(line){
+  if(PB.on||PB.done||!PR.on||!PR.gate||st.mode!=='ramp'||!running||st.crashed||!st.onGround)return false;
+  if(Math.hypot(st.vel.x,st.vel.z)>0.5||Math.hypot(st.pos.x-PR.x,st.pos.z-PR.z)>10)return false;
+  const pl=pbMake();if(!pl)return false;
+  Object.assign(PB,{on:true,ph:'attach',t:0,s:0,v:0,line:line||null,clrT:0});pbAskOff();A.pbAsk=1;tugMake();return true;}
+// the reply bar's CALL at the gate (a free flight's ask: tqAsk, shown and ticked outside a tasking)
+function pbAsk(){const a=tqAsk([{k:'CALL',sub:'Request pushback',say:'',fn:pbRequest}],{keep:1});a.free=true;tqReplyUI();}
+function pbAskOff(){if(TASK.ask&&TASK.ask.free){TASK.ask=null;tqReplyUI();}}
+function pbAskTick(dt){const a=TASK.ask;if(!a||!a.free||TASK.on)return;tqReplyUI();if(running&&!paused)tqAskTick(dt);}
+function pbRequest(){
+  const B=BASES[st.base]||BASES[BASE0],gs=B.gnd.split(' ').slice(0,2).join(' '),pl=pbMake();
+  const l0=vqAdd(L(AC.cs,'pilot',gs+', '+AC.cs+', at the gate, request pushback.',[csP(),'p_req_pushback']),{pri:2,ttl:30});
+  if(!pl){A.pbX=1;return;}   // no way back onto the taxilane from here: the taxi clearance comes instead
+  const l1=vqAdd(L(B.gnd,'tower',AC.cs+', '+gs+', pushback approved, face '+pl.face+'.',[csT(),'t_'+B.gndClip,'t_pushback_approved','t_dir_'+pl.face[0]]),{pri:2,ttl:30,dep:l0});
+  const l2=vqAdd(L(AC.cs,'pilot','Pushing back, '+AC.cs+'.',['p_rb_pushback',csP()]),{pri:2,ttl:30,dep:l1});
+  pbStart(l2);}
+// the taxi clearance: the route from the stand (or from where the push left it) to the runway's hold, its taxiways by
+// name; Easy draws it. False when there is no route (the caller says the old line)
+function prClear(sayFn){
+  if(!PR.on)return false;const B=BASES[st.base]||BASES[BASE0],G=TWG[PR.code];if(!G)return false;
+  const from=PB.done&&PB.plan&&PB.plan.ahead>=0?PB.plan.ahead:PR.n,r=prRoute(from);if(!r)return false;
+  const refs=prRefs(G,r.R),pts=[{x:st.pos.x,z:st.pos.z}].concat(r.R.map(i=>({x:G.N[i].x,z:G.N[i].z})));
+  PR.route={R:r.R,E:r.E,pts:pts,goal:G.N[r.R[r.R.length-1]],refs:refs};
+  sayFn(B.gnd,AC.cs+', '+B.gnd.split(' ').slice(0,2).join(' ')+', taxi to runway '+B.rwy+(refs.length?' via '+refs.join(', '):'')+'.',
+    [csT(),'t_'+B.gndClip,'t_taxi_to','t_'+B.rwyClip].concat(refs.length?['t_via'].concat(...refs.map(refClips)):[]));readback('wilco');
+  txrShow(pts,PR.route.goal);return true;}
+// Easy's route line: 0.5 m dashes (half of each period, 12 m or longer so at most 180 dashes) at the paint height, in a
+// clone of the runway paint's material (no new program), drawn over the taxiway lines
+function txrClear(){if(TXR.mesh){scene.remove(TXR.mesh);TXR.mesh.geometry.dispose();TXR.mesh=null;}TXR.pts=null;TXR.goal=null;TXR.tris=0;}
+function txrShow(pts,goal){txrClear();TXR.pts=pts;TXR.goal=goal;
+  const C=[0];for(let i=1;i<pts.length;i++)C.push(C[i-1]+Math.hypot(pts[i].x-pts[i-1].x,pts[i].z-pts[i-1].z));const L=C[C.length-1];if(L<5)return;
+  const per=Math.max(12,L/180),P=[];let j=0;
+  const at=u=>{while(j<pts.length-2&&C[j+1]<u)j++;const l=C[j+1]-C[j],f=l>1e-6?clamp((u-C[j])/l,0,1):0;return [pts[j].x+(pts[j+1].x-pts[j].x)*f,pts[j].z+(pts[j+1].z-pts[j].z)*f];};
+  for(let u=4;u+per*0.5<L-2;u+=per){const a=at(u),b=at(u+per*0.5),ex=b[0]-a[0],ez=b[1]-a[1],l=Math.hypot(ex,ez);if(l<0.5)continue;
+    const nx=-ez/l*0.25,nz=ex/l*0.25,ya=groundHeight(a[0],a[1])+SURF_Y+0.03,yb=groundHeight(b[0],b[1])+SURF_Y+0.03;
+    // wound counter clockwise seen from above (the paint material is front side only)
+    P.push(a[0]-nx,ya,a[1]-nz,b[0]+nx,yb,b[1]+nz,b[0]-nx,yb,b[1]-nz,a[0]-nx,ya,a[1]-nz,a[0]+nx,ya,a[1]+nz,b[0]+nx,yb,b[1]+nz);}
+  if(!P.length)return;
+  if(!TXR.mat){TXR.mat=rwpMat('white').clone();TXR.mat.color.setHex(0x4de1ff);}
+  const geo=new THREE.BufferGeometry(),n=new Float32Array(P.length);for(let i=1;i<n.length;i+=3)n[i]=1;
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(P,3));geo.setAttribute('normal',new THREE.BufferAttribute(n,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(new Float32Array(P.length/3*2),2));
+  geo.computeBoundingSphere();const m=new THREE.Mesh(geo,TXR.mat);m.name='taxiRoute';m.renderOrder=-1;m.userData.irNoDepth=true;m.userData.heat=0.16;m.visible=rookie();
+  scene.add(m);TXR.mesh=m;TXR.tris=P.length/9;}
+// off the pavement under 30 kt (step: st.rough): the bumps, and stuck once it stops there
+function roughTick(dt){const s=st;
+  if(!s.onGround||!s.rough||PB.on){if(s.stuck&&(!s.rough||!s.onGround))s.stuck=false;return;}
+  const v=Math.hypot(s.vel.x,s.vel.z);if(v>0.8)camBump=Math.max(camBump,Math.min(0.3,0.05+v*0.03)*(0.6+0.4*Math.random()));
+  if(v<0.3&&!s.stuck){s.stuck=true;toast('Stuck on rough ground. Taxi back to the pavement or restart.',5);}}
 // the curve traffic (the banner tow); the AI traffic runs in TFC.update
 function updateTraffic(dt){
   TRAFFIC.forEach(o=>{if(!o.path)return;o.t=(o.t+o.v*dt/o.len)%1;
@@ -11908,7 +12138,7 @@ function aptMats(){
   const st=tex(128,32,(x,w,h)=>{for(let i=0;i<5;i++){x.fillStyle=i%2?'#ffffff':'#ff6a13';x.fillRect(i*w/5,0,w/5,h);}});
   APT_MAT={tw:{asphalt:lam(0xe4e4e4,{map:rwpTex('asphalt'),depthWrite:false}),concrete:lam(0xd2d8de,{map:rwpTex('concrete'),depthWrite:false})},
     ap:lam(0xdde2e7,{map:rwpTex('concrete'),depthWrite:false}),bld:new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide}),term:wbTermMat(),
-    pale:lam(0xd9d6cf),cab:lam(0x30495c),roof:lam(0x2a2f35),jb:lam(0xb9bcc0),veh:lam(0xffffff),frame:lam(0x2a2c30),pole:lam(0x8a8d90),
+    pale:lam(0xd9d6cf),cab:lam(0x30495c),roof:lam(0x2a2f35),jb:lam(0xb9bcc0),veh:lam(0xffffff),frame:lam(0x2a2c30),pole:lam(0x8a8d90),fill:lam(0x7d8a7f),
     ring:lam(0xf4f4f0,{side:THREE.DoubleSide}),sock:new THREE.MeshLambertMaterial({map:st,side:THREE.DoubleSide})};
   WB.termMat=APT_MAT.term;return APT_MAT;}
 // Ramer-Douglas-Peucker: the OSM centre lines' curves kept to tol metres with a fraction of their nodes
@@ -11937,6 +12167,52 @@ function aptSignDraw(x,k,segs){
     x.fillStyle=g.fg;x.fillText(g.t,cx+sw/2,Y+1+h/2+1);cx+=sw;
     if(g.bg==='#f2c230'){x.fillStyle='#111';x.fillRect(cx-1,Y+1,2,h);}}
   return Math.min(S.sw-2,w);}
+// runways item 8: an airport's ramp start stands (RAMP[code]), each a stand node of the taxiway graph with a route to a
+// runway hold. gate: a gate stand the way the parked airliners stand (nose in, 50 to 72 m out from the terminal wall,
+// room for a 747's wings and nose, 10 m to spare), the nearest one to c.pref that has a lead-in line straight behind it
+// to push back along; near: up to three more gate stands 75 to 300 m from it (the AI airliners' neighbouring gates);
+// apron: a stand on an apron for every other type, 150 m from any gate, 35 m off any taxi line and 30 m from any
+// building, nose to the taxi line its stub joins, the nearest one to c.prefA. all: every one, kept clear of the parked
+// airliners and the apron vehicles.
+function twgNear(G,x,z){const g=G.grid;let d=1e9;const i0=Math.floor(x/g.C),j0=Math.floor(z/g.C);
+  for(let i=i0-1;i<=i0+1;i++)for(let j=j0-1;j<=j0+1;j++)for(const n of g.m.get(g.key(i,j))||[]){const e=G.E[n];if(e.k>=2)continue;const A=G.N[e.a],B=G.N[e.b];d=Math.min(d,segD(x,z,A.x,A.z,B.x,B.z));}
+  return d;}
+function aptRamp(G,code,gates,c){
+  const R={code:code,gate:null,near:[],apron:null,all:[]},N=G.N,holds=[];for(const [,L] of G.ent)for(const en of L)holds.push(en.h);
+  if(!holds.length)return R;
+  const BB=c.blds.map(P=>{let b=[1e9,1e9,-1e9,-1e9];for(const p of P)b=[Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])];return b;});
+  const clr=(x,z,m)=>{for(let i=0;i<BB.length;i++){const b=BB[i];if(x<b[0]-m||x>b[2]+m||z<b[1]-m||z>b[3]+m)continue;const P=c.blds[i];if(pipXZ(P,x,z)||wbNearEdge(P,x,z)[0]<m)return false;}return true;};
+  // the wing line clear of buildings by m, the fuselage line too and on pavement
+  const fits=(x,z,fx,fz,hs,hl,m)=>{for(let i=-8;i<=8;i++){const a=i/8,qx=x+fx*a*hl,qz=z+fz*a*hl;
+    if(!clr(x-fz*a*hs,z+fx*a*hs,m)||!clr(qx,qz,m)||!(isPaved(qx,qz)||c.onAp(qx,qz)))return false;}return true;};
+  // foot 2: a lead-in line behind it that meets its taxi line square (60 to 120 degrees), 1: any, 0: none needed
+  const join=(x,z,h,foot)=>{if(foot){const F=pbFoot(G,x,z,h*Math.PI/180);if(!F)return -1;
+      if(foot>1){const A=G.N[F.e.a],B=G.N[F.e.b],l=Math.hypot(B.x-A.x,B.z-A.z)||1,c=((B.x-A.x)*Math.sin(h*Math.PI/180)-(B.z-A.z)*Math.cos(h*Math.PI/180))/l;if(Math.abs(c)>0.5||F.s>120)return -1;}}
+    const n=twgSpot(G,[x,z,h]);return n>=0&&twgRoute(G,n,holds,{})?n:-1;};
+  const pf=c.pref,cand=[];
+  for(const q of gates){if(q.d>90)continue;let ux=q.x-q.ex,uz=q.z-q.ez,u=Math.hypot(ux,uz);if(q.inside){ux=-ux;uz=-uz;}
+    if(u<2){ux=q.ex-q.c[0];uz=q.ez-q.c[1];u=Math.hypot(ux,uz);if(u<1)continue;}ux/=u;uz/=u;
+    for(const k of [50,60,72]){const x=q.ex+ux*k,z=q.ez+uz*k;
+      if(!c.onAp(x,z)||c.rwyIn(x,z,90)||cand.some(p=>Math.hypot(p.x-x,p.z-z)<25)||!fits(x,z,-ux,-uz,32.2,35.4,10))continue;
+      cand.push({x:x,z:z,h:((Math.atan2(-ux,uz)*180/Math.PI)%360+360)%360,d:pf?Math.hypot(x-pf[0],z-pf[1]):0});break;}}
+  cand.sort((p,q)=>p.d-q.d);
+  for(const pass of [2,1,0]){if(R.gate)break;for(const p of cand.slice(0,30)){const n=join(p.x,p.z,p.h,pass);if(n>=0){R.gate={x:p.x,z:p.z,h:p.h,n:n,gate:true,kind:'gate'};break;}}}
+  if(R.gate){const g=R.gate,e=p=>Math.hypot(p.x-g.x,p.z-g.z);
+    for(const p of cand.filter(p=>e(p)>=75&&e(p)<=300).sort((p,q)=>e(p)-e(q))){if(R.near.length>=3)break;
+      if(R.near.some(q=>Math.hypot(q.x-p.x,q.z-p.z)<70))continue;const n=join(p.x,p.z,p.h,2);if(n>=0)R.near.push({x:p.x,z:p.z,h:p.h,n:n});}}
+  const gp=gates.map(q=>[q.x,q.z]).concat(cand.map(p=>[p.x,p.z])),pa=c.prefA||pf||[G.rws[0].x,G.rws[0].z],pts=[];
+  for(const P of c.aprons){let b=[1e9,1e9,-1e9,-1e9];for(const p of P)b=[Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])];
+    for(let x=Math.ceil(b[0]/25)*25;x<=b[2];x+=25)for(let z=Math.ceil(b[1]/25)*25;z<=b[3];z+=25){const d=Math.hypot(x-pa[0],z-pa[1]);if(d<5000&&pipXZ(P,x,z))pts.push([x,z,d]);}}
+  pts.sort((p,q)=>p[2]-q[2]);let tries=0;
+  for(const [x,z] of pts){if(tries>=25)break;
+    if(c.rwyIn(x,z,100)||!isPaved(x,z)||gp.some(q=>Math.hypot(q[0]-x,q[1]-z)<150)||twgNear(G,x,z)<35||!clr(x,z,30))continue;
+    tries++;const n=twgSpot(G,[x,z,null]);if(n<0)continue;
+    const se=N[n].e.map(i=>G.E[i]).find(e=>e.k===3);if(!se)continue;const f=se.a===n?se.b:se.a,fx=N[f].x-x,fz=N[f].z-z,l=Math.hypot(fx,fz);if(l<1)continue;
+    const h=((Math.atan2(fx/l,-fz/l)*180/Math.PI)%360+360)%360;
+    if(!fits(x,z,fx/l,fz/l,22,18,10)||!twgRoute(G,n,holds,{}))continue;
+    N[n].st.hdg=h;R.apron={x:x,z:z,h:h,n:n,gate:false,kind:'apron'};break;}
+  R.all=[R.gate,R.apron].concat(R.near).filter(Boolean);
+  return R;}
 function buildAirport(D,o){
   const t0=performance.now(),M=aptMats(),code=o.code,sfx=o.sfx||'',gh=o.gh||(()=>0),L=o.L,AA=alApt(code),Y0=SURF_Y,YL=SURF_Y+0.015;
   const E={code:code,fine:new THREE.Group(),tris:0,meshes:0,signs:0,holdSigns:0,dirSigns:0,windsocks:0,jetBridges:0,taxiwayMetres:0,aprons:0,holds:0,stands:0,
@@ -12020,6 +12296,11 @@ function buildAirport(D,o){
       a2=(a2+len)%fsp;}}
   AA.floods+=poles.length;
   mk(AP,AU,M.ap,'aprons',0.6);
+  // runways item 8: a world airport's reclaimed land (Haneda's east aprons) has no terrain under it in the region data,
+  // so the sea plane (y -0.4, drawn after the pavement, which writes no depth) showed through the apron from some
+  // angles. An opaque fill 20 cm under the taxiways and aprons, drawn before them, writes the depth the terrain would.
+  if(!REGION.az){const lower=P=>{const Q=P.slice();for(let i=1;i<Q.length;i+=3)Q[i]-=0.26;return Q;};
+    mk(lower(TP),null,M.fill,'taxiFill',0,null,true);mk(lower(AP),null,M.fill,'apronFill',0,null,true);}
   if(poles.length){const pm=im(new THREE.CylinderGeometry(0.2,0.3,18,5).translate(0,9,0),M.pole,poles.length,'apronPoles'),Mx=new THREE.Matrix4();
     poles.forEach((p,i)=>{Mx.makeTranslation(p[0],gh(p[0],p[1]),p[1]);pm.setMatrixAt(i,Mx);});pm.frustumCulled=false;}
   // ---- terminals and hangars, merged; every one an OBST outline and a structure (STR) ----
@@ -12132,6 +12413,13 @@ function buildAirport(D,o){
       jb.forEach((q,i)=>{const dx=q.x-q.ex,dz=q.z-q.ez,l=Math.max(12,Math.min(40,Math.hypot(dx,dz)+12)),u=Math.hypot(dx,dz)||1;
         Q.setFromAxisAngle(_yUp,Math.atan2(dx,dz));Sc.set(3.4,3.2,l);Pp.set(q.ex+dx/u*l/2,gh(q.ex,q.ez)+4.6,q.ez+dz/u*l/2);Mx.compose(Pp,Q,Sc);m.setMatrixAt(i,Mx);});
       E.jetBridges=jb.length;if(o.wb)WB.n.jetBridges=jb.length;}}
+  // ---- the taxiway graph the AI traffic taxis on (runways item 6): the stands joined by stubs ----
+  const G=twgBuild(code,tws,holdsAll,rws,terms.concat(hangs),g);
+  {const sp=[];for(const s of (D.parking_positions||[]).concat(D.gates||[])){const p=s.p;if(p&&!sp.some(q=>Math.hypot(q[0]-p[0],q[1]-p[1])<8))sp.push(p);}
+    for(const p of sp){const n=twgStand(G,p[0],p[1],null);if(n>=0)G.stands.push(n);}}
+  // ---- runways item 8: the ramp start stands (aptRamp), clear of the parked airliners and the vehicles below ----
+  const RS=o.noRamp?{code:code,gate:null,near:[],apron:null,all:[]}:aptRamp(G,code,gates,{onAp:onAp,rwyIn:rwyIn,blds:terms.concat(hangs),aprons:aprons,pref:o.rampPref||ramp,prefA:o.rampPrefA||o.rampPref||ramp});
+  RAMP[code]=RS;E.ramp={gate:!!RS.gate,near:RS.near.length,apron:!!RS.apron};const keep=RS.all;
   // ---- parked airliners at up to 12 gates (a world region), nose in, clear of the ramp and the traffic spots ----
   const clearOf=(x,z,m)=>!terms.concat(hangs).some(P=>pipXZ(P,x,z)||wbNearEdge(P,x,z)[0]<m);
   const parked=[];
@@ -12140,7 +12428,7 @@ function buildAirport(D,o){
       if(u<2){ux=q.ex-q.c[0];uz=q.ez-q.c[1];u=Math.hypot(ux,uz);if(u<1)continue;}
       for(const k of [42,55,70]){const x=q.ex+ux/u*k,z=q.ez+uz/u*k;
         if(!onAp(x,z)||!clearOf(x,z,20)||rwyIn(x,z,60))continue;
-        if(Math.hypot(x-ramp[0],z-ramp[1])<110||spots.some(s=>Math.hypot(x-s[0],z-s[1])<85)||parked.some(p=>Math.hypot(x-p[0],z-p[1])<65))continue;
+        if(Math.hypot(x-ramp[0],z-ramp[1])<110||spots.some(s=>Math.hypot(x-s[0],z-s[1])<85)||parked.some(p=>Math.hypot(x-p[0],z-p[1])<65)||keep.some(s=>Math.hypot(x-s.x,z-s.z)<75))continue;
         parked.push([x,z,Math.atan2(q.ex-x,-(q.ez-z))]);break;}}
     const pk=tfcAK()*(REGION.id==='sbrj'?0.8:1);
     parked.forEach((p,k)=>{let pg;if(hash(k,77)<0.2){pg=buildAirliner(k).g;}else{pg=tfcLod('airliner',k);pg.visible=true;scene.add(pg);}
@@ -12151,17 +12439,15 @@ function buildAirport(D,o){
   if(o.vehicles&&aprons.length){const vs=[];let tries=0;
     while(vs.length<o.vehicles&&tries++<4000){const P=aprons[Math.floor(hash(tries,5)*aprons.length)],b=bb(P);
       const x=lerp(b[0],b[2],hash(tries,6)),z=lerp(b[1],b[3],hash(tries,7));
-      if(!pipXZ(P,x,z)||!clearOf(x,z,8)||Math.hypot(x-ramp[0],z-ramp[1])<60||parked.some(p=>Math.hypot(x-p[0],z-p[1])<25)||spots.some(s=>Math.hypot(x-s[0],z-s[1])<40)||aptPvAt(g,x,z,3,null,false))continue;
+      if(!pipXZ(P,x,z)||!clearOf(x,z,8)||Math.hypot(x-ramp[0],z-ramp[1])<60||parked.some(p=>Math.hypot(x-p[0],z-p[1])<25)||spots.some(s=>Math.hypot(x-s[0],z-s[1])<40)||keep.some(s=>Math.hypot(x-s.x,z-s.z)<50)||aptPvAt(g,x,z,3,null,false))continue;
       vs.push([x,z,hash(tries,8)*6.28]);}
     if(vs.length){const m=im(new THREE.BoxGeometry(2.3,2.1,5.2).translate(0,1.05,0),M.veh,vs.length,'apronVehicles',E.fine),Mx=new THREE.Matrix4(),Q=new Q4(),Sc=new V3(1,1,1),Pp=new V3(),c=new THREE.Color();
       vs.forEach((v,i)=>{Q.setFromAxisAngle(_yUp,v[2]);Pp.set(v[0],gh(v[0],v[1])+0.04,v[1]);Mx.compose(Pp,Q,Sc);m.setMatrixAt(i,Mx);m.setColorAt(i,c.set(i%2?'#f2c230':'#f2f2ee'));});
       m.userData.heat=0.7;if(o.wb)WB.n.vehicles=vs.length;}}
-  // ---- the taxiway graph the AI traffic taxis on (runways item 6): the stands joined by stubs ----
-  {const G=twgBuild(code,tws,holdsAll,rws,terms.concat(hangs),g),sp=[];
-    for(const s of (D.parking_positions||[]).concat(D.gates||[])){const p=s.p;if(p&&!sp.some(q=>Math.hypot(q[0]-p[0],q[1]-p[1])<8))sp.push(p);}
-    for(const p of sp.concat(parked)){const n=twgStand(G,p[0],p[1],p[2]!=null?p[2]*180/Math.PI:null);if(n>=0)G.stands.push(n);}
-    for(const p of spots)twgSpot(G,p);
-    E.twg=G;TWG[code]=G;}
+  // the parked airliners' stands and the traffic plan's spots on the graph too
+  for(const p of parked){const n=twgStand(G,p[0],p[1],p[2]*180/Math.PI);if(n>=0)G.stands.push(n);}
+  for(const p of spots)twgSpot(G,p);
+  E.twg=G;TWG[code]=G;
   E.tris=Math.round(E.tris);E.ms=Math.round(performance.now()-t0);
   return E;
 }
@@ -12206,20 +12492,22 @@ function aptBuildAZ(d){
     // the box hangar row (v -415) and its parked airplanes, which OSM lacks
     kgeu:{code:'KGEU',L:AL.KGEU,twW:15,laneW:12,twrH:28,tower:gw(1290,-470),socks:[gw(300,70),gw(1090,78),gw(RWY_LEN-300,70)],extra:[gr(gw,665,1505,-400,-336)],
       termH:()=>({H:8,name:'the terminal'}),hangar:P=>{const e=ext(P);return e[1]<22&&e[0]>3*e[1]?{H:4.6,name:'a T-hangar',cls:'shed'}:{H:11,name:'a hangar',cls:'hangar'};},
-      ramp:[BASES.kgeu.ramp[0](),BASES.kgeu.ramp[1]()],vehicles:0},
+      ramp:[BASES.kgeu.ramp[0](),BASES.kgeu.ramp[1]()],vehicles:0,noRamp:true},
     // Luke: no OSM tower or windsocks; the flight line ramp OSM lacks (where the F-16s park and the ramp start is)
     kluf:{code:'KLUF',L:AL.KLUF,twW:23,laneW:15,twrH:20,tower:lk(-1000,760),socks:[lk(-1450,-275),lk(800,-275),lk(-600,225)],extra:[gr(lk,-900,900,190,700)],
       termH:()=>({H:12,name:'the terminal'}),hangar:P=>{const e=ext(P);return e[0]<80?{H:9,name:'an aircraft shelter',cls:'hangar'}:{H:16,name:'a hangar',cls:'hangar'};},
-      ramp:[BASES.luke.ramp[0](),BASES.luke.ramp[1]()],vehicles:10},
+      ramp:[BASES.luke.ramp[0](),BASES.luke.ramp[1]()],vehicles:10,noRamp:true},
     kphx:{code:'KPHX',L:AL.KPHX,twW:23,laneW:15,twrH:85,green:true,
       termH:t=>/Terminal [34]/.test(t.name)?{H:22,name:'the terminal'}:/^Gates/.test(t.name)?{H:14,name:'a concourse'}:{H:9,name:'the terminal'},
-      hangar:()=>({H:16,name:'a hangar',cls:'hangar'}),ramp:[BASES.phx.ramp[0](),BASES.phx.ramp[1]()],vehicles:20}};
+      hangar:()=>({H:16,name:'a hangar',cls:'hangar'}),ramp:[BASES.phx.ramp[0](),BASES.phx.ramp[1]()],vehicles:20,
+      // runways item 8: the airline gate nearest the old ramp spot (Terminal 4, between its D and C concourses)
+      rampPref:[shX(1250,60),shZ(1250,60)]}};
   for(const k of ['kgeu','kluf','kphx']){const c=C[k];
     if(d&&d[k]){const E=buildAirport(d[k],Object.assign(c,{sfx:'_'+c.code,pv:AZAPT.pv}));AZAPT.tris[c.code]=E.tris;AZAPT.apts[c.code]=E;}
     else rwPaint(RUNWAYS.filter(r=>r.code===c.code),[]);
     c.L.build();}
   if(d&&d.kgeu&&d.kgeu.terminals.length)aptGlendaleSigns(d.kgeu.terminals[0].ring);
-  aptScrubClear();WB.tris.runways=RWP.tris;aptFineTick(true);
+  aptScrubClear();WB.tris.runways=RWP.tris;aptFineTick(true);tfcRampSpots();
 }
 // Glendale: the GLENDALE REGIONAL AIRPORT sign on the roof of the OSM terminal and the FBO's fuel sign on its wall, on the
 // apron side (+v), at the wall that crosses the middle of its outline
@@ -12984,7 +13272,7 @@ function tfcRegion(){
     park:spots.length?{x:spots[0][0],z:spots[0][1],hdg:spots[0][2],spots:spots}:null,twy:REGION.id==='sbrj'?110:170,depTwy:REGION.id==='sbrj'?110:170,
     exitU:Math.round(short*0.6),climbOut:{hdg:0,alt:1500},count:{min:4,max:5},every:[45,90],fin:18520,surf:0.06});
   TFC.plans.push({type:'heli',apt:REGION.city,ends:[],pattern:'roam',park:null,count:{min:1,max:1},roam:roam,surf:0});
-  TFC.plans.forEach(p=>{if(p.park)p.park.taken=p.park.spots.map(()=>null);});
+  TFC.plans.forEach(p=>{if(p.park)p.park.taken=p.park.spots.map(()=>null);});tfcRampSpots();
   TFC.need=true;
 }
 // fetch and decode the region (the grids are deflated, DecompressionStream inflates them), then build it
@@ -15290,11 +15578,17 @@ function atcUpdate(){
   if(s.mode==='runway'&&!A.tko&&(s.time>0.6||ap)&&ao){A.tko=1;
     twrSay(B.twr,AC.cs+', '+B.twr.split(' ').slice(0,2).join(' ')+', '+windTxtG()+', runway '+B.rwy+', cleared for takeoff.',
         [csT(),twrC].concat(windCG(),[rwyC,'t_cleared_to']),{ok:onGnd});readback('to');}
-  if(s.mode==='ramp'&&!A.taxi&&(s.time>0.6||ap)&&ao){A.taxi=1;
-    twrSay(B.gnd,AC.cs+', '+B.gnd.split(' ').slice(0,2).join(' ')+', runway '+B.rwy+', taxi to the active via Alpha.',
-        [csT(),gndC,rwyC,'t_taxi_alpha']);readback('wilco');}
-  // at the holding point: Glendale's runway 1 end of the parallel taxiway; a world region, near the home runway's first third
-  if(s.mode==='ramp'&&A.taxi&&!A.tko&&s.onGround&&(s.base==='kgeu'?v>-70&&v<-20&&u<560:!REGION.az&&Math.abs(v)<120&&u<RWY_LEN/3)){A.tko=1;
+  // runways item 8: at an airline gate the pushback comes first (the reply bar's CALL), the taxi clearance once the tug has
+  // gone (or once the aircraft has left the stand without one); the clearance names the route's taxiways (prClear)
+  if(s.mode==='ramp'&&!A.taxi&&(s.time>0.6||ap)&&ao){let go=true;
+    if(PR.on&&PR.gate&&!A.pbX){go=PB.ph==='done'||(!PB.on&&!PB.done&&Math.hypot(s.pos.x-PR.x,s.pos.z-PR.z)>15);
+      if(!go&&!A.pbAsk&&!PB.on&&!PB.done){A.pbAsk=1;pbAsk();}}
+    if(go){A.taxi=1;pbAskOff();
+      if(!prClear(twrSay)){twrSay(B.gnd,AC.cs+', '+B.gnd.split(' ').slice(0,2).join(' ')+', runway '+B.rwy+', taxi to the active via Alpha.',
+        [csT(),gndC,rwyC,'t_taxi_alpha']);readback('wilco');}}}
+  // at the holding point: the route's hold (item 8); Glendale's runway 1 end of the parallel taxiway; a world region, near the home runway's first third
+  const atHold=!!PR.route&&Math.hypot(s.pos.x-PR.route.goal.x,s.pos.z-PR.route.goal.z)<30;
+  if(s.mode==='ramp'&&A.taxi&&!A.tko&&s.onGround&&(atHold||(s.base==='kgeu'?v>-70&&v<-20&&u<560:!REGION.az&&Math.abs(v)<120&&u<RWY_LEN/3))){A.tko=1;
     say(B.twr,AC.cs+', runway '+B.rwy+', cleared for takeoff.',[csT(),rwyC,'t_cleared_to'],{ok:onGnd});readback('to');}
   if(s.mode==='final'&&!A.land&&(s.time>0.6||ap)&&ao){A.land=1;
     twrSay(B.twr,AC.cs+', '+B.twr.split(' ').slice(0,2).join(' ')+', '+windTxtG()+', runway '+B.rwy+', cleared to land.',
@@ -16987,7 +17281,7 @@ function tqAnswer(k){const a=TASK.ask;if(!a||!a.shown||!running||paused)return f
   if(op.fn)op.fn(a.t);return true;}
 const tqReplyEl=document.getElementById('tkReply');
 let tqReplyKey='';
-function tqReplyUI(){const a=TASK.ask,on=!!(a&&a.shown&&(TASK.on||LES.on)&&running&&!st.crashed);
+function tqReplyUI(){const a=TASK.ask,on=!!(a&&a.shown&&(TASK.on||LES.on||a.free)&&running&&!st.crashed);   // a.free: the ramp start's pushback CALL
   const key=on?a.id+'|'+a.opts.map(o=>o.k).join(','):'';
   if(key!==tqReplyKey){tqReplyKey=key;
     if(on){tqReplyEl.innerHTML='';a.opts.forEach(o=>{const b=document.createElement('button');b.type='button';b.dataset.k=o.k;
@@ -17705,7 +17999,7 @@ function start(mode,base){
   if(PHOTO.on){PHOTO.on=false;$('photoOv').classList.remove('on');}
   document.body.classList.remove('menuOn','pauseOn','crashOn','photoOn','mapOn');if(window.stickReset)stickReset();
   MUSIC.forced=null;   // a mode with its own song (the Red Flag Dogfight: MUSIC.forced='dogfight.m4a') sets it after start()
-  RES.kind='';RES.freeT0=0;RES.segDone=false;tfcReset();APPR.missOn=false;missEl.classList.remove('chip');
+  RES.kind='';RES.freeT0=0;RES.segDone=false;tfcReset();rampStart(mode);APPR.missOn=false;missEl.classList.remove('chip');
   if(mode==='range')strikeStart();
   if(mode==='drop'||mode==='short')missStart(mode==='drop'?'drop':'short');
   if(mode==='drop')dzStart();
@@ -20408,6 +20702,9 @@ function drawMap(hdgT){
   mx.strokeStyle='#f4f1ea';
   for(const rw of RUNWAYS){if(Math.hypot(rw.x-ox,rw.z-oz)>range*1.8)continue;rwyPoly(mx,rw,P,Math.max(2*dpr,rw.wid*k*1.4));}
   if(NV.on)navMap(mx,P,dpr);   // a lesson's nav log route (school2)
+  // runways item 8: the taxi route to the runway's hold (Easy)
+  if(TXR.pts&&TXR.mesh&&rookie()){mx.lineCap='round';mx.lineJoin='round';mx.beginPath();TXR.pts.forEach((p,i)=>{const q=P(p.x,p.z);i?mx.lineTo(q[0],q[1]):mx.moveTo(q[0],q[1]);});
+    mx.strokeStyle='rgba(6,10,16,.75)';mx.lineWidth=4*dpr;mx.stroke();mx.strokeStyle='#4de1ff';mx.lineWidth=2*dpr;mx.setLineDash([4*dpr,3*dpr]);mx.stroke();mx.setLineDash([]);}
   // the route and its pin
   if(DEST){const q=P(DEST.x,DEST.z);mx.lineCap='round';
     mx.strokeStyle='rgba(6,10,16,.75)';mx.lineWidth=5*dpr;mx.beginPath();mx.moveTo(0,0);mx.lineTo(q[0],q[1]);mx.stroke();
@@ -23917,9 +24214,9 @@ function tick(t,skipRender){
     if(st.easy)RUN.easyEver=true;
     updateControls(dt);f16Flaps();lessonTick(dt);rookieAssist(dt,ts);wxFly(dt);acc+=dt;
     if(_ipS!==st){_ipS=st;_ipPos.copy(st.pos);_ipQ.copy(st.quat);}
-    while(acc>=DT){_ipPos.copy(st.pos);_ipQ.copy(st.quat);autopilot(st,DT,events);step(st,DT,events);acc-=DT;if(st.crashed)break;}
+    while(acc>=DT){_ipPos.copy(st.pos);_ipQ.copy(st.quat);if(PB.on)pbStep(st,DT);else{autopilot(st,DT,events);step(st,DT,events);}acc-=DT;if(st.crashed)break;}   // runways item 8: the pushback
     if(st.crashed)onCrash();
-    else atcUpdate();
+    else{atcUpdate();roughTick(dt);}
   }
   while(events.length){const ev=events.shift();if(LES.on)lessonEvent(ev);
     if(ev.type==='touchdown'){ev.vx=st.vel.x;ev.vz=st.vel.z;const f=ev.fpm,g=f<120?'Butter':f<300?'Smooth':f<500?'Firm':'Hard';toast(`Touchdown ${f} fpm. ${g}.`);
@@ -23935,7 +24232,7 @@ function tick(t,skipRender){
     if(ev.type==='liftoff') clusters.forEach(c=>{if(Math.hypot(c.x-st.pos.x,c.z-st.pos.z)<1500){c.cheer=4;}});
   }
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.classList.remove('on');}
-  missUpdate(dt);dzUpdate(dt);taskUpdate(dt);if(running&&!paused)arcTick();apprTick();stepCard();if(running){if((++HF.n&7)===0||HF.want>1){if(STEPX.hold){HF.n--;HF.want=2;}else{hudFit();HF.want=0;}}else if(HF.want)HF.want=2;}aptFineTick();STEPX.hold=false;/* runways item 5: the airports' fine detail (never in a step's frame); stepstall: no layout pass in a step's frame (the next frame runs it); a new caption's on the next frame */dfTick(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);if(LB)LB.frame();
+  missUpdate(dt);dzUpdate(dt);taskUpdate(dt);pbAskTick(dt);if(running&&!paused)arcTick();apprTick();stepCard();if(running){if((++HF.n&7)===0||HF.want>1){if(STEPX.hold){HF.n--;HF.want=2;}else{hudFit();HF.want=0;}}else if(HF.want)HF.want=2;}aptFineTick();STEPX.hold=false;/* runways item 5: the airports' fine detail (never in a step's frame); stepstall: no layout pass in a step's frame (the next frame runs it); a new caption's on the next frame */dfTick(dt);logTime(dt);dashUpdate(dt);bannerUpdate(dt);if(LB)LB.frame();
   {const show=(!rookie()||LES.on==='hood')&&camMode===1&&(AC.id==='cessna'||AC.id==='alpha'||AC.id==='archer')&&running&&!st.crashed;
    if(spCan){spCan.classList.toggle('on',show);if(show)drawSixPack();}}
   radioUpdate(dt);cfgUpdate(dt);resTick(dt);
@@ -23963,6 +24260,8 @@ function tick(t,skipRender){
   }
   {const fdt=paused?0:dt;fireUpdate(fdt);smokeUpdate(fdt);debrisUpdate(fdt);fxUpdate(fdt);crashTick(fdt);wreckUpdate(fdt);cfxUpdate(fdt);fxPack();}
   plane.g.position.copy(dp);plane.g.quaternion.copy(q);
+  pbFrame(paused?0:dt,dp,q);   // runways item 8: the tugs, Easy's taxi route
+  if(waterPlane)waterPlane.position.set(camera.position.x,-0.4,camera.position.z);   // the sea disc under the camera (its fine rings there)
   const on=running&&!s.crashed&&!DF.ej;   // the free camera shows the live prop; pause and photo freeze it (DF.ej: ejected, the jet is gone)
   propUpdate(plane,on,s.power,paused?0:dt);
   if(plane.canopy)plane.canopy.visible=camMode!==1;
@@ -24860,7 +25159,11 @@ window.__kgeu.rwyPaint=()=>RWP.info.map(i=>({code:i.code,num:i.num,surface:i.sur
   holdLines:i.holdLines,centreline:i.centreline,side:!!i.side,len:i.r.len,wid:i.r.wid,thr:i.r.ends.map(e=>e.thr)}));
 window.__kgeu.RWP=RWP;
 // runways item 6: the taxiway graph of an airport (TWG) for the tests
-window.__kgeu.TWG=TWG;window.__kgeu.isPaved=window.__kgeu.isPaved||isPaved;window.__kgeu.TWR_SAY=TWR_SAY;window.__kgeu.TWR=TWR;
+window.__kgeu.TWG=TWG;
+// runways item 8: the ramp start (PR, RAMP), the pushback (pushback() starts it at an airline gate, PB its state), Easy's
+// route line, and traffic(): the AI list (tfcList)
+window.__kgeu.traffic=tfcList;window.__kgeu.pushback=()=>pbStart(null);window.__kgeu.PB=PB;window.__kgeu.PR=PR;window.__kgeu.RAMP=RAMP;window.__kgeu.TUG=TUG;
+window.__kgeu.txr=()=>({on:!!TXR.mesh,visible:!!(TXR.mesh&&TXR.mesh.visible),tris:TXR.tris,pts:TXR.pts?TXR.pts.length:0});window.__kgeu.isPaved=window.__kgeu.isPaved||isPaved;window.__kgeu.TWR_SAY=TWR_SAY;window.__kgeu.TWR=TWR;
 window.__kgeu.twg=code=>{const G=TWG[code];if(!G)return null;const A=twgAudit(G),holds=[];for(const [r,L] of G.ent)for(const en of L)holds.push({x:+G.N[en.h].x.toFixed(1),z:+G.N[en.h].z.toFixed(1),rwy:r.num});
   return {nodes:G.N.length,edges:G.E.length,holds:holds,stands:G.stands.length+[...G.spots.values()].filter(n=>n>=0).length,spotsMissed:[...G.spots.entries()].filter(e=>e[1]<0).map(e=>e[0]),isolated:A.iso,unreached:A.bad,ms:G.ms};};
 // runways item 8: a taxi path on the nearest airport's graph from the node nearest (x0,z0) to the node nearest (x1,z1), as [[x,z],...]; null when there is none
