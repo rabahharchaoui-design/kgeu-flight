@@ -11247,7 +11247,9 @@ function tfcPose(o,dt){
     :Math.atan2(o.vs,Math.max(o.gs,1))+(o.state==='final'?(o.agl<T.flare?0.1:0.05):0.03);
   _tfcE.set(p,-o.hdg,-o.bank,'YXZ');g.quaternion.setFromEuler(_tfcE);
   if(M.gear)M.gear.visible=o.onGround||o.agl<160;
-  const dc=g.position.distanceTo(camera.position),lod=M.lodOn?dc>5800:dc>6200;
+  // runways item 9: on the ground (parked, taxiing, rolling) the stand-in from 1.2 km, a dozen pixels on a phone; in
+  // the air the full model to 6 km as before
+  const dc=g.position.distanceTo(camera.position),nr=o.onGround?1200:6000,lod=M.lodOn?dc>nr*0.96:dc>nr*1.03;
   if(lod!==M.lodOn){M.lodOn=lod;M.full.visible=!lod;M.lod.visible=lod;}
   if(M.rotor&&dt>0){M.rotor.rotation.y-=dt*28;M.trot.rotation.x+=dt*60;}
   o.vel.set(Math.sin(o.hdg)*o.gs,o.vs,-Math.cos(o.hdg)*o.gs);o.v=o.gs;
@@ -12270,7 +12272,7 @@ function buildAirport(D,o){
         acc=(acc+len)%sp;gacc=(gacc+len)%gsp;}
       s+=len;}}
   mk(TP,TU,M.tw[cfg.surf]||M.tw.asphalt,'taxiways',0.8);
-  mk(CL,null,rwpMat('yellow'),'taxiLines',-2);
+  {const tl=mk(CL,null,rwpMat('yellow'),'taxiLines',-2);if(tl)(E.mid=E.mid||[]).push({m:tl,R:5000});}   // runways item 9: mid detail (0.15 m lines: within 5 km)
   WB.n.twLights=(WB.n.twLights||0)+twl;AA.taxiBlue+=twl;AA.taxiGreen+=tgl;
   // ---- the edge lines (fine): two 0.15 m lines 0.15 m apart inside each edge, where nothing else is paved alongside ----
   for(const t of tws){if(t.lane)continue;
@@ -12302,7 +12304,7 @@ function buildAirport(D,o){
   if(!REGION.az){const lower=P=>{const Q=P.slice();for(let i=1;i<Q.length;i+=3)Q[i]-=0.26;return Q;};
     mk(lower(TP),null,M.fill,'taxiFill',0,null,true);mk(lower(AP),null,M.fill,'apronFill',0,null,true);}
   if(poles.length){const pm=im(new THREE.CylinderGeometry(0.2,0.3,18,5).translate(0,9,0),M.pole,poles.length,'apronPoles'),Mx=new THREE.Matrix4();
-    poles.forEach((p,i)=>{Mx.makeTranslation(p[0],gh(p[0],p[1]),p[1]);pm.setMatrixAt(i,Mx);});pm.frustumCulled=false;}
+    poles.forEach((p,i)=>{Mx.makeTranslation(p[0],gh(p[0],p[1]),p[1]);pm.setMatrixAt(i,Mx);});pm.frustumCulled=false;(E.mid=E.mid||[]).push({m:pm,R:10000});}
   // ---- terminals and hangars, merged; every one an OBST outline and a structure (STR) ----
   const bG=wbGeo(),tG=wbGeo(),HW=[0.70,0.71,0.70],HD=[0.30,0.32,0.34],HR=[0.62,0.64,0.66];tG.uv=[];
   const terms=[],bb=P=>{let b=[1e9,1e9,-1e9,-1e9];for(const p of P){b=[Math.min(b[0],p[0]),Math.min(b[1],p[1]),Math.max(b[2],p[0]),Math.max(b[3],p[1])];}return b;};
@@ -12453,13 +12455,18 @@ function buildAirport(D,o){
 }
 // the fine detail of the airport whose runway the aircraft is nearest, within 3 km of it (off past 3.3 km): at most every
 // half second, never in a step's frame (STEPX.hold); force: now
-const APTF={t:0,R:3000};
+const APTF={t:0,R:3000,RM:10000};
 function aptFineTick(force){
   if(!APT_ENV.length)return;const now=performance.now();if(!force&&(STEPX.hold||now-APTF.t<500))return;APTF.t=now;
-  const x=st.pos.x,z=st.pos.z;let best=null,bd=1e18;
+  const x=st.pos.x,z=st.pos.z;let best=null,bd=1e18;const dc={};
   for(const r of RUNWAYS){const e=r.ends[0],dx=x-r.x,dz=z-r.z,a=Math.abs(dx*e.dx+dz*e.dz)-r.len/2,b=Math.abs(dz*e.dx-dx*e.dz)-r.wid/2,d=Math.hypot(Math.max(a,0),Math.max(b,0));
-    if(d<bd){bd=d;best=r;}}
-  for(const E of APT_ENV){const on=!!best&&best.code===E.code&&bd<(E.fine.visible?APTF.R*1.1:APTF.R);if(E.fine.visible!==on)E.fine.visible=on;}
+    if(d<bd){bd=d;best=r;}if(!(dc[r.code]<d))dc[r.code]=d;}
+  for(const E of APT_ENV){const on=!!best&&best.code===E.code&&bd<(E.fine.visible?APTF.R*1.1:APTF.R);if(E.fine.visible!==on)E.fine.visible=on;
+    // runways item 9: an airport's mid detail is sub pixel beyond its radius and only draw calls: the 18 m apron light
+    // poles beyond 10 km, the 0.15 m taxiway centre lines beyond 5 km, the 0.36 m light fixture bases beyond 4 km (the
+    // light points themselves are never culled), each with hysteresis
+    const dm=dc[E.code]!=null?dc[E.code]:1e9,mid=(m,R)=>{const u=m.userData,v=u.midOn==null?dm<R:dm<(u.midOn?R*1.15:R);if(v!==u.midOn){u.midOn=v;m.visible=v;}};
+    for(const e of E.mid||[])mid(e.m,e.R);for(const L of AL_LAYERS)if(L.apt===E.code&&L.fixMesh)mid(L.fixMesh,4000);}
 }
 // the socks of the airport in view of its fine detail, to the wind (the old per sock pivots' look: a gentle flutter)
 const _sockO=new THREE.Object3D();_sockO.rotation.order='YXZ';
