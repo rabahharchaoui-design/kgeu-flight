@@ -17013,7 +17013,7 @@ function dfGrey(){
   if(cs!==DFH.cn){DFH.cn=cs;DFH.hCn.className=cs===2?'ok':'';DFH.hCn.textContent=cs===0?'':cs===2?'CORNER \u2713':cs===1?'CORNER \u25B2 '+DF_CORNER:'CORNER \u25BC '+DF_CORNER;}
 }
 // The edge arrows' track: a rectangle inside the screen (its left and top edges in from the safe area, its right edge
-// left of the throttle, its bottom edge above the call strip), sampled every 4 px. A sample is free for an arrow kind
+// left of the throttle, its bottom edge above the wave card's strip), sampled every 4 px. A sample is free for an arrow kind
 // (0 a bandit's green one, 1 the red missile one) when the arrow and its label, placed inward for that edge, clear every
 // piece of HUD furniture (keep-out rectangles read from the DOM here, once per layout, never per frame): the gauges,
 // the mini map, pause, the wave card, the music ticker, the stick, VIEW, the weapon buttons, the throttle, the call strip.
@@ -17023,7 +17023,11 @@ function dfTrack(){
   const R0=e=>{if(typeof e==='string')e=document.querySelector(e);if(!e)return null;const c=getComputedStyle(e);if(c.display==='none'||c.visibility==='hidden')return null;
     const r=e.getBoundingClientRect();return r.width<1||r.height<1?null:{x:r.left-u.left,y:r.top-u.top,w:r.width,h:r.height};};
   const ko=['#map','#hud','#bPause','#miss','#tk','#stickHint','#bCam','#bFox','#bGun','#bFlr','#bBrk','#bSix','#thr'].map(R0).filter(Boolean);
-  const sr=DFS.el.getBoundingClientRect(),strip={x:sr.left-u.left,y:sr.bottom-u.top-32,w:Math.max(1,sr.width),h:32};ko.push(strip);
+  // schoolhud: the bottom strip is the wave card's (the task card, #miss in #cap) since the calls went up to the top column,
+  // where their line (#dfSub) is furniture too; no card down there (568 wide: it heads the column), the stick ring's foot
+  const pc=missEl.parentNode===$('cap')?R0(missEl):null,shr=R0('#stickHint'),sb=pc?pc.y+pc.h:shr?shr.y+shr.h:H-10;
+  const strip={x:pc?pc.x:W/3,y:sb-32,w:pc?Math.max(1,pc.w):W/3,h:32};ko.push(strip);
+  {const tc=$('topCol').getBoundingClientRect();ko.push({x:tc.left-u.left,y:tc.top-u.top,w:Math.max(1,tc.width),h:26});}   // the calls' row, kept free whether a call is up or not
   const thr=R0('#thr'),mp=R0('#map'),pz=R0('#bPause'),L=(mp?mp.x:10)+14,T=(pz?pz.y:8)+12,R=(thr?thr.x:W-80)-14,B=strip.y-16;   // the map and pause sit on the safe area's edges
   // the labels' character widths, from their real fonts
   const cv=dfTrack.cv||(dfTrack.cv=document.createElement('canvas').getContext('2d')),fw=e=>{const c=getComputedStyle(e);cv.font=c.fontWeight+' '+c.fontSize+' '+c.fontFamily;return cv.measureText('0000000000').width/10;};

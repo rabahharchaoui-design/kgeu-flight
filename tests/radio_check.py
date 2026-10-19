@@ -76,9 +76,9 @@ async def main():
     # weather item 4: a free flight's runway start reads the conditions (ATIS style) first, the clearance waits for it
     try: await pg.wait_for_function("()=>/cleared for takeoff/.test(document.getElementById('atc').textContent)", timeout=120000)
     except Exception: pass
-    line=await pg.evaluate("()=>{const e=document.getElementById('atc'),r=e.getBoundingClientRect(),c=e.querySelector('b');return {on:e.classList.contains('on'),txt:e.textContent,in:e.parentNode.id,top:r.top,H:innerHeight,col:c?getComputedStyle(c).color:''};}")
-    # fix2 item 11: the subtitle is the bottom caption (#cap), below 80% of the height, the station tinted
-    chk('the clearance is on the bottom caption, the station tinted', line['in'] == 'cap' and line['top'] >= line['H'] * 0.8 - 0.5 and line['col'] == 'rgb(127, 212, 255)', repr((line['in'], round(line['top']), line['col'])))
+    line=await pg.evaluate("()=>{const e=document.getElementById('atc'),r=e.getBoundingClientRect(),c=e.querySelector('b');return {on:e.classList.contains('on'),txt:e.textContent,in:e.parentNode.id,top:r.top,bottom:r.bottom,H:innerHeight,col:c?getComputedStyle(c).color:''};}")
+    # schoolhud item 3: the subtitle is the top caption under pause (#topCol), above 26% of the height, the station tinted
+    chk('the clearance is on the top caption, the station tinted', line['in'] == 'topCol' and line['bottom'] <= line['H'] * 0.26 + 0.5 and line['col'] == 'rgb(127, 212, 255)', repr((line['in'], round(line['bottom']), line['col'])))
     chk('takeoff clearance is transmitted', line['on'] and 'cleared for takeoff' in line['txt'], repr(line['txt'][:110]))
     chk('it names the right tower and runway', 'Luke Tower' in line['txt'] and '03L' in line['txt'], repr(line['txt'][:110]))
     chk('it uses the C-130 callsign', 'Herky 71' in line['txt'], repr(line['txt'][:60]))

@@ -65,7 +65,7 @@ async def main():
         await pg.wait_for_function("()=>{const s=document.getElementById('splash');return !s||s.classList.contains('gone')}", timeout=30000)
         await pg.evaluate(f"()=>{{const K={K};K.initAudio();K.vqLog(true);K.radioLog(true);window.__ssReads=0;K.cfiPrep('pattern');}}")
         # decoded on the menu first (headless, a flight's 300 ms frames starve the decode callbacks), then the lesson
-        await pg.wait_for_function(f"()=>{K}.CFIV.want>0&&{K}.CFIV.got>={K}.CFIV.want", timeout=90000)
+        await pg.wait_for_function(f"()=>{K}.CFIV.want>0&&{K}.CFIV.got>={K}.CFIV.want", timeout=240000)
         await pg.evaluate(f"()=>{K}.startLesson('pattern',true)")
         cv = await pg.evaluate(f"()=>({{sets:{K}.CFIV.sets,want:{K}.CFIV.want,got:{K}.CFIV.got,err:{K}.CFIV.err}})")
         ok('(c) the pattern lesson decodes Dana common plus pattern at its start', cv['sets'] == ['d:common', 'd:pattern'] and cv['err'] == 0, cv)

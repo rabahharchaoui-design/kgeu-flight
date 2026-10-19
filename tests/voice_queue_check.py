@@ -71,12 +71,12 @@ async def main():
         mid = await pg.evaluate(f"()=>{{const a=document.getElementById('atc'),l=document.getElementById('lesson');const A=a.getBoundingClientRect(),B=l.getBoundingClientRect();"
                                 f"return {{who:a.querySelector('b')&&a.querySelector('b').textContent,q:{K}.radioQ().map(x=>x.who+': '+x.text),"
                                 "hit:A.height>0&&!(A.right<B.left||B.right<A.left||A.bottom<B.top||B.bottom<A.top),duck:window.__kgeu.music().ducked,"
-                                "lc:l.classList.contains('lc'),inPanel:l.classList.contains('call')&&document.getElementById('lesCap').textContent.indexOf('Dana')===0}}")
+                                "lc:l.classList.contains('lc'),inPanel:a.parentNode.id==='topCol'&&!l.classList.contains('call')&&!!document.getElementById('lesI').textContent}}")
         ok('while the instructor talks the subtitle is the instructor, not the queued tower', mid['who'] == 'Dana', mid)
         ok('the tower clearance waits in the queue', any('cleared for takeoff' in x for x in mid['q']), mid['q'])
         ok('the tower subtitle box does not cover the lesson panel', not mid['hit'], mid)
-        # fix2 item 11: in landscape the lesson strip carries the line on the air (the separate caption is hidden)
-        ok("the line on the air is in the lesson panel's instruction line", not mid['lc'] or mid['inPanel'], mid)
+        # schoolhud item 3: the line on the air is the top caption; the lesson strip keeps its instruction
+        ok("the line on the air is the top caption, the lesson panel keeps its instruction", not mid['lc'] or mid['inPanel'], mid)
         # the instructor goes on; the second clearance stops being relevant before it can play
         await pg.evaluate("()=>{window.__ok=false;}")
         done = await wait_until(pg, f"()=>{{const K={K};return K.radioLog().some(l=>/Cleared for takeoff, /.test(l.text))&&!K.VQ.cur}}", 45)
