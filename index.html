@@ -17808,7 +17808,7 @@ function owCompound(c,ang,R,o){o=o||{};
   const take=(x0,z0,x1,z1)=>{occ.push({x0:x0,z0:z0,x1:x1,z1:z1});};
   const spot=(w,d,m,z0,z1)=>{for(let k=0;k<140;k++){const x=r(-hw+0.8+w/2,hw-0.8-w/2),z=r(Math.max(-hd+0.8+d/2,z0==null?-1e9:z0),Math.min(hd-0.8-d/2,z1==null?1e9:z1));
     if(free(x-w/2,z-d/2,x+w/2,z+d/2,m)){take(x-w/2,z-d/2,x+w/2,z+d/2);return {x:x,z:z};}}return null;};
-  const paint={tyre:[],foot:[],oil:[],doors:[],shade:null,lamp:null,lampD:null},SH=[],shP=(p,h0,h1)=>SH.push({k:'p',p:p,h0:h0,h1:h1});   // SH: the shadow casters, heights over the ground
+  const lay={obs:[],out:[],gen:null},paint={tyre:[],foot:[],oil:[],doors:[],shade:null,lamp:null,lampD:null},SH=[],shP=(p,h0,h1)=>SH.push({k:'p',p:p,h0:h0,h1:h1});   // SH: the shadow casters, heights over the ground
   // ---- the wall ----
   const pil=(x,z,top,big)=>{const s=big?0.62:0.52,yb=Gb(x,z)-0.5;shP(owRect(x,z,s+0.12,s+0.12,0),0,top+0.12-G(x,z));owCap(Bw,x,yb,z,s,top-yb,s,0,0,wallCol,'w',G);owCap(Bw,x,top,z,s+0.12,0.12,s+0.12,0,0.035,capCol,'w',G);};
   const run=(x0,z0,x1,z1)=>{const L=Math.hypot(x1-x0,z1-z0),n=Math.max(1,Math.ceil(L/8-1e-6)),ux=(x1-x0)/L,uz=(z1-z0)/L,px=-uz*wT/2,pz=ux*wT/2,rot=Math.atan2(-uz,ux),tops=[];
@@ -17837,7 +17837,7 @@ function owCompound(c,ang,R,o){o=o||{};
     for(const k of [0.25,0.5,0.75])owCap(Bc,s*0.06+(hx-s*0.06)*k,gy+0.07,hd,0.05,2.0,0.05,0,0,gcol,'t',G);
     const v1=Bc.v,a0=s===half?-s*r(0.62,0.85):0;leaves.push({v0:v0,v1:v1,hx:hx,hz:hd,a0:a0,a1:-s*r(1.62,1.75),p:new Float32Array(Bc.p.slice(v0*3,v1*3)),n:new Float32Array(Bc.n.slice(v0*3,v1*3))});}
   // the lane: the departing pickup at local (0, 8), out through the gate; the leaves swing in over it
-  take(-3.3,1.4,3.3,hd);
+  take(-3.3,1.4,3.3,hd);occ[occ.length-1].walk=1;   // overwatch2 item 3: people walk it (owpNav)
   // the yard light: a pole by the gate post, its arm over the yard
   {const lx=-half*(GP+1.1),lz=hd-0.7,yb=Gb(lx,lz)-0.3,yt=G(lx,lz)+5.2;owPut(Bc,new THREE.CylinderGeometry(0.055,0.08,yt-yb,6,1,true),owMx(lx,(yt+yb)/2,lz),steel,'t',G);
     owCap(Bc,lx,yt-0.08,lz-0.55,0.06,0.06,1.1,0,0,steel,'t',G);owCap(Bc,lx,yt-0.2,lz-1.05,0.28,0.14,0.42,0,0.03,dark,'t',G);SH.push({k:'l',x:lx,z:lz,w:0.12,h0:0,h1:5.2});LP.push(lx,yt-0.26,lz-1.05);paint.lamp=[lx,lz-1.05];take(lx-0.3,lz-0.3,lx+0.3,lz+0.3);}
@@ -17904,7 +17904,7 @@ function owCompound(c,ang,R,o){o=o||{};
         if(!acDone&&f!==fd&&f!==bk){acDone=true;q=f.P(s,0,0.24);owCap(Bc,q[0],ys+0.06,q[2],0.66,0.42,0.48,f.rot,0.03,new THREE.Color(0xcfc8b6),'t',G);}}}
     // up top: the roof access block on the biggest, a hatch on the others; the clutter on the white one (and on another
     // now and then): a water tank on a stand, an evaporative cooler with its duct, a dish, drums or crates
-    const rl=[],ri=roofItems(b,yr,rl);
+    const rl=[],ri=roofItems(b,yr,rl);b.rl=rl;
     if(b===big){const pw=2.4,pd=2.3,q=ri(pw+0.4,pd+0.4);if(q){const ph=2.25,px=q[0],pz=q[1],pr=[px,yr+1,pz];
       for(const [nx,nz] of [[0,1],[0,-1],[1,0],[-1,0]]){const L=nz?pw/2:pd/2,dd=nz?pd/2:pw/2,tx=nz,tz=-nx,P=(s,y)=>[px+nx*dd+tx*s,y,pz+nz*dd+tz*s];owQuad(Bw,P(-L,yr-0.05),P(L,yr-0.05),P(L,yr+ph),P(-L,yr+ph),pr,col,'w',G);}
       owCap(Bw,px,yr+ph,pz,pw+0.14,0.1,pd+0.14,0,0.03,cap,'w',G);shP(owRect(px,pz,pw,pd,0),0,yr+ph+0.1-g0);
@@ -17923,8 +17923,8 @@ function owCompound(c,ang,R,o){o=o||{};
     // the tin on the simple set's roofs: none (the walls and boxes only)
   }
   // ---- the yard: a shade structure under tin, the water tank, the generator, drums, a woodpile or crates ----
-  {const sw=r(5,7),sd=r(3.5,4.6),q=spot(sw+0.6,sd+0.6,1.4);if(q){const h0=r(2.3,2.5),h1=h0+r(0.3,0.5),y0=G(q.x,q.z);
-    for(const [px,pz] of [[-1,-1],[1,-1],[1,1],[-1,1]]){const x=q.x+px*(sw/2-0.15),z=q.z+pz*(sd/2-0.15),yb=Gb(x,z)-0.3,yt=y0+(pz>0?h1:h0);
+  {const sw=r(5,7),sd=r(3.5,4.6),q=spot(sw+0.6,sd+0.6,1.4);if(q){const h0=r(2.3,2.5),h1=h0+r(0.3,0.5),y0=G(q.x,q.z);occ[occ.length-1].walk=1;   /* under it is open */
+    for(const [px,pz] of [[-1,-1],[1,-1],[1,1],[-1,1]]){const x=q.x+px*(sw/2-0.15),z=q.z+pz*(sd/2-0.15),yb=Gb(x,z)-0.3,yt=y0+(pz>0?h1:h0);lay.obs.push([x-0.12,z-0.12,x+0.12,z+0.12]);
       owPut(Bc,new THREE.CylinderGeometry(0.05,0.05,yt-yb,6,1,true),owMx(x,(yt+yb)/2,z),steel,'t',G);owCap(Bc,x,G(x,z)-0.02,z,0.22,0.06,0.22,0,0,steel,'t',G);}
     for(const pz of [-1,1])owCap(Bc,q.x,y0+(pz>0?h1:h0),q.z+pz*(sd/2-0.15),sw,0.12,0.1,0,0,steel,'t',G);
     const pg=new THREE.PlaneGeometry(sw+0.3,sd+0.3,6,4);pg.rotateX(-Math.PI/2);const P=pg.attributes.position,U=pg.attributes.uv;
@@ -17933,12 +17933,12 @@ function owCompound(c,ang,R,o){o=o||{};
     for(const [px,pz] of [[-1,-1],[1,-1],[1,1],[-1,1]])SH.push({k:'l',x:q.x+px*(sw/2-0.15),z:q.z+pz*(sd/2-0.15),w:0.1,h0:0,h1:pz>0?h1:h0});
     owPut(Bt,pg,owMx(q.x,0,q.z),(x,y,z,nx,ny,nz,k)=>{k.copy(galv).lerp(rust,clamp(owHash(Math.round(x),2,Math.round(z*0.7))*1.4-0.5,0,0.85));},'g',G);
     owQuad(Bl,[q.x-sw/2,y0+h0,q.z-sd/2],[q.x+sw/2,y0+h0,q.z-sd/2],[q.x+sw/2,y0+h1,q.z+sd/2],[q.x-sw/2,y0+h1,q.z+sd/2],[q.x,y0,q.z],galv,'w',G);
-    if(R()<0.6){const bx=q.x+r(-sw/4,sw/4);owCap(Bc,bx,G(bx,q.z),q.z,1.8,0.45,0.45,0,0.02,jc(0x8b6f4c,0.08),'t',G);}}}
+    if(R()<0.6){const bx=q.x+r(-sw/4,sw/4);owCap(Bc,bx,G(bx,q.z),q.z,1.8,0.45,0.45,0,0.02,jc(0x8b6f4c,0.08),'t',G);lay.obs.push([bx-0.9,q.z-0.23,bx+0.9,q.z+0.23]);}}}
   {const q=spot(2.6,2.6,1.2);if(q){const hs=r(1.6,2.2),tr=r(0.85,1.05),th=r(1.5,1.9);owTankStand(Bc,q.x,G(q.x,q.z),q.z,pick([0,Math.PI/2,Math.PI,-Math.PI/2]),hs,tr,th,pick([0x2a2c2e,0x9aa0a4,0xd8d5cc,0x3c5a40]),true,G);
     SH.push({k:'l',x:q.x,z:q.z,w:2*tr,h0:hs+tr*0.5,h1:hs+th+0.3-tr*0.5});for(const [u,w] of [[-1,-1],[1,-1],[1,1],[-1,1]])SH.push({k:'l',x:q.x+u*tr*0.85,z:q.z+w*tr*0.85,w:0.1,h0:0,h1:hs});}}
   {const q=spot(2.8,1.9,1.0);if(q){const rot=pick([0,Math.PI]),c2=Math.cos(rot),s2=Math.sin(rot),y=G(q.x,q.z),gc=jc(pick([0xc8a22a,0x5d6d49,0xd6d3c8,0x9c3a2a]),0.05);
     for(const s of [-0.38,0.38])owCap(Bc,q.x-0.35*c2+s2*s,y-0.05,q.z+0.35*s2+c2*s,1.95,0.17,0.1,rot,0,steel,'t',G);
-    const gx=q.x-0.35*c2,gz=q.z+0.35*s2;owCap(Bg,gx,y+0.12,gz,1.75,0.95,0.95,rot,0.06,gc,'t',G);shP(owRect(gx,gz,1.75,0.95,rot),0,1.07);
+    const gx=q.x-0.35*c2,gz=q.z+0.35*s2;lay.gen={x:gx,z:gz,rot:rot};owCap(Bg,gx,y+0.12,gz,1.75,0.95,0.95,rot,0.06,gc,'t',G);shP(owRect(gx,gz,1.75,0.95,rot),0,1.07);
     for(const s of [-1,1])for(const yy of [0.4,0.55,0.7]){owCap(Bg,gx+s2*s*0.48,y+0.12+yy,gz+c2*s*0.48,0.8,0.045,0.02,rot,0,gc.clone().multiplyScalar(0.55),'t',G);}
     owQuad(Bg,[gx-c2*0.876-s2*0.3,y+0.35,gz+s2*0.876-c2*0.3],[gx-c2*0.876+s2*0.3,y+0.35,gz+s2*0.876+c2*0.3],[gx-c2*0.876+s2*0.3,y+0.85,gz+s2*0.876+c2*0.3],[gx-c2*0.876-s2*0.3,y+0.85,gz+s2*0.876-c2*0.3],[gx,y+0.5,gz],dark,'t',G);
     const sx=gx+c2*0.55,sz=gz-s2*0.55,stk=new THREE.Color(0xe2e2e0);SH.push({k:'l',x:sx,z:sz,w:0.12,h0:1,h1:1.85});SH.push({k:'l',x:q.x+0.95*c2,z:q.z-0.95*s2,w:0.58,h0:0.3,h1:0.6});owPut(Bg,new THREE.CylinderGeometry(0.06,0.06,0.75,8,1,true),owMx(sx,y+1.4,sz),stk,'t',G);
@@ -17953,7 +17953,7 @@ function owCompound(c,ang,R,o){o=o||{};
   else{const q=spot(2.4,2.2,0.8);if(q){const y=G(q.x,q.z),wd=jc(pick([0x9b7c52,0x56603f]),0.05);shP(owRect(q.x,q.z,2,2,0),0,0.95);shP(owRect(q.x-0.45,q.z-0.45,0.8,0.8,0),0,1.75);
     for(const [dx,dz,s,yy] of [[-0.5,-0.5,1.0,0],[0.55,-0.45,0.9,0],[-0.45,0.55,0.95,0],[-0.45,-0.45,0.8,1.0]]){owCap(Bc,q.x+dx,y+yy-0.02,q.z+dz,s,s*0.95,s,r(-0.15,0.15),0.025,wd.clone().multiplyScalar(r(0.85,1.08)),'t',G);}}}
   // ---- vegetation: mesquite (short trunks, three to five crown lobes, darker under), scrub out to 120 m, rocks ----
-  const tree=(x,z,cr)=>{const y=G(x,z),yb=Gb(x,z)-0.3,hc=r(2.3,3.3),base=new THREE.Color(pick([0x5f6d38,0x6a7442,0x58663a])),trunk=new THREE.Color(0x4f3f2f);
+  const tree=(x,z,cr)=>{lay.out.push({x:x,z:z,r:cr*0.75});const y=G(x,z),yb=Gb(x,z)-0.3,hc=r(2.3,3.3),base=new THREE.Color(pick([0x5f6d38,0x6a7442,0x58663a])),trunk=new THREE.Color(0x4f3f2f);
     for(let i=0,n=2+Math.floor(R()*2);i<n;i++){const a=r(0.25,0.55),ph=i/n*Math.PI*2+r(-0.4,0.4),L=(y+hc*0.85-yb)/Math.cos(a),cg=new THREE.CylinderGeometry(0.07,0.13,L,5,1,true);cg.translate(0,L/2,0);
       owPut(Bv,cg,owMx(x,yb,z,a*Math.cos(ph),0,a*Math.sin(ph)),trunk,'t',G);SH.push({k:'l',x:x,z:z,w:0.22,h0:0,h1:hc*0.8});}
     for(let i=0,n=3+Math.floor(R()*3);i<n;i++){const a=i/n*Math.PI*2+r(-0.3,0.3),d=i===0?0:cr*r(0.35,0.6),sg=new THREE.SphereGeometry(1,7,5),P=sg.attributes.position,h=R()*10;
@@ -17961,12 +17961,12 @@ function owCompound(c,ang,R,o){o=o||{};
       const tint=base.clone().multiplyScalar(r(0.85,1.12)),rx=cr*r(0.45,0.65),ly=y+hc+(i===0?0.35:r(-0.25,0.25)),ry=r(0.75,1.05),rz=rx*r(0.8,1.2);
       SH.push({k:'e',x:x+Math.cos(a)*d,z:z+Math.sin(a)*d,rx:rx*0.9,rz:rz*0.9,ry:ry,h:ly-y});
       owPut(Bv,sg,owMx(x+Math.cos(a)*d,ly,z+Math.sin(a)*d,0,r(0,3),0,rx,ry,rz),(px,py,pz,nx,ny,nz,k)=>{k.copy(tint).multiplyScalar((0.5+0.5*clamp(ny*0.7+0.5,0,1))*(0.88+owHash(px,py,pz)*0.24));},'t',G);}};
-  const bush=(x,z,s)=>{const y=G(x,z),base=new THREE.Color(pick([0x6c7246,0x7d8158,0x8f8f72,0x5e6a3c]));
+  const bush=(x,z,s)=>{lay.out.push({x:x,z:z,r:s*0.9});const y=G(x,z),base=new THREE.Color(pick([0x6c7246,0x7d8158,0x8f8f72,0x5e6a3c]));
     for(let i=0,n=1+Math.floor(R()*2);i<n;i++){const sg=new THREE.SphereGeometry(1,6,4),P=sg.attributes.position,h=R()*10;
       for(let k=0;k<P.count;k++){const f=1+(owHash(P.getX(k)*3+h,P.getY(k)*3,P.getZ(k)*3)-0.5)*0.4;P.setXYZ(k,P.getX(k)*f,P.getY(k)*f,P.getZ(k)*f);}sg.computeVertexNormals();
       const rr=s*r(0.6,1),tint=base.clone().multiplyScalar(r(0.85,1.1));SH.push({k:'e',x:x,z:z,rx:rr*0.85,rz:rr*0.85,ry:rr*0.3,h:rr*0.3});
       owPut(Bv,sg,owMx(x+(i?r(-0.6,0.6)*s:0),y+rr*0.45-0.1,z+(i?r(-0.6,0.6)*s:0),0,r(0,3),0,rr,rr*r(0.55,0.75),rr*r(0.8,1.2)),(px,py,pz,nx,ny,nz,k)=>{k.copy(tint).multiplyScalar((0.55+0.45*clamp(ny*0.7+0.5,0,1))*(0.88+owHash(px,py,pz)*0.24));},'t',G);}};
-  const rock=(x,z,s)=>{const y=G(x,z),yb=Gb(x,z),ig=new THREE.IcosahedronGeometry(1,0),P=ig.attributes.position,h=R()*10,cl=jc(pick([0x8e806d,0x7a6c5c,0x9a8f80,0x6d5f50]),0.06);
+  const rock=(x,z,s)=>{lay.out.push({x:x,z:z,r:s*0.9});const y=G(x,z),yb=Gb(x,z),ig=new THREE.IcosahedronGeometry(1,0),P=ig.attributes.position,h=R()*10,cl=jc(pick([0x8e806d,0x7a6c5c,0x9a8f80,0x6d5f50]),0.06);
     for(let k=0;k<P.count;k++){const f=1+(owHash(Math.round(P.getX(k)*100)+h,Math.round(P.getY(k)*100),Math.round(P.getZ(k)*100))-0.5)*0.5;P.setXYZ(k,P.getX(k)*f,P.getY(k)*f,P.getZ(k)*f);}ig.computeVertexNormals();
     const sy=s*r(0.45,0.7)+(y-yb)*0.5;owPut(Bv,ig,owMx(x,yb+sy*0.45,z,r(0,0.5),r(0,3),0,s,sy,s*r(0.8,1.2)),cl,'t',G);};
   const nt=2+Math.floor(R()*3);let ti=0;
@@ -17996,8 +17996,9 @@ function owCompound(c,ang,R,o){o=o||{};
     for(const [q,r] of [[paint.lamp,8],[paint.lampD,3.5]]){if(!q)continue;const g=x.createRadialGradient(X(q[0]),Z(q[1]),0,X(q[0]),Z(q[1]),r*S);g.addColorStop(0,'#fff');g.addColorStop(0.4,'rgba(255,255,255,0.5)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,w,h);}}
   const tS=new THREE.CanvasTexture(cvS),tN=new THREE.CanvasTexture(cvN),tP=new THREE.CanvasTexture(cvP);for(const t of [tS,tN,tP]){t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;t.anisotropy=MAXANI;}
   const ym=o.warm&&OW_M.yardW||groundDecalMat(new THREE.MeshLambertMaterial({vertexColors:true,map:tS,emissiveMap:tP,emissive:0x000000,transparent:true}));if(o.warm){OW_M.yardW=ym;ym.map=tS;ym.emissiveMap=tP;}
-  let yard,apron;
+  let yard,apron,yg;
   {const xs=[-hw-Mg,-hw-Mg/2],zs=[-hd-Mg,-hd-Mg/2];for(let i=0;i<8;i++)xs.push(-hw+W*i/7);for(let k=0;k<6;k++)zs.push(-hd+D*k/5);xs.push(hw+Mg/2,hw+Mg);zs.push(hd+Mg/2,hd+Mg);
+    yg={xs:xs,zs:zs,h:new Float32Array(xs.length*zs.length)};{let gi=0;for(const z of zs)for(const x of xs)yg.h[gi++]=G(x,z)+0.1;}   // overwatch2 item 3: the people stand on it (owpYardH)
     const mk=(inner,name)=>{const pos=[],uv=[],cl=[],idx=[],NX=xs.length;
       for(const z of zs)for(const x of xs){pos.push(x,G(x,z)+0.1,z);uv.push((x+hw+Mg)/(W+2*Mg),(z+hd+Mg)/(D+2*Mg));cl.push(1,1,1);}
       for(let k=0;k+1<zs.length;k++)for(let i=0;i+1<NX;i++){const In=xs[i]>=-hw-1e-6&&xs[i+1]<=hw+1e-6&&zs[k]>=-hd-1e-6&&zs[k+1]<=hd+1e-6;if(In!==inner)continue;
@@ -18009,7 +18010,8 @@ function owCompound(c,ang,R,o){o=o||{};
   g.position.set(c.x,gh0,c.z);g.rotation.y=ang;
   const wb=bl[0],tris=det.reduce((s,m)=>s+m.geometry.index.count/3,0)+yard.geometry.index.count/3+apron.geometry.index.count/3;
   g.userData={det:det,lod:lod,lights:lights,full:true,yard:yard,apron:apron,ym:ym,cvS:cvS,tS:tS,tN:tN,Y:Y,plain:false,k:0,W:W,D:D,nb:bl.length,tris:tris,lodTris:lod.geometry.index.count/3,
-    bld:{x:wb.x,z:wb.z,y:wb.yf+wb.H/2,H:wb.H},spur:spur,
+    bld:{x:wb.x,z:wb.z,y:wb.yf+wb.H/2,H:wb.H},spur:spur,yg:yg,
+    lay:{occ:occ,obs:lay.obs,out:lay.out,gen:lay.gen,bl:bl,doors:paint.doors,shade:paint.shade,lamp:paint.lamp,veh:veh,hw:hw,hd:hd,G:G},   // overwatch2 item 3: the layout the people use
     gate:mc?{attr:mc.geometry.attributes.position,nrm:mc.geometry.attributes.normal,leaves:leaves,t:0}:null,
     onClear:()=>{const i=CSM.stat.indexOf(g);if(i>=0)CSM.stat.splice(i,1);const j=PFX_SRC.indexOf(lights);if(j>=0)PFX_SRC.splice(j,1);tS.dispose();tN.dispose();tP.dispose();if(!o.warm)ym.dispose();}};
   if(g.userData.gate)owGateSet(g.userData.gate,0);
@@ -18045,7 +18047,8 @@ function owGateSet(G,t){const e=t*t*(3-2*t),P=G.attr.array,N=G.nrm.array;
   G.attr.needsUpdate=true;G.nrm.needsUpdate=true;}
 // every frame of the tasking: the detail or the simple set by the camera's distance (3.5 km, 200 m of hysteresis; the
 // ball view at MFOV or narrower keeps the detail out to 9 km, the compound fills its picture there and the station
-// stage allows 4 km), the lights with the time of day, the gate opening as the pickup starts off
+// stage allows 4 km), the lights with the time of day, the gate opening when the gate guard gets to it (overwatch2
+// item 3, d.gateGo) or as the pickup starts off
 function owCmpTick(d,dt){const g=d.cmp;if(!g)return;const U=g.userData,cp=camera.position,p=g.position;
   const rr=Math.hypot(cp.x-p.x,cp.y-p.y,cp.z-p.z),zm=camMode===2&&SENSOR.zoom>=2&&rr<9000,full=zm||(U.full?rr<3600:rr<3400);
   if(full!==U.full){U.full=full;for(const m of U.det)m.visible=full;U.lod.visible=!full;}
@@ -18053,13 +18056,665 @@ function owCmpTick(d,dt){const g=d.cmp;if(!g)return;const U=g.userData,cp=camera
   // the shadowless yard canvas while the shadow cascades reach the compound (mid, within 1.5 km of the camera, by day)
   // and under the simple set (its painted shadows would be of parts no longer drawn)
   const plain=!!(CSM.n&&(CSM.act&2)&&rr<1400&&U.k>0)||!full;if(plain!==U.plain){U.plain=plain;U.ym.map=plain?U.tN:U.tS;U.apron.visible=U.k>0&&!plain;}
-  const G=U.gate;if(G&&d.veh&&(d.veh.moving||d.veh.stopped)&&G.t<1){G.t=Math.min(1,G.t+dt/2.5);owGateSet(G,G.t);}}
+  const G=U.gate;if(G&&(d.gateGo||d.veh&&(d.veh.moving||d.veh.stopped))&&G.t<1){G.t=Math.min(1,G.t+dt/2.5);owGateSet(G,G.t);}}   // overwatch2 item 3: opened when the gate guard gets there (d.gateGo)
 TOD_HOOKS.push(()=>{const d=TASK.on&&TASK.id==='overwatch'?TASK.d:null;if(d&&d.cmp){owCmpHeat(d.cmp);owCmpSun(d.cmp);d.cmp.userData.lights.visible=!!TOD.night;}});
 // the precompile queue's 'compound' job: a sample (fixed seed, every material and part kind the real one uses) in the
 // scene for one compile and draw, then gone
 function owWarm(){const g=owCompound({x:OW_FALLBACK.x,z:OW_FALLBACK.z},0.4,tqRng(4242),{warm:1});
   g.traverse(m=>{m.visible=true;});scene.add(g);
   try{warmObj(g);}finally{scene.remove(g);g.userData.onClear();g.traverse(m=>{if((m.isMesh||m.isPoints)&&m.geometry)m.geometry.dispose();});}}
+// ---------- overwatch2 item 3: the people ----------
+// Seven to ten figures round the compound each game (owPeople, from their own stream of the seed): two gate guards,
+// a lookout on the white building's roof, a two man patrol outside the wall, a pair talking, a carrier, a walker and
+// a man by the generator. Each is a lofted body (owFigure): superellipse rings from the shirt's hem to the crown,
+// tapered sleeves to mitten hands, loose trousers, shoes; clothing as shape (a long shirt flaring to mid thigh, vests,
+// chest rigs, caps and wraps, scarves) and vertex colour (muted cloth, skin, hair, beards). Two LODs, the same
+// silhouette. The IR view's override material (IR_MAT) has no skinning, so they are skinned on the CPU: 15 bones each,
+// two per vertex, written into one merged mesh per LOD for all of them (one draw each). The legs are two bone IK onto
+// feet planted in the world (a walk's stance foot never moves; its swing lands where the next stance needs it), the
+// arms IK onto targets blended from a pose's angles (the rifle's grip and handguard at the low ready); every change of
+// state crossfades the pose over 0.3 s. One Lambert material with vertex colours and a map (the compound's program,
+// linked by the precompile queue's compound job); the IR view reads a second colour set (the heat per part as grey).
+// bones: 0 pelvis, 1 spine, 2 head, 3/4 left upper arm/forearm, 5/6 right, 7/8/9 left thigh/shin/foot, 10/11/12 right,
+// 13 the rifle, 14 the prop (a jerrycan or a box)
+const OWP_NB=15,OWP_NQ=28;
+const OWP_PAL={cloth:[0xd8d5cb,0xcbbd9b,0x8b8b85,0x6e5a46,0x5e6244,0x2f3848,0x272727,0xa49b87,0x7a6d59,0xb4ab95],
+  skin:[0xa8795a,0x8e6247,0xb98b67,0x7b5339,0xc29b77,0x9a6c4e,0x6f4a33],hair:[0x1d1916,0x2a221c,0x3a3029,0x46413b],
+  vest:[0x2b2b2a,0x45483a,0x4f4436,0x3a3f46,0x5e5440],rig:[0x6b6448,0x55583f,0x7a6e52,0x5a5244],
+  hat:[0x6e5a46,0x8b8576,0xcfc7b4,0x3f3b35,0xe2ded4,0x5c5240],wrap:[0xe4e1d8,0x2a2a2a,0x7d7a70,0x5d6046,0xcab796,0x3b4452],
+  scarf:[0x7d3b2f,0x5a5e48,0xb9ab8c,0x3d4a5c,0x8a7a5a,0x6b5a73],shoe:[0x2b241f,0x3b2c22,0x1f1f1f,0x5a4634]};
+// heat in the IR view per part (written as the grey of the IR colour set: the mesh's heat 0.6 and irVar 0.8 add the
+// difference back, so a part reads as its own heat)
+const OWP_HEAT={skin:0.85,eye:0.86,lip:0.85,hair:0.8,beard:0.83,shirt:0.62,trou:0.62,vest:0.6,rig:0.58,hat:0.64,wrap:0.64,scarf:0.62,strap:0.55,shoe:0.55,metal:0.3,wood:0.32,can:0.35,box:0.35};
+const owpSS=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
+// 3x3 rotations, row major: Ry(ry) Rx(rx) Rz(rz) (yaw, then pitch, then roll in the turned frame)
+function owpE(o,rx,ry,rz){const cx=Math.cos(rx),sx=Math.sin(rx),cy=Math.cos(ry),sy=Math.sin(ry),cz=Math.cos(rz),sz=Math.sin(rz);
+  o[0]=cy*cz+sy*sx*sz;o[1]=-cy*sz+sy*sx*cz;o[2]=sy*cx;o[3]=cx*sz;o[4]=cx*cz;o[5]=-sx;o[6]=-sy*cz+cy*sx*sz;o[7]=sy*sz+cy*sx*cz;o[8]=cy*cx;return o;}
+function owpM(a,b,o){const a0=a[0],a1=a[1],a2=a[2],a3=a[3],a4=a[4],a5=a[5],a6=a[6],a7=a[7],a8=a[8];
+  o[0]=a0*b[0]+a1*b[3]+a2*b[6];o[1]=a0*b[1]+a1*b[4]+a2*b[7];o[2]=a0*b[2]+a1*b[5]+a2*b[8];
+  o[3]=a3*b[0]+a4*b[3]+a5*b[6];o[4]=a3*b[1]+a4*b[4]+a5*b[7];o[5]=a3*b[2]+a4*b[5]+a5*b[8];
+  o[6]=a6*b[0]+a7*b[3]+a8*b[6];o[7]=a6*b[1]+a7*b[4]+a8*b[7];o[8]=a6*b[2]+a7*b[5]+a8*b[8];return o;}
+// v = m (x,y,z) into o at k
+function owpV(m,x,y,z,o,k){k=k||0;o[k]=m[0]*x+m[1]*y+m[2]*z;o[k+1]=m[3]*x+m[4]*y+m[5]*z;o[k+2]=m[6]*x+m[7]*y+m[8]*z;return o;}
+// the basis with columns d, p (made square to d), d x p
+function owpBas(o,dx,dy,dz,px,py,pz){let l=Math.hypot(dx,dy,dz)||1;dx/=l;dy/=l;dz/=l;const k=px*dx+py*dy+pz*dz;px-=dx*k;py-=dy*k;pz-=dz*k;l=Math.hypot(px,py,pz);
+  if(l<1e-6){px=Math.abs(dy)<0.9?0:1;py=Math.abs(dy)<0.9?1:0;pz=0;const k2=px*dx+py*dy;px-=dx*k2;py-=dy*k2;pz-=dz*k2;l=Math.hypot(px,py,pz);}
+  px/=l;py/=l;pz/=l;const qx=dy*pz-dz*py,qy=dz*px-dx*pz,qz=dx*py-dy*px;
+  o[0]=dx;o[1]=px;o[2]=qx;o[3]=dy;o[4]=py;o[5]=qy;o[6]=dz;o[7]=pz;o[8]=qz;return o;}
+// a times b transposed
+function owpMT(a,b,o){for(let i=0;i<3;i++)for(let j=0;j<3;j++)o[i*3+j]=a[i*3]*b[j*3]+a[i*3+1]*b[j*3+1]+a[i*3+2]*b[j*3+2];return o;}
+
+// ---- the figure's mesh ----
+// a buffer: positions, colours (day), greys (IR), the two bones and the first's weight, triangles
+const owpBuf=()=>({p:[],c:[],g:[],b:[],w:[],i:[],v:0});
+// one loft: rings {c centre, t axis, f front (square to t), rx side, rf front, rb back radius, e superellipse,
+// k part, b bones [b0,b1,w] or a function of the point, k0: a second copy of the ring before it in the part k0 (a
+// hard colour edge: a cuff, a collar), fx(P,ct,st,ring) a shaping offset}; N round; cap0/cap1 the poles' distances
+// past the ends (0: open); closed: the last ring joins the first (the scarf)
+function owpLoft(B,F,rings,N,cap0,cap1,closed){const starts=[],cen=[];
+  const vert=(x,y,z,k,bb,P)=>{const q=F.col(k,P),c=F.pal[q]||F.pal.shirt,h=OWP_HEAT[q]!=null?OWP_HEAT[q]:0.6,nz=(owHash(x*7,y*7,z*7)-0.5);
+    const ao=F.ao?F.ao(P):1;B.p.push(x,y,z);B.c.push(c.r*ao*(1+nz*0.06),c.g*ao*(1+nz*0.06),c.b*ao*(1+nz*0.06));const gy=clamp(0.55+(h-0.6)+nz*0.03,0,1);B.g.push(gy,gy,gy);
+    B.b.push(bb[0],bb[1]);B.w.push(bb[2]);return B.v++;};
+  for(let k=0;k<rings.length;k++){const g=rings[k],t=g.t,f=g.f,x=[t[1]*f[2]-t[2]*f[1],t[2]*f[0]-t[0]*f[2],t[0]*f[1]-t[1]*f[0]],copies=g.k0?[g.k0,g.k]:[g.k];
+    for(const kk of copies){const s0=B.v;starts.push(s0);cen.push(g.c);
+      for(let j=0;j<N;j++){const a=j/N*Math.PI*2+(g.rot||0),ct=Math.cos(a),st=Math.sin(a),pe=2/(g.e||2),cx=Math.sign(ct)*Math.pow(Math.abs(ct),pe),sz=Math.sign(st)*Math.pow(Math.abs(st),pe);
+        const P={x:0,y:0,z:0,ct:ct,st:st,ring:g,lx:0};let rx=g.rx,rz=st>0?g.rf:g.rb;if(g.jaw)rx*=1-g.jaw*Math.max(0,st)*Math.max(0,st);
+        let ox=x[0]*rx*cx+f[0]*rz*sz,oy=x[1]*rx*cx+f[1]*rz*sz,oz=x[2]*rx*cx+f[2]*rz*sz;P.x=g.c[0]+ox;P.y=g.c[1]+oy;P.z=g.c[2]+oz;P.lx=cx;
+        if(g.fx){const d=g.fx(P);P.x+=x[0]*d[0]+f[0]*d[1]+t[0]*d[2];P.y+=x[1]*d[0]+f[1]*d[1]+t[1]*d[2];P.z+=x[2]*d[0]+f[2]*d[1]+t[2]*d[2];}
+        P.k=kk;vert(P.x,P.y,P.z,kk,typeof g.b==='function'?g.b(P):g.b,P);}}}
+  // the bands: between consecutive rings (a ring's two copies are not joined), wound outward
+  const tri=(a,b,c,ref)=>{const p=B.p,ax=p[a*3],ay=p[a*3+1],az=p[a*3+2],ux=p[b*3]-ax,uy=p[b*3+1]-ay,uz=p[b*3+2]-az,vx=p[c*3]-ax,vy=p[c*3+1]-ay,vz=p[c*3+2]-az;
+    const nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx,mx=(ax+p[b*3]+p[c*3])/3-ref[0],my=(ay+p[b*3+1]+p[c*3+1])/3-ref[1],mz=(az+p[b*3+2]+p[c*3+2])/3-ref[2];
+    if(nx*mx+ny*my+nz*mz<0)B.i.push(a,c,b);else B.i.push(a,b,c);};
+  const band=(ia,ib,ca,cb)=>{const ref=[(ca[0]+cb[0])/2,(ca[1]+cb[1])/2,(ca[2]+cb[2])/2];
+    for(let j=0;j<N;j++){const j1=(j+1)%N;tri(ia+j,ia+j1,ib+j1,ref);tri(ia+j,ib+j1,ib+j,ref);}};
+  let si=0;for(let k=0;k<rings.length;k++){const n=rings[k].k0?2:1;if(k>0){const prev=starts[si-1];band(prev,starts[si],cen[si-1],cen[si]);}si+=n;}
+  if(closed)band(starts[starts.length-1],starts[0],cen[cen.length-1],cen[0]);
+  const capAt=(ri,si2,d)=>{const g=rings[ri],t=g.t,c=g.c,s=d<0?-1:1,pc=[c[0]+t[0]*d,c[1]+t[1]*d,c[2]+t[2]*d],P={x:pc[0],y:pc[1],z:pc[2],ct:0,st:0,ring:g,pole:s,k:g.k,lx:0};
+    const pv=vert(pc[0],pc[1],pc[2],g.k,typeof g.b==='function'?g.b(P):g.b,P),ref=[c[0]-t[0]*d,c[1]-t[1]*d,c[2]-t[2]*d];
+    for(let j=0;j<N;j++)tri(pv,starts[si2]+j,starts[si2]+(j+1)%N,ref);};
+  if(cap0)capAt(0,0,-cap0);if(cap1)capAt(rings.length-1,starts.length-1,cap1);}
+// a box (rigid parts: the rifle, the prop) on bone bn, centre c, size s, pitched rx and yawed ry; e: the far end (+z)
+// scaled ex, ey (a taper); its own vertices per face (flat)
+function owpBox(B,F,bn,c,s,rx,k,ex,ey,ry){const hx=s[0]/2,hy=s[1]/2,hz=s[2]/2,m=owpE([],rx||0,ry||0,0),pts=[];
+  for(const [a,b2,cc] of [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]]){const fx=cc>0?(ex||1):1,fy=cc>0?(ey||1):1;
+    const v=owpV(m,a*hx*fx,b2*hy*fy,cc*hz,[]);pts.push([c[0]+v[0],c[1]+v[1],c[2]+v[2]]);}
+  const col=F.pal[k],h=OWP_HEAT[k],gy=clamp(0.55+(h-0.6),0,1);
+  for(const q of [[0,3,2,1],[4,5,6,7],[0,1,5,4],[3,7,6,2],[0,4,7,3],[1,2,6,5]]){const i0=B.v;
+    for(const j of q){const p=pts[j];B.p.push(p[0],p[1],p[2]);const sh=0.94+owHash(p[0]*9,p[1]*9,p[2]*9)*0.1;B.c.push(col.r*sh,col.g*sh,col.b*sh);B.g.push(gy,gy,gy);B.b.push(bn,bn);B.w.push(1);B.v++;}
+    B.i.push(i0,i0+1,i0+2,i0,i0+2,i0+3);}}
+// smooth normals (area weighted, per vertex; the boxes' own face vertices stay flat)
+function owpNormals(B){const n=new Float32Array(B.v*3),p=B.p,I=B.i;
+  for(let t=0;t<I.length;t+=3){const a=I[t]*3,b=I[t+1]*3,c=I[t+2]*3,ux=p[b]-p[a],uy=p[b+1]-p[a+1],uz=p[b+2]-p[a+2],vx=p[c]-p[a],vy=p[c+1]-p[a+1],vz=p[c+2]-p[a+2];
+    const nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;for(const q of [a,b,c]){n[q]+=nx;n[q+1]+=ny;n[q+2]+=nz;}}
+  for(let i=0;i<B.v;i++){const l=Math.hypot(n[i*3],n[i*3+1],n[i*3+2])||1;n[i*3]/=l;n[i*3+1]/=l;n[i*3+2]/=l;}return n;}
+// the AK pattern rifle in its bone's frame: the grip's top at the origin, the muzzle toward +z, the receiver's top +y.
+// Receiver and cover, the handguard (lower and upper), gas tube, barrel, front sight, muzzle brake, a curved magazine in
+// three pieces, the pistol grip and a tapered stock with its drop: 13 boxes, 156 triangles (5, 60, at LOD1)
+function owpRifle(B,F,L){const W=F.wood,b=13;
+  if(L){owpBox(B,F,b,[0,0.03,0.16],[0.05,0.08,0.5],0,'metal');owpBox(B,F,b,[0,0.022,0.48],[0.022,0.022,0.14],0,'metal');
+    owpBox(B,F,b,[0,-0.1,0.14],[0.03,0.2,0.08],-0.3,'metal');owpBox(B,F,b,[0,0.0,-0.25],[0.04,0.08,0.32],0.12,W);owpBox(B,F,b,[0,-0.05,-0.035],[0.03,0.09,0.04],0.35,W);return;}
+  owpBox(B,F,b,[0,0.03,0.06],[0.046,0.068,0.30],0,'metal');owpBox(B,F,b,[0,0.07,0.065],[0.04,0.016,0.27],0,'metal');
+  owpBox(B,F,b,[0,0.016,0.31],[0.05,0.046,0.2],0,W);owpBox(B,F,b,[0,0.056,0.30],[0.036,0.026,0.17],0,W);
+  owpBox(B,F,b,[0,0.056,0.415],[0.022,0.022,0.07],0,'metal');owpBox(B,F,b,[0,0.022,0.47],[0.017,0.017,0.12],0,'metal');
+  owpBox(B,F,b,[0,0.048,0.47],[0.016,0.05,0.02],0,'metal');owpBox(B,F,b,[0,0.022,0.54],[0.026,0.026,0.04],0,'metal');
+  owpBox(B,F,b,[0,-0.035,0.11],[0.028,0.07,0.075],-0.12,'metal');owpBox(B,F,b,[0,-0.098,0.128],[0.028,0.068,0.07],-0.36,'metal');owpBox(B,F,b,[0,-0.155,0.158],[0.027,0.064,0.066],-0.6,'metal');
+  owpBox(B,F,b,[0,-0.05,-0.035],[0.03,0.09,0.04],0.35,W);
+  owpBox(B,F,b,[0,0.0,-0.255],[0.04,0.06,0.33],0.14,W,1.0,1.8);}
+// the prop: a 20 litre jerrycan hanging from the hand (the handle at the origin), or a box held in front with both
+function owpProp(B,F,L,kind){const b=14;
+  if(kind==='can'){owpBox(B,F,b,[0,-0.26,0],[0.16,0.42,0.33],0,'can');if(!L){owpBox(B,F,b,[0,-0.035,0],[0.03,0.035,0.13],0,'can');owpBox(B,F,b,[0,-0.06,0.135],[0.045,0.06,0.045],0.5,'can');}}
+  else{owpBox(B,F,b,[0,0,0],[0.42,0.28,0.32],0,'box');if(!L)owpBox(B,F,b,[0,0.142,0],[0.36,0.012,0.26],0,'strap');}}
+// one figure: H 1.62 to 1.86 m (7.5 heads), build bw 0.9 to 1.1; o: armed ('ready', 'sling' or none), prop ('can',
+// 'box'). Returns its dimensions, the bones' rest pivots and the two LODs' data
+function owFigure(R,role,o){o=o||{};
+  const r=(a,b)=>tqR(R,a,b),pk=a=>tqPick(R,a),C=h=>new THREE.Color(h);
+  const H=r(1.62,1.86),s=H/1.75,bw=r(0.9,1.1),lw=1+(bw-1)*0.6;
+  const shirt=C(pk(OWP_PAL.cloth)).multiplyScalar(r(0.92,1.04)),long=R()<0.8,armed=o.armed||null;
+  const pal={skin:C(pk(OWP_PAL.skin)).multiplyScalar(r(0.94,1.05)),hair:C(pk(OWP_PAL.hair)),shirt:shirt,
+    trou:R()<0.55?shirt.clone().multiplyScalar(r(0.88,0.97)):C(pk(OWP_PAL.cloth)).multiplyScalar(r(0.8,0.92)),
+    vest:C(pk(OWP_PAL.vest)),rig:C(pk(OWP_PAL.rig)),hat:C(pk(OWP_PAL.hat)),wrap:C(pk(OWP_PAL.wrap)),scarf:C(pk(OWP_PAL.scarf)),shoe:C(pk(OWP_PAL.shoe)),
+    strap:C(0x3a3127),metal:C(0x2a2b2d),wood:C(0x6a4126),poly:C(0x2e2c29),can:C(pk([0x4a5536,0x7d2a22,0xb19a6a,0x3e4a3a])),box:C(pk([0xa98a5e,0x8f7650,0x6f7a52]))};
+  pal.beard=pal.hair.clone().multiplyScalar(1.08);pal.eye=pal.skin.clone().multiplyScalar(0.55);pal.lip=pal.skin.clone().multiplyScalar(0.78);
+  const rig=!!armed&&R()<0.55,vest=!rig&&R()<0.35,hat=R()<0.55?pk(['pakol','wrap','wrap','kufi']):null,scarf=R()<0.28,beard=R()<0.62,mous=!beard&&R()<0.4,
+    rolled=R()<0.22,hem=long?r(0.6,0.72):0.86,sandal=R()<0.35;
+  const F={pal:pal,wood:R()<0.7?'wood':'poly'};pal.poly=pal.poly;OWP_HEAT.poly=0.3;
+  // the colour rules: hair and beard on the head rings, the vest's open front, the rig's pouches, the sling's strap
+  F.col=(k,P)=>{const st=P.st,ct=P.ct,rg=P.ring;
+    if(k==='head'){const h=rg.hz;if(!hat&&(h>=4||P.pole))return 'hair';
+      if(!hat&&h===3&&st<0.55)return 'hair';if(!hat&&h===2&&st<-0.1)return 'hair';if(h===1&&st<-0.4&&!hat)return 'hair';
+      if((beard&&(h===-2||h===-3||h===-1)&&st>-0.3)||(beard&&h===0&&st>-0.1&&Math.abs(ct)>0.6)||(mous&&h===-1&&st>0.86))return 'beard';
+      if(hat&&h>=2&&st<-0.2)return 'hair';
+      if(h===1&&st>0.6&&Math.abs(ct)>0.18&&Math.abs(ct)<0.6)return 'eye';if(h===-1&&st>0.93&&!mous&&!beard)return 'lip';return 'skin';}
+    if(k==='vest'&&st>0.2&&Math.abs(ct)<0.26)return 'shirt';
+    if(k==='rig'&&st<0.2)return 'shirt';
+    if(armed&&st>0&&(k==='shirt'||k==='vest'||k==='rig')&&P.y>0.98*s&&P.y<1.43*s){const xl=(0.15-(1.42*s-P.y)/(0.44*s)*0.33)*s*bw;if(Math.abs(P.x-xl)<0.024*s)return 'strap';}   /* the sling across the chest */
+    return k;};
+  // ambient occlusion by height: the shirt's inside and the trousers under it darker, the chin's underside
+  F.ao=P=>P.k==='trou'&&P.y>(hem-0.04)*s&&long?0.85:1;
+  const D={H:H,s:s,bw:bw,ua:0.30*s,fa:0.255*s,palm:0.315*s,th:0.41*s,sh:0.421*s,ah:0.079*s,lb:0.135*s,hipX:0.088*s*bw,shX:0.175*s*bw,armed:armed,prop:o.prop||null};
+  // pivots: the pelvis, spine, neck, shoulders, elbows, hips, knees, ankles
+  const a7=0.12,sa=Math.sin(a7),ca=Math.cos(a7),pv=new Float32Array(OWP_NB*3),P3=(i,x,y,z)=>{pv[i*3]=x;pv[i*3+1]=y;pv[i*3+2]=z;};
+  P3(0,0,0.93*s,0);P3(1,0,1.06*s,-0.01*s);P3(2,0,1.455*s,0);
+  for(const sd of [1,-1]){const u=sd>0?3:5,l=sd>0?7:10,sx=sd*D.shX,sy=1.405*s,sz=-0.005*s;P3(u,sx,sy,sz);P3(u+1,sx+sd*sa*D.ua,sy-ca*D.ua,sz);
+    P3(l,sd*D.hipX,0.91*s,0);P3(l+1,sd*D.hipX,0.91*s-D.th,0);P3(l+2,sd*D.hipX,0.91*s-D.th-D.sh,0);}
+  D.pv=pv;D.armD=[sa,-ca];
+  const build=L=>{const B=owpBuf(),T=[],up=[0,1,0],fw=[0,0,1];
+    // ---- the torso, neck and head: one loft up the body ----
+    const tr=(y,rx,rf,rb,cz,k,b,e,l1,x)=>{if(L&&!l1)return;const g={c:[0,y*s,cz*s],t:up,f:fw,rx:rx*s*bw,rf:rf*s*bw,rb:rb*s*bw,e:e||2.5,k:k,b:b};if(x)Object.assign(g,x);T.push(g);};
+    const hr=(y,rx,rf,rb,cz,hz,b,l1,x)=>{if(L&&!l1)return;const g={c:[0,y*s,cz*s],t:up,f:fw,rx:rx*s*(0.97+0.03*bw),rf:rf*s*(0.97+0.03*bw),rb:rb*s*(0.97+0.03*bw),e:2.15,k:'head',hz:hz,b:b};if(x)Object.assign(g,x);T.push(g);};
+    const skirt=P=>[7,10,clamp(0.5+0.9*P.x/(0.205*s*bw),0,1)],skirt2=P=>[0,P.x>=0?7:10,1-0.45*Math.min(1,Math.abs(P.x)/(0.2*s*bw))];
+    const vk=vest?'vest':rig?'rig':'shirt',vv=vest?0.012:0,rp=rig?P=>[0,Math.max(0,P.st)*Math.max(0,P.st)*0.024*s,0]:null;
+    if(long){tr(hem,0.212,0.16,0.155,0,'shirt',skirt,2.3,1);tr((hem+0.92)/2,0.2,0.145,0.145,0,'shirt',skirt2,2.4,0);}
+    else tr(0.86,0.19,0.13,0.135,0,'shirt',[0,0,1],2.5,1);
+    tr(0.92,0.19,0.13,0.14,-0.005,'shirt',[0,0,1],2.5,1);
+    tr(1.09,0.172+vv,0.126+vv,0.12+vv,0,vk,[0,1,0.45],2.5,1,vk!=='shirt'?{k0:'shirt',fx:rp}:null);   /* the vest's hem: a hard edge */
+    tr(1.19,0.176+vv,0.136+vv,0.122+vv,0,vk,[1,1,1],2.5,0,{fx:rp});
+    tr(1.27,0.183+vv,0.142+vv,0.124+vv,0.005,vk,[1,1,1],2.5,1,{fx:rp});
+    tr(1.345,0.186+vv,0.128+vv,0.12+vv,0,vk,[1,1,1],2.5,0,{fx:rp});
+    tr(1.405,0.2,0.112,0.112,-0.005,'shirt',[1,1,1],2.6,1,vk!=='shirt'?{k0:vk}:null);
+    tr(1.44,0.14,0.086,0.09,-0.01,'shirt',[1,1,1],2.3,0);
+    tr(1.458,0.074,0.07,0.066,0.0,'shirt',[1,1,1],2,1);
+    hr(1.462,0.058,0.058,0.056,0.006,-4,[1,2,0.6],1,{k0:'shirt'});
+    hr(1.495,0.053,0.056,0.055,0.008,-4,[2,1,0.8],0);
+    const ear=P=>[Math.sign(P.lx)*0.011*s*Math.pow(Math.abs(P.ct),14)*(hat==='wrap'?0:1),0,0];
+    hr(1.527,0.061,0.072,0.066,0.018,-3,[2,2,1],1,{jaw:0.28,fx:P=>[0,beard?0.008*s*Math.max(0,P.st):0,0]});
+    hr(1.552,0.068,0.089,0.085,0.012,-2,[2,2,1],0,{jaw:0.26,fx:P=>[0,beard?0.01*s*Math.max(0,P.st):0,0]});
+    hr(1.585,0.073,0.096,0.092,0.008,-1,[2,2,1],0,{jaw:0.16});
+    hr(1.613,0.076,0.1,0.098,0.005,0,[2,2,1],1,{fx:P=>{const e=ear(P);e[1]=0.017*s*Math.pow(Math.max(0,P.st),14);return e;}});
+    hr(1.64,0.078,0.094,0.1,0.0,1,[2,2,1],0,{fx:P=>{const e=ear(P);e[1]=-0.006*s*Math.max(0,P.st)*(Math.exp(-Math.pow((P.ct-0.38)/0.16,2))+Math.exp(-Math.pow((P.ct+0.38)/0.16,2)));return e;}});
+    hr(1.668,0.079,0.098,0.1,-0.003,2,[2,2,1],0,{fx:P=>[0,0.004*s*Math.pow(Math.max(0,P.st),4),0]});
+    hr(1.70,0.074,0.09,0.095,-0.008,3,[2,2,1],1);
+    if(!hat)hr(1.728,0.056,0.068,0.074,-0.014,4,[2,2,1],0);
+    owpLoft(B,F,T,L?6:12,0,hat?0:(L?0.05:0.024)*s,false);
+    // ---- headwear: a rolled wool cap (pakol), a wrap, or a skull cap, on the head bone ----
+    if(hat){const W=[],hw=(y,rx,rf,rb,cz,l1,x)=>{if(L&&!l1)return;const g={c:[0,y*s,cz*s],t:up,f:fw,rx:rx*s,rf:rf*s,rb:rb*s,e:2.2,k:hat==='wrap'?'wrap':'hat',b:[2,2,1]};if(x)Object.assign(g,x);W.push(g);};
+      const tw=P=>[0,0,0.004*s*Math.sin(P.ct*3+P.st*5)];
+      if(hat==='pakol'){hw(1.676,0.084,0.102,0.106,-0.004,1);hw(1.708,0.089,0.107,0.11,-0.006,0);hw(1.742,0.091,0.109,0.112,-0.008,1);hw(1.764,0.085,0.102,0.106,-0.008,0);
+        owpLoft(B,F,W,L?6:12,0,0.008*s,false);}
+      else if(hat==='wrap'){hw(1.655,0.083,0.1,0.104,-0.003,1);hw(1.69,0.093,0.111,0.115,-0.005,0,{fx:tw});hw(1.727,0.096,0.112,0.118,-0.008,1,{fx:tw});hw(1.765,0.087,0.1,0.11,-0.012,0,{fx:tw});
+        owpLoft(B,F,W,L?6:12,0,0.026*s,false);}
+      else{hw(1.69,0.078,0.094,0.099,-0.006,1);hw(1.722,0.067,0.082,0.089,-0.01,0);owpLoft(B,F,W,L?6:12,0,0.033*s,false);}}
+    // ---- a scarf: a closed tube round the neck, lower at the front ----
+    if(scarf&&!L){const S=[],M=10;for(let i=0;i<M;i++){const a=i/M*Math.PI*2,c=[Math.sin(a)*0.083*s*bw,(1.455-0.014*Math.cos(a))*s,Math.cos(a)*0.078*s*bw+0.004*s],t=[Math.cos(a),0.014*Math.sin(a),-Math.sin(a)];
+      const tl=Math.hypot(t[0],t[1],t[2]);S.push({c:c,t:[t[0]/tl,t[1]/tl,t[2]/tl],f:[0,1,0],rx:0.024*s,rf:0.02*s,rb:0.02*s,e:2,k:'scarf',b:[1,2,0.75]});}
+      for(const g of S){const t=g.t,k=t[1];g.f=[-t[0]*k,1-k*k,-t[2]*k];const l=Math.hypot(g.f[0],g.f[1],g.f[2]);g.f=[g.f[0]/l,g.f[1]/l,g.f[2]/l];}
+      owpLoft(B,F,S,3,0,0,true);}
+    // ---- the arms: shoulder cap, sleeve to the cuff (rolled on some), wrist, a mitten hand ----
+    for(const sd of [1,-1]){const u=sd>0?3:5,fa=u+1,A=[],J=[sd*D.shX,1.405*s,-0.005*s],d=[sd*sa,-ca,0];
+      const ar=(t,rx,rf,k,b,l1,x)=>{if(L&&!l1)return;const g={c:[J[0]+d[0]*t*s,J[1]+d[1]*t*s,J[2]],t:d,f:fw,rx:rx*s*lw,rf:rf*s*lw,rb:rf*s*lw,e:2,k:k,b:b};if(x)Object.assign(g,x);A.push(g);};
+      const cuff=rolled?0.42:0.545;
+      ar(0.012,0.05,0.053,'shirt',[u,1,0.5],1);ar(0.045,0.06,0.063,'shirt',[u,1,0.8],1);ar(0.10,0.058,0.061,'shirt',[u,u,1],0);ar(0.2,0.054,0.056,'shirt',[u,u,1],0);
+      ar(0.30,0.05,0.052,'shirt',[u,fa,0.5],1);
+      if(rolled){ar(cuff-0.02,0.05,0.053,'shirt',[fa,u,0.9],0);ar(cuff,0.052,0.055,'shirt',[fa,fa,1],1);ar(cuff+0.004,0.038,0.041,'skin',[fa,fa,1],1,{k0:'shirt'});ar(0.5,0.032,0.035,'skin',[fa,fa,1],0);}
+      else{ar(0.40,0.05,0.053,'shirt',[fa,u,0.85],0);ar(0.5,0.047,0.05,'shirt',[fa,fa,1],0);ar(cuff,0.049,0.052,'shirt',[fa,fa,1],1);}
+      ar(0.553,0.027,0.03,'skin',[fa,fa,1],1,rolled?null:{k0:'shirt'});
+      ar(0.60,0.017,0.044,'skin',[fa,fa,1],1);ar(0.655,0.015,0.045,'skin',[fa,fa,1],0);ar(0.70,0.014,0.037,'skin',[fa,fa,1],0,{fx:()=>[-sd*0.004*s,0,0]});
+      owpLoft(B,F,A,L?4:7,0.022*s,(L?0.1:0.035)*s,false);}
+    // ---- the legs: loose trousers gathered at the ankle, the ankle; then the shoes ----
+    for(const sd of [1,-1]){const th=sd>0?7:10,sh=th+1,ft=th+2,G=[],x0=sd*D.hipX,y0=0.91*s,dn=[0,-1,0];
+      const lg=(t,rx,rf,rb,k,b,l1,x)=>{if(L&&!l1)return;const g={c:[x0,y0-t*s,0],t:dn,f:fw,rx:rx*s*lw,rf:rf*s*lw,rb:rb*s*lw,e:2.1,k:k,b:b};if(x)Object.assign(g,x);G.push(g);};
+      lg(long?-0.02:-0.06,0.098,0.102,0.106,'trou',[th,th,1],1);lg(0.2,0.09,0.093,0.095,'trou',[th,th,1],0);
+      lg(0.41,0.072,0.074,0.074,'trou',[th,sh,0.5],1);lg(0.55,0.071,0.075,0.077,'trou',[sh,th,0.85],0);
+      lg(0.775,0.05,0.053,0.053,'trou',[sh,sh,1],1);lg(0.79,0.031,0.035,0.034,sandal?'skin':'shoe',[sh,ft,0.5],1,{k0:'trou'});lg(0.825,0.03,0.034,0.033,sandal?'skin':'shoe',[ft,ft,1],0);
+      owpLoft(B,F,G,L?4:7,0,0,false);
+      const Fo=[],fo=(z,y,rx,ry,l1)=>{if(L&&!l1)return;Fo.push({c:[x0,y*s,z*s],t:fw,f:up,rx:rx*s*lw,rf:ry*s,rb:ry*s*0.9,e:2.6,k:'shoe',b:[ft,ft,1]});};
+      fo(-0.065,0.038,0.031,0.03,0);fo(-0.03,0.045,0.038,0.043,1);fo(0.05,0.04,0.044,0.036,1);fo(0.135,0.023,0.047,0.023,1);fo(0.185,0.019,0.042,0.018,0);
+      owpLoft(B,F,Fo,L?4:6,(L?0.05:0.015)*s,(L?0.06:0.027)*s,false);}
+    const bodyTris=B.i.length/3;if(armed)owpRifle(B,F,L);const rifTris=B.i.length/3-bodyTris;
+    if(D.prop)owpProp(B,F,L,D.prop);
+    const n=owpNormals(B);
+    return {p:new Float32Array(B.p),n:n,c:new Float32Array(B.c),g:new Float32Array(B.g),b:new Uint8Array(B.b),w:new Float32Array(B.w),i:B.i,v:B.v,tris:B.i.length/3,body:bodyTris,rifle:rifTris};};
+  D.lod=[build(0),build(1)];
+  D.look={long:long,vest:vest,rig:rig,hat:hat,scarf:scarf,beard:beard,rolled:rolled};
+  return D;}
+// ---- navigation: a 0.5 m grid over the yard and 34 m round it, walls, buildings, clutter, trees and the departing
+// pickup blocked with a body's clearance; A* (eight ways, no corner cutting), the string pulled, Chaikin twice where the
+// cut corners stay clear. The lane to the gate costs five times (the pickup drives out along it) ----
+function owpNav(lay){const c=0.5,M=34,x0=-lay.hw-M,z0=-lay.hd-M,nx=Math.ceil((2*lay.hw+2*M)/c),nz=Math.ceil((2*lay.hd+2*M)/c),bk=new Uint8Array(nx*nz),cost=new Float32Array(nx*nz).fill(1);
+  const rect=(ax,az,bx,bz,m)=>{const i0=Math.max(0,Math.ceil((ax-m-x0)/c-0.5)),i1=Math.min(nx-1,Math.floor((bx+m-x0)/c-0.5)),k0=Math.max(0,Math.ceil((az-m-z0)/c-0.5)),k1=Math.min(nz-1,Math.floor((bz+m-z0)/c-0.5));
+    for(let k=k0;k<=k1;k++)for(let i=i0;i<=i1;i++)bk[k*nx+i]=1;};
+  const circ=(x,z,r)=>{const i0=Math.max(0,Math.floor((x-r-x0)/c)),i1=Math.min(nx-1,Math.ceil((x+r-x0)/c)),k0=Math.max(0,Math.floor((z-r-z0)/c)),k1=Math.min(nz-1,Math.ceil((z+r-z0)/c));
+    for(let k=k0;k<=k1;k++)for(let i=i0;i<=i1;i++)if(Math.hypot(x0+(i+0.5)*c-x,z0+(k+0.5)*c-z)<r)bk[k*nx+i]=1;};
+  const hw=lay.hw,hd=lay.hd,t=0.36,mw=0.5;
+  rect(-hw-t,-hd-t,hw+t,-hd+t,mw);rect(-hw-t,hd-t,hw+t,hd+t,mw);rect(-hw-t,-hd-t,-hw+t,hd+t,mw);rect(hw-t,-hd-t,hw+t,hd+t,mw);   // the gate counts as wall (nobody uses it but the pickup)
+  for(const q of lay.occ)if(!q.walk)rect(q.x0,q.z0,q.x1,q.z1,0.42);
+  for(const q of lay.obs)rect(q[0],q[1],q[2],q[3],0.42);
+  for(const q of lay.out)circ(q.x,q.z,q.r+0.45);
+  rect(-1.0,5.3,1.0,10.7,0.45);   // the departing pickup at (0, 8)
+  for(let k=0;k<nz;k++)for(let i=0;i<nx;i++){const x=x0+(i+0.5)*c,z=z0+(k+0.5)*c;if(Math.abs(x)<1.8&&z>4&&z<hd)cost[k*nx+i]=5;}
+  return {c:c,x0:x0,z0:z0,nx:nx,nz:nz,bk:bk,cost:cost};}
+const owpCell=(N,x,z)=>{const i=Math.floor((x-N.x0)/N.c),k=Math.floor((z-N.z0)/N.c);return i<0||k<0||i>=N.nx||k>=N.nz?-1:k*N.nx+i;};
+const owpFree=(N,x,z)=>{const j=owpCell(N,x,z);return j>=0&&!N.bk[j];};
+// the nearest free cell's centre (within r metres), or null
+function owpNear(N,x,z,r){if(owpFree(N,x,z))return [x,z];const c=N.c;
+  for(let d=c;d<=(r||4);d+=c)for(let a=0;a<16;a++){const px=x+Math.cos(a/16*Math.PI*2)*d,pz=z+Math.sin(a/16*Math.PI*2)*d;if(owpFree(N,px,pz))return [px,pz];}return null;}
+function owpLOS(N,ax,az,bx,bz){const L=Math.hypot(bx-ax,bz-az),n=Math.max(1,Math.ceil(L/0.2));for(let i=0;i<=n;i++)if(!owpFree(N,ax+(bx-ax)*i/n,az+(bz-az)*i/n))return false;return true;}
+function owpAstar(N,ax,az,bx,bz){const s0=owpNear(N,ax,az,3),g0=owpNear(N,bx,bz,3);if(!s0||!g0)return null;
+  const nx=N.nx,s=owpCell(N,s0[0],s0[1]),g=owpCell(N,g0[0],g0[1]),gi=g%nx,gk=(g-gi)/nx,G=new Float32Array(N.nx*N.nz).fill(1e9),from=new Int32Array(N.nx*N.nz).fill(-1),cl=new Uint8Array(N.nx*N.nz);
+  const hp=[],hv=[],push=(f,j)=>{hp.push(f);hv.push(j);let i=hp.length-1;while(i>0){const p=(i-1)>>1;if(hp[p]<=hp[i])break;[hp[p],hp[i]]=[hp[i],hp[p]];[hv[p],hv[i]]=[hv[i],hv[p]];i=p;}},
+    pop=()=>{const j=hv[0],lf=hp.pop(),lv=hv.pop();if(hp.length){hp[0]=lf;hv[0]=lv;let i=0;for(;;){const a=2*i+1,b=a+1;let m=i;if(a<hp.length&&hp[a]<hp[m])m=a;if(b<hp.length&&hp[b]<hp[m])m=b;if(m===i)break;[hp[m],hp[i]]=[hp[i],hp[m]];[hv[m],hv[i]]=[hv[i],hv[m]];i=m;}}return j;};
+  const H=j=>{const i=j%nx,k=(j-i)/nx,dx=Math.abs(i-gi),dz=Math.abs(k-gk);return Math.max(dx,dz)+0.414*Math.min(dx,dz);};
+  G[s]=0;push(H(s),s);let it=0;
+  while(hp.length&&it++<200000){const j=pop();if(cl[j])continue;cl[j]=1;if(j===g)break;const i=j%nx,k=(j-i)/nx;
+    for(let dk=-1;dk<=1;dk++)for(let di=-1;di<=1;di++){if(!di&&!dk)continue;const ii=i+di,kk=k+dk;if(ii<0||kk<0||ii>=nx||kk>=N.nz)continue;const q=kk*nx+ii;if(N.bk[q]||cl[q])continue;
+      if(di&&dk&&(N.bk[k*nx+ii]||N.bk[kk*nx+i]))continue;
+      const ng=G[j]+(di&&dk?1.4142:1)*(N.cost[j]+N.cost[q])*0.5;if(ng<G[q]){G[q]=ng;from[q]=j;push(ng+H(q),q);}}}
+  if(from[g]<0&&g!==s)return null;
+  const pts=[];for(let j=g;j>=0;j=from[j]){const i=j%nx,k=(j-i)/nx;pts.push([N.x0+(i+0.5)*N.c,N.z0+(k+0.5)*N.c]);if(j===s)break;}
+  pts.reverse();pts[0]=s0;pts[pts.length-1]=g0;
+  // the string pulled
+  const out=[pts[0]];let a=0;while(a<pts.length-1){let b=pts.length-1;while(b>a+1&&!owpLOS(N,pts[a][0],pts[a][1],pts[b][0],pts[b][1]))b--;out.push(pts[b]);a=b;}
+  return owpSmooth(N,out,false);}
+function owpSmooth(N,P,loop){for(let it=0;it<2;it++){const Q=loop?[]:[P[0]],n=P.length;
+    for(let i=0;i<(loop?n:n-1);i++){const a=P[i],b=P[(i+1)%n];Q.push([a[0]*0.75+b[0]*0.25,a[1]*0.75+b[1]*0.25],[a[0]*0.25+b[0]*0.75,a[1]*0.25+b[1]*0.75]);}
+    if(!loop)Q.push(P[n-1]);let ok=true;for(let i=0;i<(loop?Q.length:Q.length-1)&&ok;i++){const a=Q[i],b=Q[(i+1)%Q.length];if(!owpLOS(N,a[0],a[1],b[0],b[1]))ok=false;}
+    if(!ok)break;P=Q;}
+  return P;}
+// a path: its points, the running lengths; at(s) the point and heading (0 facing +z, x = sin) at s along it
+function owpPath(P,loop){const pts=P.slice();if(loop)pts.push(P[0]);const cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]));
+  return {pts:pts,cum:cum,len:cum[cum.length-1],loop:!!loop};}
+function owpAt(p,s,o){const L=p.len;if(p.loop){s%=L;if(s<0)s+=L;}else s=clamp(s,0,L);const c=p.cum;let lo=0,hi=c.length-1;
+  while(hi-lo>1){const m=(lo+hi)>>1;if(c[m]<=s)lo=m;else hi=m;}
+  const a=p.pts[lo],b=p.pts[Math.min(lo+1,p.pts.length-1)],l=(c[lo+1]-c[lo])||1,f=clamp((s-c[lo])/l,0,1);o[0]=a[0]+(b[0]-a[0])*f;o[1]=a[1]+(b[1]-a[1])*f;o[2]=Math.atan2(b[0]-a[0],b[1]-a[1]);return o;}
+
+// ---- materials: the compound's program (Lambert, vertex colours, a map: a white one here), the blob shadows the
+// track's (a ground decal MeshBasicMaterial with a map) ----
+const OWP_M={};
+function owpMats(){if(OWP_M.body)return OWP_M;
+  OWP_M.tex=tex(4,4,(x,w,h)=>{x.fillStyle='#ffffff';x.fillRect(0,0,w,h);});
+  // drawn in the transparent pass (opaque, opacity 1; transparent is not in r128's program key) after the yard's
+  // canvas, whose depth bias at the sensor's range would otherwise paint over their lower legs
+  OWP_M.body=new THREE.MeshLambertMaterial({vertexColors:true,map:OWP_M.tex,transparent:true});
+  OWP_M.blobT=tex(64,64,(x,w,h)=>{x.clearRect(0,0,w,h);const g=x.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(0.5,'rgba(255,255,255,0.75)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,w,h);});
+  OWP_M.blob=groundDecalMat(new THREE.MeshBasicMaterial({map:OWP_M.blobT,transparent:true,color:0x1b2030,opacity:0.5}));
+  return OWP_M;}
+let OWP_FORCE=null;   // tests: every figure at one LOD (0 or 1)
+const owpIRon=()=>camMode===2&&sensorIRPass()&&!PHOTO.on&&!FREECAM;
+// the yard's draped canvas height at (x, z) in the compound's frame (its grid and triangles, owCompound's mk)
+function owpYardH(Y,x,z){const xs=Y.xs,zs=Y.zs,NX=xs.length;let i=0,k=0;while(i<NX-2&&xs[i+1]<=x)i++;while(k<zs.length-2&&zs[k+1]<=z)k++;
+  const fx=clamp((x-xs[i])/(xs[i+1]-xs[i]),0,1),fz=clamp((z-zs[k])/(zs[k+1]-zs[k]),0,1),h=Y.h,a=h[k*NX+i],b=h[k*NX+i+1],c=h[(k+1)*NX+i],d=h[(k+1)*NX+i+1];
+  return fx+fz<=1?a+(b-a)*fx+(c-a)*fz:d+(c-d)*(1-fx)+(b-d)*(1-fz);}
+// walking styles: speed, step (per 1.75 m of height)
+const OWP_GAIT={walk:[1.25,0.72],carry:[1.0,0.62],box:[0.95,0.6],patrol:[1.15,0.7],ready:[1.1,0.66]};
+const _owpX=new Float64Array(9),_owpA=[0,0,0],_owpB=[0,0,0],_owpT=new Float64Array(9),_owpU=new Float64Array(9),_owpW=new Float64Array(9),_owpV3=[0,0,0],_owpQ=new Float64Array(OWP_NQ);
+// how far the pelvis drops in a walk with step L so both the leading foot at contact and the trailing one at toe off
+// (heel up 1 rad on the ball) stay within the legs' reach, through the 3 cm bob
+function owpDrop(D,L){const Zc=0.58*L,du=0.6,th=1.0,re=0.995*(D.th+D.sh),hip=0.91*D.s;
+  const zc=Zc-D.lb,hc=D.ah+Math.sqrt(Math.max(0,re*re-zc*zc)),zt=Zc-du*2*L+(D.ah*Math.sin(th)-D.lb*Math.cos(th)),yt=D.ah*Math.cos(th)+D.lb*Math.sin(th),ht=yt+Math.sqrt(Math.max(0,re*re-zt*zt));
+  return Math.max(0.015*D.s,hip-Math.min(hc,ht)-0.0121+0.02);}
+function owpFig(P,R,id,role,o){const D=owFigure(R,role,o),f={id:id,role:role,D:D,armed:D.armed,prop:D.prop,propOn:false,x:o.x,z:o.z,h:o.h||0,base:0,
+    mode:'stand',act:null,acts:[],at:0,s:0,v:0,phase:0,L:0.72*D.s,vf:tqR(R,0.94,1.06),drop:0,sub:'idle',tS:0,xf:1,iv:Math.floor(R()*4),ph:R()*6.28,ph2:R()*6.28,
+    Q:new Float64Array(OWP_NQ),Qb:new Float64Array(OWP_NQ),Q0:new Float64Array(OWP_NQ),S:new Float32Array(OWP_NB*12),Sf:new Float32Array(OWP_NB*12),rf:[0,0,0,0],
+    RR:new Float64Array(OWP_NB*9),J:new Float64Array(OWP_NB*3),ev:{sw:0,swT:0,ns:tqR(R,2,7),hy:0,hyT:0,nh:tqR(R,3,10),hh:0},
+    lod:-1,lodW:1,hid:false,boarded:false,roof:o.roof!=null?o.roof:null,plan:null,fsS:0,fsT:0,fs:null,fsN:0,fsI:0,bt:0,ball:[[0,0,0],[0,0,0]],pk:null,muz:[0,0,0],rd:0,
+    fz:[tqR(R,-0.04,0.06)*D.s,tqR(R,-0.04,0.06)*D.s],stW:tqR(R,0.09,0.12)*D.s,sh:[0,0]};
+  if(f.iv===3&&f.armed)f.iv=0;
+  // the rifle's frame in the spine's (relative to its pivot): at the low ready the grip by the right hip in front, the
+  // muzzle 30 degrees down, turned 20 degrees across the body; slung: diagonal on the back, the muzzle down by the left hip
+  const s=D.s;D.rG=[-0.1*s,0.0,0.19*s];D.rL=owpE(new Float64Array(9),0.52,0.35,-0.25);
+  D.sG=[0.02*s,0.1*s,-0.17*s];{const m=owpBas(new Float64Array(9),0,0,1,0,1,0);   /* columns: z (muzzle), then the top */
+    const zr=[0.45,-0.89,0],l=Math.hypot(zr[0],zr[1]);zr[0]/=l;zr[1]/=l;const yr=[0,0,1],xr=[yr[1]*zr[2]-yr[2]*zr[1],yr[2]*zr[0]-yr[0]*zr[2],yr[0]*zr[1]-yr[1]*zr[0]];
+    m[0]=xr[0];m[1]=yr[0];m[2]=zr[0];m[3]=xr[1];m[4]=yr[1];m[5]=zr[1];m[6]=xr[2];m[7]=yr[2];m[8]=zr[2];D.sL=m;}
+  {const v=owpV(D.rL,0,0.012,0.25,[]);D.rH=[D.rG[0]+v[0],D.rG[1]+v[1],D.rG[2]+v[2]];const w=owpV(D.rL,0,-0.035,-0.005,[]);D.rP=[D.rG[0]+w[0],D.rG[1]+w[1],D.rG[2]+w[2]];}
+  // the IK bones' rest bases: arms (straight, the elbow pointing back), legs (straight down, the knee forward)
+  D.B0=[owpBas(new Float64Array(9),D.armD[0],D.armD[1],0,0,0,-1),owpBas(new Float64Array(9),-D.armD[0],D.armD[1],0,0,0,-1),owpBas(new Float64Array(9),0,-1,0,0,0,1)];
+  f.gnd=(x,z)=>f.roof!=null?f.roof:P.surf(x,z);
+  f.base=f.gnd(f.x,f.z);
+  f.ft=[0,1].map(i=>{const sd=i?-1:1,c=Math.cos(f.h),sn=Math.sin(f.h),lx=sd*f.stW,lz=D.lb+f.fz[i],x=f.x+lx*c+lz*sn,z=f.z-lx*sn+lz*c;return {b:[x,f.gnd(x,z),z],yaw:f.h+sd*0.12,th:0,sw:0,fr:[0,0,0],fy:0,u0:0,tt:0,T:0.36,lt:-1};});
+  return f;}
+// ---- actions: walk a path (s0 to s1 along it; style), stand (a pose for dur, facing a heading or a point), crouch
+// (down and up, fn at the bottom), board (into the cab), and a call (fn) ----
+const owpW=(p,style,s0,s1)=>({k:'walk',p:p,style:style,s0:s0||0,s1:s1==null?p.len:s1});
+const owpS=(dur,sub,face,fp)=>({k:'stand',dur:dur,sub:sub,face:face,fp:fp||null});
+function owpNext(P,f){if(!f.acts.length&&f.plan)f.plan(f,P);f.act=f.acts.shift()||owpS(5,'idle',null);f.at=0;f.act.st=0;return f.act;}
+function owpSub(f,sub){if(f.armed==='ready'&&(sub==='idle'||sub==='talk'||sub==='listen'))sub='guard';if(sub===f.sub)return;f.Q0.set(f.Qb);f.xf=0;f.sub=sub;f.tS=0;}
+function owpMove(P,f,dt){let a=f.act||owpNext(P,f);
+  for(let g=0;g<3&&a.k==='call';g++){a.fn(f,P);a=owpNext(P,f);}
+  f.at+=dt;
+  if(a.k==='walk'){
+    if(!a.st){a.st=1;const G=OWP_GAIT[a.style]||OWP_GAIT.walk;a.v=(a.v||G[0])*f.vf;const L=G[1]*f.D.s;
+      if(f.mode!=='walk'){f.L=L;f.drop=owpDrop(f.D,L);owpWalkInit(P,f,a);}else if(Math.abs(L-f.L)>1e-4){const p=f.phase;f.L=L;f.drop=owpDrop(f.D,L);f.phase=p;}
+      f.mode='walk';f.s=a.s0;owpSub(f,a.style);}
+    const rem=a.s1-f.s,vT=Math.min(a.v,Math.sqrt(2*1.4*Math.max(0,rem))+0.04);f.v+=clamp(vT-f.v,-3*dt,1.8*dt);
+    const ds=Math.max(0,Math.min(rem,f.v*dt));f.s+=ds;f.phase+=ds/(2*f.L);
+    owpAt(a.p,f.s,_owpA);f.x=_owpA[0];f.z=_owpA[1];owpAt(a.p,a.p.loop?f.s+0.45:Math.min(a.p.len,f.s+0.45),_owpB);
+    const hT=Math.hypot(_owpB[0]-f.x,_owpB[1]-f.z)>0.05?Math.atan2(_owpB[0]-f.x,_owpB[1]-f.z):_owpA[2];f.h+=wrapPi(hT-f.h)*Math.min(1,dt*6);
+    if(rem<=0.004){f.act=null;f.v=0;}return;}
+  if(f.mode==='walk')owpStandInit(f);
+  if(a.k==='stand'){if(!a.st){a.st=1;f.mode='stand';owpSub(f,a.sub);if(a.fp)a.face=Math.atan2(a.fp[0]-f.x,a.fp[1]-f.z);}
+    if(a.peer)a.face=Math.atan2(a.peer.x-f.x,a.peer.z-f.z);
+    if(a.face!=null)f.h+=wrapPi(a.face-f.h)*(1-Math.exp(-dt/0.13));
+    if(a.talk)owpSub(f,a.talk.spk===f?'talk':'listen');
+    if(f.at>=a.dur)f.act=null;return;}
+  if(a.k==='crouch'){if(!a.st){a.st=1;f.mode='stand';owpSub(f,'crouch');if(a.fp)a.face=Math.atan2(a.fp[0]-f.x,a.fp[1]-f.z);}
+    if(a.face!=null)f.h+=wrapPi(a.face-f.h)*(1-Math.exp(-dt/0.13));
+    if(!a.done&&f.at>=a.dur*0.5){a.done=1;if(a.fn)a.fn(f,P);}if(f.at>=a.dur)f.act=null;return;}
+  if(a.k==='board'){if(!a.st){a.st=1;f.mode='board';owpSub(f,'board');a.x0=f.x;a.z0=f.z;}
+    const k=owpSS(0,a.dur,f.at);f.x=a.x0+a.dx*k;f.z=a.z0+a.dz*k;f.h+=wrapPi(a.face-f.h)*Math.min(1,dt*8);
+    if(f.at>=a.dur){f.boarded=true;owpHide(P,f);}return;}}
+// a walk from standing: the phase put where the planted foot (the more forward, in the walk's direction) already is
+function owpWalkInit(P,f,a){owpAt(a.p,a.s0,_owpA);owpAt(a.p,a.p.loop?a.s0+0.5:Math.min(a.p.len,a.s0+0.5),_owpB);
+  const hx=_owpB[0]-_owpA[0],hz=_owpB[1]-_owpA[1],hl=Math.hypot(hx,hz)||1,fx=hx/hl,fz=hz/hl,Zc=0.58*f.L;
+  for(const F of f.ft)if(F.sw===2){F.sw=0;F.b[1]=f.gnd(F.b[0],F.b[2]);}
+  const lz=f.ft.map(F=>(F.b[0]-f.x)*fx+(F.b[2]-f.z)*fz),i=lz[0]>=lz[1]?0:1,q=clamp((Zc-lz[i])/(2*f.L),0.03,0.3);
+  f.phase=((q-0.5*i)%1+1)%1;f.v=Math.max(f.v,0);}
+function owpStandInit(f){f.mode='stand';for(const F of f.ft)if(F.sw===1){F.sw=2;F.fr[0]=F.b[0];F.fr[1]=F.b[1];F.fr[2]=F.b[2];F.fy=F.yaw;F.tt=0;F.T=0.26;F.th0=F.th;}}
+function owpHide(P,f){f.hid=true;f.mode='hide';P.dirty=3;f.lod=-1;}
+// weight shifts every 4 to 9 s (3 to 6 guarding), a head turn now and then; eased, nothing snaps; none while walking
+function owpEv(f,dt){const e=f.ev,still=f.mode==='stand'&&f.sub!=='crouch';
+  if(still){e.ns-=dt;if(e.ns<=0){const g=f.sub==='guard';e.ns=g?3+Math.random()*3:4+Math.random()*5;e.swT=(e.swT>0?-1:1)*(0.018+Math.random()*0.016)*f.D.s;}
+    e.nh-=dt;if(e.nh<=0){if(e.hyT){e.hyT=0;e.nh=5+Math.random()*9;}else{e.hyT=(Math.random()<0.5?-1:1)*(0.35+Math.random()*0.5)*(f.sub==='talk'||f.sub==='listen'?0.4:1);e.nh=1+Math.random()*2.2;}}}
+  else{e.swT=0;e.hyT=0;}
+  e.sw+=(e.swT-e.sw)*(1-Math.exp(-dt/0.32));e.hy+=(e.hyT-e.hy)*(1-Math.exp(-dt/0.28));}
+// the feet. Walking: each foot's phase q (the right half a cycle on); stance for q < 0.6 with the ball of the foot
+// fixed where it landed (the heel rising on it from mid stance), swing after it, from where it lifted to where the
+// walk will want it at the next contact (0.58 of a step ahead of the pelvis, along the path), lifted 7 cm, the toe up
+// before the strike. Standing: a step (0.36 s) whenever a foot is 7 cm or 14 degrees from its place under the body
+function owpFeet(P,f,dt){const D=f.D,c=Math.cos(f.h),sn=Math.sin(f.h);
+  if(f.mode==='walk'){const a=f.act,du=0.6,L=f.L,Zc=0.58*L,tt=1.0;
+    for(let i=0;i<2;i++){const F=f.ft[i],sd=i?-1:1,q=((f.phase+0.5*i)%1+1)%1;
+      if(q<du){if(F.sw){F.sw=0;F.b[0]=F.tg[0];F.b[1]=F.tg[1];F.b[2]=F.tg[2];F.yaw=F.ty;}F.th=tt*owpSS(0.26,du,q);}
+      else{const u=(q-du)/(1-du);if(F.sw!==1){F.sw=1;F.fr[0]=F.b[0];F.fr[1]=F.b[1];F.fr[2]=F.b[2];F.fy=F.yaw;F.u0=Math.min(u,0.9);F.th0=F.th;F.tg=F.tg||[0,0,0];}
+        const up=clamp((u-F.u0)/(1-F.u0),0,1),rem=(1-q)*2*L+Zc,p=a&&a.k==='walk'?a.p:null;
+        let tx,tz,ty;if(p){const sl=p.loop?f.s+rem:Math.min(p.len,f.s+rem);owpAt(p,sl,_owpA);owpAt(p,p.loop?sl+0.3:Math.min(p.len,sl+0.3),_owpB);
+          let hx=_owpB[0]-_owpA[0],hz=_owpB[1]-_owpA[1];const hl=Math.hypot(hx,hz);const hh=hl>0.05?Math.atan2(hx,hz):f.h,over=p.loop?0:Math.max(0,f.s+rem-p.len);
+          tx=_owpA[0]+Math.sin(hh)*over+Math.cos(hh)*sd*0.085*D.s;tz=_owpA[1]+Math.cos(hh)*over-Math.sin(hh)*sd*0.085*D.s;ty=hh;}
+        else{tx=f.x+sn*rem+c*sd*0.085*D.s;tz=f.z+c*rem-sn*sd*0.085*D.s;ty=f.h;}
+        F.tg[0]=tx;F.tg[2]=tz;F.tg[1]=f.gnd(tx,tz);F.ty=ty+sd*0.1;
+        const e=up*up*(3-2*up);F.b[0]=F.fr[0]+(tx-F.fr[0])*e;F.b[2]=F.fr[2]+(tz-F.fr[2])*e;F.b[1]=F.fr[1]+(F.tg[1]-F.fr[1])*e+0.07*D.s*Math.pow(Math.sin(Math.PI*up),0.8);
+        F.yaw=F.fy+wrapPi(F.ty-F.fy)*e;F.th=F.th0*Math.pow(Math.max(0,1-up/0.38),2)-0.26*Math.pow(Math.sin(Math.PI*clamp((up-0.3)/0.7,0,1)),1.3);}}
+    return;}
+  if(f.mode==='board'){const k=owpSS(0,1.2,f.at);for(let i=0;i<2;i++){const F=f.ft[i],sd=i?-1:1,lx=sd*f.stW*(1-0.4*k),lz=D.lb+0.1*k,x=f.x+lx*c+lz*sn,z=f.z-lx*sn+lz*c;
+      F.b[0]=x;F.b[2]=z;F.b[1]=f.gnd(x,z)+0.32*k*D.s;F.yaw=f.h+sd*0.12;F.th=0;}return;}
+  if(f.mode!=='stand')return;
+  let sw=-1,worst=0,wi=-1;
+  for(let i=0;i<2;i++){const F=f.ft[i],sd=i?-1:1,cr=f.sub==='crouch'?1.25:1,lx=sd*f.stW*cr,lz=D.lb+f.fz[i],x=f.x+lx*c+lz*sn,z=f.z-lx*sn+lz*c,yw=f.h+sd*0.12;
+    if(F.sw===2){F.tt+=dt;const up=clamp(F.tt/F.T,0,1),e=up*up*(3-2*up),gy=f.gnd(x,z);F.b[0]=F.fr[0]+(x-F.fr[0])*e;F.b[2]=F.fr[2]+(z-F.fr[2])*e;
+      F.b[1]=F.fr[1]+(gy-F.fr[1])*e+0.045*D.s*Math.sin(Math.PI*up);F.yaw=F.fy+wrapPi(yw-F.fy)*e;F.th=(F.th0||0)*(1-e)+0.18*Math.sin(Math.PI*up)*(1-up);
+      if(up>=1){F.sw=0;F.th=0;F.lt=P.t;}sw=i;}
+    else{const er=Math.hypot(F.b[0]-x,F.b[2]-z)+0.3*Math.abs(wrapPi(F.yaw-yw));F.th+=(0-F.th)*Math.min(1,dt*10);if(er>worst){worst=er;wi=i;}}}
+  if(sw<0&&wi>=0&&worst>0.07&&P.t-Math.max(f.ft[0].lt,f.ft[1].lt)>0.1){const F=f.ft[wi];F.sw=2;F.fr[0]=F.b[0];F.fr[1]=F.b[1];F.fr[2]=F.b[2];F.fy=F.yaw;F.tt=0;F.T=0.36;F.th0=F.th;}}
+// ---- the poses: a sub state's joint angles and IK targets (spine frame) at its time t ----
+// 0-2 pelvis pitch, roll, yaw; 3-5 spine; 6-8 head; 9-12 left shoulder flex, abduct, twist, elbow; 13-16 right; 17 sway;
+// 18 drop; 19, 20 the left and right arm's IK weight; 21 crouch; 22-24, 25-27 the IK targets
+function owpPose(f,sub,t,o){o.fill(0);const D=f.D,s=D.s,ph=f.ph;
+  o[9]=-0.04;o[10]=0.08;o[12]=-0.16;o[13]=-0.04;o[14]=-0.08;o[16]=-0.16;
+  o[3]=0.025+0.008*Math.sin(t*1.6+ph);o[9]+=0.012*Math.sin(t*1.6+ph);o[13]+=0.012*Math.sin(t*1.6+ph);
+  o[18]=0.014*s;   // standing: the knees just unlocked (and the legs keep their reach through a weight shift)
+  const W=OWP_GAIT[sub];
+  if(W){const p=f.phase%1,c1=Math.cos(2*Math.PI*p),c3=Math.cos(2*Math.PI*(p-0.3)),c2=Math.cos(4*Math.PI*(p-0.3)),am=sub==='patrol'?0.85:sub==='carry'?0.8:sub==='ready'?0:1;
+    o[0]=0.03;o[2]=-0.075*c1;o[5]=0.11*c1;o[1]=0.035*c3;o[4]=-0.028*c3;o[3]=0.06;
+    o[6]=-(o[0]+o[3])+0.02;o[7]=-(o[2]+o[5]);o[8]=-(o[1]+o[4]);
+    o[9]=-0.3*am*Math.cos(2*Math.PI*(p-0.5))-0.03;o[13]=-0.3*am*c1-0.03;o[10]=0.09;o[14]=-0.09;
+    o[12]=-(0.2+0.28*Math.max(0,-o[9]/0.3));o[16]=-(0.2+0.28*Math.max(0,-o[13]/0.3));
+    o[17]=0.02*s*c3;o[18]=f.drop-0.015*s*c2;
+    if(sub==='carry'){o[13]=0.02+0.03*c1;o[14]=-0.2;o[16]=-0.05;o[10]=0.26;o[4]-=0.07;o[3]+=0.02;}
+    if(sub==='box'){o[19]=o[20]=1;o[22]=0.2*s;o[23]=-0.1*s;o[24]=0.26*s;o[25]=-0.2*s;o[26]=-0.1*s;o[27]=0.26*s;o[3]=-0.02;o[6]=0.02;}
+    if(sub==='patrol'&&f.iv&1){o[20]=1;o[25]=-0.05*s;o[26]=0.3*s;o[27]=0.15*s;}}
+  else if(sub==='crouch'){const k=Math.sin(Math.PI*clamp(t/1.2,0,1));o[18]=0.34*k*s;o[3]+=0.55*k;o[0]=0.1*k;o[6]=-0.3*k;o[13]=-0.55*k;o[16]=-0.12;o[9]=-0.3*k;o[12]=-0.5*k;o[21]=k;
+    if(f.prop==='box'&&f.propOn){o[19]=o[20]=1;o[22]=0.2*s;o[23]=-0.1*s;o[24]=0.26*s;o[25]=-0.2*s;o[26]=-0.1*s;o[27]=0.26*s;}}
+  else if(sub==='board'){const k=owpSS(0,1.2,t);o[18]=0.36*k*s;o[3]+=0.42*k;o[6]=-0.22*k;o[9]=-0.4*k;o[13]=-0.4*k;o[12]=o[16]=-0.6*k;}
+  else if(sub==='guard'){o[5]=0.15*Math.sin(t*0.86+ph);o[7]=0.5*Math.sin(t*1.03+f.ph2)-o[5]*0.6;o[6]=0.03*Math.sin(t*0.4);}
+  else if(sub==='talk'){const g=owpSS(-0.25,0.35,Math.sin(t*1.7+ph)+0.45*Math.sin(t*0.63+ph*2)),g2=g*owpSS(0.2,0.6,Math.sin(t*0.41+ph));
+    o[20]=g;o[25]=(-0.12+0.05*Math.sin(t*5.3))*s;o[26]=(0.15+0.05*Math.sin(t*3.1+1))*s;o[27]=(0.3+0.045*Math.cos(t*4.4))*s;
+    o[19]=g2;o[22]=(0.11-0.04*Math.sin(t*4.1))*s;o[23]=(0.13+0.04*Math.sin(t*2.7))*s;o[24]=(0.27+0.04*Math.cos(t*3.6))*s;
+    o[6]=0.04*Math.sin(t*4.6)+0.02;o[8]=0.05*Math.sin(t*1.25+ph);o[5]=0.05*Math.sin(t*0.9);}
+  else if(sub==='listen'){if(f.iv<2){o[19]=o[20]=1;o[22]=-0.1*s;o[23]=0.2*s;o[24]=0.15*s;o[25]=0.1*s;o[26]=0.17*s;o[27]=0.14*s;}
+    o[6]=0.11*Math.pow(Math.max(0,Math.sin(t*2.5+ph)),4)+0.03;o[8]=0.04*Math.sin(t*0.7);}
+  if(sub==='idle'||sub==='talk'&&!o[19]){if(f.iv===1&&sub==='idle'){o[19]=o[20]=1;o[22]=0.05*s;o[23]=-0.1*s;o[24]=-0.17*s;o[25]=-0.05*s;o[26]=-0.1*s;o[27]=-0.17*s;}
+    else if(f.iv===2&&sub==='idle'){o[19]=o[20]=1;o[22]=0.035*s;o[23]=-0.13*s;o[24]=0.18*s;o[25]=-0.035*s;o[26]=-0.13*s;o[27]=0.18*s;}
+    else if(f.iv===3){o[19]=1;o[22]=0.2*s*D.bw;o[23]=-0.04*s;o[24]=0.03*s;}}
+  // the low ready: both hands on the rifle, whatever the legs do
+  if(f.armed==='ready'){o[19]=o[20]=1;o[22]=D.rH[0];o[23]=D.rH[1];o[24]=D.rH[2];o[25]=D.rP[0];o[26]=D.rP[1];o[27]=D.rP[2];}
+  return o;}
+// two bone IK: from J toward T, segments a and b, the middle joint toward pole; E the middle joint, T2 the reached end
+function owpIK(J,T,a,b,pl,E,T2){let dx=T[0]-J[0],dy=T[1]-J[1],dz=T[2]-J[2],d=Math.hypot(dx,dy,dz)||1e-6;dx/=d;dy/=d;dz/=d;d=clamp(d,Math.abs(a-b)+1e-3,(a+b)*0.9995);
+  const x=(a*a-b*b+d*d)/(2*d),h=Math.sqrt(Math.max(0,a*a-x*x));let px=pl[0],py=pl[1],pz=pl[2];const k=px*dx+py*dy+pz*dz;px-=dx*k;py-=dy*k;pz-=dz*k;const l=Math.hypot(px,py,pz)||1;px/=l;py/=l;pz/=l;
+  E[0]=J[0]+dx*x+px*h;E[1]=J[1]+dy*x+py*h;E[2]=J[2]+dz*x+pz*h;T2[0]=J[0]+dx*d;T2[1]=J[1]+dy*d;T2[2]=J[2]+dz*d;}
+// the bones from the pose (f.Q), the root and the feet: rotations RR, joints J, the skin matrices S (R and J - R pivot)
+const _oE=[0,0,0],_oT=[0,0,0],_oH=[0,0,0],_oP=[0,0,0],_oK=[0,0,0],_oF=[0,0,0];
+function owpBones(P,f){const D=f.D,Q=f.Q,pv=D.pv,RR=f.RR,J=f.J,S=f.S,s=D.s;
+  const R=b=>RR.subarray(b*9,b*9+9),setJ=(b,x,y,z)=>{J[b*3]=x;J[b*3+1]=y;J[b*3+2]=z;},rel=(b,a,q)=>{const m=R(a);return owpV(m,pv[b*3]-pv[a*3],pv[b*3+1]-pv[a*3+1],pv[b*3+2]-pv[a*3+2],q);};
+  const Ry=owpE(_owpT,0,f.h,0);
+  // pelvis, spine, head
+  owpE(R(0),Q[0],f.h+Q[2],Q[1]);owpV(Ry,Q[17],pv[1]-Q[18],0,_oP);setJ(0,f.x+_oP[0],f.base+_oP[1],f.z+_oP[2]);
+  owpM(R(0),owpE(_owpU,Q[3],Q[5],Q[4]),R(1));rel(1,0,_oP);setJ(1,J[0]+_oP[0],J[1]+_oP[1],J[2]+_oP[2]);
+  owpM(R(1),owpE(_owpU,Q[6],Q[7],Q[8]),R(2));rel(2,1,_oP);setJ(2,J[3]+_oP[0],J[4]+_oP[1],J[5]+_oP[2]);
+  const Rs=R(1),Js=[J[3],J[4],J[5]];
+  // arms: the hand toward the blend of its pose's angles and its IK target, the elbow toward the blend of their poles
+  for(let i=0;i<2;i++){const sd=i?-1:1,u=i?5:3,q=i?13:9,w=Q[19+i],tq=22+i*3,d0x=sd*D.armD[0],d0y=D.armD[1];
+    rel(u,1,_oP);const Ju=[Js[0]+_oP[0],Js[1]+_oP[1],Js[2]+_oP[2]];
+    const Ruf=owpM(Rs,owpE(_owpU,Q[q],Q[q+2],Q[q+1]),_owpW);
+    owpV(Ruf,d0x*D.ua,d0y*D.ua,0,_oE);const Ex=Ju[0]+_oE[0],Ey=Ju[1]+_oE[1],Ez=Ju[2]+_oE[2];
+    const Rff=owpM(Ruf,owpE(_owpU,Q[q+3],0,0),_owpX);owpV(Rff,d0x*D.palm,d0y*D.palm,0,_oH);
+    let Hx=Ex+_oH[0],Hy=Ey+_oH[1],Hz=Ez+_oH[2];
+    let lx=Hx-Ju[0],ly=Hy-Ju[1],lz=Hz-Ju[2];const ll=Math.hypot(lx,ly,lz)||1;lx/=ll;ly/=ll;lz/=ll;
+    let ex=Ex-Ju[0],ey=Ey-Ju[1],ez=Ez-Ju[2];const kk=ex*lx+ey*ly+ez*lz;ex-=lx*kk;ey-=ly*kk;ez-=lz*kk;let el=Math.hypot(ex,ey,ez);
+    if(el<1e-4){owpV(Ruf,0,0,-1,_oK);ex=_oK[0];ey=_oK[1];ez=_oK[2];el=1;}ex/=el;ey/=el;ez/=el;
+    if(w>0){owpV(Rs,Q[tq],Q[tq+1],Q[tq+2],_oT);const Tx=Js[0]+_oT[0],Ty=Js[1]+_oT[1],Tz=Js[2]+_oT[2];owpV(Rs,sd*0.5,-0.45,-0.75,_oK);
+      Hx+=(Tx-Hx)*w;Hy+=(Ty-Hy)*w;Hz+=(Tz-Hz)*w;ex+=(_oK[0]-ex)*w;ey+=(_oK[1]-ey)*w;ez+=(_oK[2]-ez)*w;}
+    _oH[0]=Hx;_oH[1]=Hy;_oH[2]=Hz;_oK[0]=ex;_oK[1]=ey;_oK[2]=ez;owpIK(Ju,_oH,D.ua,D.palm,_oK,_oE,_oT);
+    const B0=D.B0[i];owpMT(owpBas(_owpU,_oE[0]-Ju[0],_oE[1]-Ju[1],_oE[2]-Ju[2],ex,ey,ez),B0,R(u));setJ(u,Ju[0],Ju[1],Ju[2]);
+    owpMT(owpBas(_owpU,_oT[0]-_oE[0],_oT[1]-_oE[1],_oT[2]-_oE[2],ex,ey,ez),B0,R(u+1));setJ(u+1,_oE[0],_oE[1],_oE[2]);
+    if(i===1){f.palm=f.palm||[0,0,0];f.palm[0]=_oT[0];f.palm[1]=_oT[1];f.palm[2]=_oT[2];}}
+  // legs onto the feet: the ankle from the ball of the foot, its yaw and pitch
+  for(let i=0;i<2;i++){const th=i?10:7,F=f.ft[i];rel(th,0,_oP);const Jt=[J[0]+_oP[0],J[1]+_oP[1],J[2]+_oP[2]];
+    const Rf=owpE(R(th+2),F.th,F.yaw,0);owpV(Rf,0,D.ah,-D.lb,_oF);const A=[F.b[0]+_oF[0],F.b[1]+_oF[1],F.b[2]+_oF[2]];
+    _oK[0]=Math.sin(F.yaw);_oK[1]=0.1;_oK[2]=Math.cos(F.yaw);owpIK(Jt,A,D.th,D.sh,_oK,_oE,_oT);
+    owpMT(owpBas(_owpU,_oE[0]-Jt[0],_oE[1]-Jt[1],_oE[2]-Jt[2],_oK[0],_oK[1],_oK[2]),D.B0[2],R(th));setJ(th,Jt[0],Jt[1],Jt[2]);
+    owpMT(owpBas(_owpU,_oT[0]-_oE[0],_oT[1]-_oE[1],_oT[2]-_oE[2],_oK[0],_oK[1],_oK[2]),D.B0[2],R(th+1));setJ(th+1,_oE[0],_oE[1],_oE[2]);
+    setJ(th+2,_oT[0],_oT[1],_oT[2]);owpV(Rf,0,-D.ah,D.lb,_oF);const bl=f.ball[i];bl[0]=_oT[0]+_oF[0];bl[1]=_oT[1]+_oF[1];bl[2]=_oT[2]+_oF[2];}
+  // the rifle: in the spine's frame (the low ready or slung)
+  if(f.armed){const L=f.armed==='ready'?D.rL:D.sL,G=f.armed==='ready'?D.rG:D.sG;owpM(Rs,L,R(13));owpV(Rs,G[0],G[1],G[2],_oP);setJ(13,Js[0]+_oP[0],Js[1]+_oP[1],Js[2]+_oP[2]);
+    owpV(R(13),0,0,1,f.muz);const ref=f.armed==='ready'?f.palm:Js;f.rd=Math.hypot(J[39]-ref[0],J[40]-ref[1],J[41]-ref[2]);}
+  else{R(13).fill(0);setJ(13,J[0],J[1],J[2]);}
+  // the prop: the can hanging from the right hand (upright, the body's heading), the box in front between the hands
+  if(f.prop&&f.propOn){if(f.prop==='can'){owpE(R(14),0,f.h+Q[2]+Q[5]*0.5,0);setJ(14,f.palm[0],f.palm[1],f.palm[2]);}
+    else{owpV(Rs,0,-0.1*s,0.27*s,_oP);R(14).set(Rs);setJ(14,Js[0]+_oP[0],Js[1]+_oP[1],Js[2]+_oP[2]);}}
+  else{R(14).fill(0);setJ(14,J[0],J[1],J[2]);}
+  for(let b=0;b<OWP_NB;b++){const m=RR.subarray(b*9,b*9+9),o=b*12,px=b<13?pv[b*3]:0,py=b<13?pv[b*3+1]:0,pz=b<13?pv[b*3+2]:0;
+    S[o]=m[0];S[o+1]=m[1];S[o+2]=m[2];S[o+3]=J[b*3]-(m[0]*px+m[1]*py+m[2]*pz);
+    S[o+4]=m[3];S[o+5]=m[4];S[o+6]=m[5];S[o+7]=J[b*3+1]-(m[3]*px+m[4]*py+m[5]*pz);
+    S[o+8]=m[6];S[o+9]=m[7];S[o+10]=m[8];S[o+11]=J[b*3+2]-(m[6]*px+m[7]*py+m[8]*pz);}}
+// the skinned vertices of figure f into LOD L's buffers (two bones a vertex)
+function owpSkin(P,f,L){const g=f.D.lod[L],M=P.lod[L],o=f.r[L]*3,PA=M.pos.array,NA=M.nrm.array,S=f.S,rp=g.p,rn=g.n,bi=g.b,bw=g.w,n=g.v;
+  for(let i=0,j=0,k=o;i<n;i++,j+=3,k+=3){const a=bi[2*i]*12,b=bi[2*i+1]*12,w=bw[i],u=1-w,x=rp[j],y=rp[j+1],z=rp[j+2],nx=rn[j],ny=rn[j+1],nz=rn[j+2];
+    PA[k]=w*(S[a]*x+S[a+1]*y+S[a+2]*z+S[a+3])+u*(S[b]*x+S[b+1]*y+S[b+2]*z+S[b+3]);
+    PA[k+1]=w*(S[a+4]*x+S[a+5]*y+S[a+6]*z+S[a+7])+u*(S[b+4]*x+S[b+5]*y+S[b+6]*z+S[b+7]);
+    PA[k+2]=w*(S[a+8]*x+S[a+9]*y+S[a+10]*z+S[a+11])+u*(S[b+8]*x+S[b+9]*y+S[b+10]*z+S[b+11]);
+    NA[k]=w*(S[a]*nx+S[a+1]*ny+S[a+2]*nz)+u*(S[b]*nx+S[b+1]*ny+S[b+2]*nz);
+    NA[k+1]=w*(S[a+4]*nx+S[a+5]*ny+S[a+6]*nz)+u*(S[b+4]*nx+S[b+5]*ny+S[b+6]*nz);
+    NA[k+2]=w*(S[a+8]*nx+S[a+9]*ny+S[a+10]*nz)+u*(S[b+8]*nx+S[b+9]*ny+S[b+10]*nz);}
+  P.dirty|=1<<L;}
+function owpCollapse(P,f,L){const g=f.D.lod[L],M=P.lod[L],o=f.r[L]*3,PA=M.pos.array;for(let i=0;i<g.v*3;i+=3){PA[o+i]=f.x;PA[o+i+1]=f.base+0.5;PA[o+i+2]=f.z;}P.dirty|=1<<L;}
+// the pose this frame: the sub state's, crossfaded over 0.3 s from where the last one left it, plus the eased weight
+// shift and head turn
+function owpPoseUpd(f){owpPose(f,f.sub,f.tS,_owpQ);const Qb=f.Qb,Q=f.Q;
+  if(f.xf<1){const k=f.xf*f.xf*(3-2*f.xf),Q0=f.Q0;for(let i=0;i<OWP_NQ;i++)Qb[i]=Q0[i]+(_owpQ[i]-Q0[i])*k;}else Qb.set(_owpQ);
+  Q.set(Qb);const e=f.ev;Q[17]+=e.sw;Q[1]+=e.sw*1.4/f.D.s;Q[4]-=e.sw*1.1/f.D.s;Q[7]+=e.hy;}
+// the planted foot's speed in the world (the ball of the foot, from the bones), over each walk cycle
+function owpFS(P,f){const dtb=P.t-f.bt;f.bt=P.t;
+  if(f.mode==='walk'&&dtb>0&&dtb<0.5){let n=0,sm=0;for(let i=0;i<2;i++){const F=f.ft[i],b=f.ball[i],q=f.pb&&f.pb[i];if(!F.sw&&F.wasP&&q){sm+=Math.hypot(b[0]-q[0],b[1]-q[1],b[2]-q[2])/dtb;n++;}}
+    if(n){f.fsS+=sm/n*dtb;f.fsT+=dtb;}
+    const cy=Math.floor(f.phase);if(cy!==f.fsI){f.fsI=cy;if(f.fsT>0.4){f.fs=f.fsS/f.fsT;f.fsN++;f.fsMax=Math.max(f.fsMax||0,f.fs);}f.fsS=0;f.fsT=0;}}
+  else{f.fsS=0;f.fsT=0;}
+  f.pb=f.pb||[[0,0,0],[0,0,0]];for(let i=0;i<2;i++){const b=f.ball[i];f.pb[i][0]=b[0];f.pb[i][1]=b[1];f.pb[i][2]=b[2];f.ft[i].wasP=!f.ft[i].sw;}}
+// the merged mesh of every figure at one LOD: positions and normals written each frame (DynamicDrawUsage), the day's
+// colours or the IR's greys, a constant uv for the white map
+function owpMerge(P,L){let nv=0,ni=0;for(const f of P.figs){f.r=f.r||[0,0];f.r[L]=nv;nv+=f.D.lod[L].v;ni+=f.D.lod[L].i.length;}
+  const pos=new Float32Array(nv*3),nrm=new Float32Array(nv*3),col=new Float32Array(nv*3),day=new Float32Array(nv*3),ir=new Float32Array(nv*3),uv=new Float32Array(nv*2).fill(0.5),idx=nv>65535?new Uint32Array(ni):new Uint16Array(ni);
+  let ii=0;for(const f of P.figs){const g=f.D.lod[L],o=f.r[L];day.set(g.c,o*3);ir.set(g.g,o*3);nrm.set(g.n,o*3);for(let k=0;k<g.i.length;k++)idx[ii++]=g.i[k]+o;}
+  col.set(day);
+  const geo=new THREE.BufferGeometry(),pa=new THREE.BufferAttribute(pos,3),na=new THREE.BufferAttribute(nrm,3),cl=new THREE.BufferAttribute(col,3);pa.setUsage(THREE.DynamicDrawUsage);na.setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute('position',pa);geo.setAttribute('normal',na);geo.setAttribute('color',cl);geo.setAttribute('uv',new THREE.BufferAttribute(uv,2));geo.setIndex(new THREE.BufferAttribute(idx,1));
+  geo.boundingSphere=new THREE.Sphere(new THREE.Vector3(0,4,0),P.rad);
+  const m=new THREE.Mesh(geo,owpMats().body);m.name='ow_people'+L;m.userData.heat=0.6;m.userData.irVar=0.8;m.castShadow=false;m.receiveShadow=true;m.renderOrder=2;
+  P.lod[L]={m:m,pos:pa,nrm:na,col:cl,day:day,ir:ir,tris:ni/3,nv:nv};P.g.add(m);}
+// the blob shadows: a soft ellipse under each figure, stretched away from the sun (by day)
+function owpBlobs(P){const n=P.figs.length,pos=new Float32Array(n*12),uv=new Float32Array(n*8),idx=[];
+  for(let i=0;i<n;i++){uv.set([0,0,1,0,1,1,0,1],i*8);idx.push(i*4,i*4+2,i*4+1,i*4,i*4+3,i*4+2);}
+  const geo=new THREE.BufferGeometry(),pa=new THREE.BufferAttribute(pos,3);pa.setUsage(THREE.DynamicDrawUsage);geo.setAttribute('position',pa);geo.setAttribute('uv',new THREE.BufferAttribute(uv,2));geo.setIndex(idx);
+  geo.boundingSphere=new THREE.Sphere(new THREE.Vector3(0,4,0),P.rad);
+  const m=new THREE.Mesh(geo,owpMats().blob);m.name='ow_blobs';m.renderOrder=1;m.castShadow=m.receiveShadow=false;P.blob={m:m,pos:pa};P.g.add(m);}
+function owpBlobTick(P){const on=!TOD.night&&owShK()>0;P.blob.m.visible=on;if(!on)return;const M=owpMats().blob;M.opacity=0.62*owShK()/0.58;
+  const sp=_owP.copy(sun.position).normalize(),ca=Math.cos(P.ang),sa=Math.sin(P.ang),lx=sp.x*ca-sp.z*sa,lz=sp.x*sa+sp.z*ca,hl=Math.hypot(lx,lz)||1,ux=-lx/hl,uz=-lz/hl,el=Math.max(0.2,Math.asin(clamp(sp.y,-1,1)));
+  const A=P.blob.pos.array;
+  for(let i=0;i<P.figs.length;i++){const f=P.figs[i],o=i*12;if(f.hid){A.fill(0,o,o+12);continue;}
+    const len=Math.min(2.4,f.D.H*0.55/Math.tan(el)),cx=(f.ft[0].b[0]+f.ft[1].b[0])/2+ux*len*0.3,cz=(f.ft[0].b[2]+f.ft[1].b[2])/2+uz*len*0.3,y=f.gnd(cx,cz)+0.03,a=0.3*f.D.s+len*0.45,b=0.27*f.D.s;
+    const px=-uz,pz=ux;A[o]=cx-ux*a-px*b;A[o+1]=y;A[o+2]=cz-uz*a-pz*b;A[o+3]=cx+ux*a-px*b;A[o+4]=y;A[o+5]=cz+uz*a-pz*b;A[o+6]=cx+ux*a+px*b;A[o+7]=y;A[o+8]=cz+uz*a+pz*b;A[o+9]=cx-ux*a+px*b;A[o+10]=y;A[o+11]=cz-uz*a+pz*b;}
+  P.blob.pos.needsUpdate=true;}
+// a walk to goal from wherever f is: one of its precomputed paths (from its home spots), joined by a straight line when
+// clear, else a fresh A*; then the rest of the list
+function owpGoto(P,f,paths,goal,style,then){let best=null,bd=1e9;for(const p of paths||[]){if(!p)continue;const q=p.pts[0],e=Math.hypot(q[0]-f.x,q[1]-f.z);if(e<bd){bd=e;best=p;}}
+  let p=best;if(!p||bd>0.6){if(p&&owpLOS(P.N,f.x,f.z,p.pts[0][0],p.pts[0][1]))p=owpPath([[f.x,f.z]].concat(p.pts));
+    else{const q=owpAstar(P.N,f.x,f.z,goal[0],goal[1]);p=owpPath(q||[[f.x,f.z],goal]);}}
+  const e=p.pts[p.pts.length-1];if(Math.hypot(e[0]-goal[0],e[1]-goal[1])>0.05)p=owpPath(p.pts.concat([goal]));
+  // walking the other way: stop, turn with a step, then go (a stance foot left behind would be out of the leg's reach)
+  owpAt(p,Math.min(p.len,0.6),_owpA);const hd=Math.atan2(_owpA[0]-f.x,_owpA[1]-f.z),turn=f.mode==='walk'&&Math.abs(wrapPi(hd-f.h))>0.8;
+  if(turn){owpStandInit(f);f.v=0;}
+  f.act=null;f.acts=(turn?[owpS(0.45,'idle',hd)]:[]).concat([owpW(p,style)],then||[]);f.plan=null;}
+// the departure: d.dep after the watch began the wheels move (owVehTick, unchanged). From 12 s before (earlier when
+// the walk is longer) the driver and the passenger (the talking pair) and the armed gate guard walk to the pickup's
+// doors and board; the other gate guard walks to the gate, and the leaves swing open as he gets there (d.gateGo,
+// owCmpTick). Too late to walk (the watch began late): they are already in the cab and the gate open
+function owpDepPlan(P){const d=P.d,now=P.t;P.tDep=d.w0+d.dep;
+  if(P.tDep-now<6){for(const b of P.board)if(!b.f.hid){b.f.boarded=true;owpHide(P,b.f);}P.gateGo=1;d.gateGo=1;P.depDone=1;return;}
+  for(const b of P.board){const L=b.paths.reduce((m,p)=>Math.max(m,p?p.len:0),8);b.start=Math.max(now,P.tDep-Math.max(12,L/1.2+4));}
+  if(P.gb){P.gb.start=Math.max(now,P.tDep-Math.max(12,P.gb.path.len/1.15+7));}}
+function owpDepTick(P){const now=P.t,d=P.d;
+  for(const b of P.board){const f=b.f;if(b.go||f.hid)continue;if(now>=b.start){b.go=1;
+    owpGoto(P,f,b.paths,b.door,f.armed==='ready'?'ready':'walk',[owpS(0.45,'idle',0),{k:'board',dur:1.2,dx:b.dx,dz:0,face:0}]);}}
+  const G=P.gb;if(G&&!G.go&&now>=G.start){G.go=1;owpGoto(P,G.f,[G.path],G.gp,G.f.armed==='ready'?'ready':'walk',
+    [owpS(0.3,'idle',0),{k:'call',fn:()=>{P.gateGo=1;d.gateGo=1;}},owpS(1e9,'guard',0)]);}
+  if(now>=P.tDep&&!P.depDone){P.depDone=1;for(const b of P.board)if(!b.f.hid){b.f.boarded=true;owpHide(P,b.f);}P.gateGo=1;d.gateGo=1;}}
+// ---- the cast, rolled from its own stream of the seed (the compound's layout, userData.lay) ----
+function owPeople(d){const g0=d.cmp,U=g0.userData,lay=U.lay;if(!lay)return null;
+  const R=tqRng((d.seed^0x2c1b3c6d)>>>0),N=owpNav(lay),r=(a,b)=>tqR(R,a,b),hw=lay.hw,hd=lay.hd,ca=Math.cos(d.ang),sa=Math.sin(d.ang),gh0=g0.position.y;
+  const P={d:d,N:N,lay:lay,figs:[],t:st.time,frame:0,ms:0,msW:[],ir:false,tDep:null,board:[],gb:null,talks:[],dirty:0,ang:d.ang,lod:[null,null],rad:Math.hypot(hw+42,hd+42)};
+  const trk=[];{const pts=[[U.spur?U.spur.x:0,U.spur?U.spur.z:8]].concat(d.route.map(p=>{const X=p.x-d.c.x,Z=p.z-d.c.z;return [X*ca-Z*sa,X*sa+Z*ca];}));
+    for(let i=0;i+1<pts.length;i++){const a=pts[i],b=pts[i+1];if(Math.min(Math.hypot(a[0],a[1]),Math.hypot(b[0],b[1]))<160)trk.push([a[0],a[1],b[0],b[1]]);}}
+  // what they stand on: the yard's draped canvas inside the wall, outside the ground the compound stands on (the higher
+  // of the real ground and the terrain mesh) and the track's ribbon 12 cm over it
+  P.surf=(x,z)=>{if(Math.abs(x)<hw-0.05&&Math.abs(z)<hd-0.05)return owpYardH(U.yg,x,z);
+    const X=d.c.x+x*ca+z*sa,Z=d.c.z-x*sa+z*ca;let y=Math.max(groundHeight(X,Z),owMeshH(X,Z))-gh0,m=9;
+    for(const q of trk){const e=segD(x,z,q[0],q[1],q[2],q[3]);if(e<m)m=e;}if(m<2.3)y+=0.12*owpSS(2.3,1.6,m);return y;};
+  const fr=(x,z,rr)=>owpNear(N,x,z,rr||4),path=(a,b)=>{const q=a&&b?owpAstar(N,a[0],a[1],b[0],b[1]):null;return q?owpPath(q):null;},ang=(a,b)=>Math.atan2(b[0]-a[0],b[1]-a[1]);
+  let id=0;const add=(role,o)=>{const f=owpFig(P,R,id++,role,o);P.figs.push(f);return f;};
+  const gateC=[0,hd-0.5],s=R()<0.5?1:-1,lampX=lay.lamp?lay.lamp[0]:0;
+  // the departing pickup's doors (it faces the gate, +z; the driver's side +x)
+  const DL=[1.6,9.25],DR=[-1.6,9.25],RR=[-1.6,8.0];
+  // ---- gate guard 1: armed, at the low ready inside the gate, standing or pacing 6 m; he rides out with the pickup ----
+  {const p0=fr(s*5.5,hd-3.5)||fr(s*6,hd-6,8);let p1=null,p01=null,p10=null;
+    if(p0&&R()<0.65)for(const c of [[p0[0]+s*6,p0[1]],[p0[0],p0[1]-6],[p0[0]-s*6,p0[1]-3]]){if(owpFree(N,c[0],c[1])&&owpLOS(N,p0[0],p0[1],c[0],c[1])){p1=c;break;}}
+    if(p1){p01=owpPath([p0,p1]);p10=owpPath([p1,p0]);}
+    const f=add('guard',{armed:'ready',x:p0[0],z:p0[1],h:ang(p0,gateC)}),fg=ang(p0,gateC);
+    f.plan=p1?(f)=>{f.acts.push(owpS(r(6,12),'guard',fg+r(-0.4,0.4)),owpW(p01,'ready'),owpS(r(5,10),'guard',ang(p1,[0,0])+r(-0.5,0.5)),owpW(p10,'ready'));}
+      :(f)=>{f.acts.push(owpS(r(8,16),'guard',fg+r(-0.3,0.3)),owpS(r(6,12),'guard',fg+(R()<0.5?-1:1)*r(0.7,1.3)));};
+    P.board.push({f:f,door:RR,dx:1.05,paths:[path(p0,RR),p1?path(p1,RR):null],role:'escort'});}
+  // ---- gate guard 2: armed half the time, ten metres in; he walks to the gate and opens it for the pickup ----
+  {const gs=lampX>0?-1:1,post=fr(-s*7,hd-10,8)||fr(0,0,10),gp=fr(gs*3.6,hd-1.3,2.5)||fr(gs*4,hd-2.5,4);
+    const f=add('guard2',{armed:R()<0.5?'ready':null,x:post[0],z:post[1],h:ang(post,gateC)});
+    f.plan=(f)=>{f.acts.push(owpS(r(10,22),'idle',ang(post,gateC)+r(-0.4,0.4)),owpS(r(8,16),'idle',ang(post,[0,0])+r(-0.6,0.6)));};
+    P.gb={f:f,gp:gp,path:path(post,gp)||owpPath([post,gp])};}
+  // ---- the lookout: armed, on the white building's roof 0.7 m in from its parapet, pacing a few metres along a side
+  // clear of the roof's clutter, scanning outward ----
+  {const b=lay.bl.find(q=>q.white)||lay.bl[0];let seg=null;
+    if(b){const sides=[[0,1],[0,-1],[1,0],[-1,0]].sort(()=>R()-0.5),items=b.rl||[];
+      for(const [nx,nz] of sides){const L=(nz?b.ex:b.ez)-1.0,run=Math.min(4.5,2*L);if(run<1.2)continue;const c0=r(-L+run/2,L-run/2),inset=(nz?b.ez:b.ex)-0.75;
+        const P0=nz?[b.x+c0-run/2,b.z+nz*inset]:[b.x+nx*inset,b.z+c0-run/2],P1=nz?[b.x+c0+run/2,b.z+nz*inset]:[b.x+nx*inset,b.z+c0+run/2];
+        let ok=true;for(let k=0;k<=10&&ok;k++){const x=P0[0]+(P1[0]-P0[0])*k/10,z=P0[1]+(P1[1]-P0[1])*k/10;for(const q of items)if(Math.abs(x-q[0])<q[2]/2+0.55&&Math.abs(z-q[1])<q[3]/2+0.55)ok=false;}
+        if(ok){seg={a:P0,b:P1,out:Math.atan2(nx,nz)};break;}}}
+    if(seg){const f=add('lookout',{armed:'ready',x:seg.a[0],z:seg.a[1],h:seg.out,roof:b.yr}),pa=owpPath([seg.a,seg.b]),pb=owpPath([seg.b,seg.a]);
+      f.plan=(f)=>{f.acts.push(owpS(r(6,14),'guard',seg.out+r(-0.3,0.3)),owpW(pa,'ready'),owpS(r(6,12),'guard',seg.out+r(-0.3,0.3)),owpW(pb,'ready'));};}
+    else{const c=[[-1,-1],[1,-1],[-1,1],[1,1]].map(([u,w])=>fr(u*(hw-2),w*(hd-2),3)).find(q=>q)||[0,0];   // a wall corner
+      const f=add('lookout',{armed:'ready',x:c[0],z:c[1],h:Math.atan2(c[0],c[1])});f.plan=(f)=>{f.acts.push(owpS(r(8,14),'guard',Math.atan2(c[0],c[1])+r(-0.6,0.6)));};}}
+  // ---- the patrol: two men, rifles slung, one behind the other round a loop 16 to 25 m outside the wall, three pauses ----
+  {let loop=null;for(let tr=0;tr<4&&!loop;tr++){const o=r(16,25)-tr*2.5,ch=6,X=hw+o,Z=hd+o,W=[[X,Z-ch],[X-ch,Z],[-X+ch,Z],[-X,Z-ch],[-X,-Z+ch],[-X+ch,-Z],[X-ch,-Z],[X,-Z+ch]];
+      const pts=[];let ok=true;for(let i=0;i<W.length&&ok;i++){const a=W[i],b=W[(i+1)%W.length],q=owpAstar(N,a[0],a[1],b[0],b[1]);if(!q){ok=false;break;}for(const p of (pts.length?q.slice(1):q))pts.push(p);}
+      if(ok){pts.pop();loop=owpPath(owpSmooth(N,pts,true),true);}}
+    if(!loop){const a=fr(-10,hd+18,6)||[-10,hd+18],b=fr(10,hd+18,6)||[10,hd+18];loop=owpPath([a,b,[b[0],b[1]+0.01],[a[0],a[1]+0.01]],true);}
+    const ps=[r(0,1),r(0,1),r(0,1)].map(v=>v*loop.len).sort((a,b)=>a-b),pd=[r(5,10),r(5,10),r(5,10)];P.pat={path:loop,ps:ps};
+    for(let m=0;m<2;m++){const lag=m*1.9;owpAt(loop,ps[0]-lag,_owpA);const f=add('patrol',{armed:'sling',x:_owpA[0],z:_owpA[1],h:_owpA[2]});f.pi=0;f.vf=1;   /* one pace for the pair, so the gap holds */
+      f.plan=(f)=>{const i=f.pi%3,lap=Math.floor(f.pi/3)*loop.len,sA=ps[i]+lap,sB=(i<2?ps[i+1]:ps[0]+loop.len)+lap;f.pi++;
+        owpAt(loop,sB,_owpB);f.acts.push(owpW(loop,'patrol',sA-lag,sB-lag),owpS(pd[i],'idle',Math.atan2(_owpB[0],_owpB[1])+0.3*(m?-1:1)));};}}
+  // ---- the talking pair, in front of the door nearest the departing pickup (they are its driver and passenger) ----
+  {const doors=(lay.doors||[]).slice().sort((a,b)=>Math.hypot(a[0],a[1]-8)-Math.hypot(b[0],b[1]-8));let A=null,B=null;
+    for(const dp of doors){const b=lay.bl.reduce((m,q)=>Math.hypot(q.x-dp[0],q.z-dp[1])<Math.hypot(m.x-dp[0],m.z-dp[1])?q:m,lay.bl[0]);if(!b)break;
+      const ox=Math.abs(dp[0]-b.x)/b.ex>Math.abs(dp[1]-b.z)/b.ez?Math.sign(dp[0]-b.x):0,oz=ox?0:Math.sign(dp[1]-b.z),cx=dp[0]+ox*1.6,cz=dp[1]+oz*1.6,ux=-oz,uz=ox;
+      const a=[cx+ux*0.62,cz+uz*0.62],bb=[cx-ux*0.62,cz-uz*0.62];if(owpFree(N,a[0],a[1])&&owpFree(N,bb[0],bb[1])&&owpLOS(N,a[0],a[1],bb[0],bb[1])){A=a;B=bb;break;}}
+    if(!A){const c=fr(r(-8,8),r(-hd*0.4,0),12)||[0,0];A=[c[0]+0.6,c[1]];B=[c[0]-0.6,c[1]];if(!owpFree(N,A[0],A[1]))A=c;if(!owpFree(N,B[0],B[1]))B=fr(c[0]-0.7,c[1],2)||c;}
+    const fa=add('talk',{x:A[0],z:A[1],h:ang(A,B)}),fb=add('talk',{x:B[0],z:B[1],h:ang(B,A)}),T={spk:fa,nt:st.time+r(3,6)};P.talks.push({a:fa,b:fb,T:T});
+    fa.plan=(f)=>{f.acts.push(Object.assign(owpS(1e9,'talk'),{peer:fb,talk:T}));};fb.plan=(f)=>{f.acts.push(Object.assign(owpS(1e9,'talk'),{peer:fa,talk:T}));};
+    // the driver takes the nearer door (their own side of the cab)
+    const dA=Math.hypot(A[0]-DL[0],A[1]-DL[1])+Math.hypot(B[0]-DR[0],B[1]-DR[1]),dB=Math.hypot(A[0]-DR[0],A[1]-DR[1])+Math.hypot(B[0]-DL[0],B[1]-DL[1]);
+    const [dr,ps]=dA<=dB?[fa,fb]:[fb,fa];
+    P.board.push({f:dr,door:DL,dx:-1.05,paths:[path([dr.x,dr.z],DL)],role:'driver'},{f:ps,door:DR,dx:1.05,paths:[path([ps.x,ps.z],DR)],role:'passenger'});}
+  const nU=3+Math.floor(R()*3),gen=lay.gen,genPts=gen?[[0,1.55],[0,-1.55],[1.6,0],[-1.6,0],[1.3,1.3],[-1.3,1.3],[1.3,-1.3],[-1.3,-1.3]].map(([u,w])=>[gen.x+u,gen.z+w]).filter(q=>owpFree(N,q[0],q[1])):[];
+  // ---- the carrier: a jerrycan or a box from under the shade to the parked vehicle's tailgate, set down, and back ----
+  {const sh=lay.shade,vh=(lay.veh&&lay.veh[0])||{x:0,z:8},S0=(sh&&fr(sh[0],sh[1],2.5))||fr(r(-10,10),-hd*0.5,10)||[0,0],V0=fr(vh.x,vh.z-3.5,3)||fr(vh.x+2.2,vh.z,3)||S0,kind=R()<0.65?'can':'box';
+    const f=add('carry',{x:S0[0],z:S0[1],h:ang(S0,V0),prop:kind}),pSV=path(S0,V0)||owpPath([S0,V0]),pVS=path(V0,S0)||owpPath([V0,S0]),vp=[vh.x,vh.z],sp=sh?[sh[0],sh[1]+0.01]:[S0[0],S0[1]-1];
+    f.plan=(f)=>{f.acts.push(owpS(r(3,7),'idle',null,vp),{k:'crouch',dur:1.2,fn:f=>{f.propOn=true;},fp:sp},owpW(pSV,kind==='can'?'carry':'box'),
+      {k:'crouch',dur:1.2,fn:f=>{f.propOn=false;},fp:vp},owpS(r(2,4),'idle',null,vp),owpW(pVS,'walk'));};}
+  // ---- the walker: round the doors and the generator, a pause at each ----
+  if(nU>=4){const stops=[];if(genPts.length)stops.push({p:genPts[0],l:[gen.x,gen.z]});
+    for(const dp of (lay.doors||[]).slice().sort(()=>R()-0.5)){const q=fr(dp[0],dp[1],1.5);if(q&&stops.length<4)stops.push({p:q,l:dp});}
+    if(stops.length<2){const q=fr(r(-hw*0.5,hw*0.5),r(-hd*0.5,hd*0.3),8);if(q)stops.push({p:q,l:[0,0]});}
+    if(stops.length>=2){const legs=stops.map((a,i)=>path(a.p,stops[(i+1)%stops.length].p));
+      if(legs.every(p=>p)){const f=add('walk',{x:stops[0].p[0],z:stops[0].p[1],h:0});f.wi=0;
+        f.plan=(f)=>{const i=f.wi++%stops.length,nx=stops[(i+1)%stops.length];f.acts.push(owpW(legs[i],'walk'),owpS(r(2,5),'idle',null,nx.l));};}}}
+  // ---- by the generator: standing at it, now and then round to its other side ----
+  if(nU>=5&&genPts.length){const a=genPts[genPts.length>1?1:0],b=genPts[genPts.length-1],gc=[gen.x,gen.z],pab=a!==b?path(a,b):null,pba=a!==b?path(b,a):null;
+    const f=add('gen',{x:a[0],z:a[1],h:ang(a,gc)});
+    f.plan=(f)=>{f.acts.push(owpS(r(10,24),'idle',null,gc));if(pab&&pba)f.acts.push(owpW(pab,'walk'),owpS(r(10,24),'idle',null,gc),owpW(pba,'walk'));};}
+  // ---- the meshes: one per LOD, the blobs; in the compound's frame ----
+  const g=new THREE.Group();g.name='owPeople';g.position.set(d.c.x,gh0,d.c.z);g.rotation.y=d.ang;P.g=g;
+  owpMerge(P,0);owpMerge(P,1);owpBlobs(P);
+  for(const f of P.figs){f.sub=null;owpSub(f,'idle');f.xf=1;}
+  return P;}
+function owpFreeAll(P){if(!P)return;P.dead=1;scene.remove(P.g);P.g.traverse(m=>{if(m.isMesh&&m.geometry)m.geometry.dispose();});}
+// every frame of the tasking: the cast's behaviour, feet and pose, the LOD by the figure's height on the screen (over
+// 40 px the full set, else the light one, animated every second frame; under 6 px or past 3.5 km a frozen pose moved
+// with it), the skinning, the blobs, the IR's colours; the time it all took (P.ms)
+function owPplTick(d,dt){const P=d.ppl;if(!P||P.dead)return;const t0=performance.now();P.t=st.time;P.frame++;
+  if(P.tDep==null&&d.w0!=null)owpDepPlan(P);
+  if(P.tDep!=null)owpDepTick(P);
+  for(const q of P.talks){const T=q.T;if(P.t>=T.nt){T.spk=T.spk===q.a?q.b:q.a;T.nt=P.t+3+Math.random()*3;}}
+  const g=P.g,cp=camera.position,dx=cp.x-g.position.x,dz=cp.z-g.position.z,ca=Math.cos(P.ang),sa=Math.sin(P.ang),cx=dx*ca-dz*sa,cz=dx*sa+dz*ca,cy=cp.y-g.position.y;
+  const kp=innerHeight/(2*Math.tan(camera.fov*Math.PI/360));
+  for(const f of P.figs){
+    if(f.hid){if(f.lod!==-2){owpCollapse(P,f,0);owpCollapse(P,f,1);f.lod=-2;}continue;}
+    owpMove(P,f,dt);if(f.hid){owpCollapse(P,f,0);owpCollapse(P,f,1);f.lod=-2;continue;}
+    owpEv(f,dt);owpFeet(P,f,dt);
+    if(f.mode!=='board'){const gb=Math.min(f.gnd(f.x,f.z),f.gnd(f.ft[0].b[0],f.ft[0].b[2]),f.gnd(f.ft[1].b[0],f.ft[1].b[2]));f.base+=(gb-f.base)*Math.min(1,dt*8);}
+    f.tS+=dt;if(f.xf<1)f.xf=Math.min(1,f.xf+dt/0.3);
+    const dist=Math.hypot(f.x-cx,f.base+0.9-cy,f.z-cz),px=f.D.H*kp/Math.max(1,dist);
+    const L=OWP_FORCE!=null?OWP_FORCE:px>(f.lod===0?36:44)?0:(dist>3500||px<(f.lod===2?7:5))?2:1;
+    if(L!==f.lod){if(f.lod===0)owpCollapse(P,f,0);if(f.lod!==0&&L===0)owpCollapse(P,f,1);f.lod=L;f.need=1;}
+    if(f.need||L===0||(L===1&&((P.frame+f.id)&1)===0)){owpPoseUpd(f);owpBones(P,f);owpSkin(P,f,L===0?0:1);owpFS(P,f);f.need=0;f.frz=0;}
+    else if(L===2){const rf=f.rf;if(!f.frz){f.frz=1;f.Sf.set(f.S);rf[0]=f.x;rf[1]=f.base;rf[2]=f.z;rf[3]=f.h;}
+      const dh=f.h-rf[3];if(Math.abs(dh)>1e-4||Math.hypot(f.x-rf[0],f.z-rf[2],f.base-rf[1])>0.01){const c=Math.cos(dh),sn=Math.sin(dh),S=f.S,Z=f.Sf;
+        for(let b=0;b<OWP_NB;b++){const o=b*12;for(let j=0;j<4;j++){const x=Z[o+j],z=Z[o+8+j];S[o+j]=c*x+sn*z;S[o+4+j]=Z[o+4+j];S[o+8+j]=-sn*x+c*z;}
+          const tx=Z[o+3]-rf[0],tz=Z[o+11]-rf[2];S[o+3]=c*tx+sn*tz+f.x;S[o+7]=Z[o+7]-rf[1]+f.base;S[o+11]=-sn*tx+c*tz+f.z;}
+        owpSkin(P,f,1);rf[0]=f.x;rf[2]=f.z;rf[1]=f.base;rf[3]=f.h;f.Sf.set(f.S);}}}
+  if(P.dirty&1){P.lod[0].pos.needsUpdate=true;P.lod[0].nrm.needsUpdate=true;}
+  if(P.dirty&2){P.lod[1].pos.needsUpdate=true;P.lod[1].nrm.needsUpdate=true;}
+  P.dirty=0;
+  owpBlobTick(P);
+  const ir=owpIRon();if(ir!==P.ir){P.ir=ir;for(const M of P.lod){M.col.array.set(ir?M.ir:M.day);M.col.needsUpdate=true;}}
+  P.ms=performance.now()-t0;P.msW.push(P.ms);if(P.msW.length>60)P.msW.shift();}
+// tests: the cast, where each one is and what it does
+function owPplInfo(){const d=TASK.on&&TASK.id==='overwatch'?TASK.d:null,P=d&&d.ppl;if(!P)return null;const ca=Math.cos(P.ang),sa=Math.sin(P.ang),gy=P.g.position.y,W=(x,z)=>[d.c.x+x*ca+z*sa,d.c.z-x*sa+z*ca];
+  const br=f=>{const b=P.board.find(q=>q.f===f);return b?b.role:null;};
+  return {n:P.figs.length,ms:+P.ms.toFixed(3),msAvg:+(P.msW.reduce((a,b)=>a+b,0)/Math.max(1,P.msW.length)).toFixed(3),msMax:+Math.max(0,...P.msW).toFixed(3),
+    tris:[P.lod[0].tris,P.lod[1].tris],verts:[P.lod[0].nv,P.lod[1].nv],draws:[P.lod[0].m,P.lod[1].m,P.blob.m].filter(m=>m.visible).length,tDep:P.tDep,gateGo:!!d.gateGo,gate:d.cmp.userData.gate?d.cmp.userData.gate.t:null,
+    ir:P.ir,force:OWP_FORCE,blob:P.blob.m.visible,
+    lay:{hw:P.lay.hw,hd:P.lay.hd,bl:P.lay.bl.map(b=>[b.x-b.ex,b.z-b.ez,b.x+b.ex,b.z+b.ez,b.white?1:0,b.yr])},loop:P.pat?P.pat.path.pts.map(p=>[+p[0].toFixed(2),+p[1].toFixed(2)]):null,
+    figs:P.figs.map(f=>{const w=W(f.x,f.z),m=f.muz,mp=Math.asin(clamp(m[1],-1,1))*180/Math.PI,my=((Math.atan2(m[0],m[2])+P.ang)*180/Math.PI+720)%360;
+      const fe=f.ball.map(b=>+(b[1]-f.gnd(b[0],b[2])).toFixed(3)),pl=f.ft.map(F=>!F.sw);
+      return {id:f.id,role:f.role,armed:f.armed,prop:f.prop,propOn:f.propOn,state:f.mode+'/'+f.sub,x:+w[0].toFixed(2),z:+w[1].toFixed(2),y:+(gy+f.base).toFixed(3),lx:+f.x.toFixed(2),lz:+f.z.toFixed(2),
+        lod:f.lod,hid:f.hid,boarded:f.boarded,board:br(f),roof:f.roof,v:+f.v.toFixed(2),H:+f.D.H.toFixed(2),tris:[f.D.lod[0].tris,f.D.lod[1].tris],body:[f.D.lod[0].body,f.D.lod[1].body],rifTris:[f.D.lod[0].rifle,f.D.lod[1].rifle],look:f.D.look,
+        feet:fe,planted:pl,onGround:fe.every((e,i)=>!pl[i]||Math.abs(e)<=0.1),rifle:f.armed?{pitch:+mp.toFixed(1),yaw:+my.toFixed(1),d:+f.rd.toFixed(3)}:null,fs:f.fs==null?null:+f.fs.toFixed(3),fsMax:f.fsMax==null?null:+f.fsMax.toFixed(3),fsN:f.fsN};})};}
 // the pickup's road: out of the gate, then a dirt track that follows the ground to the real road at e (owRoadPt): steps
 // of 120 to 200 m, each wandering up to 25 degrees, bent toward the gentler, lower ground (heights 60 m ahead, left and
 // right), never steeper than 12 percent, never back past the compound, ending exactly on the road; smoothed once
@@ -18179,6 +18834,8 @@ TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limi
     // the dirt track, with its spur inside the gate to the parked vehicles (U.spur), draped on the yard as outside
     {const t1=performance.now(),sp={x:d.c.x+U.spur.x*ca+U.spur.z*sa,z:d.c.z-U.spur.x*sa+U.spur.z*ca};d.track=tqAdd(owTrack([sp].concat(d.route),d.c,null,d.ang));d.ms.track=+(performance.now()-t1).toFixed(1);}
     TASK.tgts.push(d.bld,d.veh);TASK.sens=true;irDirty=true;
+    // overwatch2 item 3: the people (not targets; their meshes go and come with the compound: its onClear)
+    {const t1=performance.now();d.gateGo=0;d.ppl=owPeople(d);if(d.ppl){scene.add(d.ppl.g);const oc=U.onClear;U.onClear=()=>{oc();owpFreeAll(d.ppl);};owPplTick(d,0);irDirty=true;}d.ms.ppl=+(performance.now()-t1).toFixed(1);}
     d.tgt=d.bld;tqDest(d.c.x,d.c.z,'Compound','CMPD');
   },
   // AUTO in flight: an orbit on the target at 3,000 ft (it climbs on the way), then off; on the ground AUTO takes off
@@ -18188,7 +18845,7 @@ TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limi
     const t=d.tgt===d.veh?d.veh:d.c;initAudio();if(AC.retract)st.gearDown=false;st.flapIdx=0;
     apEngage(st,'orbit',{cx:t.x,cz:t.z,r:OW_R,y:Math.max(st.pos.y-GEAR,(OW_ALT-FIELD_FT)/M2FT),v:AC.vcruise,dir:1});st.ap.tk=1;st.ap.sensor=true;
     toast((d.tgt===d.veh?'Orbit following the pickup':'Orbit: the compound')+', 3,000 ft. AUTO again: your airplane',3);return true;},
-  always(d,dt){owVehTick(d,dt);owTrackLight(d.track);owCmpTick(d,dt);
+  always(d,dt){owVehTick(d,dt);owTrackLight(d.track);owCmpTick(d,dt);owPplTick(d,dt);
     if(DEST&&DEST.task&&d.tgt===d.veh){DEST.x=d.veh.x;DEST.z=d.veh.z;}
     // the orbit follows the pickup while the ball is locked on it (the crew's track), at a truck's pace
     if(st.ap&&st.ap.mode==='orbit'&&d.tgt===d.veh&&(SENSOR.tgt===d.veh||st.ap.tk)){const k=Math.min(1,dt*0.6);st.ap.cx+=(d.veh.x-st.ap.cx)*k;st.ap.cz+=(d.veh.z-st.ap.cz)*k;}
@@ -25708,7 +26365,7 @@ const APP_VER='2026-10-19-schoolhud';          // keep version.json in step when
     get P(){return E.P;}};
 })();
 
-window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.holdF=n|0;},pfx:()=>{const L=PFX.last||{};return {w:L.w,h:L.h,sw:L.sw,sh:L.sh,bloomed:!!L.bloomed,smaa:!!L.smaa,sharp:L.sharp||0,samples:L.samples||0,layer:!!L.layer,box:L.box||null,split:!!L.split,full:L.full||null,webgl2:renderer.capabilities.isWebGL2,msaaRT:!!(PFX.rt&&PFX.rt.isWebGLMultisampleRenderTarget),allocN:PFX.allocN,scale:GFX.scale,rs:L.rs!=null?L.rs:GFX.rs,post:GFX.post,sens:GFX.sens};},setScale:s=>GFX.setScale(+s),sharpOff:v=>{PFX_SHARP.off=!!v;},msaaOff:v=>{PFX.msOff=!!v;},csmNBT:a=>{if(a)CSM.NBT=a.slice();if(CSM.n)csmRadii();return CSM.NBT.slice();},layerOff:v=>{PFX.layerOff=!!v;},splitOff:v=>{PFX.layerOff=!!v;},gfxBusy:()=>({applying:gfxApplying(),resumeWait:GFX.resumeWait,preDone:PRE.done,warmDone:WARM.done,busy:GFX.busy}),stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>({id:p.id,name:p.name,cacheKey:p.cacheKey,usedTimes:p.usedTimes})),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),tqStage:i=>tqStageGo(i),inFrame:()=>FRAME_IN,stepx:()=>({cfi:{plays:CFIV.plays,want:CFIV.want,got:CFIV.got,err:CFIV.err,miss:CFIV.miss.length,sets:CFIV.sets.slice()},ls:{n:LSQ.n,pend:LSQ.m.size},chime:!!STEPX.buf,last:STEPX.last,ghost:!!(STEPX.les.ghost&&STEPX.les.ghost.parentNode),geo:STEPX.les.geo&&{el:STEPX.les.geo.el.id,p:STEPX.les.geo.p.id,x:STEPX.les.geo.x,y:STEPX.les.geo.y,w:STEPX.les.geo.w,h:STEPX.les.geo.h},key:STEPX.les.key.slice(0,40)}),lsFlush:lsFlush,taskGo:()=>taskGo(),taskStop:()=>taskStop(),owSiteOK:(x,z)=>owSiteOK(x,z),owSiteInfo:(x,z)=>owSiteInfo(x,z),owRoadPt:(x,z)=>owRoadPt(x,z),owFallback:OW_FALLBACK,OW_LIM:OW_LIM,OW_RMAX:()=>OW_RMAX,owSlots:()=>({n:OW_SLOT.list&&OW_SLOT.list.length,ms:+OW_SLOT.ms.toFixed(1),busy:OW_SLOT.busy}),mapdReady:()=>!!MAPD.ready,taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
+window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.holdF=n|0;},pfx:()=>{const L=PFX.last||{};return {w:L.w,h:L.h,sw:L.sw,sh:L.sh,bloomed:!!L.bloomed,smaa:!!L.smaa,sharp:L.sharp||0,samples:L.samples||0,layer:!!L.layer,box:L.box||null,split:!!L.split,full:L.full||null,webgl2:renderer.capabilities.isWebGL2,msaaRT:!!(PFX.rt&&PFX.rt.isWebGLMultisampleRenderTarget),allocN:PFX.allocN,scale:GFX.scale,rs:L.rs!=null?L.rs:GFX.rs,post:GFX.post,sens:GFX.sens};},setScale:s=>GFX.setScale(+s),sharpOff:v=>{PFX_SHARP.off=!!v;},msaaOff:v=>{PFX.msOff=!!v;},csmNBT:a=>{if(a)CSM.NBT=a.slice();if(CSM.n)csmRadii();return CSM.NBT.slice();},layerOff:v=>{PFX.layerOff=!!v;},splitOff:v=>{PFX.layerOff=!!v;},gfxBusy:()=>({applying:gfxApplying(),resumeWait:GFX.resumeWait,preDone:PRE.done,warmDone:WARM.done,busy:GFX.busy}),stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>({id:p.id,name:p.name,cacheKey:p.cacheKey,usedTimes:p.usedTimes})),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),tqStage:i=>tqStageGo(i),inFrame:()=>FRAME_IN,stepx:()=>({cfi:{plays:CFIV.plays,want:CFIV.want,got:CFIV.got,err:CFIV.err,miss:CFIV.miss.length,sets:CFIV.sets.slice()},ls:{n:LSQ.n,pend:LSQ.m.size},chime:!!STEPX.buf,last:STEPX.last,ghost:!!(STEPX.les.ghost&&STEPX.les.ghost.parentNode),geo:STEPX.les.geo&&{el:STEPX.les.geo.el.id,p:STEPX.les.geo.p.id,x:STEPX.les.geo.x,y:STEPX.les.geo.y,w:STEPX.les.geo.w,h:STEPX.les.geo.h},key:STEPX.les.key.slice(0,40)}),lsFlush:lsFlush,taskGo:()=>taskGo(),taskStop:()=>taskStop(),owSiteOK:(x,z)=>owSiteOK(x,z),owSiteInfo:(x,z)=>owSiteInfo(x,z),owRoadPt:(x,z)=>owRoadPt(x,z),owFallback:OW_FALLBACK,OW_LIM:OW_LIM,OW_RMAX:()=>OW_RMAX,owSlots:()=>({n:OW_SLOT.list&&OW_SLOT.list.length,ms:+OW_SLOT.ms.toFixed(1),busy:OW_SLOT.busy}),owPeople:()=>owPplInfo(),owPeopleLod:v=>{OWP_FORCE=v==null?null:+v;},mapdReady:()=>!!MAPD.ready,taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
   task:()=>({on:TASK.on,id:TASK.id,stage:TASK.stage&&TASK.stage.id,si:TASK.si,brief:TASK.brief,done:TASK.done,res:TASK.res,ask:TASK.ask&&{shown:TASK.ask.shown,opts:TASK.ask.opts.map(o=>o.k),t:TASK.ask.t},d:TASK.d,log:TASK.log.slice(),seed:TASK.seed}),
   tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzBuild:()=>dzBuild(),dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
