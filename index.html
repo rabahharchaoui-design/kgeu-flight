@@ -8962,6 +8962,7 @@ if(REGION.az){fence(1495,-141,1645,-141);fence(-70,-80,-70,80);fence(150,-450,10
 // ---------- West Valley: sections, farms, suburbs, roads ----------
 const SEC=1609,SX0=2340,SZ0=-1783.5,TILE=SEC/4,FWY_X=2340,I10_Z=6250;
 const secMap={};
+const SEC_ART=[];   // the arterials' centre lines [x0,z0,x1,z1] (overwatch2: a dirt track can end on one)
 const secKey=(i,j)=>i+','+j;
 function secAt(x,z){return secMap[secKey(Math.floor((x-SX0)/SEC),Math.floor((z-SZ0)/SEC))]||'none';}
 const lotPx=512/TILE;
@@ -9058,6 +9059,7 @@ overlay(lists.sub,subFarTex,true,false);overlay(lists.near,subNearTex,false,fals
     if(t==='airport'||t==='luke') continue;
     const wx=cx-SEC/2; if(Math.abs(wx-FWY_X)>5&&mountains(wx,cz)<2&&airportZoneDist(wx,cz)>200&&airportZoneDist(wx,cz-700)>200&&airportZoneDist(wx,cz+700)>200) segs.push([wx,cz,26,SEC]);
     const nz=cz-SEC/2; if(Math.abs(nz-I10_Z)>5&&mountains(cx,nz)<2&&airportZoneDist(cx,nz)>200&&airportZoneDist(cx-700,nz)>200&&airportZoneDist(cx+700,nz)>200) segs.push([cx,nz,SEC,26]);}
+  for(const g of segs)SEC_ART.push(g[2]<g[3]?[g[0],g[1]-g[3]/2,g[0],g[1]+g[3]/2]:[g[0]-g[2]/2,g[1],g[0]+g[2]/2,g[1]]);
   const im=new THREE.InstancedMesh(flatQuad,lam(0x55575a),segs.length),m=new THREE.Matrix4(),q=new Q4(),s=new V3(),p=new V3();
   segs.forEach((g,k)=>{p.set(g[0],0.25,g[1]);s.set(g[2],1,g[3]);m.compose(p,q,s);im.setMatrixAt(k,m);});im.userData.heat=0.38;im.userData.irVar=0;scene.add(im);
   // strip malls at some section corners
@@ -17298,7 +17300,7 @@ const tqNm=m=>(m/1852).toFixed(1)+' nm',tqMi=m=>(m/1609.34).toFixed(1)+' mi',tqD
 const tqClock=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
 const tqWind=(d,k)=>String(Math.round(d/10)*10||360).padStart(3,'0')+' at '+Math.round(k);
 // a position the way a crew reads it: degrees and decimal minutes (anchored on Luke AFB, 33.5350 N 112.3831 W)
-function tqLL(x,z){const la=33.5350-(z-LUKE.z)/110950,lo=112.3831-(x-LUKE.x)/92530;
+function tqLL(x,z){const g=geoLL(x,z),la=g[0],lo=-g[1];   // the map's own position (geoLL), so the two always agree
   const f=v=>{const d=Math.floor(v),m=(v-d)*60;return d+'°'+m.toFixed(1).padStart(4,'0')+'′';};return 'N'+f(la)+' W'+f(lo);}
 // the clock position of a point from the aircraft's nose, 1 to 12
 function tqClk(x,z){const h=-_euH.setFromQuaternion(st.quat,'YXZ').y;let r=Math.atan2(x-st.pos.x,-(z-st.pos.z))-h;r=((r%(2*Math.PI))+2*Math.PI)%(2*Math.PI);return Math.round(r/(Math.PI/6))%12||12;}
@@ -17368,6 +17370,11 @@ function tqClear(){for(const o of TASK.objs){scene.remove(o);o.traverse&&o.trave
 function taskStart(id,o){const D=TASKS[id];if(!D)return;
   if(!REGION.az){pickRegion('az',{resume:{task:id,region:'az',type:D.ac,tod:TOD.id,wx:wxOf('task:'+id)}});return;}
   if(!WORLD.ready){toast('Loading '+REGION.city+'…');return;}
+  // overwatch2: a roll that needs the roads (and the real ground) waits for them, then starts by itself
+  if(D.needMap&&(!MAPD.ready||(!AZD.ready&&!AZD.err)||(D.prep&&!D.prep()))){clearTimeout(TASK.mapT);
+    if(MAPD.err){toast('Could not load the map data. Check the connection and reload.');return;}
+    toast('Loading…');TASK.mapId=id;TASK.mapT=setTimeout(()=>{if(TASK.mapId===id&&!TASK.on)taskStart(id,o);},300);return;}
+  TASK.mapId=null;
   const seed=(o&&o.seed!=null)?o.seed:TASK.test.seed!=null?TASK.test.seed:(Math.random()*4294967296)>>>0;
   stepPrep();   // stepstall: the stage change's chime ready before the flight (a tasking has no instructor voice)
   pickType(D.ac,1);
@@ -17392,7 +17399,7 @@ function taskGo(){if(!TASK.on||TASK.done)return;audioSess();initAudio();
   TASK.d.t0=st.time;TASK.lastT=st.time;tqStageGo(0);
   if(LB)LB.runStart(tqBoard(TASK.id));   // the token clock starts with the flight, not the briefing
 }
-function taskStop(){if(!TASK.on&&!TASK.objs.length)return;
+function taskStop(){TASK.mapId=null;if(!TASK.on&&!TASK.objs.length)return;
   if(LB&&TASK.id)LB.runCancel(tqBoard(TASK.id));   // abandoned: its token is dropped (after taskEnd's runEnd there is nothing left)
   const D=TASK.def;if(D&&D.cleanup)try{D.cleanup(TASK.d);}catch(e){console.warn(e);}
   TASK.on=false;TASK.brief=false;TASK.ask=null;TASK.quiet=null;TASK.later=[];TASK.sens=false;tqReplyUI();tqClear();
@@ -17463,15 +17470,132 @@ tapBtn($('tkBack'),()=>{taskStop();openMenu('sArc');});
 // Mission Control: "Keep eyes on the white building. Report when the vehicle departs." A white pickup leaves at a
 // random moment; REPORT calls it, then follow it at a standoff (the orbit follows the track), never overhead, and talk
 // the ground team (Saber 6) onto it. Scored on time on target, standoff discipline, report timing and time to station.
-// Rolled: the compound (bearing 190 to 345 from Luke, 6 to 8.5 km, clear of the drop zone, the strip and the range),
-// the departure (30 to 70 s after on station), the pickup's road and speed, the follow time, the team's spot, the wind.
+// Rolled: the compound (bearing 205 to 350 from Luke, 9 to 16 km, out in the desert: owSiteOK), its dirt track to the
+// nearest real road, the departure (30 to 70 s after on station), the pickup's speed, the follow time, the team's spot, the wind.
 const OW_ALT=3000,OW_FLOOR=2800,OW_R=2400;
-function owSite(R){
-  for(let i=0;i<40;i++){const b=tqR(R,190,345)*Math.PI/180,r=tqR(R,6000,8500),x=LUKE.x+Math.sin(b)*r,z=LUKE.z-Math.cos(b)*r;
-    if([[DROPZ.x,DROPZ.z],[LZ.x,LZ.z],[RANGE.x,RANGE.z]].some(p=>Math.hypot(x-p[0],z-p[1])<2600))continue;
-    let lo=1e9,hi=-1e9;for(const [ox,oz] of [[0,0],[60,0],[-60,0],[0,60],[0,-60],[300,300],[-300,-300]]){const h=groundHeight(x+ox,z+oz);lo=Math.min(lo,h);hi=Math.max(hi,h);}
-    if(hi-lo>6||hi>60)continue;return {x:x,z:z};}
-  return {x:LUKE.x-7200,z:LUKE.z+600};
+// overwatch2: the compound belongs out in the desert, in the middle of nowhere, reached by a dirt track. owSiteOK(x,z):
+// null where a compound may stand, else why not: 'edge' (outside the map data or the real elevation, less a margin),
+// 'range' (the DZ, the LZ, the live range), 'airport' (KGEU, Luke), 'road', 'city' / 'farm' (a section of houses or
+// fields, a park), 'water' (a river, a canal, a lake), 'urban' (any street density), 'steep' (the yard not flat to 4 m,
+// 160 m round it to 14 m), 'hidden' (a ridge between the orbit and the yard, or the orbit under 250 m over the ground). Two clearances: OW_LIM.hi (1.5 km) from the divided highways (map classes 0 to 2, the two
+// game freeways), water, parks, the built up sections and the airports; OW_LIM.lo (1 km) from the lesser roads (classes
+// 3 to 5), the section arterials and the desert sections' edges. Each candidate walks only the map index cells its 3 km
+// square touches.
+const OW_LIM={hi:1500,lo:1000,flat:4,flat160:14};   // the rules' numbers (tests may probe them)
+const OW_DIV=[1,1,1,0,0,0];   // map road classes that are divided highways (motorway, trunk / primary, secondary)
+let OW_SEC=null;   // the West Valley sections as boxes [x0,z0,x1,z1,type], once
+function owSecs(){if(OW_SEC)return OW_SEC;OW_SEC=[];
+  for(const k in secMap){const [i,j]=k.split(',').map(Number),x0=SX0+SEC*i,z0=SZ0+SEC*j;OW_SEC.push([x0,z0,x0+SEC,z0+SEC,secMap[k]]);}return OW_SEC;}
+// the nearest point of a polyline F ({p,b}) to x,z within lim (closed: the ring's last edge too): {d,x,z} or null
+function owLinePt(F,x,z,lim,closed){const p=F.p,b=F.b;if(x<b[0]-lim||x>b[2]+lim||z<b[1]-lim||z>b[3]+lim)return null;
+  let m=1e9,mx=0,mz=0;const n=p.length;
+  for(let i=0;i+1<n;i+=2){const j=i+2<n?i+2:closed?0:-1;if(j<0)break;const ax=p[i],az=p[i+1],bx=p[j],bz=p[j+1];
+    if((ax<x-lim&&bx<x-lim)||(ax>x+lim&&bx>x+lim)||(az<z-lim&&bz<z-lim)||(az>z+lim&&bz>z+lim))continue;
+    const ex=bx-ax,ez=bz-az,L=ex*ex+ez*ez,t=L>0?clamp(((x-ax)*ex+(z-az)*ez)/L,0,1):0,px=ax+ex*t,pz=az+ez*t,d=Math.hypot(x-px,z-pz);
+    if(d<m){m=d;mx=px;mz=pz;}}
+  return m<=lim?{d:m,x:mx,z:mz}:null;}
+function owPip(p,x,z){let c=false;for(let i=0,j=p.length-2;i<p.length;j=i,i+=2){const ax=p[i],az=p[i+1],bx=p[j],bz=p[j+1];
+  if((az>z)!==(bz>z)&&x<(bx-ax)*(z-az)/(bz-az)+ax)c=!c;}return c;}
+const owBoxD=(x,z,b)=>Math.hypot(Math.max(b[0]-x,0,x-b[2]),Math.max(b[1]-z,0,z-b[3]));
+// the two game freeways (the west one, x=FWY_X north of I-10; I-10, z=I10_Z) as segments
+const OW_FWY=[[FWY_X,-17000,FWY_X,I10_Z],[-17000,I10_Z,26000,I10_Z]];
+function owUrban(x,z){const U=MAPD.urban;if(!U||!U.data)return 0;const i=Math.floor((x-U.x0)/U.G),j=Math.floor((z-U.z0)/U.G);
+  return i>=0&&j>=0&&i<U.W&&j<U.H?U.data[j*U.W+i]:0;}
+function owSiteOK(x,z){const HI=OW_LIM.hi,LO=OW_LIM.lo;
+  const E=MAPD.ext,A=AZD;
+  if(!MAPD.ready||!E||!A.ready)return 'edge';
+  if(x<E[0]+HI||x>E[2]-HI||z<E[1]+HI||z>E[3]-HI)return 'edge';
+  if(x<A.x0+1000||x>A.x0+A.W*A.c-1000||z<A.z0+1000||z>A.z0+A.H*A.c-1000)return 'edge';
+  for(const p of [DROPZ,LZ,RANGE])if(Math.hypot(x-p.x,z-p.z)<2600)return 'range';
+  if(airportZoneDist(x,z)<HI)return 'airport';
+  {const L=lukeUV(x,z);if(Math.abs(L[0])<2700+HI&&Math.abs(L[1])<1700+HI)return 'airport';}
+  for(const f of OW_FWY)if(segD(x,z,f[0],f[1],f[2],f[3])<HI)return 'road';
+  if(Math.abs(x-riverX(z))<HI)return 'water';
+  for(const b of owSecs()){const t=b[4],d=owBoxD(x,z,b);
+    if(t==='desert'){if(d<LO)return 'road';continue;}
+    if(d<HI)return t==='farm'?'farm':t==='airport'||t==='luke'?'airport':t==='river'?'water':'city';}
+  for(const s of SEC_ART)if(segD(x,z,s[0],s[1],s[2],s[3])<LO)return 'road';
+  if(owUrban(x,z)>0)return 'urban';
+  // terrain: the yard (3 x 3 at 45 m) flat to 4 m; 160 m round it to 14 m
+  let lo=1e9,hi=-1e9;for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++){const h=groundHeight(x+a*45,z+b*45);lo=Math.min(lo,h);hi=Math.max(hi,h);}
+  if(hi-lo>OW_LIM.flat)return 'steep';
+  for(let k=0;k<8;k++){const t=k*Math.PI/4,h=groundHeight(x+Math.sin(t)*160,z+Math.cos(t)*160);lo=Math.min(lo,h);hi=Math.max(hi,h);}
+  if(hi-lo>OW_LIM.flat160)return 'steep';
+  // the orbit: from 12 points of a 2.4 km circle at 3,000 ft the ball sees the yard (no ridge between), and the circle
+  // clears the ground by 250 m ('hidden' otherwise: a compound tucked in a fold of the White Tanks)
+  {const Y=(OW_ALT-FIELD_FT)/M2FT,gy=groundHeight(x,z)+3;
+    for(let k=0;k<12;k++){const t=k*Math.PI/6,ox=x+Math.sin(t)*OW_R,oz=z+Math.cos(t)*OW_R;if(groundHeight(ox,oz)>Y-250)return 'hidden';
+      for(let i=2;i<40;i++){const f=i/40;if(groundHeight(ox+(x-ox)*f,oz+(z-oz)*f)>Y+(gy-Y)*f)return 'hidden';}}}
+  // the map data: every road class (its clearance), every water line, every water and green polygon
+  let why=null;
+  mapQuery(x-HI,z-HI,x+HI,z+HI,(L,F)=>{if(why)return;const c=L.charAt(0);
+    if(c==='r'){if(owLinePt(F,x,z,OW_DIV[+L.slice(1)]?HI:LO,false))why='road';}
+    else if(c==='w'){if(owLinePt(F,x,z,HI,false))why='water';}
+    else if(c==='p'){if(owLinePt(F,x,z,HI,true)||owPip(F.p,x,z))why=L==='p0'?'water':'city';}});
+  return why;
+}
+// a site's numbers (tests, the briefing's word for the ground): its height, the relief of a 12 point ring at 1.5 km (and
+// the ring), the nearest road of any kind within 12 km (metres, and its kind: the class index, 'arterial', 'freeway')
+function owSiteInfo(x,z){
+  const h=groundHeight(x,z),ring=[];for(let k=0;k<12;k++){const t=k*Math.PI/6;ring.push(groundHeight(x+Math.sin(t)*1500,z+Math.cos(t)*1500));}
+  const relief=Math.max(...ring)-Math.min(...ring),mean=ring.reduce((a,b)=>a+b,0)/12;
+  let rd=1e9,rk=null,dv=1e9;const R=12000;
+  mapQuery(x-R,z-R,x+R,z+R,(L,F)=>{if(L.charAt(0)!=='r')return;const c=+L.slice(1),q=owLinePt(F,x,z,Math.min(R,OW_DIV[c]?Math.max(rd,dv):rd),false);if(!q)return;
+    if(q.d<rd){rd=q.d;rk=c;}if(OW_DIV[c]&&q.d<dv)dv=q.d;});
+  for(const s of SEC_ART){const d=segD(x,z,s[0],s[1],s[2],s[3]);if(d<rd){rd=d;rk='arterial';}}
+  for(const f of OW_FWY){const d=segD(x,z,f[0],f[1],f[2],f[3]);if(d<rd){rd=d;rk='freeway';}if(d<dv)dv=d;}
+  // the ground: open flats, below rising ground (the foothills), between two higher sides (a valley), else a wash
+  const arc=q=>(ring[q*3]+ring[q*3+1]+ring[(q*3+2)%12])/3;   // four 90 degree arcs: N, E, S, W
+  let terrain;
+  if(relief<25)terrain='flats';
+  else if((arc(0)-h>=20&&arc(2)-h>=20)||(arc(1)-h>=20&&arc(3)-h>=20))terrain='valley';
+  else if(h>30||mean>h)terrain='foothills';
+  else terrain='wash';
+  return {h:+h.toFixed(1),relief1500:+relief.toFixed(1),ringMean:+mean.toFixed(1),nearestRoad:Math.round(rd),nearestRoadKind:rk,nearestDivided:Math.round(dv),terrain:terrain};
+}
+const OW_TERR={flats:'out on the open flats',foothills:'in the foothills',valley:'in a desert valley',wash:'by a dry wash'};
+// where the dirt track meets a real road: the nearest point 2 to 9 km off on a mapped road (never a motorway or its ramps)
+// or a section arterial. {x,z,kind,d} or null
+function owRoadPt(x,z){const lo=2000,hi=9000;let best=null;
+  const take=(ax,az,bx,bz,kind)=>{const ex=bx-ax,ez=bz-az,L2=ex*ex+ez*ez,L=Math.sqrt(L2)||1;let t=L2>0?clamp(((x-ax)*ex+(z-az)*ez)/L2,0,1):0;
+    let px=ax+ex*t,pz=az+ez*t,d=Math.hypot(x-px,z-pz);if(d>hi)return;
+    if(d<lo){const perp=d,s=Math.sqrt(lo*lo-perp*perp)/L;const t1=t+s,t2=t-s;t=t1<=1?t1:t2>=0?t2:-1;if(t<0)return;px=ax+ex*t;pz=az+ez*t;d=lo;}
+    if(!best||d<best.d)best={x:px,z:pz,kind:kind,d:d};};
+  mapQuery(x-hi,z-hi,x+hi,z+hi,(L,F)=>{if(L.charAt(0)!=='r')return;const c=+L.slice(1);if(c===0||c===3)return;const p=F.p,b=F.b;
+    if(x<b[0]-hi||x>b[2]+hi||z<b[1]-hi||z>b[3]+hi)return;
+    for(let i=0;i+3<p.length;i+=2)take(p[i],p[i+1],p[i+2],p[i+3],c);});
+  for(const s of SEC_ART)take(s[0],s[1],s[2],s[3],'arterial');
+  return best;}
+// the places a compound can go: the ring (9 km to OW_RMAX from Luke, bearings 205 to 350) scanned on a 150 m grid with
+// owSiteOK (and a road for its track), packed into slots 650 m apart. Built once off the frame, in 4 ms slices, after the
+// map data and the elevation are in (about 120 ms in all headless); taskStart waits for it like the map data.
+const OW_RMAX=16000;   // the ring: 9 km to this from Luke
+const OW_SLOT={list:null,busy:false,k:0,ok:[],ms:0};
+function owSlotsBuild(sync){const S=OW_SLOT;if(S.list)return;
+  if(!MAPD.ready||!(AZD.ready||AZD.err)){if(!S.wait){S.wait=1;setTimeout(()=>{S.wait=0;owSlotsBuild();},500);}return;}
+  if(S.busy&&!sync)return;S.busy=true;
+  const G=150,n=Math.ceil(2*OW_RMAX/G)+1,N=n*n;
+  const run=()=>{const t0=performance.now();
+    while(S.k<N&&(sync||performance.now()-t0<4)){const x=LUKE.x-OW_RMAX+(S.k%n)*G,z=LUKE.z-OW_RMAX+Math.floor(S.k/n)*G;S.k++;
+      const r=Math.hypot(x-LUKE.x,z-LUKE.z);if(r<9000||r>OW_RMAX)continue;const b=tqBrg(LUKE.x,LUKE.z,x,z);if(b<205||b>350)continue;
+      if(owSiteOK(x,z)===null&&owRoadPt(x,z))S.ok.push([x,z]);}
+    S.ms+=performance.now()-t0;
+    if(S.k<N){if(!sync)setTimeout(run,30);return;}
+    const P=[];for(const q of S.ok)if(P.every(p=>Math.hypot(p[0]-q[0],p[1]-q[1])>650))P.push(q);
+    S.list=P;S.busy=false;S.ok=[];};
+  run();}
+// the hand picked fallback (no slots at all): open desert at the foot of the White Tanks' east face, 10.9 km west of
+// Luke, checked by tests/tasking_site_check.py against owSiteOK
+const OW_FALLBACK={x:-18600,z:-2600};
+// the site: a slot (consecutive seeds walk the list by the golden ratio, so a run of them visits different places), moved
+// up to 20 m (three tries, each checked) so a slot played twice is not the same yard to the metre
+function owSite(R,seed){const L=OW_SLOT.list;
+  if(L&&L.length){const q=L[Math.floor((((seed>>>0)*0.6180339887)%1)*L.length)%L.length];
+    for(let i=0;i<3;i++){const a=R()*Math.PI*2,r=R()*20,x=q[0]+Math.sin(a)*r,z=q[1]+Math.cos(a)*r;
+      const r0=Math.hypot(x-LUKE.x,z-LUKE.z),b0=tqBrg(LUKE.x,LUKE.z,x,z);if(r0<9000||r0>OW_RMAX||b0<205||b0>350)continue;   // still in the ring
+      if(owSiteOK(x,z))continue;const rd=owRoadPt(x,z);if(rd)return {x:x,z:z,road:rd,tries:i+1};}
+    return {x:q[0],z:q[1],road:owRoadPt(q[0],q[1]),tries:4};}
+  const f=OW_FALLBACK;return {x:f.x,z:f.z,road:owRoadPt(f.x,f.z)||{x:f.x+3000,z:f.z,kind:'arterial',d:3000},tries:0,fb:1};
 }
 // a white pickup: body, cab, glass, bed, wheels; 5.4 m long, nose toward -z (heading 0 = north)
 function owPickup(col){const g=new THREE.Group(),W=lam(col||0xeef0f2),D=lam(0x23272c),G=lam(0x3a4a5a),T=lam(0x151515);
@@ -17498,15 +17622,84 @@ function owCompound(c,ang){const g=new THREE.Group(),gh=groundHeight(c.x,c.z),ta
   g.position.set(c.x,gh,c.z);g.rotation.y=ang;
   g.traverse(o=>{if(o.isMesh&&o.userData.heat==null)o.userData.heat=0.25;});
   return g;}
-// the pickup's road: out of the gate, then three to five legs away from Luke, each turn under 55 degrees
-function owRoute(R,c,ang){const P=[],gx=Math.sin(ang),gz=Math.cos(ang);   // the gate faces local +z, turned by ang
+// the pickup's road: out of the gate, then a dirt track that follows the ground to the real road at e (owRoadPt): steps
+// of 120 to 200 m, each wandering up to 25 degrees, bent toward the gentler, lower ground (heights 60 m ahead, left and
+// right), never steeper than 12 percent, never back past the compound, ending exactly on the road; smoothed once
+// (Chaikin, kept only when no smoothed step is steeper than 12 percent). The gate points first.
+const OW_GRADE=0.12;
+function owRoute(R,c,ang,e){const P=[],gx=Math.sin(ang),gz=Math.cos(ang);   // the gate faces local +z, turned by ang
   let x=c.x+gx*30,z=c.z+gz*30;P.push({x:c.x+gx*8,z:c.z+gz*8},{x:x,z:z});
-  let h=Math.atan2(c.x-LUKE.x,-(c.z-LUKE.z))+tqR(R,-0.9,0.9);
-  const n=3+Math.floor(R()*3);
-  for(let i=0;i<n;i++){const L=tqR(R,350,650);h+=tqR(R,-0.95,0.95);x+=Math.sin(h)*L;z-=Math.cos(h)*L;
-    if(groundHeight(x,z)>80||Math.hypot(x-LUKE.x,z-LUKE.z)<3500){x-=Math.sin(h)*L*2;z+=Math.cos(h)*L*2;h+=Math.PI*0.6;}
-    P.push({x:x,z:z});}
+  const M=[{x:x,z:z}];let y=groundHeight(x,z),h=Math.atan2(gx,-gz);   // h: 0 north, x+=sin, z-=cos (as owVehTick)
+  const D0=Math.hypot(e.x-x,e.z-z),maxN=Math.ceil(D0/100)+40;
+  for(let n=0;n<maxN;n++){const D=Math.hypot(e.x-x,e.z-z);
+    if(D<=200)break;
+    const tb=Math.atan2(e.x-x,-(e.z-z)),w=h+tqR(R,-25,25)*Math.PI/180;
+    // the wander, kept within 70 degrees of the road, less as it nears it (the first step: out of the gate)
+    const lim=1.22*clamp((D-300)/2500,0.15,1),hd=n===0?w:tb+clamp(wrapPi(w-tb),-lim,lim);
+    let pick=null,pc=1e9,fb=null,fbg=1e9;
+    for(const Ls of [tqR(R,120,200),90]){
+      for(const k of [0,-0.22,0.22,-0.45,0.45,-0.7,0.7,-1.0,1.0]){const hc=hd+k;
+        if(n>0&&Math.abs(wrapPi(hc-tb))>lim+0.45)continue;
+        const nx=x+Math.sin(hc)*Ls,nz=z-Math.cos(hc)*Ls;
+        if(segD(c.x,c.z,x,z,nx,nz)<60)continue;   // never through the yard
+        const ny=groundHeight(nx,nz),g=Math.abs(ny-y)/Ls;
+        if(g<fbg){fbg=g;fb={x:nx,z:nz,y:ny,h:hc};}
+        if(g>OW_GRADE)continue;
+        const a=groundHeight(x+Math.sin(hc)*60,z-Math.cos(hc)*60),l=groundHeight(x+Math.sin(hc-0.5)*60,z-Math.cos(hc-0.5)*60),r=groundHeight(x+Math.sin(hc+0.5)*60,z-Math.cos(hc+0.5)*60);
+        const cost=8*g+0.6*Math.abs(k)+Math.max(0,a-y)/60+0.5*Math.abs(l-r)/60;
+        if(cost<pc){pc=cost;pick={x:nx,z:nz,y:ny,h:hc};}}
+      if(pick)break;}
+    const s=pick||fb||{x:x+Math.sin(tb)*150,z:z-Math.cos(tb)*150,h:tb};if(s.y==null)s.y=groundHeight(s.x,s.z);x=s.x;z=s.z;y=s.y;h=s.h;M.push({x:x,z:z});}
+  // past the step budget (never seen): straight on to the road in 150 m steps
+  {const D=Math.hypot(e.x-x,e.z-z),n=Math.floor(D/150);for(let i=1;i<=n;i++){const t=i/(n+1);M.push({x:x+(e.x-x)*t,z:z+(e.z-z)*t});}}
+  M.push({x:e.x,z:e.z});
+  // Chaikin once, the gate and the road end kept
+  const S=[M[0]];for(let i=0;i+1<M.length;i++){const a=M[i],b=M[i+1];S.push({x:a.x*0.75+b.x*0.25,z:a.z*0.75+b.z*0.25},{x:a.x*0.25+b.x*0.75,z:a.z*0.25+b.z*0.75});}
+  S.push(M[M.length-1]);
+  const steep=A=>{for(let i=0;i+1<A.length;i++){const L=Math.hypot(A[i+1].x-A[i].x,A[i+1].z-A[i].z);if(L>0.5&&Math.abs(groundHeight(A[i+1].x,A[i+1].z)-groundHeight(A[i].x,A[i].z))/L>OW_GRADE)return true;}return false;};
+  const T=steep(S)?M:S;
+  for(let i=1;i<T.length;i++)P.push(T[i]);
   return P;}
+const owLen=P=>{let L=0;for(let i=0;i+1<P.length;i++)L+=Math.hypot(P[i+1].x-P[i].x,P[i+1].z-P[i].z);return L;};
+// the track on the ground: a 3.4 m ribbon (edge, centre, edge) a vertex every 25 m at most, on the ground the terrain's
+// inner ring draws (its 100 m lattice, split as tlFill splits it) or the real ground, whichever is higher, plus 12 cm;
+// tan dirt with two darker wheel ruts (a 64 x 16 canvas repeated along it). The material is the aircraft shadow's
+// (a MeshBasicMaterial with a map, transparent, groundDecalMat): a program the Arizona scene has linked from the start,
+// so nothing compiles in flight; lit by hand (owTrackLight) from the hemisphere and the sun as a Lambert surface would be.
+const OW_TRACK_COL=new THREE.Color(0xb7a07a);
+let OW_TRACK_TEX=null;
+function owTrackTex(){if(OW_TRACK_TEX)return OW_TRACK_TEX;
+  OW_TRACK_TEX=tex(64,16,(x,w,h)=>{x.clearRect(0,0,w,h);
+    const g=x.createLinearGradient(0,0,w,0);g.addColorStop(0,'rgba(255,255,255,0)');g.addColorStop(0.12,'rgba(255,255,255,0.85)');g.addColorStop(0.88,'rgba(255,255,255,0.85)');g.addColorStop(1,'rgba(255,255,255,0)');
+    x.fillStyle=g;x.fillRect(0,0,w,h);
+    for(const c of [19,45]){x.fillStyle='rgba(120,100,78,0.9)';x.fillRect(c-4,0,8,h);x.fillStyle='rgba(95,78,60,0.9)';x.fillRect(c-2,0,4,h);}
+    for(let i=0;i<60;i++){x.fillStyle=Math.random()<0.5?'rgba(150,130,100,0.6)':'rgba(235,225,205,0.5)';x.fillRect(6+Math.random()*52,Math.random()*h,1+Math.random()*2,1);}},[1,1]);
+  return OW_TRACK_TEX;}
+function owMeshH(x,z){const c=TRING[0].c,i=Math.floor(x/c),k=Math.floor(z/c),fx=x/c-i,fz=z/c-k;
+  const h00=groundHeight(i*c,k*c),h10=groundHeight((i+1)*c,k*c),h01=groundHeight(i*c,(k+1)*c),h11=groundHeight((i+1)*c,(k+1)*c);
+  // tlFill's two triangles: (i,k) (i,k+1) (i+1,k) and (i,k+1) (i+1,k+1) (i+1,k)
+  return fx+fz<=1?h00+(h10-h00)*fx+(h01-h00)*fz:h11+(h01-h11)*(1-fx)+(h10-h11)*(1-fz);}
+function owTrack(P,c,floor,ang){const sa=Math.sin(ang||0),ca=Math.cos(ang||0);
+  const Q=[];for(let i=0;i+1<P.length;i++){const a=P[i],b=P[i+1],L=Math.hypot(b.x-a.x,b.z-a.z),n=Math.max(1,Math.ceil(L/25));
+    for(let k=0;k<n;k++)Q.push({x:a.x+(b.x-a.x)*k/n,z:a.z+(b.z-a.z)*k/n});}
+  Q.push(P[P.length-1]);
+  const N=Q.length,pos=new Float32Array(N*9),uv=new Float32Array(N*6),idx=[],W=1.7;let v=0,s=0;
+  const yAt=(x,z)=>{let y=Math.max(groundHeight(x,z),owMeshH(x,z));if(floor&&Math.hypot(x-c.x,z-c.z)<40&&(x-c.x)*sa+(z-c.z)*ca<23.5)y=Math.max(y,floor);   /* in the yard: on its floor */return y+0.12;};
+  for(let i=0;i<N;i++){const a=Q[Math.max(0,i-1)],b=Q[Math.min(N-1,i+1)],dx=b.x-a.x,dz=b.z-a.z,l=Math.hypot(dx,dz)||1,px=-dz/l,pz=dx/l;
+    if(i>0)s+=Math.hypot(Q[i].x-Q[i-1].x,Q[i].z-Q[i-1].z);
+    for(let j=-1;j<=1;j++){const x=Q[i].x+px*W*j,z=Q[i].z+pz*W*j;pos[v*3]=x-c.x;pos[v*3+1]=yAt(x,z);pos[v*3+2]=z-c.z;uv[v*2]=(j+1)/2;uv[v*2+1]=s/16;v++;}
+    if(i>0)for(let j=0;j<2;j++){const p=(i-1)*3+j,q=i*3+j;idx.push(p,p+1,q,p+1,q+1,q);}}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('uv',new THREE.BufferAttribute(uv,2));g.setIndex(idx);
+  g.computeBoundingSphere();
+  const m=new THREE.Mesh(g,groundDecalMat(new THREE.MeshBasicMaterial({map:owTrackTex(),transparent:true})));
+  m.position.set(c.x,0,c.z);m.castShadow=m.receiveShadow=false;m.userData.heat=0.3;m.userData.irVar=0.3;m.name='owTrack';
+  owTrackLight(m);return m;}
+// a Lambert surface facing up: the hemisphere's sky colour plus the sun (or its shadow cascades) times its height
+const _owL=new THREE.Color(),_owS=new THREE.Vector3();
+function owTrackLight(m){if(!m)return;_owL.copy(hemi.color).multiplyScalar(hemi.intensity);
+  let si=sun.intensity;for(const L of CSM.lights||[])si=Math.max(si,L.intensity);
+  _owS.copy(sun.position).normalize();_owL.r+=sun.color.r*si*Math.max(0,_owS.y);_owL.g+=sun.color.g*si*Math.max(0,_owS.y);_owL.b+=sun.color.b*si*Math.max(0,_owS.y);
+  m.material.color.copy(OW_TRACK_COL).multiply(_owL);}
 function owVehTick(d,dt){const v=d.veh,P=d.route;if(!v.moving)return;
   let rem=d.vk*dt;
   while(rem>0&&v.i<P.length-1){const a=P[v.i],b=P[v.i+1],L=Math.hypot(b.x-a.x,b.z-a.z)||1,left=L*(1-v.f),step=Math.min(rem,left);v.f+=step/L;rem-=step;if(v.f>=1-1e-6){v.i++;v.f=0;}}
@@ -17519,15 +17712,19 @@ function owVehTick(d,dt){const v=d.veh,P=d.route;if(!v.moving)return;
 }
 // the sensor on a target: the ball's ground point within r metres of it
 function owOn(t,r){return !!(t&&SENSOR.valid&&(SENSOR.tgt===t||Math.hypot(SENSOR.spot.x-t.x,SENSOR.spot.z-t.z)<r));}   // a lock on it counts
-TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limit:520,
-  roll(R,d){const c=owSite(R);d.c=c;d.ang=tqR(R,0,Math.PI*2);d.route=owRoute(R,c,d.ang);d.vk=tqR(R,10.5,14);
+TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limit:600,
+  needMap:1,   // the site and its track need the map data's roads and the real elevation (taskStart waits for them)
+  prep:()=>{owSlotsBuild();return !!OW_SLOT.list;},   // and the slots built from them
+  roll(R,d){const t0=performance.now(),c=owSite(R,d.seed);d.c={x:c.x,z:c.z};d.tries=c.tries;d.roadEnd={x:c.road.x,z:c.road.z,kind:c.road.kind};
+    d.ang=Math.atan2(c.road.x-c.x,c.road.z-c.z)+tqR(R,-0.9,0.9);   // the gate faces its road, more or less
+    d.route=owRoute(R,d.c,d.ang,d.roadEnd);d.routeLen=Math.round(owLen(d.route));d.terrain=owSiteInfo(c.x,c.z).terrain;d.vk=tqR(R,10.5,14);
     d.dep=tqR(R,30,70);d.follow=tqR(R,45,60);d.wdir=Math.round(tqR(R,0,36))*10||360;d.wkt=Math.round(tqR(R,3,16));
     d.dist=Math.hypot(c.x-LUKE.x,c.z-LUKE.z);d.brg=tqBrg(LUKE.x,LUKE.z,c.x,c.z);
-    d.stPar=Math.round(45+Math.max(147,d.dist/62)+25);d.par=Math.round(d.stPar+d.dep+d.follow+35);
+    d.stPar=Math.round(45+Math.max(147,d.dist/62)+25);d.par=Math.round(d.stPar+d.dep+d.follow+35);d.lateT=d.stPar+60;
     const sa=R()*Math.PI*2;d.saber={a:sa,r:tqR(R,1800,2600)};
-    d.tot=0;d.totT=0;d.band=0;d.bandT=0;d.over=0;d.overT=-99;d.falseRep=0;d.repDelay=null;d.onT=0;},
+    d.tot=0;d.totT=0;d.band=0;d.bandT=0;d.over=0;d.overT=-99;d.falseRep=0;d.repDelay=null;d.onT=0;d.ms={roll:+(performance.now()-t0).toFixed(1)};},
   brief(d){return {ac:'MQ-9B SkyGuardian · Luke AFB runway 3L',
-    sit:'A compound '+tqDs(d.dist)+' '+tqDir(d.brg)+' of Luke. Keep the sensor on its white building from 3,000 ft. A vehicle is expected to leave: call it the moment it moves, follow it without overflying, then talk the ground team onto it.',
+    sit:'A compound '+OW_TERR[d.terrain]+', '+tqDs(d.dist)+' '+tqDir(d.brg)+' of Luke. Keep the sensor on its white building from 3,000 ft. A vehicle is expected to leave: call it the moment it moves, follow it without overflying, then talk the ground team onto it.',
     facts:[['PAR',tqClock(d.par)],['ON STATION',tqClock(d.stPar)],['WIND',tqWind(d.wdir,d.wkt)],['TARGET',tqDs(d.dist)+' '+tqDir(d.brg).replace('north','N').replace('south','S').replace('east','E').replace('west','W').replace('-','')]]};},
   spawn(d){
     const g=tqAdd(owCompound(d.c,d.ang)),gh=groundHeight(d.c.x,d.c.z);
@@ -17537,6 +17734,8 @@ TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limi
     const pk=tqAdd(owPickup()),p0=d.route[0];
     d.veh={g:pk,x:p0.x,y:groundHeight(p0.x,p0.z),z:p0.z,h:Math.atan2(d.route[1].x-p0.x,-(d.route[1].z-p0.z)),i:0,f:0,moving:false,stopped:false,name:'the white pickup',dead:false,task:1};
     pk.position.set(p0.x,d.veh.y+0.06,p0.z);pk.rotation.y=-d.veh.h;
+    // the dirt track, with its spur inside the gate to the parked car (local 4,1)
+    {const t1=performance.now(),sp={x:d.c.x+4*ca+1*sa,z:d.c.z-4*sa+1*ca};d.track=tqAdd(owTrack([sp].concat(d.route),d.c,gh+0.05,d.ang));d.ms.track=+(performance.now()-t1).toFixed(1);}
     TASK.tgts.push(d.bld,d.veh);TASK.sens=true;irDirty=true;
     d.tgt=d.bld;tqDest(d.c.x,d.c.z,'Compound','CMPD');
   },
@@ -17547,7 +17746,7 @@ TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limi
     const t=d.tgt===d.veh?d.veh:d.c;initAudio();if(AC.retract)st.gearDown=false;st.flapIdx=0;
     apEngage(st,'orbit',{cx:t.x,cz:t.z,r:OW_R,y:Math.max(st.pos.y-GEAR,(OW_ALT-FIELD_FT)/M2FT),v:AC.vcruise,dir:1});st.ap.tk=1;st.ap.sensor=true;
     toast((d.tgt===d.veh?'Orbit following the pickup':'Orbit: the compound')+', 3,000 ft. AUTO again: your airplane',3);return true;},
-  always(d,dt){owVehTick(d,dt);
+  always(d,dt){owVehTick(d,dt);owTrackLight(d.track);
     if(DEST&&DEST.task&&d.tgt===d.veh){DEST.x=d.veh.x;DEST.z=d.veh.z;}
     // the orbit follows the pickup while the ball is locked on it (the crew's track), at a truck's pace
     if(st.ap&&st.ap.mode==='orbit'&&d.tgt===d.veh&&(SENSOR.tgt===d.veh||st.ap.tk)){const k=Math.min(1,dt*0.6);st.ap.cx+=(d.veh.x-st.ap.cx)*k;st.ap.cz+=(d.veh.z-st.ap.cz)*k;}
@@ -17563,7 +17762,7 @@ TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limi
   stages:[
     {id:'takeoff',name:'Take off from Luke runway 3L',
       obj:d=>['Take off, Luke 3L',st.onGround?'AUTO takes off for you. The compound is on the map':'Climbing'],
-      enter(d){tqQuiet(()=>{const l=tqMC(AC.csS+', Mission Control. Tasking: overwatch on a compound '+tqDsW(d.dist)+' '+tqDir(d.brg)+' of Luke, '+tqLL(d.c.x,d.c.z)+'. Climb to 3,000, set up an orbit, sensor on the white building.',
+      enter(d){tqQuiet(()=>{const l=tqMC(AC.csS+', Mission Control. Tasking: overwatch on a compound '+OW_TERR[d.terrain]+', '+tqDsW(d.dist)+' '+tqDir(d.brg)+' of Luke, '+tqLL(d.c.x,d.c.z)+'. Climb to 3,000, set up an orbit, sensor on the white building.',
           {plain:'Fly to the compound on your map, circle it at 3,000 ft and point the camera at the white building.'});
         tqAsk([{k:'WILCO'},{k:'UNABLE',fn:()=>tqMC('Copy unable. Take your time, the compound is on your map. Call us when you have eyes on.',{plain:'No rush. Find the compound on the map.'})}],{line:l});});},
       tick:d=>!st.onGround&&st.agl>40},
@@ -17573,8 +17772,8 @@ TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limi
         return ['On station',need];},
       tick(d,dt){const ok=tqD(d.c.x,d.c.z)<4000&&tqMSL()>=OW_FLOOR&&owOn(d.bld,rookie()?110:70);d.onT=ok?d.onT+dt:0;
         if(d.onT>=2){d.station=st.time-d.t0;tqPilot('Mission Control, '+AC.csS+', on station, eyes on the white building.');return true;}
-        // the window will not wait: past 4:20 the vehicle goes anyway
-        if(st.time-d.t0>260){d.station=null;d.late=1;return true;}return false;}},
+        // the window will not wait: a minute past the on station par the vehicle goes anyway
+        if(st.time-d.t0>d.lateT){d.station=null;d.late=1;return true;}return false;}},
     {id:'watch',name:'Watch the white building. REPORT when the vehicle departs',
       obj(d){return ['Eyes on the building',d.veh.moving?'It is moving: REPORT':'REPORT the moment the vehicle departs'];},
       enter(d){d.w0=st.time;if(d.late)d.dep=2;
@@ -20710,10 +20909,10 @@ function mapQuery(x0,z0,x1,z1,cb){
 // a world region's base raster needs its terrain and water: ready waits for WORLD (never in Arizona)
 function mapLoad(){
   fetch('assets/map/'+(REGION.az?'phx':REGION.id)+'.bin?v=1').then(r=>r.ok?r.arrayBuffer():null).then(b=>{
-    if(!b||!mapParse(b))return;return mapInflate().then(()=>{mapIndex();
+    if(!b||!mapParse(b)){MAPD.err=1;return;}return mapInflate().then(()=>{mapIndex();
       const fin=()=>{if(!WORLD.ready){if(!WORLD.err)setTimeout(fin,250);return;}
-        if(!REGION.az)mapRegionData();MAPD.ready=true;if(typeof mapDataReady==="function")mapDataReady();};fin();});
-  }).catch(()=>{});
+        if(!REGION.az)mapRegionData();MAPD.ready=true;if(REGION.az)setTimeout(()=>owSlotsBuild(),1500);   /* overwatch2: the compound's slots, off the frame */if(typeof mapDataReady==="function")mapDataReady();};fin();});
+  }).catch(()=>{MAPD.err=1;});
 }
 mapLoad();
 
@@ -23645,7 +23844,10 @@ function targetUnder(p,maxD){
   for(const t of STRIKE.targets){if(t.dead)continue;
     const d=Math.hypot(t.x-p.x,t.z-p.z);if(d<bd){bd=d;best=t;}}
   // a tasking's targets (Overwatch's building and pickup): LOCK takes them a little wider, Easy wider still
-  if(TASK.on)for(const t of TASK.tgts){if(t.dead)continue;const d=Math.hypot(t.x-p.x,t.z-p.z),lim=Math.max(maxD,rookie()?200:110);if(d<lim&&d<(best?bd:lim)){bd=d;best=t;}}
+  // overwatch2: measured where the line of sight passes the target's height, not where it meets the ground behind it (from
+  // 4 km at 3,000 ft the ray over the white building lands 28 m beyond it, nearer the pickup by the gate)
+  const L=SENSOR.los,up=p===SENSOR.spot&&L&&L.y<-0.02;
+  if(TASK.on)for(const t of TASK.tgts){if(t.dead)continue;const k=up?(t.y-p.y)/L.y:0,d=Math.hypot(t.x-(p.x+L.x*k),t.z-(p.z+L.z*k)),lim=Math.max(maxD,rookie()?200:110);if(d<lim&&d<(best?bd:lim)){bd=d;best=t;}}
   // sensor item 5: in free flight the freeway traffic can be point tracked (a car within 30 m, Easy 50 m)
   if(!best&&!STRIKE.active&&!TASK.on&&cars.length){const lim=rookie()?50:30;let bk=-1,bc=lim;
     for(let k=0;k<cars.length;k++){const c=cars[k],x=c.r===0?FWY_X+c.off:c.s,z=c.r===0?c.s:I10_Z+c.off,d=Math.hypot(x-p.x,z-p.z);if(d<bc){bc=d;bk=k;}}
@@ -25056,7 +25258,7 @@ const APP_VER='2026-10-19-schoolhud';          // keep version.json in step when
     get P(){return E.P;}};
 })();
 
-window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.holdF=n|0;},pfx:()=>{const L=PFX.last||{};return {w:L.w,h:L.h,sw:L.sw,sh:L.sh,bloomed:!!L.bloomed,smaa:!!L.smaa,sharp:L.sharp||0,samples:L.samples||0,layer:!!L.layer,box:L.box||null,split:!!L.split,full:L.full||null,webgl2:renderer.capabilities.isWebGL2,msaaRT:!!(PFX.rt&&PFX.rt.isWebGLMultisampleRenderTarget),allocN:PFX.allocN,scale:GFX.scale,rs:L.rs!=null?L.rs:GFX.rs,post:GFX.post,sens:GFX.sens};},setScale:s=>GFX.setScale(+s),sharpOff:v=>{PFX_SHARP.off=!!v;},msaaOff:v=>{PFX.msOff=!!v;},csmNBT:a=>{if(a)CSM.NBT=a.slice();if(CSM.n)csmRadii();return CSM.NBT.slice();},layerOff:v=>{PFX.layerOff=!!v;},splitOff:v=>{PFX.layerOff=!!v;},gfxBusy:()=>({applying:gfxApplying(),resumeWait:GFX.resumeWait,preDone:PRE.done,warmDone:WARM.done,busy:GFX.busy}),stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>({id:p.id,name:p.name,cacheKey:p.cacheKey,usedTimes:p.usedTimes})),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),tqStage:i=>tqStageGo(i),inFrame:()=>FRAME_IN,stepx:()=>({cfi:{plays:CFIV.plays,want:CFIV.want,got:CFIV.got,err:CFIV.err,miss:CFIV.miss.length,sets:CFIV.sets.slice()},ls:{n:LSQ.n,pend:LSQ.m.size},chime:!!STEPX.buf,last:STEPX.last,ghost:!!(STEPX.les.ghost&&STEPX.les.ghost.parentNode),geo:STEPX.les.geo&&{el:STEPX.les.geo.el.id,p:STEPX.les.geo.p.id,x:STEPX.les.geo.x,y:STEPX.les.geo.y,w:STEPX.les.geo.w,h:STEPX.les.geo.h},key:STEPX.les.key.slice(0,40)}),lsFlush:lsFlush,taskGo:()=>taskGo(),taskStop:()=>taskStop(),taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
+window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.holdF=n|0;},pfx:()=>{const L=PFX.last||{};return {w:L.w,h:L.h,sw:L.sw,sh:L.sh,bloomed:!!L.bloomed,smaa:!!L.smaa,sharp:L.sharp||0,samples:L.samples||0,layer:!!L.layer,box:L.box||null,split:!!L.split,full:L.full||null,webgl2:renderer.capabilities.isWebGL2,msaaRT:!!(PFX.rt&&PFX.rt.isWebGLMultisampleRenderTarget),allocN:PFX.allocN,scale:GFX.scale,rs:L.rs!=null?L.rs:GFX.rs,post:GFX.post,sens:GFX.sens};},setScale:s=>GFX.setScale(+s),sharpOff:v=>{PFX_SHARP.off=!!v;},msaaOff:v=>{PFX.msOff=!!v;},csmNBT:a=>{if(a)CSM.NBT=a.slice();if(CSM.n)csmRadii();return CSM.NBT.slice();},layerOff:v=>{PFX.layerOff=!!v;},splitOff:v=>{PFX.layerOff=!!v;},gfxBusy:()=>({applying:gfxApplying(),resumeWait:GFX.resumeWait,preDone:PRE.done,warmDone:WARM.done,busy:GFX.busy}),stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>({id:p.id,name:p.name,cacheKey:p.cacheKey,usedTimes:p.usedTimes})),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),tqStage:i=>tqStageGo(i),inFrame:()=>FRAME_IN,stepx:()=>({cfi:{plays:CFIV.plays,want:CFIV.want,got:CFIV.got,err:CFIV.err,miss:CFIV.miss.length,sets:CFIV.sets.slice()},ls:{n:LSQ.n,pend:LSQ.m.size},chime:!!STEPX.buf,last:STEPX.last,ghost:!!(STEPX.les.ghost&&STEPX.les.ghost.parentNode),geo:STEPX.les.geo&&{el:STEPX.les.geo.el.id,p:STEPX.les.geo.p.id,x:STEPX.les.geo.x,y:STEPX.les.geo.y,w:STEPX.les.geo.w,h:STEPX.les.geo.h},key:STEPX.les.key.slice(0,40)}),lsFlush:lsFlush,taskGo:()=>taskGo(),taskStop:()=>taskStop(),owSiteOK:(x,z)=>owSiteOK(x,z),owSiteInfo:(x,z)=>owSiteInfo(x,z),owRoadPt:(x,z)=>owRoadPt(x,z),owFallback:OW_FALLBACK,OW_LIM:OW_LIM,OW_RMAX:()=>OW_RMAX,owSlots:()=>({n:OW_SLOT.list&&OW_SLOT.list.length,ms:+OW_SLOT.ms.toFixed(1),busy:OW_SLOT.busy}),mapdReady:()=>!!MAPD.ready,taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
   task:()=>({on:TASK.on,id:TASK.id,stage:TASK.stage&&TASK.stage.id,si:TASK.si,brief:TASK.brief,done:TASK.done,res:TASK.res,ask:TASK.ask&&{shown:TASK.ask.shown,opts:TASK.ask.opts.map(o=>o.k),t:TASK.ask.t},d:TASK.d,log:TASK.log.slice(),seed:TASK.seed}),
   tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzBuild:()=>dzBuild(),dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),

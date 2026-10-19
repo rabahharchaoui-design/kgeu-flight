@@ -4,7 +4,7 @@
 # REPORT and its delay, the track moving to the pickup and the orbit following it, the standoff band, an overflight
 # (the warning, the count), a talk-on without the sensor on it (reacquire) then with it, the score, the card, the device
 # board and XP. Then: two seeds roll two different taskings; Easy's plain lines and the ball swinging to the target.
-# The whole run lands inside 3 to 6 minutes of sim time. Run: .venv/bin/python tests/tasking_overwatch_check.py
+# The whole run lands inside 3 to 7 minutes of sim time (overwatch2: the compound 9 to 16 km out). Run: .venv/bin/python tests/tasking_overwatch_check.py
 import asyncio, json
 from playwright.async_api import async_playwright
 from harness import serve, launch, page, Checks, finger
@@ -27,14 +27,17 @@ async def main():
     async with async_playwright() as p:
         b = await launch(p)
         pg = await page(b, url, vp={'width': 844, 'height': 390}, storage={'kgeuOnboard': 'pilot', 'kgeuTut': '1', 'kgeuCoach': '3'})
+        for _ in range(120):
+            if (await pg.evaluate(f"()=>{K}.owSlots()"))['n']: break
+            await pg.wait_for_timeout(500)
         await pg.evaluate(f"()=>{K}.taskStart('overwatch',{{seed:42}})"); await pg.wait_for_timeout(500)
         br = await pg.evaluate("()=>({k:document.getElementById('tkbK').textContent,t:document.getElementById('tkbT').textContent,ac:document.getElementById('tkbAc').textContent,sit:document.getElementById('tkbSit').textContent,f:[...document.querySelectorAll('#tkbF span')].map(e=>e.innerText.replace(/\\n/,' ')),n:document.querySelectorAll('#tkbSt li').length})")
         ok('the briefing: Surveillance, OVERWATCH, the MQ-9B at Luke 3L, five objectives, par, on station, wind, the target in nm (Hard) and the weather (clear)',
            br['k'] == 'TASKING · SURVEILLANCE' and br['t'].startswith('OVERWATCH') and 'MQ-9B' in br['ac'] and 'Luke' in br['ac'] and br['n'] == 5
            and [f.split(' ')[0] for f in br['f']] == ['PAR', 'ON', 'WIND', 'TARGET', 'WEATHER'] and ' nm ' in br['f'][3] and br['f'][4].endswith('Clear'), br)
         s = await pg.evaluate(f"()=>{{const K={K},d=K.TASK.d,s=K.state();return {{type:s.type,on:s.onGround,base:s.base,dist:d.dist,brg:d.brg,objs:K.TASK.objs.length,tg:K.TASK.tgts.map(t=>t.name),dest:K.dest&&K.dest()}}}}")
-        ok('on the runway at Luke in the MQ-9B; the compound 6 to 8.5 km west of Luke with its building and pickup as targets',
-           s['type'] == 'mq9b' and s['on'] and 6000 <= s['dist'] <= 8500 and 190 <= s['brg'] <= 345 and s['objs'] == 2 and s['tg'] == ['the white building', 'the white pickup'], s)
+        ok('on the runway at Luke in the MQ-9B; the compound 9 to 16 km west of Luke (overwatch2) with its building and pickup as targets, and its dirt track',
+           s['type'] == 'mq9b' and s['on'] and 9000 <= s['dist'] <= 16000 and 205 <= s['brg'] <= 350 and s['objs'] == 3 and s['tg'] == ['the white building', 'the white pickup'], s)
         await finger(pg, '#tkGo'); await pg.wait_for_timeout(100)
         await until(pg, SHOW, 30)
         t = await pg.evaluate(T)
@@ -91,13 +94,16 @@ async def main():
         ok('talk-on with the sensor off the pickup: stand by, reacquiring, and Mission Control asks for the sensor', any('reacquiring' in l.get('text', '') for l in t['log']) and any('sensor back on' in l.get('text', '') for l in t['log']))
         await pg.evaluate(f"()=>{{const K={K};K.SENSOR.tgt=K.TASK.d.veh;}}"); await adv(pg, 0.5)
         await until(pg, SHOW, 30)
+        # overwatch2: the orbit round a truck 9 to 16 km out can put the airframe between the ball and it (MASK drops the
+        # track); the crew re-locks once the view is clear, then talks the team on
+        await until(pg, f"()=>{{const K={K},S=K.SENSOR;if(!S.masked&&!S.tgt)S.tgt=K.TASK.d.veh;return !!S.tgt&&!S.masked&&S.valid}}", 30, 0.2)
         await finger(pg, '#tkReply button[data-k="REPORT"]')
         await until(pg, f"()=>{K}.task().done", 30)
         t = await pg.evaluate(T)
         talk = [l['text'] for l in t['log'] if l.get('who') == 'You' and 'your vehicle is the white pickup' in l.get('text', '')]
-        ok('the talk-on: where the pickup is from Saber 6, which way it goes; Saber 6 has it', talk and ' of you' in talk[0] and any(l.get('who') == 'Saber 6' and 'Contact the white pickup' in l['text'] for l in t['log']), talk)
+        ok('the talk-on: where the pickup is from Saber 6, which way it goes; Saber 6 has it', talk and ' of you' in talk[0] and any(l.get('who') == 'Saber 6' and 'Contact the white pickup' in l['text'] for l in t['log']), (talk, t['stage'], t['ask'], t['log'][-5:]))
         secs = t['d']['secs']
-        ok('the whole tasking runs 3 to 6 minutes', 180 <= secs <= 360, secs)
+        ok('the whole tasking runs 3 to 7 minutes', 180 <= secs <= 420, secs)
         r = t['res']
         ok('the score: 0 to 100 from time on target, standoff, report and station; one early call and one overflight cost points', r and 50 <= r['score'] < 100 and [l[0] for l in r['lines']] == ['Time on target', 'Standoff in band', 'Report after departure', 'On station', 'Talk-on'] and '1 early' in r['lines'][2][1] and '1 overflight' in r['lines'][1][1], r and (r['score'], r['lines']))
         await pg.wait_for_timeout(3200)
@@ -114,6 +120,9 @@ async def main():
         await pg.close()
         # Easy: plain lines, the ball swings to the target, wider standoff band
         pg = await page(b, url, vp={'width': 568, 'height': 320}, storage={'kgeuOnboard': 'rookie', 'kgeuTut': '1', 'kgeuCoach': '3'})
+        for _ in range(120):
+            if (await pg.evaluate(f"()=>{K}.owSlots()"))['n']: break
+            await pg.wait_for_timeout(500)
         await pg.evaluate(f"()=>{{{K}.TASK.test.noBrief=true;{K}.taskStart('overwatch',{{seed:9}})}}")
         await until(pg, SHOW, 30)
         pl = await pg.evaluate("()=>{const e=document.querySelector('#atc .plain');return e?e.textContent:''}")
