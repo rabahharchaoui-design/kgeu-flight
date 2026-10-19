@@ -12,7 +12,12 @@
 #    frame and the two after it must stay under 3x the leg's median frame (headless frames are ~300 ms, so 50 ms means
 #    nothing there), with no compile in the leg, no speech call, storage write or fetch inside the step's frame; the
 #    speech job must run after the frame (counted after it), and the stall logger must log nothing tagged in a step frame.
-# Page errors fail it. Usage: .venv/bin/python tests/stepstall_check.py [--part a|b] [--only name,name] [--par 4]
+#  Schoolhud: A and B also fail on any read of window.speechSynthesis (the game must never touch it); A checks that each
+#    step's new instruction is readable in the frame that changed it and that the top caption and the bottom task card
+#    overlap nothing on the next frame. C: the layout at 568x320, 844x390, 932x430 and 390x844 (the pattern lesson's steps
+#    with Dana, the OVERWATCH stages, the airdrop, the dogfight). D: B's pattern leg with the CPU throttled 4x and audio on
+#    (Dana's clips decoded and played), the same frame budget.
+# Page errors fail it. Usage: .venv/bin/python tests/stepstall_check.py [--part a|b|c|d, or several: abcd] [--only name,name] [--par 4]
 #   [--out /tmp/stepstall/run] (A's records and the drivers' logs go there; B's to <out>/b.jsonl)
 import asyncio, glob, json, os, statistics, subprocess, sys, time
 from playwright.async_api import async_playwright
@@ -25,7 +30,7 @@ def opt(name, dflt):
     if name in args:
         i = args.index(name); v = args[i + 1]; del args[i:i + 2]; return v
     return dflt
-PART = opt('--part', 'ab'); ONLY = [x for x in opt('--only', '').split(',') if x]; PAR = int(opt('--par', '4'))
+PART = opt('--part', 'abcd'); ONLY = [x for x in opt('--only', '').split(',') if x]; PAR = int(opt('--par', '4'))
 OUT = opt('--out', '/tmp/stepstall/run')
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 ok = Checks()
@@ -100,11 +105,18 @@ def part_a():
             if sp: why.append(f'{sp} speech calls')
             if ls: why.append('storage ' + ','.join(c['lsKeys'] + rc.get('lsKeys', [])))
             if fe: why.append(f'{fe} fetch')
+            # schoolhud item 4: the next instruction readable in the frame the step completes, the caption and the card clear
+            v = r.get('vis')
+            if v is not None and not v.get('ok'): why.append(f'the new instruction not readable in its frame {v}')
+            if r.get('lap'): why.append('overlap ' + '; '.join(r['lap'][:3]))
             worst.append((max(ms, rms), n, r['kinds'], r['i'] or r['m']))
             if why: bad.append(f"{'+'.join(r['kinds'])} '{(r['i'] or r['m'])[:40]}': {', '.join(why)}")
+        ssr = max([r.get('ssr', 0) for r in ev + ctl] + [0])
+        if ssr: bad.append(f'window.speechSynthesis read {ssr} times')
+        nvis = sum(1 for r in steps if r.get('vis'))
         cm = statistics.median([x['ms'] for x in ctl]) if ctl else 0
         mx = max([r.get('ms', 0) for r in steps] + [0]); rmx = max([r.get('render', {}).get('ms', 0) for r in steps] + [0])
-        ok(f'(A) {n}: {len(steps)} step changes ({sum(r["path"]=="raf" for r in steps)} on real frames), frame max {mx:.1f} ms, rendered {rmx:.1f} ms (quiet frames {cm:.1f} ms), nothing in the frame that belongs after it',
+        ok(f'(A) {n}: {len(steps)} step changes ({sum(r["path"]=="raf" for r in steps)} on real frames), frame max {mx:.1f} ms, rendered {rmx:.1f} ms (quiet frames {cm:.1f} ms), nothing in the frame that belongs after it, no speechSynthesis at all, {nvis} instructions readable in their frame, the caption and the card overlapping nothing',
            len(steps) > 0 and not bad, (bad[:4], f'driver exit {codes.get(n)}'))
         if codes.get(n) not in (0, None): print(f'  note: {n} exited {codes.get(n)} (its own checks; see {OUT}/{n}.log)')
     worst.sort(reverse=True)
@@ -254,6 +266,106 @@ async def part_b():
         await b.close()
     srv.shutdown()
 
+# ---------------- part C (schoolhud item 4): the layout at four sizes ----------------
+# On held frames at 568x320, 844x390, 932x430 and 390x844 (iPhone insets): the pattern lesson's steps (the lesson's own tick
+# writes each instruction as its phase moves on) with Dana's lines on the air, the OVERWATCH stages (tqStage) with mission
+# control's, the airdrop's AIRDROP to TO CENTER with the Loadmaster's and the dogfight's wave pill with SENTRY's. At every
+# step: the new instruction readable in the frame that changed it (in the DOM, on screen, at least half opaque), and the top
+# caption and the bottom task card overlap nothing (each other, the buttons, the stick ring, the throttle, the readouts, the
+# map, the TCAS panel); a few frames later the same with the caption up. No speechSynthesis read at all.
+SIZES_C = [(568, 320, (0, 47, 47, 21)), (844, 390, (0, 47, 47, 21)), (932, 430, (0, 59, 59, 21)), (390, 844, (47, 0, 0, 34))]
+SETSAFE = """([t,l,r,b])=>{const s=document.documentElement.style;s.setProperty('--saT',t+'px');s.setProperty('--saL',l+'px');s.setProperty('--saR',r+'px');s.setProperty('--saB',b+'px');
+  if(window.layoutCtl)layoutCtl(true);}"""
+GEO = """(k)=>{const SP=window.__sp,s={les:window.__kgeu.LES.on||'',i:window.__kgeu.LES.on?document.getElementById('lesI').textContent:'',m:document.getElementById('miss').classList.contains('on')?document.getElementById('missT').textContent:''};
+  const v=SP.visOf(s),l=SP.lapOf(),a=document.getElementById('atc'),d=document.querySelector('#dfSub.on span');return {vis:v,lap:l,cap:!!(a.classList.contains('on')||d),ssr:SP.ssr};}"""
+
+async def c_step(pg, tag, js, want_cap=True):
+    """js makes the step happen; one rendered frame; then the checks, and again after six frames"""
+    r0 = await pg.evaluate(f"()=>{{const K={K};{js};K.stepFrame(1/30);return 0}}")
+    g = await pg.evaluate(GEO, 0)
+    # the step's own frame lays nothing out (stepstall): a dock that changed with the stage moves the card's band on the next one
+    await pg.evaluate(f"()=>{K}.stepFrame(1/30)")
+    g1 = await pg.evaluate(GEO, 0)
+    ok(f'(C) {tag}: the new instruction readable in its frame; the next frame, the caption and the card clear', bool(g['vis'] and g['vis']['ok']) and not g1['lap'], (g, g1['lap']))
+    await pg.evaluate(f"()=>{{const K={K};for(let i=0;i<6;i++)K.stepFrame(1/30);K.hudFit();K.stepFrame(1/30);}}")
+    g2 = await pg.evaluate(GEO, 0)
+    ok(f'(C) {tag}: six frames on, still readable and clear' + (' with the caption up' if want_cap else ''), bool(g2['vis'] and g2['vis']['ok']) and not g2['lap'] and (g2['cap'] or not want_cap), g2)
+    return g2
+
+async def part_c():
+    srv, url = serve()
+    async with async_playwright() as p:
+        b = await launch(p)
+        async def pre(ctx): await ctx.add_init_script(PROBE)
+        for (w, h, sa) in SIZES_C:
+            pg = await page(b, url, vp={'width': w, 'height': h}, storage=BASE, pre=pre)
+            await pg.evaluate("()=>document.body.classList.add('portraitok')")
+            await pg.evaluate(SETSAFE, list(sa))
+            await pg.wait_for_function("()=>window.__sp&&window.__sp.visOf", timeout=20000)
+            tg = f'{w}x{h}'
+            # the pattern lesson: airborne past 700 ft, then each phase in turn (the tick writes the instruction), Dana with it
+            await pg.evaluate(f"()=>{{const K={K};K.startLesson('pattern',true,{{brief:false}});K.lesBriefSkip&&K.lesBriefSkip();for(let i=0;i<8;i++)K.stepFrame(1/30);}}")
+            for ph, line in ((1, 'Turn crosswind now. Level off at 2,100.'), (2, 'You are 250 feet high. Ease the power back a touch.'), (3, 'Turn base, then final. Aim for the numbers.')):
+                await c_step(pg, f'{tg} pattern step {ph}', f"const s=K.state();s.onGround=false;K.LES.ph={ph};K.cfi('{line}')")
+            await pg.evaluate(f"()=>{{const K={K};if(K.LES.on)document.getElementById('lesQuit').click();K.stepFrame(1/30);}}")
+            # OVERWATCH: each stage, with a mission control line (the stage's own radio)
+            await pg.evaluate(f"()=>{{const K={K};K.TASK.test.noBrief=true;K.taskStart('overwatch',{{seed:7}});}}"); await pg.wait_for_timeout(600)
+            await pg.evaluate(f"()=>{{const K={K};if(K.TASK.brief&&K.taskGo)K.taskGo();for(let i=0;i<6;i++)K.stepFrame(1/30);}}")
+            n = await pg.evaluate(f"()=>{K}.TASK.def.stages.length")
+            for i in range(1, n):
+                await c_step(pg, f'{tg} OVERWATCH stage {i + 1}', f"K.tqStage({i});K.say('Mission control','Shadow 1, mission control, copy, continue.',[])")
+            await pg.evaluate(f"()=>{K}.taskStop()")
+            # the airdrop: in the window, the drop, TO CENTER with the Loadmaster's line
+            await pg.evaluate(f"()=>{{const K={K};K.pick('c130');K.start('drop');for(let i=0;i<6;i++)K.stepFrame(1/30);const s=K.state();s.pos.x=K.DROPZ.x+260;s.pos.z=K.DROPZ.z;}}")
+            await pg.evaluate(f"()=>{{const K={K};for(let i=0;i<40&&!K.MISS.armed;i++)K.stepFrame(1/30,false,true);}}")
+            await c_step(pg, f'{tg} airdrop TO CENTER', "K.missDrop();K.vqAdd({who:'Loadmaster',kind:'crew',text:'Load clear.',clips:[]},{front:1})")
+            # the dogfight: the wave pill and SENTRY's picture call
+            await pg.evaluate(f"()=>{{const K={K};K.DF.test.noBrief=true;K.DF.test.noBanditFire=true;K.dfStart();}}")
+            for i in range(25):
+                if await pg.evaluate(f"()=>{{const K={K};for(let j=0;j<4;j++)K.stepFrame(1/30);K.hudFit();return !!document.querySelector('#dfSub.on span')}}"): break
+            g = await pg.evaluate(GEO, 0)
+            ok(f'(C) {tg} dogfight: the wave pill readable, SENTRY up top, both clear', bool(g['vis'] and g['vis']['ok']) and not g['lap'] and g['cap'], g)
+            ok(f'(C) {tg}: no speechSynthesis read, no page errors', g['ssr'] == 0 and not pg.errs, (g['ssr'], pg.errs[:3]))
+            await pg.context.close()
+        await b.close()
+    srv.shutdown()
+
+# ---------------- part D (schoolhud item 4): the step frames on a phone class CPU ----------------
+# Part B's pattern leg on the real rAF loop with the CPU throttled 4x (DevTools Emulation.setCPUThrottlingRate) and audio
+# on: an AudioContext, Dana's clips decoded, her lines played as clips at each step. The same budget as B (each step's frame
+# and the two after it under 3x the leg's median, no compile, nothing in the frame that belongs after it) and no
+# speechSynthesis read; the frame times are printed for the record.
+async def part_d():
+    os.makedirs(OUT, exist_ok=True)
+    srv, url = serve()
+    async with async_playwright() as p:
+        b = await launch(p)
+        async def pre(ctx): await ctx.add_init_script(PROBE)
+        pg = await page(b, url, vp=IPHONE_15, storage=BASE, pre=pre)
+        await pg.evaluate(f"()=>{K}.initAudio&&{K}.initAudio()")
+        await pg.wait_for_function(f"()=>{K}.boot().pre.done&&{K}.warm()", timeout=240000, polling=250)
+        await pg.evaluate(f"()=>{K}.cfiPrep('pattern')")
+        await wait(pg, f"()=>{K}.CFIV.want>0&&{K}.CFIV.got>={K}.CFIV.want", 90)
+        cdp = await pg.context.new_cdp_session(pg)
+        await cdp.send('Emulation.setCPUThrottlingRate', {'rate': 4})
+        print('CPU throttled 4x', flush=True)
+        await pg.evaluate(f"()=>{{const K={K};K.pick('cessna');K.start('runway');}}"); await pg.wait_for_timeout(3000)
+        await pg.evaluate(f"()=>{K}.fpsReset()"); ms = []
+        for _ in range(3):
+            await pg.wait_for_timeout(2000); ms.append((await pg.evaluate(f"()=>{K}.fpsStats()")).get('ms') or 0)
+        thr = max(250, round(3 * sorted(ms)[1])); await pg.evaluate(f"(t)=>{K}.stallsThr(t)", thr)
+        print(f'median flight frame {sorted(ms)[1]:.0f} ms at 4x, stall threshold {thr} ms', flush=True)
+        T = B(pg)
+        st = await b_pattern(pg, T)
+        pl = await pg.evaluate(f"()=>({{plays:{K}.CFIV.plays,miss:{K}.CFIV.miss.length,ssr:window.__sp.ssr,actx:{K}.actx&&{K}.actx.state}})")
+        ok("(D) 4x CPU, audio on: Dana's lines played as clips, none missed, no speechSynthesis read", pl['plays'] > 0 and pl['miss'] == 0 and pl['ssr'] == 0, pl)
+        ok('(D) no page errors', not pg.errs, pg.errs[:3])
+        await cdp.send('Emulation.setCPUThrottlingRate', {'rate': 1})
+        await b.close()
+    srv.shutdown()
+
 if 'b' in PART: asyncio.run(part_b())
+if 'c' in PART: asyncio.run(part_c())
+if 'd' in PART: asyncio.run(part_d())
 if 'a' in PART: part_a()
 sys.exit(ok.done('stepstall_check'))

@@ -43,7 +43,8 @@ for sz in 568x320 390x844; do
   [[ $code -ne 0 ]] && fail+=("tasking_break_check $sz")
 done
 # stepstall: every lesson, tasking and mission step change costs no frame (part B on the real loop, then part A: the 22
-# lesson, tasking and mission checks under the step probe, four at a time; about 35 min in all)
+# lesson, tasking and mission checks under the step probe, four at a time; schoolhud's C, the layout at four sizes, and D,
+# 4x CPU with audio on; about 45 min in all)
 out=$($PY tests/stepstall_check.py 2>&1); code=$?
 echo "== stepstall_check (exit $code)"; echo "$out" | grep -E "FAIL|passed" | tail -4
 [[ $code -ne 0 ]] && fail+=("stepstall_check")

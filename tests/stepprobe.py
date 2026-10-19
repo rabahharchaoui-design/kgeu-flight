@@ -15,6 +15,10 @@
 # Counters (reset each frame): localStorage writes (keys), fetch and sendBeacon calls, speechSynthesis speak, cancel and
 # getVoices (with their ms), Web Audio nodes and buffers created, layout reads (getBoundingClientRect, offset*/client*/
 # scroll* getters, getComputedStyle), shader programs linked (__kgeu.progN().compiles), textures and geometries uploaded.
+# Schoolhud: any read of window.speechSynthesis at all (SP.ssr, in every record as ssr: the game must never touch it); at a
+# held step, right after the step's frame, whether the new instruction is already readable (vis: the lesson card's
+# instruction or the pill's text in the DOM, on screen, at least half opaque) and, on the frame after it, what the top caption and the bottom task
+# card overlap (lap: each other, the controls, the readouts, the map).
 # Records go to the console as '[stepprobe] {json}' (the harness writes them to the file).
 PROBE = r"""(()=>{if(window.__sp)return;
 const SP=window.__sp={ev:[],ctl:[],last:null,n:0,frames:0,pend:null,ctlN:0,raf:{prev:0,gaps:[],open:[]}};
@@ -29,7 +33,8 @@ const W=(o,k,f)=>{try{const g=o&&o[k];if(typeof g!=='function')return;o[k]=funct
 W(Storage.prototype,'setItem',function(g,a){const t=now();try{return g.apply(this,a);}finally{cnt('ls');C.lsMs+=now()-t;if(C.lsKeys.length<8)C.lsKeys.push(String(a[0]));if(inF())(C.F.keys=C.F.keys||[]).push(String(a[0]));}});
 W(window,'fetch',function(g,a){cnt('fetch');return g.apply(this,a);});
 if(navigator.sendBeacon)W(navigator,'sendBeacon',function(g,a){cnt('beacon');return g.apply(this,a);});
-const SS=window.speechSynthesis;
+const SS=window.speechSynthesis;SP.ssr=0;
+try{Object.defineProperty(window,'speechSynthesis',{configurable:true,get(){SP.ssr++;return SS;}});}catch(e){}
 if(SS){for(const k of ['speak','cancel','getVoices']){const g=SS[k];if(typeof g!=='function')continue;
   SS[k]=function(){const t=now();try{return g.apply(SS,arguments);}finally{cnt(k==='getVoices'?'voices':k);C.spMs+=now()-t;}};}}
 const AC=window.BaseAudioContext||window.AudioContext||window.webkitAudioContext;
@@ -58,7 +63,20 @@ function diff(a,b){const k=[];if(!a)return k;
   if(a.v!==b.v&&b.v)k.push('voice');return k;}
 function gpu(K){let c=0,t=0,g=0;try{c=K.progN().compiles;const b=K.boot();t=b.texN;g=b.geoN;}catch(e){}return [c,t,g];}
 function label(s,kinds){return {kinds:kinds,les:s.les,i:s.i.slice(0,80),task:s.task,si:s.si,m:s.mt.slice(0,60),v:kinds.indexOf('voice')>=0?s.vt:''};}
-function emit(r){SP.ev.push(r);try{console.log('[stepprobe] '+JSON.stringify(r));}catch(e){}}
+// schoolhud: the step's instruction readable from its frame, and the caption and the card clear of everything
+const opq=e=>{let o=1;for(let n=e;n&&n.nodeType===1;n=n.parentElement){const s=getComputedStyle(n);if(s.display==='none'||s.visibility==='hidden')return 0;o*=parseFloat(s.opacity);}return o;};
+function visOf(s){const K=window.__kgeu,want=s.les&&s.i?'les':s.m?'miss':'';if(!want)return null;
+  const mp=document.getElementById('miss'),e=want==='les'?document.getElementById('lesI'):mp.classList.contains('call')?document.querySelector('#jumpLt b'):document.getElementById('missT'),r=e.getBoundingClientRect();   // a jump call (GREEN LIGHT) stands in the pill's text while it is on
+  return {k:want,ok:r.width>0&&r.height>0&&opq(e)>=0.5&&r.bottom>0&&r.top<innerHeight&&(want==='les'?e.textContent===s.i:!!e.textContent),op:+opq(e).toFixed(2)};}
+function lapOf(){const q=s=>[...document.querySelectorAll(s)].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&opq(e)>0.05;});
+  const A=q('#atc.on, #dfSub.on span, #lesson.on, #cap > #miss.on, #topCol > #miss.on'),C=q('#dock button, #dfW button, #thr, #stickHint, #map, #hud .card, #bPause, #lookPad, #tcas.on, #hDest:not([hidden]), #navLog, #tkReply.on button, #divCard.on');
+  const out=[];const nm=e=>e.id||(e.parentElement&&e.parentElement.id)||e.tagName;
+  for(let i=0;i<A.length;i++){const a=A[i].getBoundingClientRect();
+    for(const b of A.slice(i+1).concat(C)){if(A[i].contains(b)||b.contains(A[i]))continue;const c=b.getBoundingClientRect();
+      if(a.left<c.right-0.5&&c.left<a.right-0.5&&a.top<c.bottom-0.5&&c.top<a.bottom-0.5)out.push(nm(A[i])+' x '+nm(b));}}
+  return out;}
+SP.visOf=visOf;SP.lapOf=lapOf;   // part C asks for them directly
+function emit(r){r.ssr=SP.ssr;SP.ev.push(r);try{console.log('[stepprobe] '+JSON.stringify(r));}catch(e){}}
 function hook(){const K=window.__kgeu;if(!K||!K.stepFrame||K.__spWrapped)return false;K.__spWrapped=true;
   const sf=K.stepFrame;
   K.stepFrame=function(dt,release,skip){
@@ -68,9 +86,11 @@ function hook(){const K=window.__kgeu;if(!K||!K.stepFrame||K.__spWrapped)return 
     const r=sf.call(this,dt,release,skip);
     const ms=+(now()-t0).toFixed(2),cc=cCopy(),g1=gpu(K),s1=snap(K);SP.last=s1;SP.frames++;
     if(P){SP.pend=null;P.render={ms:ms,prog:g1[0]-g0[0],tex:g1[1]-g0[1],geo:g1[2]-g0[2],c:cc};
+      if(P.lapNext){delete P.lapNext;try{P.lap=lapOf();}catch(x){}}   // the overlaps on the frame after the step (the step's own lays nothing out)
       if(P.ctl)SP.ctl.push(P);emit(P);}
     const kinds=diff(s0,s1);
     if(kinds.length&&!force){const e=Object.assign({path:'held',t:+now().toFixed(0),ms:ms,skip:!!skip,prog:g1[0]-g0[0],tex:g1[1]-g0[1],geo:g1[2]-g0[2],c:cc,lay:layMs()},label(s1,kinds));
+      if(kinds.some(k=>k==='step'||k==='stage'||k==='mstep')){try{e.vis=visOf(s1);e.lapNext=1;}catch(x){e.vis={err:String(x)};}}
       if(s1.les||s1.task||s1.m||kinds.some(k=>/end|off/.test(k)))SP.pend=e;else emit(e);}
     else if(!force&&(s1.les||s1.task||s1.m)&&++SP.ctlN%50===0){SP.pend={ctl:1,path:'held',ms:ms,skip:!!skip,c:cc,lay:layMs()};}
     return r;};
@@ -98,7 +118,7 @@ function hook(){const K=window.__kgeu;if(!K||!K.stepFrame||K.__spWrapped)return 
   return true;}
 const iv=setInterval(()=>{if(hook())clearInterval(iv);},20);
 SP.summary=()=>{const q=a=>{const s=a.slice().sort((x,y)=>x-y);return s.length?s[s.length>>1]:0;};
-  return {frames:SP.frames,events:SP.ev.length,ctl:SP.ctl.length,ctlMs:q(SP.ctl.map(c=>c.ms)),ctlRender:q(SP.ctl.filter(c=>c.render).map(c=>c.render.ms)),
+  return {ssr:SP.ssr,frames:SP.frames,events:SP.ev.length,ctl:SP.ctl.length,ctlMs:q(SP.ctl.map(c=>c.ms)),ctlRender:q(SP.ctl.filter(c=>c.render).map(c=>c.render.ms)),
     ctlLay:q(SP.ctl.map(c=>c.lay)),rafMedian:q(SP.raf.gaps),rafN:SP.raf.gaps.length};};
 })()"""
 

@@ -184,6 +184,9 @@ body.appr #warn{ font-size:16px; padding:1px 10px; }
 body.appr #topCol > #atc{ padding:2px 9px; }
 body.appr #topCol > #atc .tx, body.appr #topCol > #atc .plain{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:0; }
 body.appr #topCol > #atc.hasPlain .tx{ display:none; }
+/* schoolhud: on the approach too the caption keeps two lines where they fit above 26% (hudFit's c2; it drops to one beside others) */
+body.appr #topCol.c2 > #atc{ white-space:normal; } body.appr #topCol.c2 > #atc .tx{ display:-webkit-box; white-space:normal; -webkit-line-clamp:2; line-height:15px; }
+body.appr #topCol.c2 > #atc.hasPlain .tx{ display:-webkit-box; -webkit-line-clamp:1; } body.appr #topCol.c2 > #atc .plain{ white-space:normal; -webkit-line-clamp:1; display:-webkit-box; }
 body.appr #toast, body.appr.touch #toast{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:14px; }
 body.appr #lesson{ max-height:calc(var(--vvh) / 3 - var(--saB) - 26px); overflow:hidden; }
 body.appr.touch #lesson{ max-height:calc(var(--vvh) / 3 - var(--saB) - 14px); }
@@ -14099,7 +14102,7 @@ function hudFit(){
       if(p){const x0=p.right-U.left+8,yT=p.top,yB=p.bottom;let x1=W-(thr?W-(thr.right-U.left):10);
         for(const o of obs)if(o.top<yB&&o.bottom>yT&&o.left-U.left>=x0-1)x1=Math.min(x1,o.left-U.left-6);
         if(x1-x0>=100){rs.setProperty('--rowW',Math.floor(Math.min(x1-x0,420))+'px');body.classList.add('topRow');fit(1);}}}}   // one row there: the corner under it stays the side readout's
-  else{T.classList.toggle('short',lim-T.getBoundingClientRect().top<60);fit();}
+  else{const room=lim-T.getBoundingClientRect().top;T.classList.toggle('short',room<60);T.classList.toggle('c2',room>=40);fit();}
   // (3) the bottom caption
   const cap=$('cap'),dk=R($('dock'));let L,Rt,B;
   const padR=thr?W-(thr.right-U.left):10;
@@ -14811,6 +14814,7 @@ function sensorView(){if(!running||st.crashed||!hasBall())return;
     ORDER.forEach(el=>{if(!show[el.id]&&el.parentNode!==A)A.appendChild(el);});
     vis.forEach((el,i)=>(i>=cA?A:i>=cB?B:Cc).appendChild(el));
     B.hidden=cA===0;Cc.hidden=cB===0;document.body.classList.toggle('dock2',!B.hidden);   // the TCAS panel steps left of a second column
+    if(typeof HF!=='undefined'&&!HF.want)HF.want=1;   // schoolhud: the task card's band follows the new dock on the next frame, not 8 frames on
     return true;
   };
   let key='';
