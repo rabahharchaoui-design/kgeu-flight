@@ -35,9 +35,10 @@ async def main():
         ok('the briefing: Surveillance, OVERWATCH, the MQ-9B at Luke 3L, five objectives, par, on station, wind, the target in nm (Hard) and the weather (clear)',
            br['k'] == 'TASKING · SURVEILLANCE' and br['t'].startswith('OVERWATCH') and 'MQ-9B' in br['ac'] and 'Luke' in br['ac'] and br['n'] == 5
            and [f.split(' ')[0] for f in br['f']] == ['PAR', 'ON', 'WIND', 'TARGET', 'WEATHER'] and ' nm ' in br['f'][3] and br['f'][4].endswith('Clear'), br)
-        s = await pg.evaluate(f"()=>{{const K={K},d=K.TASK.d,s=K.state();return {{type:s.type,on:s.onGround,base:s.base,dist:d.dist,brg:d.brg,objs:K.TASK.objs.length,tg:K.TASK.tgts.map(t=>t.name),dest:K.dest&&K.dest()}}}}")
-        ok('on the runway at Luke in the MQ-9B; the compound 9 to 16 km west of Luke (overwatch2) with its building and pickup as targets, and its dirt track',
-           s['type'] == 'mq9b' and s['on'] and 9000 <= s['dist'] <= 16000 and 205 <= s['brg'] <= 350 and s['objs'] == 3 and s['tg'] == ['the white building', 'the white pickup'], s)
+        s = await pg.evaluate(f"()=>{{const K={K},d=K.TASK.d,s=K.state();return {{type:s.type,on:s.onGround,base:s.base,dist:d.dist,brg:d.brg,objs:K.TASK.objs.length,tg:K.TASK.tgts.map(t=>t.name),veh:d.veh.name,dec:d.decoys.map(q=>q.name),dest:K.dest&&K.dest()}}}}")
+        ok('on the runway at Luke in the MQ-9B; the compound 9 to 16 km west of Luke (overwatch2) with its building, the vehicle and its decoys (item 4a) as targets, and its dirt track',
+           s['type'] == 'mq9b' and s['on'] and 9000 <= s['dist'] <= 16000 and 205 <= s['brg'] <= 350 and s['objs'] == 3 and s['tg'] == ['the white building', s['veh']] + s['dec'], s)
+        VEH = s['veh']
         await finger(pg, '#tkGo'); await pg.wait_for_timeout(100)
         await until(pg, SHOW, 30)
         t = await pg.evaluate(T)
@@ -75,7 +76,7 @@ async def main():
         await adv(pg, 2.5)
         await finger(pg, '#tkReply button[data-k="REPORT"]'); await adv(pg, 0.5)
         t = await pg.evaluate(T)
-        ok('REPORT once it moves: the delay kept, the track moves to the pickup, the follow stage', t['stage'] == 'follow' and 2 < t['d']['repDelay'] < 4.5 and await pg.evaluate(f"()=>{K}.SENSOR.tgt&&{K}.SENSOR.tgt.name") == 'the white pickup', t['d']['repDelay'])
+        ok('REPORT once it moves: the delay kept, the track moves to the vehicle, the follow stage', t['stage'] == 'follow' and 2 < t['d']['repDelay'] < 4.5 and await pg.evaluate(f"()=>{K}.SENSOR.tgt&&{K}.SENSOR.tgt.name") == VEH, t['d']['repDelay'])
         await until(pg, SHOW, 20); await pg.evaluate(f"()=>{K}.taskAnswer('WILCO')")
         c0 = await pg.evaluate(f"()=>{{const s={K}.state(),v={K}.TASK.d.veh;return Math.hypot(s.ap.cx-v.x,s.ap.cz-v.z)}}")
         await adv(pg, 12)
@@ -100,8 +101,8 @@ async def main():
         await finger(pg, '#tkReply button[data-k="REPORT"]')
         await until(pg, f"()=>{K}.task().done", 30)
         t = await pg.evaluate(T)
-        talk = [l['text'] for l in t['log'] if l.get('who') == 'You' and 'your vehicle is the white pickup' in l.get('text', '')]
-        ok('the talk-on: where the pickup is from Saber 6, which way it goes; Saber 6 has it', talk and ' of you' in talk[0] and any(l.get('who') == 'Saber 6' and 'Contact the white pickup' in l['text'] for l in t['log']), (talk, t['stage'], t['ask'], t['log'][-5:]))
+        talk = [l['text'] for l in t['log'] if l.get('who') == 'You' and f'your vehicle is {VEH},' in l.get('text', '')]
+        ok('the talk-on: where the vehicle is from Saber 6, which way it goes; Saber 6 has it', talk and ' of you' in talk[0] and any(l.get('who') == 'Saber 6' and f'Contact {VEH}.' in l['text'] for l in t['log']), (talk, t['stage'], t['ask'], t['log'][-5:]))
         secs = t['d']['secs']
         ok('the whole tasking runs 3 to 7 minutes', 180 <= secs <= 420, secs)
         r = t['res']

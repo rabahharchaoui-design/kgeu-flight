@@ -51,7 +51,7 @@ async def run(b, url, seed, tod, st):
     ok(f'seed {seed}: LOD0 bodies 900 to 1,200 triangles, LOD1 250 to 350, the rifle about 150 (60 at LOD1); three draws (two at night: no blobs)',
        all(900 <= f['body'][0] <= 1200 and 250 <= f['body'][1] <= 350 for f in i['figs']) and all(140 <= f['rifTris'][0] <= 160 for f in armed) and i['draws'] == (2 if tod == 'night' else 3),
        [(f['role'], f['body']) for f in i['figs']])
-    ok(f'seed {seed}: figures are not sensor targets (TASK.tgts unchanged)', await pg.evaluate(f"()=>{K}.TASK.tgts.map(t=>t.name).join()") == 'the white building,the white pickup')
+    ok(f'seed {seed}: figures are not sensor targets (TASK.tgts: the building and the vehicles, item 4a)', await pg.evaluate(f"()=>{{const K={K};return K.TASK.tgts.map(t=>t.name).join()===['the white building'].concat(K.TASK.d.fleet.list.map(v=>v.name)).join()}}"))
     ok(f'seed {seed}: the patrol loop at least 10 m outside the wall, clear of every obstacle',
        all(max(abs(p[0]) - i['lay']['hw'], abs(p[1]) - i['lay']['hd']) >= 10 for p in i['loop'])
        and await pg.evaluate(f"()=>{{const P={K}.TASK.d.ppl,N=P.N,L=P.pat.path.pts;for(let k=0;k+1<L.length;k++){{const a=L[k],b=L[k+1],n=Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/0.2);for(let j=0;j<=n;j++){{const x=a[0]+(b[0]-a[0])*j/n,z=a[1]+(b[1]-a[1])*j/n,c=Math.floor((x-N.x0)/N.c)+Math.floor((z-N.z0)/N.c)*N.nx;if(N.bk[c])return false;}}}}return true}}"),

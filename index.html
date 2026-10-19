@@ -17467,7 +17467,8 @@ tapBtn($('tkBack'),()=>{taskStop();openMenu('sArc');});
 
 // ---- OVERWATCH (MQ-9B SkyGuardian, surveillance) ----
 // Launch from Luke, climb to 3,000 ft and orbit a compound west of the base with the sensor on its white building.
-// Mission Control: "Keep eyes on the white building. Report when the vehicle departs." A white pickup leaves at a
+// Mission Control: "Keep eyes on the white building. Report when the vehicle departs." The vehicle of interest (a
+// rolled type and colour, overwatch2 item 4a: decoys of other colours parked by it, one may leave first) leaves at a
 // random moment; REPORT calls it, then follow it at a standoff (the orbit follows the track), never overhead, and talk
 // the ground team (Saber 6) onto it. Scored on time on target, standoff discipline, report timing and time to station.
 // Rolled: the compound (bearing 205 to 350 from Luke, 9 to 16 km, out in the desert: owSiteOK), its dirt track to the
@@ -17597,18 +17598,333 @@ function owSite(R,seed){const L=OW_SLOT.list;
     return {x:q[0],z:q[1],road:owRoadPt(q[0],q[1]),tries:4};}
   const f=OW_FALLBACK;return {x:f.x,z:f.z,road:owRoadPt(f.x,f.z)||{x:f.x+3000,z:f.z,kind:'arterial',d:3000},tries:0,fb:1};
 }
-// a white pickup: body, cab, glass, bed, wheels; 5.4 m long, nose toward -z (heading 0 = north). Overwatch2 item 2: the
-// hood (part 'hood', the engine bay) and the exhaust (part 'exh') are their own meshes so the IR view can heat them:
-// the bay 0.65 parked, 0.85 once it drives, the exhaust 0.95 moving (owVehTick)
-function owPickup(col){const g=new THREE.Group(),W=lam(col||0xeef0f2),D=lam(0x23272c),G=lam(0x3a4a5a),T=lam(0x151515);
-  const add=(geo,m,x,y,z)=>{const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);g.add(o);return o;};
-  add(new THREE.BoxGeometry(1.95,0.75,5.4),W,0,0.85,0);add(new THREE.BoxGeometry(1.85,0.85,2.3),W,0,1.62,-0.6);
-  add(new THREE.BoxGeometry(1.87,0.55,0.08),G,0,1.72,-1.76).rotation.x=-0.35;add(new THREE.BoxGeometry(1.9,0.5,1.9),G,0,1.68,-0.6).scale.set(1.002,1,0.98);
-  add(new THREE.BoxGeometry(1.95,0.45,0.1),W,0,1.45,2.65);add(new THREE.BoxGeometry(1.95,0.12,5.42),D,0,0.5,0);
-  add(new THREE.BoxGeometry(1.9,0.05,0.95),W,0,1.245,-2.2).userData.part='hood';
-  const ex=add(new THREE.CylinderGeometry(0.045,0.045,0.35,6),T,0.62,0.45,2.62);ex.rotation.x=Math.PI/2;ex.userData.part='exh';
-  const wg=new THREE.CylinderGeometry(0.42,0.42,0.3,10);wg.rotateZ(Math.PI/2);for(const z of [-1.7,1.7])for(const x of [-0.92,0.92])add(wg,T,x,0.42,z);
-  g.traverse(o=>{if(o.isMesh)o.userData.heat=o.userData.part==='hood'?0.65:0.5;});return g;}
+// ---------- overwatch2 item 4a: the vehicles ----------
+// Four types from real dimensions: a full size crew cab pickup (5.8 m, an F-150 SuperCrew with the 5.5 ft bed), a
+// compact double cab pickup (5.2 m, a Tacoma or Ranger), a mid size SUV with roof rails (4.9 m, a 4Runner or
+// Highlander), a mid size sedan (4.8 m, a Camry). Built the way the aircraft are: a lofted lower body (rounded rings
+// from the bumper to the tail, the bottom lifted round each wheel into its arch, the hood its top ahead of the cowl),
+// a lofted cabin on it (windshield, roof and rear glass one surface; the pillars and windows drawn by vertex colour
+// on paired rings so their edges are crisp), rounded pads for the bumpers, grille, lamps, mirrors, the bed's walls and
+// tailgate and the roof rails, tubes for the antenna and the exhaust, lathed wheels (tyre and a five spoke hub). One
+// smooth indexed mesh per vehicle and level: 1,400 to 2,400 triangles, and a 250 to 400 triangle level with the same
+// outline swapped in by projected size as the people are. Painted by vertex colour (the paint in six real colours,
+// two glass tones, trim, tyres, alloy, lamps) with the people's material (a program the compound already links, drawn
+// after the yard's canvas); in IR the colours swap to heat greys by part (the people's trick, owvIR): the paint warm
+// by day, the glass cold, the hood, grille, tyres and exhaust warming once it drives. Nose toward -z, the origin on
+// the ground at the middle of its length (heading 0 north, rotation.y = -h, as before).
+const OWV_T={
+  pickup:{nm:'pickup',cap:'PICKUP',L:5.8,W:2.03,wb:3.68,fo:0.95,tw:1.72,R:0.405,tyW:0.28,clr:0.25,noseB:0.36,tailB:0.4,nw:0.95,
+    tp:[[0,1.1],[0.07,1.15],[0.6,1.2],[1.94,1.28],[1.98,1.31],[3.95,1.31],[3.956,0.94],[5.8,0.94]],belt:1.31,roof:1.94,zW0:1.98,zW1:2.74,zRf:3.86,
+    rear:[[3.88,0.93],[3.945,0.14],[3.95,0]],span:[[2.93],[3.03,3.76]],bed:[0.94,1.32],zCB:3.95,
+    bf:[0.34,0.62,10],br:[0.38,0.64,10],gr:[0.58,0.66,1.08],hl:[0.79,0.19,0.84,1.07],tl:'v',tly:[0.98,1.28],mir:9,ant:'mast',exh:[0.6,0.34],H:1.94},
+  compact:{nm:'compact pickup',cap:'PICKUP',L:5.2,W:1.86,wb:3.22,fo:0.88,tw:1.56,R:0.38,tyW:0.255,clr:0.23,noseB:0.36,tailB:0.4,nw:0.95,
+    tp:[[0,1],[0.07,1.05],[0.6,1.1],[1.74,1.17],[1.78,1.2],[3.55,1.2],[3.556,0.86],[5.2,0.86]],belt:1.2,roof:1.8,zW0:1.78,zW1:2.48,zRf:3.47,
+    rear:[[3.49,0.93],[3.545,0.14],[3.55,0]],span:[[2.62],[2.71,3.38]],bed:[0.86,1.21],zCB:3.55,
+    bf:[0.32,0.56,3],br:[0.36,0.58,3],gr:[0.48,0.6,0.98],hl:[0.68,0.15,0.82,0.98],tl:'v',tly:[0.9,1.17],mir:3,ant:'mast',exh:[0.55,0.32],H:1.8},
+  suv:{nm:'SUV',cap:'SUV',L:4.9,W:1.93,wb:2.85,fo:0.95,tw:1.64,R:0.37,tyW:0.245,clr:0.21,noseB:0.33,tailB:0.36,nw:0.92,
+    tp:[[0,0.92],[0.07,0.97],[1.52,1.08],[1.56,1.1],[4.9,1.1]],belt:1.1,roof:1.76,zW0:1.56,zW1:2.32,zRf:4.6,
+    rear:[[4.63,0.95],[4.84,0.32],[4.845,0.3],[4.85,0]],span:[[2.98],[3.08,3.8],[3.9,4.42]],clad:1,rails:1,
+    bf:[0.3,0.55,3],br:[0.34,0.58,3],gr:[0.5,0.6,0.86],hl:[0.68,0.17,0.78,0.92],tl:'v',tly:[0.9,1.16],mir:0,ant:'fin',exh:[0.5,0.3],H:1.82},
+  sedan:{nm:'sedan',cap:'SEDAN',L:4.8,W:1.84,wb:2.82,fo:0.98,tw:1.58,R:0.335,tyW:0.235,clr:0.14,noseB:0.24,tailB:0.3,nw:0.88,
+    tp:[[0,0.66],[0.08,0.74],[0.45,0.8],[1.62,0.92],[1.66,0.95],[4.05,0.97],[4.6,0.98],[4.74,0.95],[4.8,0.86]],belt:0.95,roof:1.45,zW0:1.66,zW1:2.56,zRf:3.32,
+    rear:[[3.38,0.93],[4.0,0.1],[4.05,0]],span:[[3.02],[3.12,3.6]],
+    bf:[0.22,0.33,0],br:[0.32,0.5,0],gr:[0.58,0.34,0.47],gr2:[0.38,0.5,0.6],hl:[0.62,0.2,0.53,0.63],tl:'h',tly:[0.82,0.92],mir:0,ant:'fin',exh:[0.5,0.26],H:1.45}};
+const OWV_C={white:0xeef0f2,red:0x9c1c1a,silver:0xa9adb2,black:0x16181b,tan:0xb39d7a,blue:0x1f3d6c};
+const OWV_TK=['pickup','compact','suv','sedan'],OWV_CK=['white','red','silver','black','tan','blue'];
+const owvName=(t,c)=>'the '+c+' '+OWV_T[t].nm;
+// part codes: 0 paint, 1 glass, 2 glass (the lighter tone up the windshield and rear glass), 3 trim, 4 tyre, 5 alloy,
+// 6 the hub between its spokes, 7 head lamp, 8 tail lamp, 9 grille, 10 chrome, 11 bed liner, 12 exhaust, 13 hood
+// (paint, the engine under it), 14 underbody
+const OWV_DAY=[0,0x1c242c,0x3b4957,0x2a2c2f,0x161718,0xa9adb2,0x2b2c2e,0xe6ebee,0x9a1a16,0x212427,0xb9bec4,0x2b2c2e,0x3a3632,0,0x2a2826];
+const owvB=()=>({p:[],k:[],i:[],v:0});
+function owvV(B,x,y,z,k){B.p.push(x,y,z);B.k.push(k);return B.v++;}
+// one triangle, its normal turned away from the point r (inside the solid)
+function owvTri(B,a,b,c,r){const P=B.p,ax=P[a*3],ay=P[a*3+1],az=P[a*3+2],ux=P[b*3]-ax,uy=P[b*3+1]-ay,uz=P[b*3+2]-az,vx=P[c*3]-ax,vy=P[c*3+1]-ay,vz=P[c*3+2]-az;
+  const nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx,mx=(ax+P[b*3]+P[c*3])/3-r[0],my=(ay+P[b*3+1]+P[c*3+1])/3-r[1],mz=(az+P[b*3+2]+P[c*3+2])/3-r[2];
+  if(nx*mx+ny*my+nz*mz<0)B.i.push(a,c,b);else B.i.push(a,b,c);}
+// rings of [x,y,z] joined in order (closed: each wraps); K(s,j) the part code; ref(s) a point inside at ring s;
+// caps (a fan to the ring's centre, its own vertices and code) at the first (capA) and last (capB) ring
+function owvLoft(B,R,K,closed,ref,capA,capB){const n=R[0].length,b0=B.v,m=closed?n:n-1;
+  for(let s=0;s<R.length;s++)for(let j=0;j<n;j++){const q=R[s][j];owvV(B,q[0],q[1],q[2],K(s,j));}
+  for(let s=0;s+1<R.length;s++){const r=ref(s);for(let j=0;j<m;j++){const a=b0+s*n+j,b=b0+s*n+(j+1)%n,c=a+n,d=b+n;owvTri(B,a,c,b,r);owvTri(B,b,c,d,r);}}
+  for(const [s,k,rr] of [[0,capA,0],[R.length-1,capB,1]]){if(k==null)continue;const Q=R[s];let cx=0,cy=0,cz=0;for(const q of Q){cx+=q[0];cy+=q[1];cz+=q[2];}cx/=n;cy/=n;cz/=n;
+    const r=ref(Math.min(s,R.length-2)),r2=[r[0],r[1],r[2]+(rr?-0.5:0.5)],c0=owvV(B,cx,cy,cz,typeof k==='function'?k(-1):k),v0=B.v;
+    for(let j=0;j<n;j++)owvV(B,Q[j][0],Q[j][1],Q[j][2],typeof k==='function'?k(j):k);
+    for(let j=0;j<m;j++)owvTri(B,c0,v0+j,v0+(j+1)%n,r2);}}
+// a superellipse ring (exponent e) of M points, half sizes a by b
+function owvSE(M,a,b,e){const o=[];for(let j=0;j<M;j++){const t=(j+0.5)/M*Math.PI*2,c=Math.cos(t),s=Math.sin(t);o.push([Math.sign(c)*Math.pow(Math.abs(c),2/e)*a,Math.sign(s)*Math.pow(Math.abs(s),2/e)*b]);}return o;}
+// a rounded pad: a superellipse section extruded along ax ('x', 'y' or 'z'), its ends bevelled (bev 0: square), capped
+function owvPad(B,cx,cy,cz,ax,a,b,L,e,M,k,bev){const S=owvSE(M,a,b,e),bv=bev===0?0:Math.min(L*0.3,0.55*Math.min(a,b)),ts=bv?[-L/2,-L/2+bv,L/2-bv,L/2]:[-L/2,L/2],sc=bv?[0.8,1,1,0.8]:[1,1];
+  const P=(t,u,w)=>ax==='x'?[cx+t,cy+w,cz+u]:ax==='y'?[cx+u,cy+t,cz+w]:[cx+u,cy+w,cz+t];
+  owvLoft(B,ts.map((t,i)=>S.map(q=>P(t,q[0]*sc[i],q[1]*sc[i]))),()=>k,true,()=>[cx,cy,cz],k,k);}
+// a tube from p to q, radius r, S sides, capped at q
+function owvTube(B,p,q,r,S,k){const d=[q[0]-p[0],q[1]-p[1],q[2]-p[2]],l=Math.hypot(d[0],d[1],d[2]);d[0]/=l;d[1]/=l;d[2]/=l;
+  const up=Math.abs(d[1])<0.9?[0,1,0]:[1,0,0],u=[d[1]*up[2]-d[2]*up[1],d[2]*up[0]-d[0]*up[2],d[0]*up[1]-d[1]*up[0]],ul=Math.hypot(u[0],u[1],u[2]);u[0]/=ul;u[1]/=ul;u[2]/=ul;
+  const w=[d[1]*u[2]-d[2]*u[1],d[2]*u[0]-d[0]*u[2],d[0]*u[1]-d[1]*u[0]],ring=c=>{const o=[];for(let j=0;j<S;j++){const t=j/S*Math.PI*2,cs=Math.cos(t)*r,sn=Math.sin(t)*r;o.push([c[0]+u[0]*cs+w[0]*sn,c[1]+u[1]*cs+w[1]*sn,c[2]+u[2]*cs+w[2]*sn]);}return o;};
+  owvLoft(B,[ring(p),ring(q)],()=>k,true,()=>[(p[0]+q[0])/2,(p[1]+q[1])/2,(p[2]+q[2])/2],null,k);}
+// a wheel at c on side sd (+1 right), radius R, width W: the tyre lathed round the axle (tread, shoulders, outer wall)
+// and the hub (S sides: five spokes in alloy at S 10); lod 1: a plain short drum
+function owvWheel(B,c,R,W,sd,S,lod){const v0=B.v,ref=[c[0]-sd*W,c[1],c[2]],ring=(r,x,K)=>{const o=[];for(let j=0;j<S;j++){const t=j/S*Math.PI*2;o.push([c[0]+sd*x,c[1]+Math.cos(t)*r,c[2]+Math.sin(t)*r]);}return o;};
+  const pr=lod?[[R,-W/2],[R,W/2]]:[[0.9*R,-W/2],[R,-0.36*W],[R,0.36*W],[0.93*R,W/2],[0.69*R,W/2]];
+  owvLoft(B,pr.map(q=>ring(q[0],q[1])),()=>4,true,()=>ref,null,lod?5:null);
+  if(!lod){const hb=[ring(0.7*R,W/2-0.012),ring(0.24*R,W/2-0.003)];owvLoft(B,hb,(s,j)=>s===0&&j>=0&&(j&1)?6:5,true,()=>ref,null,5);}
+  return {v0:v0,v1:B.v,x:c[0],y:c[1],z:c[2]};}
+// smooth normals over the shared vertices
+function owvNormals(p,I,nv){const n=new Float32Array(nv*3);
+  for(let t=0;t<I.length;t+=3){const a=I[t]*3,b=I[t+1]*3,c=I[t+2]*3,ux=p[b]-p[a],uy=p[b+1]-p[a+1],uz=p[b+2]-p[a+2],vx=p[c]-p[a],vy=p[c+1]-p[a+1],vz=p[c+2]-p[a+2];
+    const x=uy*vz-uz*vy,y=uz*vx-ux*vz,z=ux*vy-uy*vx;for(const q of [a,b,c]){n[q]+=x;n[q+1]+=y;n[q+2]+=z;}}
+  for(let i=0;i<nv;i++){const l=Math.hypot(n[i*3],n[i*3+1],n[i*3+2])||1;n[i*3]/=l;n[i*3+1]/=l;n[i*3+2]/=l;}return n;}
+const owvLerp=(T,z)=>{if(z<=T[0][0])return T[0][1];for(let i=0;i+1<T.length;i++)if(z<=T[i+1][0]){const a=T[i],b=T[i+1];return a[1]+(b[1]-a[1])*(z-a[0])/Math.max(1e-6,b[0]-a[0]);}return T[T.length-1][1];};
+// one type at one level (0 full, 1 light): {p,k,i,v,wh (the wheels' vertex ranges and centres, first in the buffer)}
+function owvBuild(type,lod){const T=OWV_T[type],B=owvB(),L=T.L,hw=T.W/2,zf=T.fo,zr=T.fo+T.wb,Ra=T.R+0.07,mz=z=>z-L/2,wh=[],tw0=T.bed?0.985:0.93,nw0=T.nw;
+  // ---- the wheels first (their vertices rewritten as they turn) ----
+  for(const z of [zf,zr])for(const sd of [-1,1])wh.push(Object.assign(owvWheel(B,[sd*T.tw/2,T.R,mz(z)],T.R,T.tyW,sd,lod?6:10,lod),{front:z===zf}));
+  const nw=B.v;
+  // ---- the lower body: rings from the bumper to the tail ----
+  const yb=z=>{let y=T.clr;if(z<0.45)y+=(T.noseB-T.clr)*Math.pow(1-z/0.45,1.5);if(z>L-0.5)y+=(T.tailB-T.clr)*Math.pow((z-(L-0.5))/0.5,1.5);
+    for(const w of [zf,zr]){const d=Math.abs(z-w);if(d<=Ra+1e-4)y=Math.max(y,lod?T.R+Ra*0.85*clamp((Ra-d)/(Ra*0.45),0,1):T.R+Math.sqrt(Math.max(0,Ra*Ra-d*d)));}return y;};
+  const yt=z=>owvLerp(T.tp,z),hwz=z=>hw*(z<0.35?nw0+(1-nw0)*Math.sin(z/0.35*Math.PI/2):z>L-0.3?tw0+(1-tw0)*Math.sin((L-z)/0.3*Math.PI/2):1);
+  const LB=lod?[[0,0],[1,0.12],[1,0.88],[0,1]]:type==='sedan'?[[0,0],[0.84,0],[0.95,0.06],[0.995,0.24],[1,0.6],[0.94,0.96],[0.86,1],[0,1]]
+    :T.clad?[[0,0],[0.86,0],[0.97,0.05],[1,0.22],[1,0.25],[1,0.72],[0.96,0.97],[0.88,1],[0,1]]
+    :[[0,0],[0.86,0],[0.97,0.05],[1,0.22],[1,0.72],[0.96,0.97],[0.88,1],[0,1]];
+  const ringIdx=[];for(let j=0;j<LB.length;j++)ringIdx.push(j);for(let j=LB.length-2;j>0;j--)ringIdx.push(j);   // bottom centre, right side up, top centre, left side down
+  // the stations: the nose and tail, every arch (its edge a pair, a vertical step), the top's key points (a step in it,
+  // the pickup's bed, a pair); the rest thinned to 6 cm apart
+  const keep=[0,L],soft=lod?[0.2,L-0.2,T.zW0]:[0.14,0.32,L-0.32,L-0.14];
+  for(let i=0;i+1<T.tp.length;i++)if(T.tp[i+1][0]-T.tp[i][0]<0.01)keep.push(T.tp[i][0],T.tp[i+1][0]);
+  if(!lod)for(const q of T.tp)soft.push(q[0]);
+  for(const w of [zf,zr]){for(const f of lod?[-1.01,1.01]:[-1.012,-1,1,1.012])keep.push(w+f*Ra);for(const f of lod?[-0.55,0.55]:[-0.7,-0.36,0,0.36,0.7])keep.push(w+f*Ra);}
+  let zs=keep.filter(z=>z>=0&&z<=L).sort((a,b)=>a-b);for(const z of soft)if(z>0&&z<L&&zs.every(q=>Math.abs(q-z)>0.06)&&!(Math.min(z,L-z)<0.2&&T.tp.some(q=>q[0]!==z&&Math.abs(q[0]-z)<0.1)))zs.push(z);
+  zs.sort((a,b)=>a-b);zs=zs.filter((z,i)=>i===0||z-zs[i-1]>0.003);
+  const R1=[],Ks=[];
+  for(const z of zs){const b=yb(z),t=Math.max(b+0.15,yt(z)),w=hwz(z),ring=[];
+    for(let j=0;j<ringIdx.length;j++){const q=LB[ringIdx[j]],sx=j<LB.length&&j>0&&j<LB.length-1?1:j>=LB.length?-1:0;ring.push([sx*q[0]*w,b+q[1]*(t-b),mz(z)]);}
+    R1.push(ring);}
+  const arch=z=>Math.abs(z-zf)<=Ra+0.001||Math.abs(z-zr)<=Ra+0.001,bed=T.bed&&T.zCB;
+  owvLoft(B,R1,(s,j)=>{const z=zs[s],p=ringIdx[j],v=LB[p][1];
+      if(v<=0.001&&p<LB.length-1)return 14;
+      if(v<=0.23&&T.clad||v<=0.06&&arch(z))return 3;   // the SUV's cladding (a paired row above it keeps its edge), the arches' lips
+      if(v>=0.97){if(z<T.zW0)return 13;if(bed&&z>bed+0.003)return 11;}
+      return 0;},true,s=>{const z=(zs[s]+zs[s+1])/2;return [0,(yb(z)+yt(z))/2,mz(z)];},
+    j=>j<0?(lod?9:0):0,j=>j<0&&T.bed?0:0);
+  // ---- the cabin: the windshield from the cowl, the roof, the rear glass; one surface over the belt ----
+  const CP=lod?[[1,0],[0.9,0.9],[0,1]]:[[1,0],[0.995,0.07],[0.965,0.5],[0.93,0.86],[0.905,0.93],[0.875,0.955],[0.78,0.99],[0,1]];
+  const ci=[];for(let j=0;j<CP.length;j++)ci.push(j);for(let j=CP.length-2;j>=0;j--)ci.push(j);   // left belt over the roof to the right belt
+  const dW=T.zW1-T.zW0,rr=T.rear,zE=rr[rr.length-1][0];
+  const fz=z=>z<=T.zW0?0:z<T.zW1?(z-T.zW0)/dW:z<=T.zRf?1:owvLerp([[T.zRf,1]].concat(rr),z);
+  const inSpan=z=>{const S=T.span;if(z<S[0][0]-0.003&&z>T.zW0+dW*0.42)return true;for(let i=1;i<S.length;i++)if(z>S[i][0]+0.003&&z<S[i][1]-0.003)return true;return false;};
+  const topG=z=>(z>T.zW0+dW*0.03&&z<T.zW0+dW*0.97)?(z>T.zW0+dW*0.5?2:1):(z>T.zRf+0.01&&z<zE-0.003&&fz(z)>0.05)?2:0;
+  let cz=lod?[T.zW0,T.zW0+dW*0.6,T.zW1,T.zRf,T.zRf+(zE-T.zRf)*0.5,zE]:[T.zW0,T.zW0+dW*0.06,T.zW0+dW*0.4,T.zW0+dW*0.44,T.zW0+dW*0.94,T.zW1,T.zRf].concat(rr.map(q=>q[0]));
+  if(!lod){for(let i=0;i<T.span.length;i++)for(const e of T.span[i])cz.push(e-0.005,e+0.005);}
+  cz.sort((a,b)=>a-b);cz=cz.filter((z,i)=>i===0||z-cz[i-1]>0.002);
+  const R2=cz.map(z=>{const f=fz(z),w=hwz(z)*0.955,y0=T.belt-0.012,H=T.roof-T.belt;
+    return ci.map((p,j)=>{const q=CP[p],sx=j<CP.length-1?-1:j===CP.length-1?0:1;return [sx*q[0]*w*(1-0.07*q[1]*f),y0+q[1]*f*H,mz(z)];});});
+  owvLoft(B,R2,(s,j)=>{const z=cz[s],p=ci[j],f=fz(z);if(lod){if(p===0||f<0.05)return 0;if(p===1)return z<T.zW0+dW*0.3?0:1;const g=topG(z);return g?1:0;}
+      if(p===0||f<0.04)return 0;if(p>=1&&p<=3)return inSpan(z)?1:0;if(p===4)return 0;return topG(z);},false,s=>[0,T.belt-0.4,mz((cz[s]+cz[s+1])/2)]);
+  // ---- bumpers, grille, lamps ----
+  const zF=mz(0),zT=mz(L),bk=k=>k===10?10:k===3?3:0;
+  owvPad(B,0,(T.bf[0]+T.bf[1])/2,zF+0.03,'x',0.085,(T.bf[1]-T.bf[0])/2,T.W*0.88,4,lod?4:T.bf[2]===3?8:10,bk(T.bf[2]),lod?0:1);
+  owvPad(B,0,(T.br[0]+T.br[1])/2,zT-0.03,'x',0.085,(T.br[1]-T.br[0])/2,T.W*0.93,4,lod?4:T.br[2]===3?8:10,bk(T.br[2]),lod?0:1);
+  if(!lod){const G=T.gr;owvPad(B,0,(G[1]+G[2])/2,zF+0.012,'z',G[0],(G[2]-G[1])/2,0.05,5,10,9);
+    if(T.gr2){const g2=T.gr2;owvPad(B,0,(g2[1]+g2[2])/2,zF+0.06,'z',g2[0],(g2[2]-g2[1])/2,0.05,5,8,9);}
+    const H=T.hl;for(const s of [-1,1])owvPad(B,s*H[0],(H[2]+H[3])/2,zF+0.015,'z',H[1],(H[3]-H[2])/2,0.05,4,6,7);
+    for(const s of [-1,1]){if(T.tl==='v')owvPad(B,s*(hw*tw0-0.06),(T.tly[0]+T.tly[1])/2,zT-0.004,'z',0.07,(T.tly[1]-T.tly[0])/2,0.04,4,6,8);
+      else owvPad(B,s*(hw*0.6),(T.tly[0]+T.tly[1])/2,zT+0.012,'z',0.26,(T.tly[1]-T.tly[0])/2,0.05,4,6,8);}}
+  // ---- the pickup's bed: two walls with their rails, the front wall, the tailgate ----
+  if(T.bed){const [y0,y1]=T.bed,zc=mz(T.zCB),l=L-T.zCB,ym=(y0+y1)/2,hh=(y1-y0)/2+0.01,M=lod?4:6;
+    for(const s of [-1,1])owvPad(B,s*(hw*0.99-0.05),ym,zc+l/2,'z',0.05,hh,l-0.02,6,M,0,lod?0:1);
+    owvPad(B,0,ym+0.01,zc+0.05,'x',0.045,hh+0.01,T.W*0.93-0.04,6,M,0,lod?0:1);
+    if(!lod)owvPad(B,0,(T.br[1]+y1)/2,zT-0.05,'x',0.05,(y1-T.br[1])/2+0.01,T.W*0.93-0.06,6,M,0,1);}
+  // ---- the SUV's roof rails ----
+  if(T.rails){const z0=mz(T.zW1+0.18),z1=mz(T.zRf-0.12),w=hwz(2.5)*0.955*0.93*0.8;for(const s of [-1,1])owvPad(B,s*w,T.roof+0.012,(z0+z1)/2,'z',0.026,0.028,z1-z0,4,lod?4:6,3,0);}
+  // ---- mirrors, the antenna, the exhaust ----
+  if(!lod){for(const s of [-1,1])owvPad(B,s*(hw*0.86+0.14),T.belt+0.12,mz(T.zW0+dW*0.46),'z',0.14,T.mir===9?0.12:0.085,0.09,4,6,T.mir===9||T.mir===3?3:0);
+    if(T.ant==='mast'){const z=mz(T.zW0-0.3),y=yt(T.zW0-0.3)-0.01;owvTube(B,[hw*0.8,y,z],[hw*0.8,y+0.78,z+0.05],0.006,4,3);}
+    else owvPad(B,0,T.roof+0.008,mz(T.zRf-0.2),'z',0.028,0.03,0.16,3,4,0);
+    const E=T.exh;owvTube(B,[E[0],E[1],zT-0.45],[E[0],E[1],zT+0.015],0.045,6,12);}
+  const p=new Float32Array(B.p),I=new Uint16Array(B.i);
+  return {p:p,k:new Uint8Array(B.k),i:I,v:B.v,nw:nw,n:owvNormals(p,I,B.v),wh:wh,tris:I.length/3};}
+// IR greys by part (the people's trick: the mesh's heat 0.6 and irVar 0.8, each vertex's grey picked so the view shows
+// the temperature g): paint warm by day (dark paint warmer), glass and lamps cold, chrome colder (the sky in it), the
+// hood, grille and underbody warming over 40 s once it drives (v.hot), the tyres over a minute, the exhaust in seconds
+function owvIRg(k,v,night,lum){const h=v.hot,base=night?0.3:0.44+0.12*(1-lum);
+  switch(k){case 0:return base;case 13:return base+h*0.36;case 1:case 2:case 7:case 8:return night?0.2:0.28;
+    case 9:return (night?0.3:0.4)+h*0.3;case 14:return (night?0.3:0.4)+h*0.2;case 3:case 11:return night?0.3:0.4;
+    case 4:case 5:case 6:return (night?0.28:0.38)+0.22*v.hotT;case 10:return night?0.22:0.34;case 12:return 0.4+0.55*v.hotE;}
+  return base;}
+function owvIRfill(v){const night=!!TOD.night,amb=night?0.06:TOD.id==='sunset'||TOD.hb?0.1:0.13,c=_owvC.setHex(v.colHex),lum=c.r*0.3+c.g*0.59+c.b*0.11;
+  for(const L of v.lods){const K=L.G.k,a=L.ir;for(let i=0;i<K.length;i++){const b=clamp((owvIRg(K[i],v,night,lum)-amb-0.48)/0.8+0.55,0,1);a[i*3]=a[i*3+1]=a[i*3+2]=b;}}}
+const _owvC=new THREE.Color();
+let OWV_FORCE=null;   // tests: every vehicle at one level (0 or 1)
+// a vehicle of a type and colour: its group (both levels, the light one hidden), the lock target's fields (name, aimH,
+// task), its driving state. Level 0's wheels turn and steer on the CPU (owvWheels: their vertices first in the buffer)
+function owVehicle(type,ck){const T=OWV_T[type],g=new THREE.Group(),pc=new THREE.Color(OWV_C[ck]);g.name='owVeh';
+  const v={type:type,ck:ck,colHex:OWV_C[ck],T:T,name:owvName(type,ck),short:ck+' '+T.nm,g:g,lods:[],lod:0,x:0,y:0,z:0,h:0,aimH:T.H*0.55,task:1,dead:false,
+    moving:false,stopped:false,spd:0,s:0,pi:0,rot:0,steer:0,pp:0,pr:0,slowF:1,hot:0,hotT:0,hotE:0,ir:false,irT:-1,dust:0,dustT:0,dw:0,onRoad:false,vk:11,vRoad:22,slowK:0.62,yardS:0,path:null};
+  for(const L of [0,1]){const G=owvBuild(type,L),n=G.v,day=new Float32Array(n*3),geo=new THREE.BufferGeometry();
+    for(let i=0;i<n;i++){const k=G.k[i],c=k===0||k===13?pc:_owvC.setHex(OWV_DAY[k]);day[i*3]=c.r;day[i*3+1]=c.g;day[i*3+2]=c.b;}
+    const pa=new THREE.BufferAttribute(L?G.p:G.p.slice(),3),na=new THREE.BufferAttribute(L?G.n:G.n.slice(),3),ca=new THREE.BufferAttribute(day.slice(),3);
+    if(!L){pa.setUsage(THREE.DynamicDrawUsage);na.setUsage(THREE.DynamicDrawUsage);}
+    geo.setAttribute('position',pa);geo.setAttribute('normal',na);geo.setAttribute('color',ca);geo.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(n*2).fill(0.5),2));
+    geo.setIndex(new THREE.BufferAttribute(G.i,1));geo.boundingSphere=new THREE.Sphere(new THREE.Vector3(0,1,0),T.L/2+0.7);
+    const m=new THREE.Mesh(geo,owpMats().body);m.name='ow_veh'+L;m.userData.heat=0.6;m.userData.irVar=0.8;m.castShadow=false;m.receiveShadow=true;m.renderOrder=2;m.visible=!L;
+    g.add(m);v.lods.push({m:m,G:G,pos:pa,nrm:na,col:ca,day:day,ir:new Float32Array(n*3)});}
+  return v;}
+// level 0's wheels: each vertex turned about its axle by the distance rolled, the front pair steered, one upload of
+// their range (the first G.nw vertices)
+function owvWheels(v){const L=v.lods[0],G=L.G,P=L.pos.array,N=L.nrm.array,rp=G.p,rn=G.n,cs=Math.cos(v.rot),sn=-Math.sin(v.rot);
+  for(const w of G.wh){const a=w.front?-v.steer:0,cy=Math.cos(a),sy=Math.sin(a);
+    for(let i=w.v0;i<w.v1;i++){const o=i*3,x=rp[o]-w.x,y=rp[o+1]-w.y,z=rp[o+2]-w.z,y1=y*cs-z*sn,z1=y*sn+z*cs;
+      P[o]=w.x+x*cy+z1*sy;P[o+1]=w.y+y1;P[o+2]=w.z-x*sy+z1*cy;
+      const nx=rn[o],ny=rn[o+1],nz=rn[o+2],ny1=ny*cs-nz*sn,nz1=ny*sn+nz*cs;N[o]=nx*cy+nz1*sy;N[o+1]=ny1;N[o+2]=-nx*sy+nz1*cy;}}
+  for(const A of [L.pos,L.nrm]){A.updateRange.offset=0;A.updateRange.count=G.nw*3;A.needsUpdate=true;}}
+// what a wheel stands on: the yard's covering inside the wall (as the people), else the higher of the real ground and
+// the terrain mesh drawn there (as the compound and the track)
+function owvGnd(d,x,z){const U=d.cmp.userData,ca=Math.cos(d.ang),sa=Math.sin(d.ang),X=x-d.c.x,Z=z-d.c.z,lx=X*ca-Z*sa,lz=X*sa+Z*ca;
+  if(Math.abs(lx)<U.lay.hw-0.05&&Math.abs(lz)<U.lay.hd-0.05)return owpYardH(U.yg,lx,lz)+d.cmp.position.y;
+  return Math.max(groundHeight(x,z),owMeshH(x,z));}
+// the body on its four wheels: y from their contact heights, pitch from front against rear, roll from right against
+// left (eased a little: the springs), heading h (rotation.y = -h)
+function owvPose(d,v,dt){const T=v.T,ch=Math.cos(v.h),sh=Math.sin(v.h),zf=T.fo-T.L/2,zr=zf+T.wb,tw=T.tw/2;
+  const W=(mx,mz)=>owvGnd(d,v.x+mx*ch-mz*sh,v.z+mx*sh+mz*ch),fl=W(-tw,zf),fr=W(tw,zf),rl=W(-tw,zr),rr=W(tw,zr);
+  const pt=Math.atan2((fl+fr)-(rl+rr),2*T.wb),ro=Math.atan2((fr+rr)-(fl+rl),2*T.tw),k=dt==null?1:Math.min(1,dt*12);
+  v.pp+=(pt-v.pp)*k;v.pr+=(ro-v.pr)*k;v.y=(fl+fr+rl+rr)/4;
+  v.g.position.set(v.x,v.y+0.01+(zf+zr)/2*Math.sin(v.pp),v.z);v.g.rotation.set(v.pp,-v.h,v.pr,'YXZ');}
+// a drivable path through the points Q ({x,z,rd}: rd, the leg from it is a road): every corner rounded, its radius
+// keeping the arc within 1 m of the corner (4 m where the track joins the road), at most 30 m and 45 percent of either
+// leg; sampled every 2 m or less with its curvature k (1/m, + to the right) and the road flag
+function owvPath(Q){const X=[],Z=[],S=[],K=[],RD=[];let s=0,px=0,pz=0;
+  const put=(x,z,k,rd)=>{if(X.length){const d=Math.hypot(x-px,z-pz);if(d<1e-3)return;s+=d;}X.push(x);Z.push(z);S.push(s);K.push(k);RD.push(rd?1:0);px=x;pz=z;};
+  const line=(x0,z0,x1,z1,rd)=>{const n=Math.max(1,Math.ceil(Math.hypot(x1-x0,z1-z0)/2));for(let i=1;i<=n;i++)put(x0+(x1-x0)*i/n,z0+(z1-z0)*i/n,0,rd);};
+  put(Q[0].x,Q[0].z,0,Q[0].rd);let cx=Q[0].x,cz=Q[0].z;
+  for(let i=1;i<Q.length;i++){const a=Q[i-1],b=Q[i],c=Q[i+1];
+    if(!c){line(cx,cz,b.x,b.z,a.rd);break;}
+    const L1=Math.hypot(b.x-a.x,b.z-a.z),L2=Math.hypot(c.x-b.x,c.z-b.z);if(L1<0.05||L2<0.05){line(cx,cz,b.x,b.z,a.rd);cx=b.x;cz=b.z;continue;}
+    const d1x=(b.x-a.x)/L1,d1z=(b.z-a.z)/L1,d2x=(c.x-b.x)/L2,d2z=(c.z-b.z)/L2,th=Math.acos(clamp(d1x*d2x+d1z*d2z,-1,1));
+    if(th<0.01){line(cx,cz,b.x,b.z,a.rd);cx=b.x;cz=b.z;continue;}
+    const sg=d1x*d2z-d1z*d2x>0?1:-1,tt=Math.tan(th/2),r=Math.max(0.5,Math.min(30,(!a.rd!==!b.rd?4:1)/(1/Math.cos(th/2)-1),0.45*Math.min(L1,L2)/tt)),t=r*tt;
+    const p1x=b.x-d1x*t,p1z=b.z-d1z*t,ox=p1x-d1z*r*sg,oz=p1z+d1x*r*sg,vx=p1x-ox,vz=p1z-oz,n=Math.max(2,Math.ceil(Math.min(r*th/2,th/0.06)));
+    line(cx,cz,p1x,p1z,a.rd);
+    for(let j=1;j<=n;j++){const al=sg*th*j/n,ca=Math.cos(al),sa=Math.sin(al);put(ox+vx*ca-vz*sa,oz+vx*sa+vz*ca,sg/r,a.rd&&b.rd);}
+    cx=X[X.length-1];cz=Z[Z.length-1];}
+  return {x:new Float32Array(X),z:new Float32Array(Z),s:new Float32Array(S),k:new Float32Array(K),rd:new Uint8Array(RD),n:X.length,len:s};}
+// the road the track ends on (overwatch2 item 4a): from e (owRoadPt's point) along its mapped polyline the rolled way
+// (dir 1 or -1), then on along whichever mapped line passes within 15 m of where that one ends (an end or a middle
+// vertex: a junction), the straightest way on (never a motorway or a ramp, never one already driven), up to len
+// metres; a dead end the rolled way (under 1.5 km) takes the other. [{x,z}], e first
+function owvRoadLine(e,dir,len){
+  const cand=(x,z,r)=>{const o=[];mapQuery(x-r,z-r,x+r,z+r,(Ly,F)=>{if(Ly.charAt(0)!=='r')return;const c=+Ly.slice(1);if(c===0||c===3)return;o.push(F.p);});
+    for(const s of SEC_ART)if(segD(x,z,s[0],s[1],s[2],s[3])<r)o.push(s);return o;};
+  let c0=null,k0=0,bd=30;for(const p of cand(e.x,e.z,30))for(let k=0;k+3<p.length;k+=2){const d=segD(e.x,e.z,p[k],p[k+1],p[k+2],p[k+3]);if(d<bd){bd=d;c0=p;k0=k/2;}}
+  const walk=dr=>{const out=[{x:e.x,z:e.z}],seen=new Set();let L=0,cur=c0,np=cur.length/2,pts=[];
+    for(let k=dr>0?k0+1:k0;dr>0?k<np:k>=0;k+=dr)pts.push([cur[k*2],cur[k*2+1]]);
+    let hx=(cur[(k0+1)*2]-cur[k0*2])*dr,hz=(cur[(k0+1)*2+1]-cur[k0*2+1])*dr;
+    for(let hop=0;hop<60&&L<len;hop++){seen.add(cur);
+      for(const q of pts){const a=out[out.length-1],d=Math.hypot(q[0]-a.x,q[1]-a.z);if(d<0.5)continue;hx=q[0]-a.x;hz=q[1]-a.z;
+        if(L+d>=len){const f=(len-L)/d;out.push({x:a.x+(q[0]-a.x)*f,z:a.z+(q[1]-a.z)*f});L=len;break;}L+=d;out.push({x:q[0],z:q[1]});}
+      if(L>=len)break;
+      const e1=out[out.length-1],hl=Math.hypot(hx,hz)||1;let best=null,bc=-0.2,bp=null;
+      for(const p of cand(e1.x,e1.z,15)){if(seen.has(p))continue;const n=p.length/2;let m=-1,md=15;
+        for(let k=0;k<n;k++){const dd=Math.hypot(p[k*2]-e1.x,p[k*2+1]-e1.z);if(dd<md){md=dd;m=k;}}
+        if(m<0)continue;
+        for(const st of [1,-1]){const j=m+st;if(j<0||j>=n)continue;const dx=p[j*2]-p[m*2],dz=p[j*2+1]-p[m*2+1],c=(dx*hx+dz*hz)/((Math.hypot(dx,dz)||1)*hl);
+          if(c>bc){bc=c;best=p;bp=[];for(let k=m;st>0?k<n:k>=0;k+=st)bp.push([p[k*2],p[k*2+1]]);}}}
+      if(!best)break;cur=best;pts=bp;}
+    return {out:out,L:L};};
+  if(!c0)return [{x:e.x,z:e.z}];
+  let w=walk(dir);if(w.L<1500){const w2=walk(-dir);if(w2.L>w.L)w=w2;}
+  return w.out;}
+// open desert (a decoy's way off, item 4a): steps of 110 to 160 m held near the bearing h0, bent toward the gentler
+// ground (no step steeper than 10 percent where one can be found), clear of the compound, for len metres
+function owvXC(R,x,z,h0,len,c){const P=[];let y=groundHeight(x,z),L=0;
+  for(let n=0;n<60&&L<len;n++){const Ls=tqR(R,110,160),w=h0+tqR(R,-0.35,0.35);let pick=null,pc=1e9;
+    for(const k of [0,-0.25,0.25,-0.5,0.5,-0.8,0.8]){const hc=w+k,nx=x+Math.sin(hc)*Ls,nz=z-Math.cos(hc)*Ls;if(n>0&&segD(c.x,c.z,x,z,nx,nz)<70)continue;
+      const ny=groundHeight(nx,nz),g=Math.abs(ny-y)/Ls,cost=8*g+0.5*Math.abs(k)+(g>0.1?5:0);if(cost<pc){pc=cost;pick={x:nx,z:nz,y:ny};}}
+    if(!pick)break;L+=Math.hypot(pick.x-x,pick.z-z);x=pick.x;z=pick.z;y=pick.y;P.push({x:x,z:z});}
+  return P;}
+// driving one vehicle along its path: the speed wanted (the rolled cruise on the track, 20 to 24 m/s on the road,
+// 5 in the yard), cut to the rolled 55 to 70 percent where the ground 20 m ahead climbs or falls more than 5 percent or a
+// bend there is tighter than 25 m, eased over a second; 0.8 m/s² up, 1.5 down (and to a stop at the end); the wheels
+// roll and the front pair steers (atan of wheelbase times curvature); the engine, tyres and exhaust warm; dust off the
+// rear wheels (owvDust)
+function owvDrive(d,v,dt){const P=v.path,T=v.T;if(!P||P.n<2){v.moving=false;v.stopped=true;return;}
+  v.hot=Math.min(1,v.hot+dt/40);v.hotT=Math.min(1,v.hotT+dt/60);v.hotE=Math.min(1,v.hotE+dt/4);
+  let i=v.pi;while(i+2<P.n&&P.s[i+1]<=v.s)i++;
+  let km=0,j=i;while(j+1<P.n&&P.s[j]<v.s+20){km=Math.max(km,Math.abs(P.k[j]));j++;}
+  const ga=Math.abs(groundHeight(P.x[j],P.z[j])-groundHeight(v.x,v.z))/Math.max(5,P.s[j]-v.s);
+  v.rough=ga>0.05||km>1/25;v.slowF+=((v.rough?v.slowK:1)-v.slowF)*Math.min(1,dt);
+  let vt=(v.onRoad?v.vRoad:v.vk)*v.slowF;if(v.s<v.yardS)vt=Math.min(vt,5);
+  const left=P.len-v.s;vt=Math.min(vt,Math.sqrt(3*Math.max(0,left-0.5)));
+  v.spd=vt>v.spd?Math.min(vt,v.spd+0.8*dt):Math.max(vt,v.spd-1.5*dt);
+  v.s=Math.min(P.len,v.s+v.spd*dt);
+  while(i+2<P.n&&P.s[i+1]<=v.s)i++;v.pi=i;
+  const f=clamp((v.s-P.s[i])/Math.max(1e-4,P.s[i+1]-P.s[i]),0,1);
+  v.x=P.x[i]+(P.x[i+1]-P.x[i])*f;v.z=P.z[i]+(P.z[i+1]-P.z[i])*f;v.h=Math.atan2(P.x[i+1]-P.x[i],-(P.z[i+1]-P.z[i]));
+  v.onRoad=!!P.rd[i];v.steer=Math.atan(T.wb*P.k[i]);v.rot+=v.spd*dt/T.R;
+  if(left<0.6&&v.spd<0.3){v.moving=false;v.stopped=true;v.spd=0;}
+  owvDust(v,dt);}
+// dust from the rear wheels, the breakup dust's ring (fxDyn 'dust'): none under 2 m/s, up to five puffs a second at full
+// speed on dirt (bigger and longer lived the faster it goes), a quarter of that on the road
+function owvDust(v,dt){if(v.spd<2)return;const T=v.T,kk=clamp((v.spd-2)/(Math.max(4,v.vk)-2),0,1)*(v.onRoad?0.25:1);
+  v.dustT-=dt*5*kk;
+  while(v.dustT<=0){v.dustT+=1;v.dw^=1;const ch=Math.cos(v.h),sh=Math.sin(v.h),mx=(v.dw?1:-1)*T.tw/2,mz=T.fo+T.wb-T.L/2+T.R*0.9,bx=-sh,bz=ch,j=Math.random()-0.5;
+    const q=fxDyn('dust',v.x+mx*ch-mz*sh,v.y+0.3,v.z+mx*sh+mz*ch,bx*1.4+ch*j,0.3+0.4*kk,bz*1.4+sh*j,2.2+2.4*kk,1.4+2.4*kk,4+7*kk,(0.14+0.24*kk)*(TOD.night?0.4:1),1);q.gy=v.y;v.dust++;}}   // at night nothing lights it
+// the soft shadows under the vehicles (by day, the people's blob canvas): a rounded rectangle, nine quads, on the
+// ground at each corner, stretched away from the sun
+function owvBlob(d,F,i,v){const A=F.bpos.array,o=i*48,T=v.T,sp=_owP.copy(sun.position).normalize(),el=Math.max(0.2,Math.asin(clamp(sp.y,-1,1))),len=Math.min(3.5,T.H*0.6/Math.tan(el));
+  const hl=Math.hypot(sp.x,sp.z)||1,ux=-sp.x/hl,uz=-sp.z/hl,ch=Math.cos(v.h),sh=Math.sin(v.h),ex=[ch,sh],ez=[-sh,ch];
+  const a=T.L/2+0.25+0.4*len*Math.abs(ux*ez[0]+uz*ez[1]),b=T.W/2+0.2+0.4*len*Math.abs(ux*ex[0]+uz*ex[1]),r=Math.min(0.9,b*0.6),cx=v.x+ux*len*0.4,cz=v.z+uz*len*0.4;
+  const xs=[-b,-b+r,b-r,b],zs=[-a,-a+r,a-r,a];
+  for(let jz=0;jz<4;jz++)for(let jx=0;jx<4;jx++){const q=o+(jz*4+jx)*3,x=cx+ex[0]*xs[jx]+ez[0]*zs[jz],z=cz+ex[1]*xs[jx]+ez[1]*zs[jz];A[q]=x;A[q+1]=owvGnd(d,x,z)+0.05;A[q+2]=z;}}
+// the tasking's vehicles (item 4a): the target on the lane by the gate (local 0, 8, nose to the gate) with its path (the
+// track, then the road it reaches, d.roadLine), the decoys in the compound's parked slots (lay.veh, nose to the gate);
+// the one that leaves first (d.dcy) gets its way out of the yard, through the gate, then the first 2 km of the track
+// and off across the desert, or straight off across the desert (d.dcy.xc, rolled). One group (TASK.objs stays 3)
+// with the shadow blobs' mesh
+function owFleet(d){const U=d.cmp.userData,lay=U.lay,ca=Math.cos(d.ang),sa=Math.sin(d.ang),W=(x,z)=>({x:d.c.x+x*ca+z*sa,z:d.c.z-x*sa+z*ca});
+  const g=new THREE.Group();g.name='owFleet';const F={g:g,list:[],bDirty:1,ms:0,msW:[]};
+  const tv=owVehicle(d.target.type,d.target.col),p0=d.route[0];
+  Object.assign(tv,{x:p0.x,z:p0.z,h:Math.atan2(d.route[1].x-p0.x,-(d.route[1].z-p0.z)),vk:d.vk,vRoad:d.vRoad,slowK:d.slowK,yardS:Math.hypot(d.route[1].x-p0.x,d.route[1].z-p0.z)+4});
+  const Q=d.route.map(p=>({x:p.x,z:p.z,rd:0}));Q[Q.length-1].rd=d.roadLine.length>1;for(let i=1;i<d.roadLine.length;i++)Q.push({x:d.roadLine[i].x,z:d.roadLine[i].z,rd:1});
+  tv.path=owvPath(Q);F.list.push(tv);
+  d.decoys.forEach((q,i)=>{const s=lay.veh[i]||{x:(i?-1:1)*9,z:-6,h:Math.PI},v=owVehicle(q.type,q.col),w=W(s.x,s.z);
+    Object.assign(v,{x:w.x,z:w.z,h:-(d.ang+s.h),decoy:1,lockMsg:()=>rookie()?'That is '+v.name+', not '+d.veh.name:'Tracking '+v.name+': not the target'});
+    if(d.dcy&&d.dcy.i===i){const hd=lay.hd,Y=[[s.x,s.z],[s.x,Math.max(s.z+1.5,hd-6.5)],[0,hd-1.2],[0,hd+4]].map(p=>Object.assign(W(p[0],p[1]),{rd:0}));
+      const R=[d.route[1]].concat(d.dcy.mode==='track'?d.route.slice(2,d.dcy.cut):[]).concat(d.dcy.xc).map(p=>({x:p.x,z:p.z,rd:0}));
+      Object.assign(v,{path:owvPath(Y.concat(R)),vk:d.dcy.vk,slowK:d.slowK,yardS:Math.hypot(s.x,s.z-hd)+10});}
+    F.list.push(v);});
+  for(const v of F.list){g.add(v.g);owvPose(d,v,null);}
+  // the blobs: nine quads each (a 4 by 4 grid, uv 0, 0.5, 0.5, 1 each way: the soft edge round a solid middle)
+  const n=F.list.length,pos=new Float32Array(n*48),uv=new Float32Array(n*32),idx=[],U4=[0,0.5,0.5,1];
+  for(let k=0;k<n;k++){for(let j=0;j<16;j++){uv[k*32+j*2]=U4[j&3];uv[k*32+j*2+1]=U4[j>>2];}
+    for(let jz=0;jz<3;jz++)for(let jx=0;jx<3;jx++){const a=k*16+jz*4+jx;idx.push(a,a+4,a+1,a+1,a+4,a+5);}}
+  const bg=new THREE.BufferGeometry(),pa=new THREE.BufferAttribute(pos,3);pa.setUsage(THREE.DynamicDrawUsage);bg.setAttribute('position',pa);bg.setAttribute('uv',new THREE.BufferAttribute(uv,2));bg.setIndex(idx);
+  const bm=new THREE.Mesh(bg,owpMats().blob);bm.name='ow_vblobs';bm.renderOrder=1;bm.castShadow=bm.receiveShadow=false;bm.frustumCulled=false;g.add(bm);F.blob=bm;F.bpos=pa;
+  return F;}
+// every frame of the tasking: the moving ones driven and posed, each one's level by its size on screen (the people's
+// thresholds on its length: level 0 over 40 px, back to it over 50), the wheels turned, the IR greys swapped in and
+// kept current while it warms, the blobs moved
+function owVehTick(d,dt){const F=d.fleet;if(!F)return;const t0=performance.now(),kp=innerHeight/(2*Math.tan(camera.fov*Math.PI/360)),cp=camera.position,ir=owpIRon(),bOn=!TOD.night&&owShK()>0;
+  let bu=false;if(F.blob.visible!==bOn)F.blob.visible=bOn;
+  for(let i=0;i<F.list.length;i++){const v=F.list[i];
+    if(v.moving){owvDrive(d,v,dt);owvPose(d,v,dt);}
+    const px=v.T.L*kp/Math.max(1,Math.hypot(v.x-cp.x,v.y-cp.y,v.z-cp.z)),L=OWV_FORCE!=null?OWV_FORCE:px>(v.lod===0?40:50)?0:1;
+    if(L!==v.lod){v.lod=L;v.lods[0].m.visible=!L;v.lods[1].m.visible=!!L;if(!L)v.wd=1;}
+    if(!L&&(v.moving||v.wd)){owvWheels(v);v.wd=0;}
+    if(ir&&(!v.ir||v.irT<0||(v.moving&&st.time-v.irT>0.5))){v.irT=st.time;owvIRfill(v);for(const M of v.lods){M.col.array.set(M.ir);M.col.needsUpdate=true;}}
+    else if(!ir&&v.ir)for(const M of v.lods){M.col.array.set(M.day);M.col.needsUpdate=true;}
+    v.ir=ir;
+    if(bOn&&(v.moving||F.bDirty)){owvBlob(d,F,i,v);bu=true;}}
+  if(bu){F.bpos.needsUpdate=true;F.bDirty=0;}
+  F.ms=performance.now()-t0;F.msW.push(F.ms);if(F.msW.length>60)F.msW.shift();}
+// tests: each vehicle, its wheels against the ground under them, its path and state
+function owVehInfo(){const d=TASK.on&&TASK.id==='overwatch'?TASK.d:null,F=d&&d.fleet;if(!F)return null;
+  const dz=FXD.dust.filter(q=>q.on&&q.kind===1).map(q=>q.q.p);
+  return {ms:+F.ms.toFixed(3),msMax:+Math.max(...F.msW).toFixed(3),force:OWV_FORCE,roadLine:d.roadLine.length,dcy:d.dcy&&{i:d.dcy.i,t:+d.dcy.t.toFixed(1),mode:d.dcy.mode,go:d.dcy.go},
+    list:F.list.map(v=>{v.g.updateMatrixWorld(true);const T=v.T,zf=T.fo-T.L/2,zr=zf+T.wb,wh=[];
+      for(const [mx,mz] of [[-T.tw/2,zf],[T.tw/2,zf],[-T.tw/2,zr],[T.tw/2,zr]]){const p=_owP.set(mx,0,mz).applyMatrix4(v.g.matrixWorld);wh.push([+(p.y-owvGnd(d,p.x,p.z)).toFixed(3),+(p.y-Math.max(groundHeight(p.x,p.z),owMeshH(p.x,p.z))).toFixed(3)]);}
+      return {name:v.name,type:v.type,col:v.ck,decoy:!!v.decoy,x:+v.x.toFixed(2),y:+v.y.toFixed(3),z:+v.z.toFixed(2),h:+v.h.toFixed(3),spd:+v.spd.toFixed(2),s:+v.s.toFixed(1),moving:v.moving,stopped:v.stopped,
+        onRoad:v.onRoad,rough:!!v.rough,lod:v.lod,dustLive:dz.filter(p=>Math.hypot(p.x-v.x,p.z-v.z)<70).length,dustBehind:dz.filter(p=>Math.hypot(p.x-v.x,p.z-v.z)<70&&(p.x-v.x)*Math.sin(v.h)-(p.z-v.z)*Math.cos(v.h)<0).length,tris:[v.lods[0].G.tris,v.lods[1].G.tris],wheels:wh,dust:v.dust,len:v.path?Math.round(v.path.len):0,steer:+v.steer.toFixed(3),pitch:+v.pp.toFixed(3),roll:+v.pr.toFixed(3),ir:v.ir};})};}
 // ---------- overwatch2 item 2: the compound ----------
 // Rolled per game from its own stream (spawn: a tqRng of the seed, so a seed rebuilds the same compound): a perimeter
 // wall of adobe or block, 2.6 to 3.0 m high and 0.35 m thick with a coping course and pilasters at the corners and every
@@ -17841,14 +18157,15 @@ function owCompound(c,ang,R,o){o=o||{};
   // the yard light: a pole by the gate post, its arm over the yard
   {const lx=-half*(GP+1.1),lz=hd-0.7,yb=Gb(lx,lz)-0.3,yt=G(lx,lz)+5.2;owPut(Bc,new THREE.CylinderGeometry(0.055,0.08,yt-yb,6,1,true),owMx(lx,(yt+yb)/2,lz),steel,'t',G);
     owCap(Bc,lx,yt-0.08,lz-0.55,0.06,0.06,1.1,0,0,steel,'t',G);owCap(Bc,lx,yt-0.2,lz-1.05,0.28,0.14,0.42,0,0.03,dark,'t',G);SH.push({k:'l',x:lx,z:lz,w:0.12,h0:0,h1:5.2});LP.push(lx,yt-0.26,lz-1.05);paint.lamp=[lx,lz-1.05];take(lx-0.3,lz-0.3,lx+0.3,lz+0.3);}
-  // ---- the parked vehicles, beside the lane, nose to the gate; the track's spur ends at the first ----
-  const vs=R()<0.5?-1:1,nv=R()<0.6?2:1,veh=[];
-  for(let k=0;k<40&&veh.length<nv;k++){const x=vs*(5.4+veh.length*2.9+r(0,1.5)),z=r(0,hd-8);if(free(x-1.35,z-3,x+1.35,z+3,0.3)){take(x-1.35,z-3,x+1.35,z+3);veh.push({x:x,z:z,h:Math.PI+r(-0.2,0.2)});}}
+  // ---- the parked slots, beside the lane, nose to the gate; the track's spur ends at the first. Overwatch2 item 4a:
+  // as many as the tasking has decoys (o.nveh), the vehicles themselves its own (owFleet: they can drive off, so their
+  // shadows are blobs that go with them, never painted in the yard) ----
+  const vs=R()<0.5?-1:1,nv0=R()<0.6?2:1,nv=o.nveh!=null?o.nveh:nv0,veh=[];
+  for(let k=0;k<160&&veh.length<nv;k++){const sd=k<60?vs:-vs,x=sd*(5.4+veh.filter(q=>Math.sign(q.x)===sd).length*3.4+r(0,1.5)),z=k<100?r(0,hd-8):r(-hd+4,hd-8);
+    if(free(x-1.4,z-3.1,x+1.4,z+3.1,0.4)){take(x-1.4,z-3.1,x+1.4,z+3.1);veh.push({x:x,z:z,h:Math.PI+r(-0.2,0.2)});}}
   const spur=veh.length?{x:veh[0].x,z:veh[0].z}:{x:0,z:8};
-  for(const v of veh){const col=pick([0x2b2f36,0x8a8f94,0x6e2a24,0xc9c4b8,0x34465a]),pk=owPickup(col);pk.position.set(v.x,G(v.x,v.z)+0.03,v.z);pk.rotation.y=v.h;pk.updateMatrixWorld(true);
-    pk.traverse(m=>{if(!m.isMesh)return;const k=m.material.color.clone();owPut(m.userData.part==='hood'?Bb:Bh,m.geometry.clone(),m.matrixWorld,k,'k',G);m.material.dispose();m.geometry.dispose();});
-    paint.oil.push([v.x-Math.sin(v.h)*2.1,v.z-Math.cos(v.h)*2.1,1.1]);shP(owRect(v.x,v.z,1.95,5.4,v.h),0,1.25);shP(owRect(v.x-Math.sin(v.h)*0.6,v.z-Math.cos(v.h)*0.6,1.85,2.3,v.h),0,2.05);
-    paint.tyre.push([[0,hd+2],[vs*1.2,hd-4],[v.x,v.z+6],[v.x,v.z-1.5]]);}
+  for(const v of veh){R();paint.oil.push([v.x-Math.sin(v.h)*2.1,v.z-Math.cos(v.h)*2.1,1.1]);
+    paint.tyre.push([[0,hd+2],[Math.sign(v.x)*1.2,hd-4],[v.x,v.z+6],[v.x,v.z-1.5]]);}
   paint.tyre.push([[0,hd+3],[0,hd-6],[0,4]]);
   // ---- the buildings: the white one first (10-16 by 8-11, 4.2-5.5 m), then up to two more (8-13 by 6-9, 3.2-4.6 m);
   // the white one 24 m or more from the departing pickup (local 0, 8), so a lock on it never takes the pickup ----
@@ -18056,11 +18373,13 @@ function owCmpTick(d,dt){const g=d.cmp;if(!g)return;const U=g.userData,cp=camera
   // the shadowless yard canvas while the shadow cascades reach the compound (mid, within 1.5 km of the camera, by day)
   // and under the simple set (its painted shadows would be of parts no longer drawn)
   const plain=!!(CSM.n&&(CSM.act&2)&&rr<1400&&U.k>0)||!full;if(plain!==U.plain){U.plain=plain;U.ym.map=plain?U.tN:U.tS;U.apron.visible=U.k>0&&!plain;}
-  const G=U.gate;if(G&&(d.gateGo||d.veh&&(d.veh.moving||d.veh.stopped))&&G.t<1){G.t=Math.min(1,G.t+dt/2.5);owGateSet(G,G.t);}}   // overwatch2 item 3: opened when the gate guard gets there (d.gateGo)
-TOD_HOOKS.push(()=>{const d=TASK.on&&TASK.id==='overwatch'?TASK.d:null;if(d&&d.cmp){owCmpHeat(d.cmp);owCmpSun(d.cmp);d.cmp.userData.lights.visible=!!TOD.night;}});
+  const G=U.gate;if(G&&(d.gateGo||d.dcyGo||d.veh&&(d.veh.moving||d.veh.stopped))&&G.t<1){G.t=Math.min(1,G.t+dt/2.5);owGateSet(G,G.t);}}   // overwatch2 item 3: opened when the gate guard gets there (d.gateGo)
+TOD_HOOKS.push(()=>{const d=TASK.on&&TASK.id==='overwatch'?TASK.d:null;if(d&&d.cmp){owCmpHeat(d.cmp);owCmpSun(d.cmp);d.cmp.userData.lights.visible=!!TOD.night;}
+  if(d&&d.fleet){d.fleet.bDirty=1;for(const v of d.fleet.list)v.irT=-1;}});   // overwatch2 item 4a: the blobs for the new sun, the IR greys for the new time
 // the precompile queue's 'compound' job: a sample (fixed seed, every material and part kind the real one uses) in the
 // scene for one compile and draw, then gone
 function owWarm(){const g=owCompound({x:OW_FALLBACK.x,z:OW_FALLBACK.z},0.4,tqRng(4242),{warm:1});
+  OWV_TK.forEach((t,i)=>{const v=owVehicle(t,OWV_CK[i]);v.g.position.set(-6+i*4,0.1,0);g.add(v.g);});   // overwatch2 item 4a: the four vehicles, both levels
   g.traverse(m=>{m.visible=true;});scene.add(g);
   try{warmObj(g);}finally{scene.remove(g);g.userData.onClear();g.traverse(m=>{if((m.isMesh||m.isPoints)&&m.geometry)m.geometry.dispose();});}}
 // ---------- overwatch2 item 3: the people ----------
@@ -18793,19 +19112,9 @@ function owTrackLight(m){if(!m)return;_owL.copy(hemi.color).multiplyScalar(hemi.
   let si=sun.intensity;for(const L of CSM.lights||[])si=Math.max(si,L.intensity);
   _owS.copy(sun.position).normalize();_owL.r+=sun.color.r*si*Math.max(0,_owS.y);_owL.g+=sun.color.g*si*Math.max(0,_owS.y);_owL.b+=sun.color.b*si*Math.max(0,_owS.y);
   m.material.color.copy(OW_TRACK_COL).multiply(_owL);}
-function owVehTick(d,dt){const v=d.veh,P=d.route;if(!v.moving)return;
-  if(!v.hot){v.hot=1;v.g.traverse(o=>{const p=o.userData.part;if(p==='hood')o.userData.heat=0.85;else if(p==='exh')o.userData.heat=0.95;});irDirty=true;}   // overwatch2 item 2: running
-  let rem=d.vk*dt;
-  while(rem>0&&v.i<P.length-1){const a=P[v.i],b=P[v.i+1],L=Math.hypot(b.x-a.x,b.z-a.z)||1,left=L*(1-v.f),step=Math.min(rem,left);v.f+=step/L;rem-=step;if(v.f>=1-1e-6){v.i++;v.f=0;}}
-  if(v.i>=P.length-1){v.moving=false;v.stopped=true;}
-  const a=P[Math.min(v.i,P.length-2)],b=P[Math.min(v.i+1,P.length-1)],f=v.i>=P.length-1?1:v.f;
-  v.x=a.x+(b.x-a.x)*f;v.z=a.z+(b.z-a.z)*f;v.y=groundHeight(v.x,v.z);
-  const hd=Math.atan2(b.x-a.x,-(b.z-a.z));v.h+=wrapPi(hd-v.h)*Math.min(1,dt*2.5);
-  v.g.position.set(v.x,v.y+0.06,v.z);v.g.rotation.y=-v.h;
-  if(v.moving&&(v.dustT=(v.dustT||0)-dt)<=0){v.dustT=0.35;puff(v.x-Math.sin(v.h)*3,v.y+0.8,v.z+Math.cos(v.h)*3);}
-}
 // the sensor on a target: the ball's ground point within r metres of it
-function owOn(t,r){return !!(t&&SENSOR.valid&&(SENSOR.tgt===t||Math.hypot(SENSOR.spot.x-t.x,SENSOR.spot.z-t.z)<r));}   // a lock on it counts
+function owOn(t,r){if(t&&t.T&&SENSOR.tgt&&SENSOR.tgt.decoy&&SENSOR.tgt!==t)return false;   /* overwatch2 item 4a: locked on a decoy, the vehicle is not watched */
+  return !!(t&&SENSOR.valid&&(SENSOR.tgt===t||Math.hypot(SENSOR.spot.x-t.x,SENSOR.spot.z-t.z)<r));}   // a lock on it counts
 TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limit:600,
   needMap:1,   // the site and its track need the map data's roads and the real elevation (taskStart waits for them)
   prep:()=>{owSlotsBuild();return !!OW_SLOT.list;},   // and the slots built from them
@@ -18816,24 +19125,39 @@ TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limi
     d.dist=Math.hypot(c.x-LUKE.x,c.z-LUKE.z);d.brg=tqBrg(LUKE.x,LUKE.z,c.x,c.z);
     d.stPar=Math.round(45+Math.max(147,d.dist/62)+25);d.par=Math.round(d.stPar+d.dep+d.follow+35);d.lateT=d.stPar+60;
     const sa=R()*Math.PI*2;d.saber={a:sa,r:tqR(R,1800,2600)};
-    d.tot=0;d.totT=0;d.band=0;d.bandT=0;d.over=0;d.overT=-99;d.falseRep=0;d.repDelay=null;d.onT=0;d.ms={roll:+(performance.now()-t0).toFixed(1)};},
+    d.tot=0;d.totT=0;d.band=0;d.bandT=0;d.over=0;d.overT=-99;d.falseRep=0;d.repDelay=null;d.onT=0;
+    // overwatch2 item 4a: the vehicle of interest, its decoys and how they drive, from a stream of their own (the rolls
+    // above, the compound's and the people's stay as they were): the target's type and colour; one or two decoys of
+    // other colours (two when one leaves first, the first of two always the target's type, one alone half the time);
+    // the road speed, which way it turns onto the road, how much it slows on rough ground; half the games a decoy
+    // leaves 15 to 40 s before the target, along the first 2 km of the track then off across the desert, or off across
+    // the desert from the gate
+    {const t1=performance.now(),Rv=tqRng((d.seed^0x7f4a7c15)>>>0),ty=tqPick(Rv,OWV_TK),co=tqPick(Rv,OWV_CK),first=Rv()<0.5,n=first||Rv()<0.5?2:1,cols=OWV_CK.filter(k=>k!==co);
+      d.target={type:ty,col:co,name:owvName(ty,co)};d.decoys=[];
+      for(let i=0;i<n;i++){const t2=i===0&&(n===2||Rv()<0.5)?ty:tqPick(Rv,OWV_TK),k=cols.splice(Math.floor(Rv()*cols.length)%cols.length,1)[0];d.decoys.push({type:t2,col:k,name:owvName(t2,k)});}
+      d.vRoad=tqR(Rv,20,24);d.roadDir=Rv()<0.5?1:-1;d.slowK=tqR(Rv,0.55,0.7);d.roadLine=owvRoadLine(d.roadEnd,d.roadDir,8000);d.dcy=null;
+      const lead=tqR(Rv,15,Math.max(15.5,Math.min(40,d.dep-8))),mode=Rv()<0.5?'track':'away',sd=Rv()<0.5?-1:1,turn=tqR(Rv,0.6,1.2),vk=tqR(Rv,10,13);
+      if(first){const P=d.route,g=Math.atan2(Math.sin(d.ang),-Math.cos(d.ang));let cut=0,acc=0,C=null,h=g;
+        if(mode==='track')for(let i=0;i+1<P.length;i++){const L=Math.hypot(P[i+1].x-P[i].x,P[i+1].z-P[i].z);if(acc+L>=2000&&i>=1){const f=(2000-acc)/L;C={x:P[i].x+(P[i+1].x-P[i].x)*f,z:P[i].z+(P[i+1].z-P[i].z)*f};cut=i+1;h=Math.atan2(P[i+1].x-P[i].x,-(P[i+1].z-P[i].z));break;}acc+=L;}
+        const md=C?'track':'away',o=C||P[1],xc=owvXC(Rv,o.x,o.z,C?h+sd*turn:g+sd*(0.45+turn*0.5),C?3000:4000,d.c);
+        d.dcy={i:0,lead:lead,t:Math.max(5,d.dep-lead),mode:md,cut:cut,xc:(C?[C]:[]).concat(xc),vk:vk,go:0};}
+      d.ms={roll:+(performance.now()-t0).toFixed(1),veh:+(performance.now()-t1).toFixed(1)};}},
   brief(d){return {ac:'MQ-9B SkyGuardian · Luke AFB runway 3L',
-    sit:'A compound '+OW_TERR[d.terrain]+', '+tqDs(d.dist)+' '+tqDir(d.brg)+' of Luke. Keep the sensor on its white building from 3,000 ft. A vehicle is expected to leave: call it the moment it moves, follow it without overflying, then talk the ground team onto it.',
+    sit:'A compound '+OW_TERR[d.terrain]+', '+tqDs(d.dist)+' '+tqDir(d.brg)+' of Luke. Keep the sensor on its white building from 3,000 ft. A vehicle is expected to leave, '+d.target.name.replace('the ','a ')+': call it the moment it moves, follow it without overflying, then talk the ground team onto it.',
     facts:[['PAR',tqClock(d.par)],['ON STATION',tqClock(d.stPar)],['WIND',tqWind(d.wdir,d.wkt)],['TARGET',tqDs(d.dist)+' '+tqDir(d.brg).replace('north','N').replace('south','S').replace('east','E').replace('west','W').replace('-','')]]};},
   spawn(d){
     // overwatch2 item 2: the compound from its own stream of the seed (the same seed, the same compound), a static
     // shadow caster (the mid cascade's list, CSM.stat: taken out again by tqClear, onClear)
-    const g=tqAdd(owCompound(d.c,d.ang,tqRng((d.seed^0x5bd1e995)>>>0),{route:d.route})),gh=groundHeight(d.c.x,d.c.z),U=g.userData;d.cmp=g;
+    const g=tqAdd(owCompound(d.c,d.ang,tqRng((d.seed^0x5bd1e995)>>>0),{route:d.route,nveh:d.decoys.length})),gh=groundHeight(d.c.x,d.c.z),U=g.userData;d.cmp=g;
     csmStatic(g);g.traverse(m=>{if(m.userData.ow==='yard')m.castShadow=false;});
     // the white building's centre, in the world (its local centre turned by ang)
     const ca=Math.cos(d.ang),sa=Math.sin(d.ang),bx=d.c.x+U.bld.x*ca+U.bld.z*sa,bz=d.c.z-U.bld.x*sa+U.bld.z*ca;
     d.bld={x:bx,y:gh+U.bld.y,z:bz,aimH:U.bld.H/2,name:'the white building',dead:false,task:1};   // aimH: the ball aims at its roof's centre
-    const pk=tqAdd(owPickup()),p0=d.route[0];
-    d.veh={g:pk,x:p0.x,y:groundHeight(p0.x,p0.z),z:p0.z,h:Math.atan2(d.route[1].x-p0.x,-(d.route[1].z-p0.z)),i:0,f:0,moving:false,stopped:false,name:'the white pickup',dead:false,task:1};
-    pk.position.set(p0.x,d.veh.y+0.06,p0.z);pk.rotation.y=-d.veh.h;
+    // overwatch2 item 4a: the vehicles (owFleet, one object): the target by the gate, the decoys parked
+    {const t1=performance.now();d.fleet=owFleet(d);tqAdd(d.fleet.g);d.veh=d.fleet.list[0];d.ms.fleet=+(performance.now()-t1).toFixed(1);}
     // the dirt track, with its spur inside the gate to the parked vehicles (U.spur), draped on the yard as outside
     {const t1=performance.now(),sp={x:d.c.x+U.spur.x*ca+U.spur.z*sa,z:d.c.z-U.spur.x*sa+U.spur.z*ca};d.track=tqAdd(owTrack([sp].concat(d.route),d.c,null,d.ang));d.ms.track=+(performance.now()-t1).toFixed(1);}
-    TASK.tgts.push(d.bld,d.veh);TASK.sens=true;irDirty=true;
+    TASK.tgts.push(d.bld,...d.fleet.list);TASK.sens=true;irDirty=true;   // the building, the target, the decoys
     // overwatch2 item 3: the people (not targets; their meshes go and come with the compound: its onClear)
     {const t1=performance.now();d.gateGo=0;d.ppl=owPeople(d);if(d.ppl){scene.add(d.ppl.g);const oc=U.onClear;U.onClear=()=>{oc();owpFreeAll(d.ppl);};owPplTick(d,0);irDirty=true;}d.ms.ppl=+(performance.now()-t1).toFixed(1);}
     d.tgt=d.bld;tqDest(d.c.x,d.c.z,'Compound','CMPD');
@@ -18844,7 +19168,7 @@ TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limi
     if(st.ap&&st.ap.mode==='orbit'&&st.ap.tk){st.ap=null;st.apW=null;toast('Autopilot off, your airplane');return true;}
     const t=d.tgt===d.veh?d.veh:d.c;initAudio();if(AC.retract)st.gearDown=false;st.flapIdx=0;
     apEngage(st,'orbit',{cx:t.x,cz:t.z,r:OW_R,y:Math.max(st.pos.y-GEAR,(OW_ALT-FIELD_FT)/M2FT),v:AC.vcruise,dir:1});st.ap.tk=1;st.ap.sensor=true;
-    toast((d.tgt===d.veh?'Orbit following the pickup':'Orbit: the compound')+', 3,000 ft. AUTO again: your airplane',3);return true;},
+    toast((d.tgt===d.veh?'Orbit following '+d.veh.name:'Orbit: the compound')+', 3,000 ft. AUTO again: your airplane',3);return true;},
   always(d,dt){owVehTick(d,dt);owTrackLight(d.track);owCmpTick(d,dt);owPplTick(d,dt);
     if(DEST&&DEST.task&&d.tgt===d.veh){DEST.x=d.veh.x;DEST.z=d.veh.z;}
     // the orbit follows the pickup while the ball is locked on it (the crew's track), at a truck's pace
@@ -18861,8 +19185,8 @@ TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limi
   stages:[
     {id:'takeoff',name:'Take off from Luke runway 3L',
       obj:d=>['Take off, Luke 3L',st.onGround?'AUTO takes off for you. The compound is on the map':'Climbing'],
-      enter(d){tqQuiet(()=>{const l=tqMC(AC.csS+', Mission Control. Tasking: overwatch on a compound '+OW_TERR[d.terrain]+', '+tqDsW(d.dist)+' '+tqDir(d.brg)+' of Luke, '+tqLL(d.c.x,d.c.z)+'. Climb to 3,000, set up an orbit, sensor on the white building.',
-          {plain:'Fly to the compound on your map, circle it at 3,000 ft and point the camera at the white building.'});
+      enter(d){tqQuiet(()=>{const l=tqMC(AC.csS+', Mission Control. Tasking: overwatch on a compound '+OW_TERR[d.terrain]+', '+tqDsW(d.dist)+' '+tqDir(d.brg)+' of Luke, '+tqLL(d.c.x,d.c.z)+'. Climb to 3,000, set up an orbit, sensor on the white building. The vehicle of interest is '+d.target.name.replace('the ','a ')+'.',
+          {plain:'Fly to the compound on your map, circle it at 3,000 ft and point the camera at the white building. Watch for '+d.target.name+'.'});
         tqAsk([{k:'WILCO'},{k:'UNABLE',fn:()=>tqMC('Copy unable. Take your time, the compound is on your map. Call us when you have eyes on.',{plain:'No rush. Find the compound on the map.'})}],{line:l});});},
       tick:d=>!st.onGround&&st.agl>40},
     {id:'station',name:'Orbit the compound at 3,000 ft, sensor on the white building',
@@ -18880,19 +19204,21 @@ TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limi
           :tqMC('Copy. Keep eyes on the white building. Report when the vehicle departs.',{plain:'Watch the white building. Tap REPORT when the vehicle drives off.'});
         tqAsk([{k:'REPORT',sub:'vehicle departs',say:'',fn:()=>owReport(d)}],{line:l,keep:1});},
       tick(d){if(!d.veh.moving&&!d.veh.stopped&&st.time-d.w0>=d.dep){d.veh.moving=true;d.depT=st.time;}
+        // overwatch2 item 4a: a decoy may leave first (never when the window is already late)
+        if(d.dcy&&!d.dcy.go&&!d.late&&st.time-d.w0>=d.dcy.t){d.dcy.go=1;d.dcyGo=1;d.dcyDepT=st.time;d.fleet.list[1+d.dcy.i].moving=true;}
         if(d.veh.moving&&d.repDelay==null&&st.time-d.depT>40){d.repDelay=99;TASK.ask=null;tqReplyUI();
           tqMC(AC.csS+', Mission Control, we show the vehicle moving. Pick it up and follow it.',{plain:'The vehicle left without your call. Follow it.'});owFollowGo(d);}
         return !!d.following;}},
     {id:'follow',name:'Follow it at a standoff, 1 to 3 nm. Do not overfly',
       obj(d){const r=Math.hypot(st.pos.x-d.veh.x,st.pos.z-d.veh.z),lo=rookie()?1000:1400,hi=rookie()?6500:5600;
-        return ['Follow the pickup',tqDs(r)+(r<lo?'  Too close, open it up':r>hi?'  Too far, close in':'  Standoff good')+(owOn(d.veh,rookie()?110:70)?'':'. Sensor on it'),r<800];},
+        return ['Follow '+d.veh.name,tqDs(r)+(r<lo?'  Too close, open it up':r>hi?'  Too far, close in':'  Standoff good')+(owOn(d.veh,rookie()?110:70)?'':'. Sensor on it'),r<800];},
       enter(d){d.f0=st.time;},
       tick:d=>st.time-d.f0>=d.follow},
     {id:'talkon',name:'Talk Saber 6 onto the vehicle',
-      obj:d=>['Talk-on to Saber 6',owOn(d.veh,rookie()?110:70)?'REPORT where it is':'Sensor on the pickup first'],
+      obj:d=>['Talk-on to Saber 6',owOn(d.veh,rookie()?110:70)?'REPORT where it is':'Sensor on '+d.veh.name+' first'],
       enter(d){const v=d.veh;d.sab={x:v.x+Math.sin(d.saber.a)*d.saber.r,z:v.z-Math.cos(d.saber.a)*d.saber.r};
-        tqSay('Saber 6','Mission Control, Saber 6, two vehicles moving to intercept. Request a talk-on to the pickup.',{plain:'The ground team wants you to tell them where the pickup is.'});
-        const l=tqMC(AC.csS+', talk Saber 6 onto the vehicle.',{plain:'Tap REPORT to tell the team where the pickup is.'});
+        tqSay('Saber 6','Mission Control, Saber 6, two vehicles moving to intercept. Request a talk-on to '+d.veh.name+'.',{plain:'The ground team wants you to tell them where '+d.veh.name+' is.'});
+        const l=tqMC(AC.csS+', talk Saber 6 onto the vehicle.',{plain:'Tap REPORT to tell the team where '+d.veh.name+' is.'});
         tqAsk([{k:'REPORT',sub:'talk-on',say:'',fn:()=>owTalk(d)}],{line:l,wait:35,late:()=>{d.talk=0;
           tqSay('Saber 6','Mission Control, Saber 6, we have it ourselves now. Saber 6 has the vehicle.',{plain:'The team found it without your help.'});d.end=st.time;}});},
       tick:d=>d.end!=null&&st.time-d.end>4}],
@@ -18912,27 +19238,30 @@ TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limi
 };
 function owReport(d){
   if(!d.veh.moving&&!d.veh.stopped){d.falseRep++;tqPilot('Mission Control, '+AC.csS+', vehicle departing.');
-    tqMC('Negative, we show it still parked. Keep watching.',{plain:'Not yet: the vehicle has not moved. Keep watching.'});
+    // overwatch2 item 4a: only a decoy has left (the player called the wrong vehicle)
+    const dv=d.dcy&&d.dcy.go?d.fleet.list[1+d.dcy.i]:null;if(dv)d.dcyRep=(d.dcyRep||0)+1;
+    if(dv)tqMC('Negative, that is '+dv.name+'. Our vehicle is '+d.veh.name+', still parked. Keep watching.',{plain:'Wrong vehicle: that is '+dv.name+'. Keep watching for '+d.veh.name+'.'});
+    else tqMC('Negative, we show it still parked. Keep watching.',{plain:'Not yet: the vehicle has not moved. Keep watching.'});
     tqAsk([{k:'REPORT',sub:'vehicle departs',say:'',fn:()=>owReport(d)}],{keep:1});return;}
   d.repDelay=st.time-d.depT;
   const b=d.route.length>2?tqBrg(d.route[1].x,d.route[1].z,d.route[2].x,d.route[2].z):0;
-  tqPilot('Mission Control, '+AC.csS+', vehicle departing the compound, white pickup, heading '+tqDir(b)+'.');
+  tqPilot('Mission Control, '+AC.csS+', vehicle departing the compound, '+d.veh.short+', heading '+tqDir(b)+'.');
   owFollowGo(d);
 }
 function owFollowGo(d){d.tgt=d.veh;d.following=1;
   // a lock on the building moves to the pickup (the crew slews the track); the destination follows it
   if(SENSOR.tgt===d.bld)SENSOR.tgt=d.veh;
-  if(DEST&&DEST.task){DEST.name='The white pickup';DEST.short='PICKUP';destUI(true);}
-  const l=tqMC('Copy, vehicle moving. Follow it. Hold your standoff, 1 to 3 miles, do not overfly.',{plain:'Follow the pickup from 1 to 3 miles away. Do not fly over it.'});
+  if(DEST&&DEST.task){DEST.name='The '+d.veh.short;DEST.short=d.veh.T.cap;destUI(true);}
+  const l=tqMC('Copy, vehicle moving. Follow it. Hold your standoff, 1 to 3 miles, do not overfly.',{plain:'Follow '+d.veh.name+' from 1 to 3 miles away. Do not fly over it.'});
   tqAsk([{k:'WILCO'}],{line:l,wait:15});
 }
 function owTalk(d){const v=d.veh;
   if(!owOn(v,rookie()?110:70)){d.talkMiss=(d.talkMiss||0)+1;tqPilot('Saber 6, '+AC.csS+', stand by, reacquiring.');
-    const l=tqMC(AC.csS+', get your sensor back on the pickup.',{plain:'Point the camera at the pickup first, then REPORT.'});
+    const l=tqMC(AC.csS+', get your sensor back on '+d.veh.name+'.',{plain:'Point the camera at '+d.veh.name+' first, then REPORT.'});
     tqAsk([{k:'REPORT',sub:'talk-on',say:'',fn:()=>owTalk(d)}],{line:l,wait:30,late:()=>{d.talk=0;d.end=st.time;}});return;}
-  const r=Math.hypot(v.x-d.sab.x,v.z-d.sab.z),b=tqBrg(d.sab.x,d.sab.z,v.x,v.z),kt=Math.round(d.vk*MS2KT/5)*5;   // knots: the game speaks knots everywhere (units_check)
-  tqPilot('Saber 6, '+AC.csS+', your vehicle is the white pickup, '+(r/1609.34).toFixed(1)+' miles '+tqDir(b)+' of you, '+(v.moving?'heading '+tqDir(((v.h*180/Math.PI)%360+360)%360)+' on the dirt track, about '+kt+' knots.':'stopped on the dirt track.'));
-  tqSay('Saber 6','Contact the white pickup. Saber 6 has it from here. Thanks for the eyes.',{plain:'The team sees it. Job done.'});
+  const r=Math.hypot(v.x-d.sab.x,v.z-d.sab.z),b=tqBrg(d.sab.x,d.sab.z,v.x,v.z),kt=Math.max(5,Math.round(v.spd*MS2KT/5)*5),on=v.onRoad?'on the road':'on the dirt track';   // knots: the game speaks knots everywhere (units_check)
+  tqPilot('Saber 6, '+AC.csS+', your vehicle is '+v.name+', '+(r/1609.34).toFixed(1)+' miles '+tqDir(b)+' of you, '+(v.moving?'heading '+tqDir(((v.h*180/Math.PI)%360+360)%360)+' '+on+', about '+kt+' knots.':'stopped '+on+'.'));
+  tqSay('Saber 6','Contact '+v.name+'. Saber 6 has it from here. Thanks for the eyes.',{plain:'The team sees it. Job done.'});
   d.talk=1;d.end=st.time;
 }
 // ---- LIFELINE (C-130H Hercules, resupply) ----
@@ -23200,8 +23529,13 @@ function preJobs(){
     // the IR pass, its tagging undone after (irTag puts the points on layer 1 only; the white instance colours of the
     // plain instanced meshes renderIR itself takes off after its pass, fix2 item 4), so it tags afresh when the sensor is
     // first used
+    // overwatch2 item 4a: with one smoke puff (the pooled sprite points) 30 m ahead of the camera, so their IR variant
+    // links here: entering IR with a puff in view linked it in flight before (the old pickup's dust, a missile's trail)
     ['ir',()=>preAt(()=>{const pm=[];scene.traverse(o=>{if(o.isPoints)pm.push([o,o.layers.mask]);});
-      try{r.setRenderTarget(A);renderIR();}finally{for(const [o,m] of pm)o.layers.mask=m;irDirty=true;IR.pass=false;}})],
+      const sv=smokePts.visible,sp=smokePos.slice(0,3),sc=smokeCol.slice(0,3),f=camera.getWorldDirection(new V3()).multiplyScalar(30).add(camera.position);
+      smokePos[0]=f.x;smokePos[1]=f.y;smokePos[2]=f.z;smokeCol.fill(0.8,0,3);smokePts.visible=true;smokeGeo.attributes.position.needsUpdate=smokeGeo.attributes.color.needsUpdate=true;
+      try{r.setRenderTarget(A);renderIR();}finally{for(const [o,m] of pm)o.layers.mask=m;irDirty=true;IR.pass=false;
+        smokePos.set(sp,0);smokeCol.set(sc,0);smokePts.visible=sv;smokeGeo.attributes.position.needsUpdate=smokeGeo.attributes.color.needsUpdate=true;}})],
     ['carousel',()=>{if(PRE.car)return;PRE.car=true;const p=showItem(savedType||'cessna'),cam=SHOW.cam,prevT=r.getRenderTarget();p.visible=true;p.position.set(0,0,0);p.scale.setScalar(40/p.userData.dim);
       cam.aspect=1.6;cam.position.set(0,30,100);cam.lookAt(0,0,0);cam.updateProjectionMatrix();
       if(!SHOW.scene.environment)SHOW.scene.environment=envDay();
@@ -23751,6 +24085,7 @@ for(const k in FXD_N){FXD[k]=[];FXD_NEXT[k]=0;
 function fxDyn(pool,x,y,z,vx,vy,vz,life,s0,s1,a0,kind){const L=FXD[pool],d=L[FXD_NEXT[pool]];FXD_NEXT[pool]=(FXD_NEXT[pool]+1)%L.length;
   d.on=true;d.t=0;d.life=life;d.vx=vx;d.vy=vy;d.vz=vz;d.s0=s0;d.s1=s1;d.a0=a0;d.kind=kind||0;d.seed=Math.random();d.gy=-1e9;
   const q=d.q;q.p.set(x,y,z);q.visible=true;q.rot=Math.random()*6.283;q.a=0;q.ero=0;q.hot=0;q.str=0;q.sz=s0;
+  if(pool==='dust')q.heat=d.kind===1?0.15:0.3;   // overwatch2 item 4a: a vehicle's dust is barely warm (LWIR sees through it)
   if(pool==='burn'){q.tex=d.kind?2:1;q.mode=d.kind?0:1;q.heat=d.kind?0.3:1;q.bl=d.kind?0:0.5;}
   else if(pool==='sflame'){q.bl=0.5;q.v.set(0,1,0);q.str=0.7;}   // a structure fire's flame: a tongue, taller than wide
   return d;}
@@ -23771,7 +24106,10 @@ function fxDynUpdate(dt){
       const dr=Math.exp(-0.7*dt);d.vx*=dr;d.vz*=dr;d.vy*=Math.exp(-0.35*dt);
       q.p.x+=(d.vx+_fw.x*0.5*Math.min(1,u*3))*dt;q.p.y+=d.vy*dt;q.p.z+=(d.vz+_fw.z*0.5*Math.min(1,u*3))*dt;
       q.sz=d.s0+(d.s1-d.s0)*Math.sqrt(u);q.a=d.a0*clamp(u*8,0,1)*Math.pow(1-u,1.3)*fxNearP(q.p);q.ero=0.12+0.45*u;q.rot+=dt*0.25*(d.seed-0.5);
-      const v=(0.5+0.12*d.seed)*g0;q.c.setRGB(v,v*0.94,v*0.84);}
+      // overwatch2 item 4a: kind 1, a vehicle's dust off a dirt track: the desert's own pale tan, its middle kept 0.42 of
+      // its size over the ground it rose from (d.gy), so the sprite never cuts into the ground as it grows
+      if(d.kind===1){q.p.y=Math.max(q.p.y,d.gy+q.sz*0.42);const v=(0.8+0.08*d.seed)*g0;q.c.setRGB(v,v*0.9,v*0.76);}
+      else{const v=(0.5+0.12*d.seed)*g0;q.c.setRGB(v,v*0.94,v*0.84);}}
     else if(k==='glass'){
       // a shard of glass: falls, tumbling, and glints as it turns (the sun by day, the fire at night)
       d.vy-=9.81*dt;const dr=Math.exp(-0.3*dt);d.vx*=dr;d.vz*=dr;q.p.x+=d.vx*dt;q.p.y+=d.vy*dt;q.p.z+=d.vz*dt;
@@ -24965,7 +25303,7 @@ function carTgt(k){let o=CAR_TGT[k];if(o)return o;const c=cars[k];
 // a track at ground point p: a point track on the target there, else an area track on the patch (sensor item 5)
 function sensorTrackAt(p){
   const t=targetUnder(p,60);SENSOR.geo=null;SENSOR.slewTo=null;SENSOR.maskT=0;
-  if(t){SENSOR.tgt=t;SENSOR.track=null;toast('Tracking '+t.name);}
+  if(t){SENSOR.tgt=t;SENSOR.track=null;toast(t.lockMsg?t.lockMsg():'Tracking '+t.name);}   // overwatch2 item 4a: a decoy says so
   else{SENSOR.tgt=null;SENSOR.track=p.clone();toast(rookie()?'Holding that spot':'Tracking ground point');}
 }
 // geo stare (sensor item 5): the ball held on the coordinate under the crosshair by navigation, no video lock; GEO
@@ -26365,7 +26703,7 @@ const APP_VER='2026-10-19-schoolhud';          // keep version.json in step when
     get P(){return E.P;}};
 })();
 
-window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.holdF=n|0;},pfx:()=>{const L=PFX.last||{};return {w:L.w,h:L.h,sw:L.sw,sh:L.sh,bloomed:!!L.bloomed,smaa:!!L.smaa,sharp:L.sharp||0,samples:L.samples||0,layer:!!L.layer,box:L.box||null,split:!!L.split,full:L.full||null,webgl2:renderer.capabilities.isWebGL2,msaaRT:!!(PFX.rt&&PFX.rt.isWebGLMultisampleRenderTarget),allocN:PFX.allocN,scale:GFX.scale,rs:L.rs!=null?L.rs:GFX.rs,post:GFX.post,sens:GFX.sens};},setScale:s=>GFX.setScale(+s),sharpOff:v=>{PFX_SHARP.off=!!v;},msaaOff:v=>{PFX.msOff=!!v;},csmNBT:a=>{if(a)CSM.NBT=a.slice();if(CSM.n)csmRadii();return CSM.NBT.slice();},layerOff:v=>{PFX.layerOff=!!v;},splitOff:v=>{PFX.layerOff=!!v;},gfxBusy:()=>({applying:gfxApplying(),resumeWait:GFX.resumeWait,preDone:PRE.done,warmDone:WARM.done,busy:GFX.busy}),stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>({id:p.id,name:p.name,cacheKey:p.cacheKey,usedTimes:p.usedTimes})),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),tqStage:i=>tqStageGo(i),inFrame:()=>FRAME_IN,stepx:()=>({cfi:{plays:CFIV.plays,want:CFIV.want,got:CFIV.got,err:CFIV.err,miss:CFIV.miss.length,sets:CFIV.sets.slice()},ls:{n:LSQ.n,pend:LSQ.m.size},chime:!!STEPX.buf,last:STEPX.last,ghost:!!(STEPX.les.ghost&&STEPX.les.ghost.parentNode),geo:STEPX.les.geo&&{el:STEPX.les.geo.el.id,p:STEPX.les.geo.p.id,x:STEPX.les.geo.x,y:STEPX.les.geo.y,w:STEPX.les.geo.w,h:STEPX.les.geo.h},key:STEPX.les.key.slice(0,40)}),lsFlush:lsFlush,taskGo:()=>taskGo(),taskStop:()=>taskStop(),owSiteOK:(x,z)=>owSiteOK(x,z),owSiteInfo:(x,z)=>owSiteInfo(x,z),owRoadPt:(x,z)=>owRoadPt(x,z),owFallback:OW_FALLBACK,OW_LIM:OW_LIM,OW_RMAX:()=>OW_RMAX,owSlots:()=>({n:OW_SLOT.list&&OW_SLOT.list.length,ms:+OW_SLOT.ms.toFixed(1),busy:OW_SLOT.busy}),owPeople:()=>owPplInfo(),owPeopleLod:v=>{OWP_FORCE=v==null?null:+v;},mapdReady:()=>!!MAPD.ready,taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
+window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.holdF=n|0;},pfx:()=>{const L=PFX.last||{};return {w:L.w,h:L.h,sw:L.sw,sh:L.sh,bloomed:!!L.bloomed,smaa:!!L.smaa,sharp:L.sharp||0,samples:L.samples||0,layer:!!L.layer,box:L.box||null,split:!!L.split,full:L.full||null,webgl2:renderer.capabilities.isWebGL2,msaaRT:!!(PFX.rt&&PFX.rt.isWebGLMultisampleRenderTarget),allocN:PFX.allocN,scale:GFX.scale,rs:L.rs!=null?L.rs:GFX.rs,post:GFX.post,sens:GFX.sens};},setScale:s=>GFX.setScale(+s),sharpOff:v=>{PFX_SHARP.off=!!v;},msaaOff:v=>{PFX.msOff=!!v;},csmNBT:a=>{if(a)CSM.NBT=a.slice();if(CSM.n)csmRadii();return CSM.NBT.slice();},layerOff:v=>{PFX.layerOff=!!v;},splitOff:v=>{PFX.layerOff=!!v;},gfxBusy:()=>({applying:gfxApplying(),resumeWait:GFX.resumeWait,preDone:PRE.done,warmDone:WARM.done,busy:GFX.busy}),stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>({id:p.id,name:p.name,cacheKey:p.cacheKey,usedTimes:p.usedTimes})),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),tqStage:i=>tqStageGo(i),inFrame:()=>FRAME_IN,stepx:()=>({cfi:{plays:CFIV.plays,want:CFIV.want,got:CFIV.got,err:CFIV.err,miss:CFIV.miss.length,sets:CFIV.sets.slice()},ls:{n:LSQ.n,pend:LSQ.m.size},chime:!!STEPX.buf,last:STEPX.last,ghost:!!(STEPX.les.ghost&&STEPX.les.ghost.parentNode),geo:STEPX.les.geo&&{el:STEPX.les.geo.el.id,p:STEPX.les.geo.p.id,x:STEPX.les.geo.x,y:STEPX.les.geo.y,w:STEPX.les.geo.w,h:STEPX.les.geo.h},key:STEPX.les.key.slice(0,40)}),lsFlush:lsFlush,taskGo:()=>taskGo(),taskStop:()=>taskStop(),owSiteOK:(x,z)=>owSiteOK(x,z),owSiteInfo:(x,z)=>owSiteInfo(x,z),owRoadPt:(x,z)=>owRoadPt(x,z),owFallback:OW_FALLBACK,OW_LIM:OW_LIM,OW_RMAX:()=>OW_RMAX,owSlots:()=>({n:OW_SLOT.list&&OW_SLOT.list.length,ms:+OW_SLOT.ms.toFixed(1),busy:OW_SLOT.busy}),owPeople:()=>owPplInfo(),owPeopleLod:v=>{OWP_FORCE=v==null?null:+v;},owVeh:()=>owVehInfo(),owVehLod:v=>{OWV_FORCE=v==null?null:+v;},owOn:(t,r)=>owOn(t,r),owGnd:(x,z)=>groundHeight(x,z),puff:(x,y,z)=>puff(x,y,z),owTalk:()=>{const d=TASK.d;if(!d.sab)d.sab={x:d.veh.x+1500,z:d.veh.z};owTalk(d);},mapdReady:()=>!!MAPD.ready,taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
   task:()=>({on:TASK.on,id:TASK.id,stage:TASK.stage&&TASK.stage.id,si:TASK.si,brief:TASK.brief,done:TASK.done,res:TASK.res,ask:TASK.ask&&{shown:TASK.ask.shown,opts:TASK.ask.opts.map(o=>o.k),t:TASK.ask.t},d:TASK.d,log:TASK.log.slice(),seed:TASK.seed}),
   tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzBuild:()=>dzBuild(),dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
