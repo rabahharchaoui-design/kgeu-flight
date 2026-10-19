@@ -17363,7 +17363,7 @@ function tqStageGo(i){const D=TASK.def;TASK.si=i;TASK.stage=D.stages[i];TASK.st0
 
 // ---- the 3D bits a tasking puts in the world, removed by taskStop ----
 function tqAdd(o){scene.add(o);TASK.objs.push(o);return o;}
-function tqClear(){for(const o of TASK.objs){scene.remove(o);o.traverse&&o.traverse(m=>{if(m.isMesh&&m.geometry&&!m.geometry.userData.keep)m.geometry.dispose();});}TASK.objs.length=0;TASK.tgts.length=0;}
+function tqClear(){for(const o of TASK.objs){scene.remove(o);if(o.userData&&o.userData.onClear)o.userData.onClear();o.traverse&&o.traverse(m=>{if((m.isMesh||m.isPoints)&&m.geometry&&!m.geometry.userData.keep)m.geometry.dispose();});}TASK.objs.length=0;TASK.tgts.length=0;}
 
 // ---- start, stop, the frame ----
 // id: a tasking; from a world region it switches to Arizona first (the taskings fly around Luke and the White Tanks)
@@ -17597,31 +17597,469 @@ function owSite(R,seed){const L=OW_SLOT.list;
     return {x:q[0],z:q[1],road:owRoadPt(q[0],q[1]),tries:4};}
   const f=OW_FALLBACK;return {x:f.x,z:f.z,road:owRoadPt(f.x,f.z)||{x:f.x+3000,z:f.z,kind:'arterial',d:3000},tries:0,fb:1};
 }
-// a white pickup: body, cab, glass, bed, wheels; 5.4 m long, nose toward -z (heading 0 = north)
+// a white pickup: body, cab, glass, bed, wheels; 5.4 m long, nose toward -z (heading 0 = north). Overwatch2 item 2: the
+// hood (part 'hood', the engine bay) and the exhaust (part 'exh') are their own meshes so the IR view can heat them:
+// the bay 0.65 parked, 0.85 once it drives, the exhaust 0.95 moving (owVehTick)
 function owPickup(col){const g=new THREE.Group(),W=lam(col||0xeef0f2),D=lam(0x23272c),G=lam(0x3a4a5a),T=lam(0x151515);
   const add=(geo,m,x,y,z)=>{const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);g.add(o);return o;};
   add(new THREE.BoxGeometry(1.95,0.75,5.4),W,0,0.85,0);add(new THREE.BoxGeometry(1.85,0.85,2.3),W,0,1.62,-0.6);
   add(new THREE.BoxGeometry(1.87,0.55,0.08),G,0,1.72,-1.76).rotation.x=-0.35;add(new THREE.BoxGeometry(1.9,0.5,1.9),G,0,1.68,-0.6).scale.set(1.002,1,0.98);
   add(new THREE.BoxGeometry(1.95,0.45,0.1),W,0,1.45,2.65);add(new THREE.BoxGeometry(1.95,0.12,5.42),D,0,0.5,0);
+  add(new THREE.BoxGeometry(1.9,0.05,0.95),W,0,1.245,-2.2).userData.part='hood';
+  const ex=add(new THREE.CylinderGeometry(0.045,0.045,0.35,6),T,0.62,0.45,2.62);ex.rotation.x=Math.PI/2;ex.userData.part='exh';
   const wg=new THREE.CylinderGeometry(0.42,0.42,0.3,10);wg.rotateZ(Math.PI/2);for(const z of [-1.7,1.7])for(const x of [-0.92,0.92])add(wg,T,x,0.42,z);
-  g.traverse(o=>{if(o.isMesh)o.userData.heat=0.5;});return g;}
-// the compound: a walled yard, the white building, a tan house, a shade structure, a water tank, two trees
-function owCompound(c,ang){const g=new THREE.Group(),gh=groundHeight(c.x,c.z),tan=lam(0xc8ab82),wht=lam(0xf3f1ea),dark=lam(0x4a4a4a),grn=lam(0x5d6b3a);
-  const add=(geo,m,x,y,z)=>{const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);g.add(o);return o;};
-  const W=64,H=46,h=2.4;
-  add(new THREE.BoxGeometry(W,h,0.5),tan,0,h/2,-H/2);add(new THREE.BoxGeometry(0.5,h,H),tan,-W/2,h/2,0);add(new THREE.BoxGeometry(0.5,h,H),tan,W/2,h/2,0);
-  add(new THREE.BoxGeometry(W/2-5,h,0.5),tan,-W/4-2.5,h/2,H/2);add(new THREE.BoxGeometry(W/2-5,h,0.5),tan,W/4+2.5,h/2,H/2);   // the gate: a 10 m gap on the south wall
-  const yd=new THREE.Mesh(new THREE.PlaneGeometry(W,H),lam(0xb59e7a));yd.rotation.x=-Math.PI/2;yd.position.y=0.05;g.add(yd);
-  add(new THREE.BoxGeometry(15,5.2,10),wht,-14,2.6,-10);add(new THREE.BoxGeometry(15.6,0.6,10.6),wht,-14,5.5,-10);   // the white building, its parapet
-  add(new THREE.BoxGeometry(2.2,2.4,0.15),dark,-14,1.2,-4.95);
-  add(new THREE.BoxGeometry(10,3.6,8),tan,16,1.8,-12);const rf=add(new THREE.BoxGeometry(10.8,0.3,8.8),lam(0x8a5a3c),16,3.75,-12);rf.rotation.z=0.06;
-  add(new THREE.BoxGeometry(8,0.2,6),dark,14,3,8);for(const [x,z] of [[10.2,5.2],[17.8,5.2],[10.2,10.8],[17.8,10.8]])add(new THREE.CylinderGeometry(0.12,0.12,3,5),dark,x,1.5,z);
-  add(new THREE.CylinderGeometry(1.8,1.8,3.2,12),lam(0xd8d6cf),26,4.6,-18);add(new THREE.CylinderGeometry(0.15,0.15,3,5),dark,26,1.5,-18);
-  for(const [x,z] of [[-28,14],[2,-18]]){add(new THREE.CylinderGeometry(0.25,0.35,2.5,6),lam(0x5a4632),x,1.25,z);const t=add(new THREE.SphereGeometry(3,8,6),grn,x,4.2,z);t.scale.y=0.8;}
-  const car=owPickup(0x2b2f36);car.position.set(4,0,6);car.rotation.y=0.3;g.add(car);
-  g.position.set(c.x,gh,c.z);g.rotation.y=ang;
-  g.traverse(o=>{if(o.isMesh&&o.userData.heat==null)o.userData.heat=0.25;});
-  return g;}
+  g.traverse(o=>{if(o.isMesh)o.userData.heat=o.userData.part==='hood'?0.65:0.5;});return g;}
+// ---------- overwatch2 item 2: the compound ----------
+// Rolled per game from its own stream (spawn: a tqRng of the seed, so a seed rebuilds the same compound): a perimeter
+// wall of adobe or block, 2.6 to 3.0 m high and 0.35 m thick with a coping course and pilasters at the corners and every
+// 7 to 8 m, round a yard 52 to 70 by 40 to 50 m; a steel gate (two leaves in a frame, one half open) on the side the
+// track reaches (local +z, turned by ang); one to three flat roofed buildings with parapets, doors, windows, a stair
+// hatch or roof access block (the white one is d.bld); a shade structure under tin, a water tank on a stand, a
+// generator, drums, a woodpile or crates, parked vehicles; mesquite trees, scrub out to 120 m and rocks.
+// G(x,z): the higher of the real ground and the terrain mesh the inner ring draws (owMeshH, as the track), what
+// everything stands on; Gb the lower, every wall and building base buried 0.5 m under it, so a gentle slope never
+// shows a gap and the ground never pokes through. Merged by material and by heat (the IR view's heat is per mesh):
+// walls, roofs, tin, clutter, generator, vegetation, yard, vehicles, engine bays, the lights: 10 draws at most, the
+// lights at night only. Beyond 3.5 km of the camera a simple set (walls and building boxes) stands in (owCmpTick).
+// Materials: one stucco canvas for the walls and buildings (UVs in metres, v from the ground at each vertex so the dirt
+// band follows it; the tint is the vertex colour), one roof and grime canvas for the rest, one tin canvas; all Lambert
+// with vertex colours and a map (the terrain's program), the tin double sided, the yard a ground decal; the 'compound'
+// job of the precompile queue links them all at boot (owWarm), so nothing links in flight.
+let OW_TX=null;
+function owTx(){if(OW_TX)return OW_TX;const R=tqRng(9127);
+  const blot=(x,w,h,n,a,b,r0,r1)=>{for(let i=0;i<n;i++){const px=R()*w,py=R()*h,r=r0+R()*(r1-r0),g=x.createRadialGradient(px,py,0,px,py,r);
+    g.addColorStop(0,R()<0.5?a:b);g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.fillRect(px-r,py-r,2*r,2*r);}};
+  const spk=(x,w,h,n,a0,a1)=>{for(let i=0;i<n;i++){x.fillStyle=R()<0.5?'rgba(70,60,50,'+(a0+R()*a1).toFixed(3)+')':'rgba(255,255,250,'+(a0+R()*a1).toFixed(3)+')';x.fillRect(R()*w,R()*h,1+R()*1.4,1+R()*1.4);}};
+  // the stucco: 4 m across (repeats), 7 m up (clamped), v = height over the ground / 7 + 0.07
+  const wall=tex(256,256,(x,w,h)=>{x.fillStyle='#efece6';x.fillRect(0,0,w,h);
+    blot(x,w,h,80,'rgba(120,105,85,0.08)','rgba(255,255,250,0.12)',8,34);
+    x.fillStyle='rgba(90,80,65,0.05)';const ch=h/35;   // faint block courses, 0.4 by 0.2 m
+    for(let r=0;r<35;r++){const y=Math.round(r*ch);x.fillRect(0,y,w,1);for(let c=(r&1)*12.8;c<w;c+=25.6)x.fillRect(Math.round(c),y,1,Math.round(ch));}
+    spk(x,w,h,5200,0.04,0.1);
+    for(let i=0;i<50;i++){const px=R()*w,t=h*(0.1+R()*0.5),len=20+R()*80,g=x.createLinearGradient(0,t,0,t+len);   // weathering streaks
+      g.addColorStop(0,'rgba(95,85,70,'+(0.06+R()*0.1).toFixed(3)+')');g.addColorStop(1,'rgba(95,85,70,0)');x.fillStyle=g;x.fillRect(px,t,1+R()*5,len);}
+    const y0=h*(1-0.134),y1=h*(1-0.07),g=x.createLinearGradient(0,y0-6,0,y1);   // the dirt band: 0.45 m up from the ground, darker under it
+    g.addColorStop(0,'rgba(120,95,65,0)');g.addColorStop(0.55,'rgba(120,95,65,0.3)');g.addColorStop(1,'rgba(105,82,55,0.55)');x.fillStyle=g;x.fillRect(0,y0-6,w,y1-y0+6);
+    x.fillStyle='rgba(105,82,55,0.6)';x.fillRect(0,y1,w,h-y1);
+    for(let i=0;i<320;i++){x.fillStyle='rgba(110,88,60,'+(0.1+R()*0.25).toFixed(3)+')';x.fillRect(R()*w,y0-10+R()*(y1-y0+10),1+R()*2,1+R()*2);}},[1,1]);
+  wall.wrapT=THREE.ClampToEdgeWrapping;
+  // roofs and grime: a 4 m tile of weathered roof coating, 2 m panel seams, a few cracks
+  const top=tex(128,128,(x,w,h)=>{x.fillStyle='#e8e6e1';x.fillRect(0,0,w,h);blot(x,w,h,40,'rgba(110,100,85,0.12)','rgba(255,255,255,0.12)',5,22);spk(x,w,h,2600,0.04,0.12);
+    x.fillStyle='rgba(80,72,60,0.16)';x.fillRect(0,h/2,w,1);x.fillRect(w/2,0,1,h);
+    x.strokeStyle='rgba(70,62,52,0.22)';x.lineWidth=0.7;for(let i=0;i<5;i++){let px=R()*w,py=R()*h;x.beginPath();x.moveTo(px,py);for(let k=0;k<6;k++){px+=(R()-0.5)*14;py+=(R()-0.5)*14;x.lineTo(px,py);}x.stroke();}},[1,1]);
+  // corrugated tin: 1.6 m, 21 ribs across, a lap at 0.8 m, rust running down the sheets
+  const tin=tex(128,128,(x,w,h)=>{for(let i=0;i<w;i++){const s=Math.sin(i/w*Math.PI*42),v=Math.round(168+58*s);x.fillStyle='rgb('+v+','+(v+3)+','+(v+6)+')';x.fillRect(i,0,1,h);}
+    x.fillStyle='rgba(40,40,40,0.3)';x.fillRect(0,h/2,w,2);x.fillRect(0,0,w,1);x.fillRect(Math.round(w*0.62),0,1,h);
+    blot(x,w,h,26,'rgba(140,78,38,0.38)','rgba(120,70,40,0.22)',4,16);
+    for(let i=0;i<30;i++){const px=R()*w,py=R()*h,g=x.createLinearGradient(0,py,0,py+30);g.addColorStop(0,'rgba(130,72,36,0.3)');g.addColorStop(1,'rgba(130,72,36,0)');x.fillStyle=g;x.fillRect(px,py,1+R()*3,30);}
+    spk(x,w,h,900,0.04,0.1);},[1,1]);
+  return OW_TX={wall:wall,top:top,tin:tin};}
+const OW_M={};
+function owMats(){if(OW_M.wall)return OW_M;const T=owTx();
+  OW_M.wall=new THREE.MeshLambertMaterial({vertexColors:true,map:T.wall});OW_M.top=new THREE.MeshLambertMaterial({vertexColors:true,map:T.top});
+  OW_M.tin=new THREE.MeshLambertMaterial({vertexColors:true,map:T.tin,side:THREE.DoubleSide});return OW_M;}
+// heat by part, [day, sunset and night]; irVar: how much the textures and paint show in IR (the generator's stack and
+// the rocks are lighter in paint, so they read warmer in their meshes)
+const OW_HEAT={walls:[0.42,0.46],roofs:[0.5,0.5],tin:[0.65,0.25],clutter:[0.3,0.3],gen:[0.9,0.9],veg:[0.35,0.25],yard:[0.33,0.18],veh:[0.5,0.5],bay:[0.65,0.65],lod:[0.42,0.46]};
+const OW_IRV={walls:0.3,roofs:0.3,tin:0.25,clutter:0.2,gen:0.6,veg:0.3,yard:0.25,veh:0.15,bay:0.15,lod:0.3};
+function owCmpHeat(g){if(!g)return;const k=TOD.night||TOD.id==='sunset'?1:0;
+  // after sunset the stucco keeps the day's face shading in IR (irShade), so walls and buildings read as warm solids
+  // with edges instead of one flat bright mass
+  g.traverse(m=>{const q=m.userData.ow;if(q&&OW_HEAT[q]){m.userData.heat=OW_HEAT[q][k];m.userData.irVar=OW_IRV[q];m.userData.irShade=k&&(q==='walls'||q==='roofs'||q==='lod')?0.16:null;}});irDirty=true;}
+// the merge buffers: positions, normals, colours, uvs, indices. uv: 'w' the stucco (metres along, v from the ground G),
+// 't' metres on a 4 m tile (triplanar), 'g' the geometry's own, 'k' one spot of the grime canvas
+const _owP=new THREE.Vector3(),_owN=new THREE.Vector3(),_owNm=new THREE.Matrix3(),_owK=new THREE.Color(),_owMx=new THREE.Matrix4(),_owQ=new THREE.Quaternion(),_owE=new THREE.Euler(),_owSc=new THREE.Vector3();
+const owBuf=()=>({p:[],n:[],c:[],u:[],i:[],v:0});
+const owHash=(x,y,z)=>{const s=Math.sin(x*12.9898+y*78.233+z*37.719)*43758.5453;return s-Math.floor(s);};
+function owVert(B,x,y,z,nx,ny,nz,col,uv,G,ua,ub){B.p.push(x,y,z);B.n.push(nx,ny,nz);
+  if(typeof col==='function')col(x,y,z,nx,ny,nz,_owK);else _owK.copy(col);B.c.push(_owK.r,_owK.g,_owK.b);
+  let a=0.5,b=0.5;
+  if(uv==='g'){a=ua;b=ub;}
+  else if(uv==='w'||uv==='t'){const ax=Math.abs(nx),az=Math.abs(nz);
+    if(Math.abs(ny)>0.75){a=(x+z*0.37)/4;b=uv==='w'?0.55:z/4;}   // the stucco's top faces read one row of it
+    else{a=(ax>az?z:x)/4;b=uv==='w'?(y-G(x,z))/7+0.07:y/4;}}
+  B.u.push(a,b);return B.v++;}
+// a quad a b c d, its normal turned away from ref (a point inside the solid)
+function owQuad(B,a,b,c,d,ref,col,uv,G){
+  let nx=(c[1]-a[1])*(d[2]-b[2])-(c[2]-a[2])*(d[1]-b[1]),ny=(c[2]-a[2])*(d[0]-b[0])-(c[0]-a[0])*(d[2]-b[2]),nz=(c[0]-a[0])*(d[1]-b[1])-(c[1]-a[1])*(d[0]-b[0]);
+  const l=Math.hypot(nx,ny,nz)||1;nx/=l;ny/=l;nz/=l;
+  const fl=nx*((a[0]+c[0])/2-ref[0])+ny*((a[1]+c[1])/2-ref[1])+nz*((a[2]+c[2])/2-ref[2])<0;if(fl){nx=-nx;ny=-ny;nz=-nz;}
+  const i0=owVert(B,a[0],a[1],a[2],nx,ny,nz,col,uv,G),i1=owVert(B,b[0],b[1],b[2],nx,ny,nz,col,uv,G),i2=owVert(B,c[0],c[1],c[2],nx,ny,nz,col,uv,G),i3=owVert(B,d[0],d[1],d[2],nx,ny,nz,col,uv,G);
+  if(fl)B.i.push(i0,i2,i1,i0,i3,i2);else B.i.push(i0,i1,i2,i0,i2,i3);}
+// a block from y0 up sy, sx by sz turned rot about its centre, the top edges chamfered by ch (0: square); no bottom face
+function owCap(B,cx,y0,cz,sx,sy,sz,rot,ch,col,uv,G){const c=Math.cos(rot),s=Math.sin(rot),hx=sx/2,hz=sz/2,y1=y0+sy,ym=ch>0?y1-ch:y1;
+  const T=(x,y,z)=>[cx+x*c+z*s,y,cz-x*s+z*c],ref=[cx,y0+sy*0.5,cz];
+  const b=[T(-hx,y0,-hz),T(hx,y0,-hz),T(hx,y0,hz),T(-hx,y0,hz)],m=[T(-hx,ym,-hz),T(hx,ym,-hz),T(hx,ym,hz),T(-hx,ym,hz)];
+  for(let i=0;i<4;i++){const j=(i+1)%4;owQuad(B,b[i],b[j],m[j],m[i],ref,col,uv,G);}
+  if(ch>0){const ix=Math.max(0.002,hx-ch),iz=Math.max(0.002,hz-ch),t=[T(-ix,y1,-iz),T(ix,y1,-iz),T(ix,y1,iz),T(-ix,y1,iz)];
+    for(let i=0;i<4;i++){const j=(i+1)%4;owQuad(B,m[i],m[j],t[j],t[i],ref,col,uv,G);}owQuad(B,t[0],t[1],t[2],t[3],ref,col,uv,G);}
+  else owQuad(B,m[0],m[1],m[2],m[3],ref,col,uv,G);}
+// a geometry into a buffer through the matrix Mx
+function owPut(B,g,Mx,col,uv,G){const P=g.attributes.position,N=g.attributes.normal,U=g.attributes.uv,n0=B.v;_owNm.getNormalMatrix(Mx);
+  for(let i=0;i<P.count;i++){_owP.fromBufferAttribute(P,i).applyMatrix4(Mx);_owN.fromBufferAttribute(N,i).applyMatrix3(_owNm).normalize();
+    owVert(B,_owP.x,_owP.y,_owP.z,_owN.x,_owN.y,_owN.z,col,uv,G,U?U.getX(i):0.5,U?U.getY(i):0.5);}
+  if(g.index){const I=g.index;for(let i=0;i<I.count;i++)B.i.push(n0+I.getX(i));}else for(let i=0;i<P.count;i++)B.i.push(n0+i);
+  g.dispose();}
+const owMx=(x,y,z,rx,ry,rz,sx,sy,sz)=>_owMx.compose(_owP.set(x,y,z),_owQ.setFromEuler(_owE.set(rx||0,ry||0,rz||0,'YXZ')),_owSc.set(sx||1,sy||sx||1,sz||sx||1));
+function owMesh(B,mat,key){if(!B.v)return null;const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(B.p,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(B.n,3));
+  g.setAttribute('color',new THREE.Float32BufferAttribute(B.c,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(B.u,2));g.setIndex(B.i);g.computeBoundingSphere();
+  const m=new THREE.Mesh(g,mat);m.name='ow_'+key;m.userData.ow=key;return m;}
+// the yard's canvas (per game, 832 px across the yard and a 26 m apron round it): packed dirt inside the wall, sand
+// drifted against it, the tyre loops of the vehicles in and out of the gate, foot paths to the doors, oil under the
+// vehicles and the generator; then the sun's shadows of every part (Y.S, heights over the ground) as one layer, so
+// overlaps never darken twice: from 3,000 ft the compound is 2.5 km off and the shadow cascades end at 1.5 km, so
+// these are the shadows the sensor sees (a shadowless copy stands in while the cascades reach it, owCmpTick).
+// k: the shadows' strength (0 none); repainted when the time of day changes (owCmpSun)
+function owYardDraw(cv,Y,k){const x=cv.getContext('2d'),w=cv.width,h=cv.height,R=tqRng(Y.seed),W=Y.W,D=Y.D,Mg=Y.Mg,hw=W/2,hd=D/2,P=Y.P;
+  const X=v=>(v+hw+Mg)/(W+2*Mg)*w,Z=v=>(hd+Mg-v)/(D+2*Mg)*h,S=w/(W+2*Mg);
+  x.clearRect(0,0,w,h);x.save();x.beginPath();x.rect(X(-hw),Z(hd),W*S,D*S);x.clip();
+  x.fillStyle='#b99e77';x.fillRect(X(-hw),Z(hd),W*S,D*S);
+  const rx=()=>X(-hw)+R()*W*S,rz=()=>Z(hd)+R()*D*S;
+  const blob=(px,py,r,c)=>{const g=x.createRadialGradient(px,py,0,px,py,r);g.addColorStop(0,c);g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.fillRect(px-r,py-r,2*r,2*r);};
+  // tonal patches: darker packed and damp spots, paler loose sand
+  for(let i=0;i<110;i++){const q=R();blob(rx(),rz(),(1.5+R()*7)*S,q<0.55?'rgba(132,108,76,'+(0.18+R()*0.2).toFixed(2)+')':'rgba(216,198,162,'+(0.15+R()*0.18).toFixed(2)+')');}
+  for(let i=0;i<9000;i++){const q=R();x.fillStyle=q<0.45?'rgba(100,84,64,0.4)':q<0.75?'rgba(226,212,186,0.35)':'rgba(130,126,120,0.45)';x.fillRect(rx(),rz(),1+R()*1.5,1+R()*1.5);}
+  const e=1.6*S,x0=X(-hw),x1=X(hw),z0=Z(hd),z1=Z(-hd),edge=(a,b,c,d,ga,gb,gc,gd)=>{const g=x.createLinearGradient(ga,gb,gc,gd);g.addColorStop(0,'rgba(160,132,96,0.55)');g.addColorStop(1,'rgba(160,132,96,0)');x.fillStyle=g;x.fillRect(a,b,c-a,d-b);};
+  edge(x0,z0,x1,z0+e,0,z0,0,z0+e);edge(x0,z1-e,x1,z1,0,z1,0,z1-e);edge(x0,z0,x0+e,z1,x0,0,x0+e,0);edge(x1-e,z0,x1,z1,x1,0,x1-e,0);
+  x.lineCap=x.lineJoin='round';
+  const line=(pts,wd,col)=>{x.strokeStyle=col;x.lineWidth=wd*S;x.beginPath();pts.forEach((p,i)=>i?x.lineTo(X(p[0]),Z(p[1])):x.moveTo(X(p[0]),Z(p[1])));x.stroke();};
+  const curve=c=>{const out=[];for(let i=0;i+1<c.length;i++){const a=c[Math.max(0,i-1)],b=c[i],d=c[i+1],f=c[Math.min(c.length-1,i+2)];
+    for(let j=0;j<8;j++){const t=j/8,t2=t*t,t3=t2*t;out.push([0,1].map(q=>0.5*(2*b[q]+(-a[q]+d[q])*t+(2*a[q]-5*b[q]+4*d[q]-f[q])*t2+(-a[q]+3*b[q]-3*d[q]+f[q])*t3)));}}
+    out.push(c[c.length-1]);return out;};
+  const off=(pts,o)=>pts.map((p,i)=>{const a=pts[Math.max(0,i-1)],b=pts[Math.min(pts.length-1,i+1)],dx=b[0]-a[0],dz=b[1]-a[1],l=Math.hypot(dx,dz)||1;return [p[0]-dz/l*o,p[1]+dx/l*o];});
+  // trampled ground: in front of every door and under the shade, darker and churned
+  for(const d of P.doors){for(let i=0;i<5;i++)blob(X(d[0]+(R()-0.5)*1.6),Z(d[1]+(R()-0.5)*1.6),(1.6+R()*1.6)*S,'rgba(112,90,64,0.32)');}
+  if(P.shade){const [sx,sz,sw,sd]=P.shade;x.fillStyle='rgba(118,95,67,0.38)';x.fillRect(X(sx-sw/2+0.4),Z(sz+sd/2-0.4),(sw-0.8)*S,(sd-0.8)*S);
+    for(let i=0;i<8;i++)blob(X(sx+(R()-0.5)*sw),Z(sz+(R()-0.5)*sd),(1.2+R()*1.5)*S,'rgba(112,90,64,0.3)');}
+  // faint footpaths between the doors and to the gate lane
+  for(const c of P.foot)line(curve(c),0.7,'rgba(128,104,74,0.3)');
+  for(let i=0;i+1<P.doors.length;i++){const a=P.doors[i],b=P.doors[i+1];line(curve([a,[(a[0]+b[0])/2+(R()-0.5)*4,(a[1]+b[1])/2+(R()-0.5)*4],b]),0.6,'rgba(128,104,74,0.28)');}
+  // the tyre tracks: a compacted band, then two ruts 1.3 m apart in the track ribbon's own tones (its rut canvas times
+  // its colour), the older loop round the yard fainter
+  const ruts=(c,al)=>{const pts=curve(c);line(pts,2.4,'rgba(140,113,80,'+(0.35*al).toFixed(2)+')');
+    for(let j=0;j<2;j++){const q=(R()-0.5)*0.25;for(const sg of [-0.65,0.65]){const o=off(pts,sg+q);line(o,0.42,'rgba(86,63,37,'+(0.55*al).toFixed(2)+')');line(o,0.2,'rgba(68,49,29,'+(0.6*al).toFixed(2)+')');}}};
+  for(const c of P.tyre)ruts(c,1);
+  ruts([[0,hd+2],[0,4],[-hw*0.3,-1],[-hw*0.45,-hd*0.45],[0,-hd+6],[hw*0.45,-hd*0.45],[hw*0.3,-1],[0,4]],0.45);   // the loop round the yard
+  for(const o of P.oil){const r=o[2]*S,g=x.createRadialGradient(X(o[0]),Z(o[1]),0,X(o[0]),Z(o[1]),r);g.addColorStop(0,'rgba(55,45,36,0.5)');g.addColorStop(1,'rgba(55,45,36,0)');x.fillStyle=g;x.fillRect(X(o[0])-r,Z(o[1])-r,2*r,2*r);}
+  // at night, the yard light's pool on the ground under it (the yard's vertex colours lift it as well, owCmpSun)
+  if(Y.night&&P.lamp)blob(X(P.lamp[0]),Z(P.lamp[1]),7*S,'rgba(255,226,170,0.55)');
+  x.restore();
+  if(!(k>0))return;
+  // the shadows: away from the sun (in the compound's frame), never longer than 3 times the height (the apron's reach)
+  const sp=_owP.copy(sun.position).normalize(),ca=Math.cos(Y.ang),sa=Math.sin(Y.ang),ly=Math.max(0.3,sp.y),ox=-(sp.x*ca-sp.z*sa)/ly,oz=-(sp.x*sa+sp.z*ca)/ly;
+  const sh=document.createElement('canvas');sh.width=w;sh.height=h;const s=sh.getContext('2d');s.fillStyle=s.strokeStyle='rgb(30,36,52)';s.lineCap='round';
+  const hull=Q=>{Q.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);const cr=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]),L=[],U=[];
+    for(const p of Q){while(L.length>1&&cr(L[L.length-2],L[L.length-1],p)<=0)L.pop();L.push(p);}
+    for(let i=Q.length-1;i>=0;i--){const p=Q[i];while(U.length>1&&cr(U[U.length-2],U[U.length-1],p)<=0)U.pop();U.push(p);}
+    return L.slice(0,-1).concat(U.slice(0,-1));};
+  const poly=H=>{s.beginPath();H.forEach((p,i)=>i?s.lineTo(X(p[0]),Z(p[1])):s.moveTo(X(p[0]),Z(p[1])));s.closePath();s.fill();};
+  for(const q of Y.S){
+    if(q.k==='p'){const Q=[];for(const p of q.p)Q.push([p[0]+ox*q.h0,p[1]+oz*q.h0],[p[0]+ox*q.h1,p[1]+oz*q.h1]);poly(hull(Q));}
+    else if(q.k==='f')poly(q.p.map(p=>[p[0]+ox*q.h1,p[1]+oz*q.h1]));
+    else if(q.k==='l'){s.lineWidth=Math.max(1,q.w*S);s.beginPath();s.moveTo(X(q.x+ox*q.h0),Z(q.z+oz*q.h0));s.lineTo(X(q.x+ox*q.h1),Z(q.z+oz*q.h1));s.stroke();}
+    else if(q.k==='e'){for(const f of [-0.7,0,0.7]){const hh=q.h+f*q.ry;s.beginPath();s.ellipse(X(q.x+ox*hh),Z(q.z+oz*hh),q.rx*S,q.rz*S,0,0,Math.PI*2);s.fill();}}}
+  // faded out over the apron's last 5 m, so a long shadow never ends on a hard line
+  s.globalCompositeOperation='destination-out';const f=5*S;
+  for(const [a,b,c,d] of [[0,0,0,f],[0,h,0,h-f],[0,0,f,0],[w,0,w-f,0]]){const g=s.createLinearGradient(a,b,c,d);g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(1,'rgba(0,0,0,0)');s.fillStyle=g;
+    s.fillRect(Math.min(a,c),Math.min(b,d),c===a?w:f,d===b?h:f);}
+  x.globalAlpha=k;x.drawImage(sh,0,0);x.globalAlpha=1;}
+// a footprint rectangle (centre, size, turned rot as owCap) for the shadow list
+function owRect(cx,cz,sx,sz,rot){const c=Math.cos(rot||0),s=Math.sin(rot||0),hx=sx/2,hz=sz/2;return [[-hx,-hz],[hx,-hz],[hx,hz],[-hx,hz]].map(([a,b])=>[cx+a*c+b*s,cz-a*s+b*c]);}
+// the shadows' strength for the time of day: none at night, softer in the haboob's dust
+const owShK=()=>TOD.night?0:(TOD.id==='sunset'?0.5:0.58)*(TOD.hb?0.35:1);
+// the time of day changed (or the compound was just built): the shadows repainted for the new sun, the apron shown
+// only when there are any
+function owCmpSun(g){const U=g.userData,k=owShK();U.Y.night=!!TOD.night;U.ym.emissive.setHex(TOD.night?0x4a3418:0);owYardDraw(U.cvS,U.Y,k);U.tS.needsUpdate=true;U.k=k;U.apron.visible=k>0&&!U.plain;
+  // the yard light's pool at night: the yard's vertex colours over 1 round it (the grid's corners near the gate)
+  const L=U.Y.P.lamp,C=U.yard.geometry.attributes.color,P=U.yard.geometry.attributes.position;
+  for(let i=0;i<C.count;i++){const d=L?Math.hypot(P.getX(i)-L[0],P.getZ(i)-L[1]):1e9,f=TOD.night?1+1.6*Math.exp(-(d*d)/80):1;C.setXYZ(i,f,1+(f-1)*0.93,1+(f-1)*0.8);}
+  C.needsUpdate=true;}
+// the lights (night): the airport lights' points (AL_MAT, its program), warm, on their own little geometry; for this
+// draw only the points are 3.2 times the size with the fog's soft halo round a bright core (uWx x and y, uniforms of
+// the same material: put back after it, and the next draw of it uploads them again), so the yard light and the door
+// lamp read from 3 km through the ball as warm points with a glow
+const OW_LWX=new THREE.Vector4();
+function owLights(L){const n=L.length/3,z=new Array(n).fill(0),C=new THREE.Color(0xffb35c).multiplyScalar(1.25),col=[],dir=[];for(let i=0;i<n;i++){col.push(C.r,C.g,C.b);dir.push(0,0,-1);}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(L,3));g.setAttribute('aCol',new THREE.Float32BufferAttribute(col,3));
+  g.setAttribute('kind',new THREE.Float32BufferAttribute(z,1));g.setAttribute('aDir',new THREE.Float32BufferAttribute(dir,3));g.setAttribute('flash',new THREE.Float32BufferAttribute(z,1));g.setAttribute('phase',new THREE.Float32BufferAttribute(z,1));
+  g.computeBoundingSphere();const p=new THREE.Points(g,AL_MAT);p.name='ow_lights';p.renderOrder=2;p.frustumCulled=false;
+  p.onBeforeRender=(r,sc,cam)=>{const u=AL_MAT.uniforms,w=u.uWx.value;u.uCam.value.setFromMatrixPosition(cam.matrixWorld);u.uTime.value=AL_TFREEZE!==null?AL_TFREEZE:performance.now()/1000;u.uPR.value=alPR(r);
+    OW_LWX.copy(w);w.x*=3.2;w.y=1;AL_MAT.uniformsNeedUpdate=true;};
+  p.onAfterRender=()=>{AL_MAT.uniforms.uWx.value.copy(OW_LWX);AL_MAT.uniformsNeedUpdate=true;};
+  pfxBloomTag(p);p.visible=!!TOD.night;return p;}
+// the compound at c, its gate toward local +z turned by ang; R its own seeded stream; o.route (the track, world) keeps
+// the scrub off it. userData: bld (the white building, local centre and height), spur (where the track's spur ends,
+// at the parked vehicles), gate (the leaves, opened by owCmpTick), det and lod (the two sets), tris
+function owCompound(c,ang,R,o){o=o||{};
+  const M=owMats(),gh0=groundHeight(c.x,c.z),ca=Math.cos(ang),sa=Math.sin(ang),GC=new Map();
+  const gq=(x,z)=>{const k=Math.round(x*4)*100003+Math.round(z*4);let v=GC.get(k);
+    if(v===undefined){const X=c.x+x*ca+z*sa,Z=c.z-x*sa+z*ca,a=groundHeight(X,Z),b=owMeshH(X,Z);v=[Math.max(a,b)-gh0,Math.min(a,b)-gh0];GC.set(k,v);}return v;};
+  const G=(x,z)=>gq(x,z)[0],Gb=(x,z)=>gq(x,z)[1];
+  const r=(a,b)=>tqR(R,a,b),pick=a=>tqPick(R,a),jc=(h,j)=>new THREE.Color(h).multiplyScalar(1+(R()-0.5)*2*(j==null?0.06:j));
+  const route=(o.route||[]).map(p=>{const X=p.x-c.x,Z=p.z-c.z;return [X*ca-Z*sa,X*sa+Z*ca];});
+  const offTrack=(x,z,m)=>{for(let i=0;i+1<route.length;i++)if(segD(x,z,route[i][0],route[i][1],route[i+1][0],route[i+1][1])<m)return false;return true;};
+  const Bw=owBuf(),Br=owBuf(),Bt=owBuf(),Bc=owBuf(),Bg=owBuf(),Bv=owBuf(),Bh=owBuf(),Bb=owBuf(),Bl=owBuf(),LP=[];
+  const W=Math.round(r(52,70)),D=Math.round(r(40,50)),hw=W/2,hd=D/2,wH=r(2.6,3.0),wT=0.35,GW=2.6;   // GW: one gate leaf
+  const wallCol=jc(pick([0xc9aa83,0xbfa98c,0xb5a794,0xd1b28b]),0.03),capCol=wallCol.clone().multiplyScalar(r(0.86,0.94));
+  const steel=new THREE.Color(0x7d8084),dark=new THREE.Color(0x2b2e31),conc=new THREE.Color(0xbdb7ab);
+  const outPt=(a,dd)=>{const cx=Math.cos(a),sz=Math.sin(a),k=Math.min((hw+dd)/Math.max(1e-3,Math.abs(cx)),(hd+dd)/Math.max(1e-3,Math.abs(sz)));return [cx*k,sz*k];};
+  const occ=[],free=(x0,z0,x1,z1,m)=>{if(x0<-hw+0.7||x1>hw-0.7||z0<-hd+0.7||z1>hd-0.7)return false;for(const q of occ)if(x0<q.x1+m&&x1>q.x0-m&&z0<q.z1+m&&z1>q.z0-m)return false;return true;};
+  const take=(x0,z0,x1,z1)=>{occ.push({x0:x0,z0:z0,x1:x1,z1:z1});};
+  const spot=(w,d,m,z0,z1)=>{for(let k=0;k<140;k++){const x=r(-hw+0.8+w/2,hw-0.8-w/2),z=r(Math.max(-hd+0.8+d/2,z0==null?-1e9:z0),Math.min(hd-0.8-d/2,z1==null?1e9:z1));
+    if(free(x-w/2,z-d/2,x+w/2,z+d/2,m)){take(x-w/2,z-d/2,x+w/2,z+d/2);return {x:x,z:z};}}return null;};
+  const paint={tyre:[],foot:[],oil:[],doors:[],shade:null,lamp:null,lampD:null},SH=[],shP=(p,h0,h1)=>SH.push({k:'p',p:p,h0:h0,h1:h1});   // SH: the shadow casters, heights over the ground
+  // ---- the wall ----
+  const pil=(x,z,top,big)=>{const s=big?0.62:0.52,yb=Gb(x,z)-0.5;shP(owRect(x,z,s+0.12,s+0.12,0),0,top+0.12-G(x,z));owCap(Bw,x,yb,z,s,top-yb,s,0,0,wallCol,'w',G);owCap(Bw,x,top,z,s+0.12,0.12,s+0.12,0,0.035,capCol,'w',G);};
+  const run=(x0,z0,x1,z1)=>{const L=Math.hypot(x1-x0,z1-z0),n=Math.max(1,Math.ceil(L/8-1e-6)),ux=(x1-x0)/L,uz=(z1-z0)/L,px=-uz*wT/2,pz=ux*wT/2,rot=Math.atan2(-uz,ux),tops=[];
+    for(let i=0;i<n;i++){const ax=x0+(x1-x0)*i/n,az=z0+(z1-z0)*i/n,bx=x0+(x1-x0)*(i+1)/n,bz=z0+(z1-z0)*(i+1)/n,mx=(ax+bx)/2,mz=(az+bz)/2;
+      const yt=G(mx,mz)+wH,ya=Gb(ax,az)-0.5,yb=Gb(bx,bz)-0.5,sc=wallCol.clone().multiplyScalar(r(0.95,1.04));tops.push(yt);   // each stretch rendered at its own time
+      for(const s of [1,-1])owQuad(Bw,[ax+px*s,ya,az+pz*s],[bx+px*s,yb,bz+pz*s],[bx+px*s,yt,bz+pz*s],[ax+px*s,yt,az+pz*s],[mx,yt-1,mz],sc,'w',G);
+      owCap(Bw,mx,yt,mz,L/n,0.09,wT+0.1,rot,0.03,capCol,'w',G);shP(owRect(mx,mz,L/n,wT+0.1,rot),0,wH+0.09);}   // the coping course
+    for(let i=1;i<n;i++)pil(x0+(x1-x0)*i/n,z0+(z1-z0)*i/n,Math.max(tops[i-1],tops[i])+0.18);
+    // the simple set: pieces up to 16 m, faces and top
+    const m=Math.max(1,Math.ceil(L/16));for(let i=0;i<m;i++){const ax=x0+(x1-x0)*i/m,az=z0+(z1-z0)*i/m,bx=x0+(x1-x0)*(i+1)/m,bz=z0+(z1-z0)*(i+1)/m,yt=G((ax+bx)/2,(az+bz)/2)+wH,ya=Gb(ax,az)-0.6,yb=Gb(bx,bz)-0.6,rf=[(ax+bx)/2,yt-1,(az+bz)/2];
+      for(const s of [1,-1])owQuad(Bl,[ax+px*s,ya,az+pz*s],[bx+px*s,yb,bz+pz*s],[bx+px*s,yt,bz+pz*s],[ax+px*s,yt,az+pz*s],rf,wallCol,'w',G);
+      owQuad(Bl,[ax+px,yt,az+pz],[bx+px,yt,bz+pz],[bx-px,yt,bz-pz],[ax-px,yt,az-pz],rf,capCol,'w',G);}};
+  const GP=GW+0.31;
+  run(-hw,-hd,hw,-hd);run(hw,-hd,hw,hd);run(-hw,hd,-hw,-hd);run(hw,hd,GP+0.31,hd);run(-GP-0.31,hd,-hw,hd);
+  for(const [x,z] of [[-hw,-hd],[hw,-hd],[hw,hd],[-hw,hd]])pil(x,z,G(x,z)+wH+0.2,true);
+  for(const x of [-GP,GP])pil(x,hd,G(x,hd)+wH+0.45,true);
+  // ---- the gate: a steel frame, two leaves (stiles, rails, a sheet with ribs); the half open one by the roll ----
+  const gy=G(0,hd)+0.05,gcol=jc(pick([0x3d5b4b,0x31475f,0x5b3f2f,0x4b5056]),0.05),gcol2=gcol.clone().multiplyScalar(0.9),leaves=[];
+  for(const x of [-GW+0.05,GW-0.05])owCap(Bc,x,Gb(x,hd)-0.3,hd,0.1,gy+2.5-Gb(x,hd)+0.3,0.12,0,0,steel,'t',G);
+  owCap(Bc,0,gy+2.4,hd,2*GW,0.12,0.12,0,0,steel,'t',G);
+  const half=R()<0.5?-1:1;
+  for(const s of [-1,1]){const v0=Bc.v,hx=s*(GW-0.1),cx=s*(GW-0.1)/2,L=GW-0.14;
+    for(const x of [hx-s*0.04,s*0.06])owCap(Bc,x,gy,hd,0.07,2.15,0.07,0,0,gcol,'t',G);
+    for(const y of [gy,gy+1.02,gy+2.08])owCap(Bc,cx,y,hd,L,0.07,0.07,0,0,gcol,'t',G);
+    owCap(Bc,cx,gy+0.07,hd,L-0.05,2.0,0.025,0,0,gcol2,'t',G);
+    for(const k of [0.25,0.5,0.75])owCap(Bc,s*0.06+(hx-s*0.06)*k,gy+0.07,hd,0.05,2.0,0.05,0,0,gcol,'t',G);
+    const v1=Bc.v,a0=s===half?-s*r(0.62,0.85):0;leaves.push({v0:v0,v1:v1,hx:hx,hz:hd,a0:a0,a1:-s*r(1.62,1.75),p:new Float32Array(Bc.p.slice(v0*3,v1*3)),n:new Float32Array(Bc.n.slice(v0*3,v1*3))});}
+  // the lane: the departing pickup at local (0, 8), out through the gate; the leaves swing in over it
+  take(-3.3,1.4,3.3,hd);
+  // the yard light: a pole by the gate post, its arm over the yard
+  {const lx=-half*(GP+1.1),lz=hd-0.7,yb=Gb(lx,lz)-0.3,yt=G(lx,lz)+5.2;owPut(Bc,new THREE.CylinderGeometry(0.055,0.08,yt-yb,6,1,true),owMx(lx,(yt+yb)/2,lz),steel,'t',G);
+    owCap(Bc,lx,yt-0.08,lz-0.55,0.06,0.06,1.1,0,0,steel,'t',G);owCap(Bc,lx,yt-0.2,lz-1.05,0.28,0.14,0.42,0,0.03,dark,'t',G);SH.push({k:'l',x:lx,z:lz,w:0.12,h0:0,h1:5.2});LP.push(lx,yt-0.26,lz-1.05);paint.lamp=[lx,lz-1.05];take(lx-0.3,lz-0.3,lx+0.3,lz+0.3);}
+  // ---- the parked vehicles, beside the lane, nose to the gate; the track's spur ends at the first ----
+  const vs=R()<0.5?-1:1,nv=R()<0.6?2:1,veh=[];
+  for(let k=0;k<40&&veh.length<nv;k++){const x=vs*(5.4+veh.length*2.9+r(0,1.5)),z=r(0,hd-8);if(free(x-1.35,z-3,x+1.35,z+3,0.3)){take(x-1.35,z-3,x+1.35,z+3);veh.push({x:x,z:z,h:Math.PI+r(-0.2,0.2)});}}
+  const spur=veh.length?{x:veh[0].x,z:veh[0].z}:{x:0,z:8};
+  for(const v of veh){const col=pick([0x2b2f36,0x8a8f94,0x6e2a24,0xc9c4b8,0x34465a]),pk=owPickup(col);pk.position.set(v.x,G(v.x,v.z)+0.03,v.z);pk.rotation.y=v.h;pk.updateMatrixWorld(true);
+    pk.traverse(m=>{if(!m.isMesh)return;const k=m.material.color.clone();owPut(m.userData.part==='hood'?Bb:Bh,m.geometry.clone(),m.matrixWorld,k,'k',G);m.material.dispose();m.geometry.dispose();});
+    paint.oil.push([v.x-Math.sin(v.h)*2.1,v.z-Math.cos(v.h)*2.1,1.1]);shP(owRect(v.x,v.z,1.95,5.4,v.h),0,1.25);shP(owRect(v.x-Math.sin(v.h)*0.6,v.z-Math.cos(v.h)*0.6,1.85,2.3,v.h),0,2.05);
+    paint.tyre.push([[0,hd+2],[vs*1.2,hd-4],[v.x,v.z+6],[v.x,v.z-1.5]]);}
+  paint.tyre.push([[0,hd+3],[0,hd-6],[0,4]]);
+  // ---- the buildings: the white one first (10-16 by 8-11, 4.2-5.5 m), then up to two more (8-13 by 6-9, 3.2-4.6 m);
+  // the white one 24 m or more from the departing pickup (local 0, 8), so a lock on it never takes the pickup ----
+  const nb=1+Math.floor(R()*3),tints=[0xe2cba3,0xe7cf92,0xdcc8a6,0xe9e1cf].sort(()=>R()-0.5),bl=[];
+  for(let i=0;i<nb;i++){const wh=i===0;let w=wh?r(10,16):r(8,13),d=wh?r(8,11):r(6,9);if(R()<0.5){const t=w;w=d;d=t;}
+    let ok=null;for(let k=0;k<90&&!ok;k++){if(k===60){w*=0.88;d*=0.88;}const ex=w/2,ez=d/2,x=r(-hw+1.3+ex,hw-1.3-ex),z=k<45?r(-hd+1.3+ez,Math.min(1,hd-1.3-ez)):r(-hd+1.3+ez,hd-1.3-ez);
+      if(free(x-ex,z-ez,x+ex,z+ez,2.4)&&(!wh||Math.hypot(x,z-8)>=(k<70?24:18)))ok={x:x,z:z,ex:ex,ez:ez};}   // the white one 24 m from the pickup (LOCK picks the nearer)
+    if(!ok&&wh){const ex=5,ez=4;ok={x:-hw+1.3+ex,z:-hd+1.3+ez,ex:ex,ez:ez};}   // never seen: the white one in the back corner
+    if(!ok)continue;take(ok.x-ok.ex,ok.z-ok.ez,ok.x+ok.ex,ok.z+ok.ez);
+    bl.push(Object.assign(ok,{white:wh,H:wh?r(4.2,5.5):r(3.2,4.6),p:r(0.5,0.85),col:wh?new THREE.Color(0xf3f1ea):jc(tints[i],0.03),roof:new THREE.Color(pick([0xd8d4cc,0xcfc8ba,0xe6e3dc,0xb9b2a5]))}));}
+  const big=bl.reduce((a,b)=>a.ex*a.ez>=b.ex*b.ez?a:b);
+  const roofItems=(b,yr,list)=>{const ix=b.ex-0.9,iz=b.ez-0.9;return (w,d)=>{for(let k=0;k<40;k++){const x=b.x+r(-ix+w/2,ix-w/2),z=b.z+r(-iz+d/2,iz-d/2);
+    if(list.every(q=>Math.abs(q[0]-x)>(q[2]+w)/2+0.3||Math.abs(q[1]-z)>(q[3]+d)/2+0.3)){list.push([x,z,w,d]);return [x,z];}}return null;};};
+  for(const b of bl){const {x,z,ex,ez,H,p,col}=b,cs=[[x-ex,z-ez],[x+ex,z-ez],[x+ex,z+ez],[x-ex,z+ez],[x,z]];let yb=1e9,yf=-1e9;
+    for(const q of cs){yb=Math.min(yb,Gb(q[0],q[1]));yf=Math.max(yf,G(q[0],q[1]));}yb-=0.5;yf+=0.06;const yr=yf+H,yp=yr+p,ref=[x,yr-1,z],g0=G(x,z);b.yf=yf;b.yr=yr;
+    shP(owRect(x,z,2*ex,2*ez,0),0,yp+0.07-g0);
+    const lin=conc.clone().multiplyScalar(r(0.92,1.04)),cap=col.clone().multiplyScalar(0.9);
+    const F=[[0,1],[0,-1],[1,0],[-1,0]].map(([nx,nz])=>{const L=nz?ex:ez,dd=nz?ez:ex,tx=nz,tz=-nx;
+      return {nx:nx,nz:nz,L:L,rot:Math.atan2(nx,nz),P:(s,y,o)=>[x+nx*(dd+(o||0))+tx*s,y,z+nz*(dd+(o||0))+tz*s],out:[x+nx*(dd+2),yr,z+nz*(dd+2)],
+        k:-(x*nx+(z-6)*nz)/Math.hypot(x,z-6||1)};});
+    // the shell up to the parapet's top, the parapet's inner face, its coping, the roof
+    for(const f of F){owQuad(Bw,f.P(-f.L,yb),f.P(f.L,yb),f.P(f.L,yp),f.P(-f.L,yp),ref,col,'w',G);
+      owQuad(Bw,f.P(-f.L+0.22,yr,-0.22),f.P(f.L-0.22,yr,-0.22),f.P(f.L-0.22,yp,-0.22),f.P(-f.L+0.22,yp,-0.22),f.out,col,'w',G);
+      const q=f.P(0,yp,-0.09);owCap(Bw,q[0],yp,q[2],2*f.L+0.08,0.07,0.32,f.rot,0.025,cap,'w',G);
+      owQuad(Bl,f.P(-f.L,yb-0.1),f.P(f.L,yb-0.1),f.P(f.L,yp),f.P(-f.L,yp),ref,col,'w',G);}
+    owQuad(Bl,[x-ex,yp,z-ez],[x+ex,yp,z-ez],[x+ex,yp,z+ez],[x-ex,yp,z+ez],ref,b.roof,'w',G);
+    owQuad(Br,[x-ex+0.22,yr,z-ez+0.22],[x+ex-0.22,yr,z-ez+0.22],[x+ex-0.22,yr,z+ez-0.22],[x-ex+0.22,yr,z+ez-0.22],ref,b.roof,'t',G);
+    for(let k=0,n=1+Math.floor(R()*3);k<n;k++){const w=r(0.8,2.4),d=r(0.6,1.8),px=x+r(-ex+0.4+w/2,ex-0.4-w/2),pz=z+r(-ez+0.4+d/2,ez-0.4-d/2),pc=b.roof.clone().multiplyScalar(r(0.82,0.94));   // patched roof
+      owQuad(Br,[px-w/2,yr+0.012,pz-d/2],[px+w/2,yr+0.012,pz-d/2],[px+w/2,yr+0.012,pz+d/2],[px-w/2,yr+0.012,pz+d/2],ref,pc,'t',G);}
+    const fd=F.reduce((a,f)=>f.k>a.k?f:a),bk=F.reduce((a,f)=>f.k<a.k?f:a);
+    // the scuppers on the back, each with its stain down the wall
+    for(const s of [-bk.L*0.5,bk.L*0.5]){const q=bk.P(s,yr-0.08,0.15);owCap(Bc,q[0],yr-0.08,q[2],0.18,0.12,0.3,bk.rot,0,steel,'t',G);
+      owQuad(Bw,bk.P(s-0.1,yr-1.6,0.006),bk.P(s+0.1,yr-1.6,0.006),bk.P(s+0.12,yr-0.1,0.006),bk.P(s-0.12,yr-0.1,0.006),ref,col.clone().multiplyScalar(0.74),'w',G);}
+    // the doors: a dark steel leaf in a frame proud of the wall, a lintel over it, a concrete step; the white building's
+    // front door gets the lamp
+    const door=(f,sd,dw,lamp)=>{const dc=jc(pick([0x3a332d,0x2d3a44,0x40483a,0x5a4030]),0.05);
+      owQuad(Bw,f.P(sd-dw/2,yf,0.012),f.P(sd+dw/2,yf,0.012),f.P(sd+dw/2,yf+2.1,0.012),f.P(sd-dw/2,yf+2.1,0.012),ref,dc,'w',G);
+      for(const k of [-1,1]){const q=f.P(sd+k*(dw/2+0.06),0,0.05);owCap(Bw,q[0],yf,q[2],0.12,2.12,0.1,f.rot,0,lin,'w',G);}
+      const h=f.P(sd,0,0.06);owCap(Bw,h[0],yf+2.1,h[2],dw+0.36,0.18,0.12,f.rot,0.02,lin,'w',G);
+      const st=f.P(sd,0,0.45),sy=G(st[0],st[2])-0.12;owCap(Bw,st[0],sy,st[2],dw+0.7,yf-sy,0.9,f.rot,0.03,conc,'t',G);
+      if(lamp){const q=f.P(sd,0,0.18);owCap(Bc,q[0],yf+2.42,q[2],0.26,0.16,0.3,f.rot,0.03,dark,'t',G);const lq=f.P(sd,0,0.26);LP.push(lq[0],yf+2.38,lq[2]);const lg=f.P(sd,0,1.6);paint.lampD=[lg[0],lg[2]];}
+      const fp=f.P(sd,0,1.2);paint.doors.push([fp[0],fp[2]]);paint.foot.push([[fp[0],fp[2]],[(fp[0]*0.5),(fp[2]+6)*0.5],[0,6]]);};
+    const sd=fd.L>1.5?r(-fd.L+1.3,fd.L-1.3):0,dw=b.white?1.1:r(0.9,1.05);door(fd,sd,dw,b.white);
+    let sd2=null,f2=null;if(b.white&&R()<0.6){f2=F.find(f=>f!==fd&&f!==bk);if(f2){sd2=r(-f2.L+1.4,f2.L-1.4);door(f2,sd2,1.7,false);}}
+    // the windows: small and dark, a sill, a concrete lintel, two bars
+    const ww=r(0.75,1.0),wh=r(0.7,0.9),ys=yf+1.15,pane=new THREE.Color(0x24292e);let acDone=!b.white;
+    for(const f of F){const n=f===bk?(R()<0.5?1:0):Math.max(0,Math.min(3,Math.floor((2*f.L-1.2)/3.1)));
+      for(let k=0;k<n;k++){const s=-f.L+(k+0.5)*(2*f.L/n);if(f===fd&&Math.abs(s-sd)<dw/2+1.0)continue;if(f===f2&&Math.abs(s-sd2)<1.9)continue;
+        owQuad(Bw,f.P(s-ww/2,ys,0.012),f.P(s+ww/2,ys,0.012),f.P(s+ww/2,ys+wh,0.012),f.P(s-ww/2,ys+wh,0.012),ref,pane,'w',G);
+        let q=f.P(s,0,0.035);owCap(Bw,q[0],ys+wh+0.02,q[2],ww+0.34,0.15,0.07,f.rot,0,lin,'w',G);
+        q=f.P(s,0,0.04);owCap(Bw,q[0],ys-0.06,q[2],ww+0.14,0.06,0.08,f.rot,0,lin,'w',G);
+        if(b.white)for(const t of [-ww/6,ww/6]){q=f.P(s+t,0,0.035);owCap(Bc,q[0],ys,q[2],0.025,wh,0.025,f.rot,0,dark,'t',G);}   // bars on the white one's
+        if(!acDone&&f!==fd&&f!==bk){acDone=true;q=f.P(s,0,0.24);owCap(Bc,q[0],ys+0.06,q[2],0.66,0.42,0.48,f.rot,0.03,new THREE.Color(0xcfc8b6),'t',G);}}}
+    // up top: the roof access block on the biggest, a hatch on the others; the clutter on the white one (and on another
+    // now and then): a water tank on a stand, an evaporative cooler with its duct, a dish, drums or crates
+    const rl=[],ri=roofItems(b,yr,rl);
+    if(b===big){const pw=2.4,pd=2.3,q=ri(pw+0.4,pd+0.4);if(q){const ph=2.25,px=q[0],pz=q[1],pr=[px,yr+1,pz];
+      for(const [nx,nz] of [[0,1],[0,-1],[1,0],[-1,0]]){const L=nz?pw/2:pd/2,dd=nz?pd/2:pw/2,tx=nz,tz=-nx,P=(s,y)=>[px+nx*dd+tx*s,y,pz+nz*dd+tz*s];owQuad(Bw,P(-L,yr-0.05),P(L,yr-0.05),P(L,yr+ph),P(-L,yr+ph),pr,col,'w',G);}
+      owCap(Bw,px,yr+ph,pz,pw+0.14,0.1,pd+0.14,0,0.03,cap,'w',G);shP(owRect(px,pz,pw,pd,0),0,yr+ph+0.1-g0);
+      const dz=pz>z?-1:1,dq=[px,0,pz+dz*(pd/2+0.012)];owQuad(Bw,[dq[0]-0.45,yr,dq[2]],[dq[0]+0.45,yr,dq[2]],[dq[0]+0.45,yr+2.0,dq[2]],[dq[0]-0.45,yr+2.0,dq[2]],pr,dark,'w',G);
+      owCap(Bw,px,yr+2.0,pz+dz*(pd/2+0.05),1.2,0.15,0.1,0,0,lin,'w',G);}}
+    else{const q=ri(1.2,1.2);if(q){owCap(Bc,q[0],yr,q[1],0.95,0.38,0.95,0,0.04,steel,'t',G);owCap(Bc,q[0],yr+0.38,q[1],1.06,0.05,1.06,0,0.02,steel.clone().multiplyScalar(0.85),'t',G);}}
+    if(b.white||R()<0.35){let q=ri(1.9,1.9);if(q){owTankStand(Bc,q[0],yr,q[1],r(0,1.5),1.0,0.62,1.15,pick([0x2a2c2e,0xd8d5cc,0x9aa0a4]),false,null);SH.push({k:'l',x:q[0],z:q[1],w:1.24,h0:yr+1.1-g0,h1:yr+2.4-g0});}
+      q=ri(1.3,1.9);if(q){const rot=pick([0,Math.PI/2]);shP(owRect(q[0],q[1],1.05,1.0,rot),0,yr+0.95-g0);owCap(Bc,q[0],yr,q[1],1.05,0.95,1.0,rot,0.05,new THREE.Color(0xbab5a6),'t',G);
+        for(const s of [-1,1])for(const yy of [0.25,0.45,0.65]){const c2=Math.cos(rot),s2=Math.sin(rot);owCap(Bc,q[0]+s2*s*0.51,yr+yy,q[1]+c2*s*0.51,0.9,0.05,0.02,rot,0,dark,'t',G);}
+        owCap(Bc,q[0]+Math.cos(rot)*0.75,yr,q[1]-Math.sin(rot)*0.75,0.5,0.55,0.5,rot,0.02,steel,'t',G);}
+      q=ri(1.0,1.0);if(q){const az=Math.atan2(-sa,ca);owPut(Bc,new THREE.CylinderGeometry(0.04,0.05,0.7,6,1,true),owMx(q[0],yr+0.35,q[1]),steel,'t',G);
+        const pr=[new THREE.Vector2(0.01,0),new THREE.Vector2(0.2,0.03),new THREE.Vector2(0.4,0.11),new THREE.Vector2(0.46,0.16),new THREE.Vector2(0.44,0.17)],dg=new THREE.LatheGeometry(pr,12);
+        owPut(Bc,dg,owMx(q[0],yr+0.75,q[1],0.8,az,0),new THREE.Color(0xdedcd6),'t',G);owCap(Bc,q[0]+Math.sin(az)*0.25,yr+0.78,q[1]+Math.cos(az)*0.25,0.04,0.04,0.5,az,0,dark,'t',G);}
+      q=ri(1.3,1.0);if(q){if(R()<0.5){owDrum(Bc,q[0]-0.3,yr,q[1],jc(pick([0x31507f,0x7d2c22,0x3c5934]),0.08),0,G);owDrum(Bc,q[0]+0.33,yr,q[1]+0.1,jc(pick([0x31507f,0x7f8081]),0.08),0,G);}
+        else{owCap(Bc,q[0],yr,q[1],0.9,0.6,0.7,0.2,0.025,jc(0x9b7c52,0.08),'t',G);owCap(Bc,q[0]+0.1,yr+0.6,q[1],0.6,0.4,0.5,0.5,0.02,jc(0x8f7048,0.08),'t',G);}}}
+    // the tin on the simple set's roofs: none (the walls and boxes only)
+  }
+  // ---- the yard: a shade structure under tin, the water tank, the generator, drums, a woodpile or crates ----
+  {const sw=r(5,7),sd=r(3.5,4.6),q=spot(sw+0.6,sd+0.6,1.4);if(q){const h0=r(2.3,2.5),h1=h0+r(0.3,0.5),y0=G(q.x,q.z);
+    for(const [px,pz] of [[-1,-1],[1,-1],[1,1],[-1,1]]){const x=q.x+px*(sw/2-0.15),z=q.z+pz*(sd/2-0.15),yb=Gb(x,z)-0.3,yt=y0+(pz>0?h1:h0);
+      owPut(Bc,new THREE.CylinderGeometry(0.05,0.05,yt-yb,6,1,true),owMx(x,(yt+yb)/2,z),steel,'t',G);owCap(Bc,x,G(x,z)-0.02,z,0.22,0.06,0.22,0,0,steel,'t',G);}
+    for(const pz of [-1,1])owCap(Bc,q.x,y0+(pz>0?h1:h0),q.z+pz*(sd/2-0.15),sw,0.12,0.1,0,0,steel,'t',G);
+    const pg=new THREE.PlaneGeometry(sw+0.3,sd+0.3,6,4);pg.rotateX(-Math.PI/2);const P=pg.attributes.position,U=pg.attributes.uv;
+    for(let i=0;i<P.count;i++){const x=P.getX(i),z=P.getZ(i),u=x/(sw+0.3)+0.5,v=z/(sd+0.3)+0.5;P.setY(i,y0+h0+0.15+(h1-h0)*(z+sd/2-0.15)/(sd-0.3)-0.08*Math.sin(Math.PI*u)*Math.sin(Math.PI*v)+(owHash(x,1,z)-0.5)*0.03);U.setXY(i,x/1.6,z/1.6);}
+    pg.computeVertexNormals();const rust=new THREE.Color(0x9a6a48),galv=new THREE.Color(0xc4c8ca);SH.push({k:'f',p:owRect(q.x,q.z,sw+0.3,sd+0.3,0),h1:(h0+h1)/2+0.15});paint.shade=[q.x,q.z,sw,sd];
+    for(const [px,pz] of [[-1,-1],[1,-1],[1,1],[-1,1]])SH.push({k:'l',x:q.x+px*(sw/2-0.15),z:q.z+pz*(sd/2-0.15),w:0.1,h0:0,h1:pz>0?h1:h0});
+    owPut(Bt,pg,owMx(q.x,0,q.z),(x,y,z,nx,ny,nz,k)=>{k.copy(galv).lerp(rust,clamp(owHash(Math.round(x),2,Math.round(z*0.7))*1.4-0.5,0,0.85));},'g',G);
+    owQuad(Bl,[q.x-sw/2,y0+h0,q.z-sd/2],[q.x+sw/2,y0+h0,q.z-sd/2],[q.x+sw/2,y0+h1,q.z+sd/2],[q.x-sw/2,y0+h1,q.z+sd/2],[q.x,y0,q.z],galv,'w',G);
+    if(R()<0.6){const bx=q.x+r(-sw/4,sw/4);owCap(Bc,bx,G(bx,q.z),q.z,1.8,0.45,0.45,0,0.02,jc(0x8b6f4c,0.08),'t',G);}}}
+  {const q=spot(2.6,2.6,1.2);if(q){const hs=r(1.6,2.2),tr=r(0.85,1.05),th=r(1.5,1.9);owTankStand(Bc,q.x,G(q.x,q.z),q.z,pick([0,Math.PI/2,Math.PI,-Math.PI/2]),hs,tr,th,pick([0x2a2c2e,0x9aa0a4,0xd8d5cc,0x3c5a40]),true,G);
+    SH.push({k:'l',x:q.x,z:q.z,w:2*tr,h0:hs+tr*0.5,h1:hs+th+0.3-tr*0.5});for(const [u,w] of [[-1,-1],[1,-1],[1,1],[-1,1]])SH.push({k:'l',x:q.x+u*tr*0.85,z:q.z+w*tr*0.85,w:0.1,h0:0,h1:hs});}}
+  {const q=spot(2.8,1.9,1.0);if(q){const rot=pick([0,Math.PI]),c2=Math.cos(rot),s2=Math.sin(rot),y=G(q.x,q.z),gc=jc(pick([0xc8a22a,0x5d6d49,0xd6d3c8,0x9c3a2a]),0.05);
+    for(const s of [-0.38,0.38])owCap(Bc,q.x-0.35*c2+s2*s,y-0.05,q.z+0.35*s2+c2*s,1.95,0.17,0.1,rot,0,steel,'t',G);
+    const gx=q.x-0.35*c2,gz=q.z+0.35*s2;owCap(Bg,gx,y+0.12,gz,1.75,0.95,0.95,rot,0.06,gc,'t',G);shP(owRect(gx,gz,1.75,0.95,rot),0,1.07);
+    for(const s of [-1,1])for(const yy of [0.4,0.55,0.7]){owCap(Bg,gx+s2*s*0.48,y+0.12+yy,gz+c2*s*0.48,0.8,0.045,0.02,rot,0,gc.clone().multiplyScalar(0.55),'t',G);}
+    owQuad(Bg,[gx-c2*0.876-s2*0.3,y+0.35,gz+s2*0.876-c2*0.3],[gx-c2*0.876+s2*0.3,y+0.35,gz+s2*0.876+c2*0.3],[gx-c2*0.876+s2*0.3,y+0.85,gz+s2*0.876+c2*0.3],[gx-c2*0.876-s2*0.3,y+0.85,gz+s2*0.876-c2*0.3],[gx,y+0.5,gz],dark,'t',G);
+    const sx=gx+c2*0.55,sz=gz-s2*0.55,stk=new THREE.Color(0xe2e2e0);SH.push({k:'l',x:sx,z:sz,w:0.12,h0:1,h1:1.85});SH.push({k:'l',x:q.x+0.95*c2,z:q.z-0.95*s2,w:0.58,h0:0.3,h1:0.6});owPut(Bg,new THREE.CylinderGeometry(0.06,0.06,0.75,8,1,true),owMx(sx,y+1.4,sz),stk,'t',G);
+    owPut(Bg,new THREE.CylinderGeometry(0.075,0.075,0.05,8,1,true),owMx(sx,y+1.1,sz),stk,'t',G);owPut(Bg,new THREE.CylinderGeometry(0.0,0.1,0.08,8,1,false),owMx(sx,y+1.83,sz,0.25,0,0),stk,'t',G);
+    owDrum(Bc,q.x+0.95*c2,y,q.z-0.95*s2,jc(pick([0x7d2c22,0x31507f]),0.06),0,G);paint.oil.push([gx,gz,1.4]);}}
+  {const q=spot(2.2,2.2,0.8);if(q){const n=3+Math.floor(R()*3),cols=[0x31507f,0x7d2c22,0x3c5934,0x7f8081,0x6b4a2b];
+    for(let i=0;i<n;i++){const a=i/n*Math.PI*2+r(-0.2,0.2),rr=i===0?0:0.62,x=q.x+Math.cos(a)*rr,z=q.z+Math.sin(a)*rr,cl=jc(pick(cols),0.08);
+      if(i===n-1&&n>=4){const dx=q.x+r(-0.4,0.4),ry=r(0,3);owDrum(Bc,dx,G(q.x,q.z),q.z+1.15,cl,1,G,ry);shP(owRect(dx,q.z+1.15,0.86,0.58,ry),0,0.58);}else{owDrum(Bc,x,G(x,z),z,cl,0,G);SH.push({k:'l',x:x,z:z,w:0.58,h0:0.29,h1:0.6});}}}}
+  if(R()<0.5){const q=spot(2.6,1.8,0.8);if(q){const L=r(1.6,2.2),y=G(q.x,q.z);let k=0;shP(owRect(q.x,q.z,L,0.95,0),0,0.62);
+    for(const [n,row] of [[4,0],[3,1],[2,2]])for(let i=0;i<n;i++){const rr=r(0.085,0.12),z=q.z+(i-(n-1)/2)*0.23,cl=jc(0x857360,0.12),end=new THREE.Color(0xc4a57c);
+      owPut(Bc,new THREE.CylinderGeometry(rr,rr,L+r(-0.2,0.2),6,1,false),owMx(q.x+r(-0.1,0.1),y+0.1+row*0.2,z,0,0,Math.PI/2),(x,yy,zz,nx)=>{_owK.copy(Math.abs(nx)>0.7?end:cl);},'t',G);k++;}}}
+  else{const q=spot(2.4,2.2,0.8);if(q){const y=G(q.x,q.z),wd=jc(pick([0x9b7c52,0x56603f]),0.05);shP(owRect(q.x,q.z,2,2,0),0,0.95);shP(owRect(q.x-0.45,q.z-0.45,0.8,0.8,0),0,1.75);
+    for(const [dx,dz,s,yy] of [[-0.5,-0.5,1.0,0],[0.55,-0.45,0.9,0],[-0.45,0.55,0.95,0],[-0.45,-0.45,0.8,1.0]]){owCap(Bc,q.x+dx,y+yy-0.02,q.z+dz,s,s*0.95,s,r(-0.15,0.15),0.025,wd.clone().multiplyScalar(r(0.85,1.08)),'t',G);}}}
+  // ---- vegetation: mesquite (short trunks, three to five crown lobes, darker under), scrub out to 120 m, rocks ----
+  const tree=(x,z,cr)=>{const y=G(x,z),yb=Gb(x,z)-0.3,hc=r(2.3,3.3),base=new THREE.Color(pick([0x5f6d38,0x6a7442,0x58663a])),trunk=new THREE.Color(0x4f3f2f);
+    for(let i=0,n=2+Math.floor(R()*2);i<n;i++){const a=r(0.25,0.55),ph=i/n*Math.PI*2+r(-0.4,0.4),L=(y+hc*0.85-yb)/Math.cos(a),cg=new THREE.CylinderGeometry(0.07,0.13,L,5,1,true);cg.translate(0,L/2,0);
+      owPut(Bv,cg,owMx(x,yb,z,a*Math.cos(ph),0,a*Math.sin(ph)),trunk,'t',G);SH.push({k:'l',x:x,z:z,w:0.22,h0:0,h1:hc*0.8});}
+    for(let i=0,n=3+Math.floor(R()*3);i<n;i++){const a=i/n*Math.PI*2+r(-0.3,0.3),d=i===0?0:cr*r(0.35,0.6),sg=new THREE.SphereGeometry(1,7,5),P=sg.attributes.position,h=R()*10;
+      for(let k=0;k<P.count;k++){const f=1+(owHash(P.getX(k)*3+h,P.getY(k)*3,P.getZ(k)*3)-0.5)*0.36;P.setXYZ(k,P.getX(k)*f,P.getY(k)*f,P.getZ(k)*f);}sg.computeVertexNormals();
+      const tint=base.clone().multiplyScalar(r(0.85,1.12)),rx=cr*r(0.45,0.65),ly=y+hc+(i===0?0.35:r(-0.25,0.25)),ry=r(0.75,1.05),rz=rx*r(0.8,1.2);
+      SH.push({k:'e',x:x+Math.cos(a)*d,z:z+Math.sin(a)*d,rx:rx*0.9,rz:rz*0.9,ry:ry,h:ly-y});
+      owPut(Bv,sg,owMx(x+Math.cos(a)*d,ly,z+Math.sin(a)*d,0,r(0,3),0,rx,ry,rz),(px,py,pz,nx,ny,nz,k)=>{k.copy(tint).multiplyScalar((0.5+0.5*clamp(ny*0.7+0.5,0,1))*(0.88+owHash(px,py,pz)*0.24));},'t',G);}};
+  const bush=(x,z,s)=>{const y=G(x,z),base=new THREE.Color(pick([0x6c7246,0x7d8158,0x8f8f72,0x5e6a3c]));
+    for(let i=0,n=1+Math.floor(R()*2);i<n;i++){const sg=new THREE.SphereGeometry(1,6,4),P=sg.attributes.position,h=R()*10;
+      for(let k=0;k<P.count;k++){const f=1+(owHash(P.getX(k)*3+h,P.getY(k)*3,P.getZ(k)*3)-0.5)*0.4;P.setXYZ(k,P.getX(k)*f,P.getY(k)*f,P.getZ(k)*f);}sg.computeVertexNormals();
+      const rr=s*r(0.6,1),tint=base.clone().multiplyScalar(r(0.85,1.1));SH.push({k:'e',x:x,z:z,rx:rr*0.85,rz:rr*0.85,ry:rr*0.3,h:rr*0.3});
+      owPut(Bv,sg,owMx(x+(i?r(-0.6,0.6)*s:0),y+rr*0.45-0.1,z+(i?r(-0.6,0.6)*s:0),0,r(0,3),0,rr,rr*r(0.55,0.75),rr*r(0.8,1.2)),(px,py,pz,nx,ny,nz,k)=>{k.copy(tint).multiplyScalar((0.55+0.45*clamp(ny*0.7+0.5,0,1))*(0.88+owHash(px,py,pz)*0.24));},'t',G);}};
+  const rock=(x,z,s)=>{const y=G(x,z),yb=Gb(x,z),ig=new THREE.IcosahedronGeometry(1,0),P=ig.attributes.position,h=R()*10,cl=jc(pick([0x8e806d,0x7a6c5c,0x9a8f80,0x6d5f50]),0.06);
+    for(let k=0;k<P.count;k++){const f=1+(owHash(Math.round(P.getX(k)*100)+h,Math.round(P.getY(k)*100),Math.round(P.getZ(k)*100))-0.5)*0.5;P.setXYZ(k,P.getX(k)*f,P.getY(k)*f,P.getZ(k)*f);}ig.computeVertexNormals();
+    const sy=s*r(0.45,0.7)+(y-yb)*0.5;owPut(Bv,ig,owMx(x,yb+sy*0.45,z,r(0,0.5),r(0,3),0,s,sy,s*r(0.8,1.2)),cl,'t',G);};
+  const nt=2+Math.floor(R()*3);let ti=0;
+  for(;ti<Math.min(nt,R()<0.5?1:2);ti++){const cr=r(2.4,3.2),q=spot(2.2*cr,2.2*cr,0.3);if(q)tree(q.x,q.z,cr);}
+  for(let k=0;k<80&&ti<nt;k++){const cr=r(2.6,3.6),[x,z]=outPt(R()*Math.PI*2,r(3.5,10)+cr);
+    if(z>hd&&Math.abs(x)<12)continue;if(!offTrack(x,z,cr+3))continue;tree(x,z,cr);ti++;}
+  for(let i=0,k=0,n=6+Math.floor(R()*5);i<n&&k<200;k++){const [x,z]=outPt(R()*Math.PI*2,3+117*Math.pow(R(),1.5));
+    if(!offTrack(x,z,4))continue;bush(x,z,r(0.6,1.1));i++;}
+  for(let i=0,n=10+Math.floor(R()*7);i<n;i++){if(i<n*0.35){const s=r(0.18,0.35),side=Math.floor(R()*4),t=r(-0.9,0.9),x=side<2?t*hw:(side===2?1:-1)*(hw-0.6),z=side<2?(side?1:-1)*(hd-0.6):t*hd;
+      if(Math.abs(x)<4&&z>0)continue;if(free(x-s,z-s,x+s,z+s,0.1))rock(x,z,s);}
+    else{const [x,z]=outPt(R()*Math.PI*2,r(2,40));if(offTrack(x,z,3))rock(x,z,r(0.25,0.7));}}
+  // ---- assemble ----
+  const g=new THREE.Group(),det=[];g.name='owCompound';
+  const add=(B,mat,key)=>{const m=owMesh(B,mat,key);if(m){g.add(m);det.push(m);}return m;};
+  add(Bw,M.wall,'walls');add(Br,M.top,'roofs');add(Bt,M.tin,'tin');const mc=add(Bc,M.top,'clutter');add(Bg,M.top,'gen');add(Bv,M.top,'veg');add(Bh,M.top,'veh');add(Bb,M.top,'bay');
+  const lod=owMesh(Bl,M.wall,'lod');lod.visible=false;g.add(lod);
+  // the yard decal: an 8 by 6 grid inside the wall and an apron 26 m round it (the shadows only, never in the IR view:
+  // transparent and unheated, irTag skips it), on the ground 10 cm up, under the track (12 cm); one canvas for both
+  // (the warm sample's material is kept for good: a disposed material releases its program, and each game's own,
+  // made and disposed with it, then finds it linked)
+  const Mg=26,TW=832,TH=Math.round(TW*(D+2*Mg)/(W+2*Mg)/4)*4,Y={W:W,D:D,Mg:Mg,P:paint,S:SH,ang:ang,seed:Math.floor(R()*4294967296)};
+  const cvS=document.createElement('canvas'),cvN=document.createElement('canvas');cvS.width=cvN.width=TW;cvS.height=cvN.height=TH;owYardDraw(cvN,Y,0);
+  // the lamps' pools: a small canvas of the same layout, the yard's emissive map (its emissive colour 0 by day, warm at
+  // night: owCmpSun), so the ground under the gate light and the door lamp glows faintly in the dark
+  const cvP=document.createElement('canvas');cvP.width=128;cvP.height=Math.max(4,Math.round(128*TH/TW));
+  {const x=cvP.getContext('2d'),w=cvP.width,h=cvP.height,X=v=>(v+hw+Mg)/(W+2*Mg)*w,Z=v=>(hd+Mg-v)/(D+2*Mg)*h,S=w/(W+2*Mg);x.fillStyle='#000';x.fillRect(0,0,w,h);
+    for(const [q,r] of [[paint.lamp,8],[paint.lampD,3.5]]){if(!q)continue;const g=x.createRadialGradient(X(q[0]),Z(q[1]),0,X(q[0]),Z(q[1]),r*S);g.addColorStop(0,'#fff');g.addColorStop(0.4,'rgba(255,255,255,0.5)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,w,h);}}
+  const tS=new THREE.CanvasTexture(cvS),tN=new THREE.CanvasTexture(cvN),tP=new THREE.CanvasTexture(cvP);for(const t of [tS,tN,tP]){t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;t.anisotropy=MAXANI;}
+  const ym=o.warm&&OW_M.yardW||groundDecalMat(new THREE.MeshLambertMaterial({vertexColors:true,map:tS,emissiveMap:tP,emissive:0x000000,transparent:true}));if(o.warm){OW_M.yardW=ym;ym.map=tS;ym.emissiveMap=tP;}
+  let yard,apron;
+  {const xs=[-hw-Mg,-hw-Mg/2],zs=[-hd-Mg,-hd-Mg/2];for(let i=0;i<8;i++)xs.push(-hw+W*i/7);for(let k=0;k<6;k++)zs.push(-hd+D*k/5);xs.push(hw+Mg/2,hw+Mg);zs.push(hd+Mg/2,hd+Mg);
+    const mk=(inner,name)=>{const pos=[],uv=[],cl=[],idx=[],NX=xs.length;
+      for(const z of zs)for(const x of xs){pos.push(x,G(x,z)+0.1,z);uv.push((x+hw+Mg)/(W+2*Mg),(z+hd+Mg)/(D+2*Mg));cl.push(1,1,1);}
+      for(let k=0;k+1<zs.length;k++)for(let i=0;i+1<NX;i++){const In=xs[i]>=-hw-1e-6&&xs[i+1]<=hw+1e-6&&zs[k]>=-hd-1e-6&&zs[k+1]<=hd+1e-6;if(In!==inner)continue;
+        const a=k*NX+i,b=a+1,c2=a+NX,d=c2+1;idx.push(a,c2,b,b,c2,d);}
+      const yg=new THREE.BufferGeometry();yg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));yg.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));yg.setAttribute('color',new THREE.Float32BufferAttribute(cl,3));
+      yg.setIndex(idx);yg.computeVertexNormals();yg.computeBoundingSphere();const m=new THREE.Mesh(yg,ym);m.name=name;m.renderOrder=-1;g.add(m);return m;};
+    yard=mk(true,'ow_yard');yard.userData.ow='yard';apron=mk(false,'ow_apron');}
+  const lights=owLights(LP);g.add(lights);
+  g.position.set(c.x,gh0,c.z);g.rotation.y=ang;
+  const wb=bl[0],tris=det.reduce((s,m)=>s+m.geometry.index.count/3,0)+yard.geometry.index.count/3+apron.geometry.index.count/3;
+  g.userData={det:det,lod:lod,lights:lights,full:true,yard:yard,apron:apron,ym:ym,cvS:cvS,tS:tS,tN:tN,Y:Y,plain:false,k:0,W:W,D:D,nb:bl.length,tris:tris,lodTris:lod.geometry.index.count/3,
+    bld:{x:wb.x,z:wb.z,y:wb.yf+wb.H/2,H:wb.H},spur:spur,
+    gate:mc?{attr:mc.geometry.attributes.position,nrm:mc.geometry.attributes.normal,leaves:leaves,t:0}:null,
+    onClear:()=>{const i=CSM.stat.indexOf(g);if(i>=0)CSM.stat.splice(i,1);const j=PFX_SRC.indexOf(lights);if(j>=0)PFX_SRC.splice(j,1);tS.dispose();tN.dispose();tP.dispose();if(!o.warm)ym.dispose();}};
+  if(g.userData.gate)owGateSet(g.userData.gate,0);
+  owCmpHeat(g);owCmpSun(g);return g;}
+// a 55 gallon drum: its lid and top chime, two rolling hoops, a bung; standing, or lying (rotated ry about the up axis)
+function owDrum(B,x,y,z,col,lying,G,ry){const r=0.285,h=0.86,rim=col.clone().multiplyScalar(0.8);
+  const put=(geo,yy,c)=>{if(lying){geo.translate(0,yy-h/2,0);owPut(B,geo,owMx(x,y+r+0.01,z,0,ry||0,Math.PI/2),c,'t',G);}else{geo.translate(0,yy,0);owPut(B,geo,owMx(x,y-0.02,z),c,'t',G);}};
+  put(new THREE.CylinderGeometry(r,r,h,10,1,true),h/2,col);const lid=new THREE.CircleGeometry(r,10);lid.rotateX(-Math.PI/2);put(lid,h,col);
+  put(new THREE.CylinderGeometry(r+0.012,r+0.012,0.035,10,1,true),h-0.01,rim);   // the top chime (the bottom one sits in the dirt)
+  for(const yy of [h*0.33,h*0.66])put(new THREE.CylinderGeometry(r+0.01,r+0.01,0.03,10,1,true),yy,rim);
+  put(new THREE.CylinderGeometry(0.03,0.03,0.025,5,1,true),h+0.01,rim);}
+// a water tank on a stand: four legs, braces, the deck, the tank with two ribs, a domed top and a lid; with the ladder
+// and the hose when it stands in the yard (G given: the hose runs down to the ground)
+function owTankStand(B,x,y,z,rot,hs,tr,th,tc,yard,G){const c=Math.cos(rot),s=Math.sin(rot),T=(u,w)=>[x+u*c+w*s,z-u*s+w*c],a=tr*0.85,st=new THREE.Color(0x6f7276),col=new THREE.Color(tc),rib=col.clone().multiplyScalar(0.82);
+  const gg=G||(()=>y);
+  for(const [u,w] of [[-a,-a],[a,-a],[a,a],[-a,a]]){const q=T(u,w),yb=(G?gg(q[0],q[1]):y)-0.2;owCap(B,q[0],yb,q[1],0.08,y+hs-yb,0.08,rot,0,st,'t',gg);}
+  for(const [u,w,rr] of [[0,-a,0],[0,a,0],[-a,0,Math.PI/2],[a,0,Math.PI/2]]){const q=T(u,w);owCap(B,q[0],y+hs*0.45,q[1],2*a,0.06,0.05,rot+rr,0,st,'t',gg);}
+  owCap(B,x,y+hs,z,2*a+0.3,0.08,2*a+0.3,rot,0.02,st,'t',gg);
+  const yt=y+hs+0.08;owPut(B,new THREE.CylinderGeometry(tr,tr,th,14,1,true),owMx(x,yt+th/2,z),col,'t',gg);
+  owPut(B,new THREE.CylinderGeometry(tr*0.25,tr,0.24,14,1,true),owMx(x,yt+th+0.12,z),col,'t',gg);
+  owPut(B,new THREE.CylinderGeometry(tr*0.25,tr*0.25,0.06,8,1,false),owMx(x,yt+th+0.27,z),rib,'t',gg);
+  for(const k of [0.33,0.66])owPut(B,new THREE.CylinderGeometry(tr+0.012,tr+0.012,0.05,14,1,true),owMx(x,yt+th*k,z),rib,'t',gg);
+  if(!yard)return;
+  const lr=T(0,a+0.25),top=yt+th+0.1;for(const k of [-0.2,0.2]){const q=T(k,a+0.25);owCap(B,q[0],gg(q[0],q[1])-0.05,q[1],0.04,top-gg(q[0],q[1])+0.05,0.04,rot,0,st,'t',gg);}
+  for(let yy=gg(lr[0],lr[1])+0.35;yy<top;yy+=0.35)owCap(B,lr[0],yy,lr[1],0.4,0.03,0.03,rot,0,st,'t',gg);
+  const h0=T(a*0.5,-a*0.5),h1=T(a+0.5,-a-0.8),h2=T(a+2.5,-a-2.2),pts=[new THREE.Vector3(h0[0],yt,h0[1]),new THREE.Vector3(h0[0],yt-0.4,h0[1]),new THREE.Vector3(h1[0],gg(h1[0],h1[1])+0.06,h1[1]),new THREE.Vector3(h2[0],gg(h2[0],h2[1])+0.05,h2[1])];
+  owPut(B,new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),12,0.035,4,false),owMx(0,0,0),new THREE.Color(0x2f3a30),'t',gg);}
+// the gate's leaves at t (0 as built: one half open; 1 open for the pickup, over 2.5 s from its start, owCmpTick)
+function owGateSet(G,t){const e=t*t*(3-2*t),P=G.attr.array,N=G.nrm.array;
+  for(const L of G.leaves){const a=L.a0+(L.a1-L.a0)*e,c=Math.cos(a),s=Math.sin(a);
+    for(let i=L.v0;i<L.v1;i++){const o=(i-L.v0)*3,x=L.p[o]-L.hx,z=L.p[o+2]-L.hz,nx=L.n[o],nz=L.n[o+2];
+      P[i*3]=L.hx+x*c+z*s;P[i*3+2]=L.hz-x*s+z*c;N[i*3]=nx*c+nz*s;N[i*3+2]=-nx*s+nz*c;}}
+  G.attr.needsUpdate=true;G.nrm.needsUpdate=true;}
+// every frame of the tasking: the detail or the simple set by the camera's distance (3.5 km, 200 m of hysteresis; the
+// ball view at MFOV or narrower keeps the detail out to 9 km, the compound fills its picture there and the station
+// stage allows 4 km), the lights with the time of day, the gate opening as the pickup starts off
+function owCmpTick(d,dt){const g=d.cmp;if(!g)return;const U=g.userData,cp=camera.position,p=g.position;
+  const rr=Math.hypot(cp.x-p.x,cp.y-p.y,cp.z-p.z),zm=camMode===2&&SENSOR.zoom>=2&&rr<9000,full=zm||(U.full?rr<3600:rr<3400);
+  if(full!==U.full){U.full=full;for(const m of U.det)m.visible=full;U.lod.visible=!full;}
+  const lv=!!TOD.night;if(U.lights.visible!==lv)U.lights.visible=lv;
+  // the shadowless yard canvas while the shadow cascades reach the compound (mid, within 1.5 km of the camera, by day)
+  // and under the simple set (its painted shadows would be of parts no longer drawn)
+  const plain=!!(CSM.n&&(CSM.act&2)&&rr<1400&&U.k>0)||!full;if(plain!==U.plain){U.plain=plain;U.ym.map=plain?U.tN:U.tS;U.apron.visible=U.k>0&&!plain;}
+  const G=U.gate;if(G&&d.veh&&(d.veh.moving||d.veh.stopped)&&G.t<1){G.t=Math.min(1,G.t+dt/2.5);owGateSet(G,G.t);}}
+TOD_HOOKS.push(()=>{const d=TASK.on&&TASK.id==='overwatch'?TASK.d:null;if(d&&d.cmp){owCmpHeat(d.cmp);owCmpSun(d.cmp);d.cmp.userData.lights.visible=!!TOD.night;}});
+// the precompile queue's 'compound' job: a sample (fixed seed, every material and part kind the real one uses) in the
+// scene for one compile and draw, then gone
+function owWarm(){const g=owCompound({x:OW_FALLBACK.x,z:OW_FALLBACK.z},0.4,tqRng(4242),{warm:1});
+  g.traverse(m=>{m.visible=true;});scene.add(g);
+  try{warmObj(g);}finally{scene.remove(g);g.userData.onClear();g.traverse(m=>{if((m.isMesh||m.isPoints)&&m.geometry)m.geometry.dispose();});}}
 // the pickup's road: out of the gate, then a dirt track that follows the ground to the real road at e (owRoadPt): steps
 // of 120 to 200 m, each wandering up to 25 degrees, bent toward the gentler, lower ground (heights 60 m ahead, left and
 // right), never steeper than 12 percent, never back past the compound, ending exactly on the road; smoothed once
@@ -17701,6 +18139,7 @@ function owTrackLight(m){if(!m)return;_owL.copy(hemi.color).multiplyScalar(hemi.
   _owS.copy(sun.position).normalize();_owL.r+=sun.color.r*si*Math.max(0,_owS.y);_owL.g+=sun.color.g*si*Math.max(0,_owS.y);_owL.b+=sun.color.b*si*Math.max(0,_owS.y);
   m.material.color.copy(OW_TRACK_COL).multiply(_owL);}
 function owVehTick(d,dt){const v=d.veh,P=d.route;if(!v.moving)return;
+  if(!v.hot){v.hot=1;v.g.traverse(o=>{const p=o.userData.part;if(p==='hood')o.userData.heat=0.85;else if(p==='exh')o.userData.heat=0.95;});irDirty=true;}   // overwatch2 item 2: running
   let rem=d.vk*dt;
   while(rem>0&&v.i<P.length-1){const a=P[v.i],b=P[v.i+1],L=Math.hypot(b.x-a.x,b.z-a.z)||1,left=L*(1-v.f),step=Math.min(rem,left);v.f+=step/L;rem-=step;if(v.f>=1-1e-6){v.i++;v.f=0;}}
   if(v.i>=P.length-1){v.moving=false;v.stopped=true;}
@@ -17727,15 +18166,18 @@ TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limi
     sit:'A compound '+OW_TERR[d.terrain]+', '+tqDs(d.dist)+' '+tqDir(d.brg)+' of Luke. Keep the sensor on its white building from 3,000 ft. A vehicle is expected to leave: call it the moment it moves, follow it without overflying, then talk the ground team onto it.',
     facts:[['PAR',tqClock(d.par)],['ON STATION',tqClock(d.stPar)],['WIND',tqWind(d.wdir,d.wkt)],['TARGET',tqDs(d.dist)+' '+tqDir(d.brg).replace('north','N').replace('south','S').replace('east','E').replace('west','W').replace('-','')]]};},
   spawn(d){
-    const g=tqAdd(owCompound(d.c,d.ang)),gh=groundHeight(d.c.x,d.c.z);
-    // the white building's centre, in the world (local -14,-10 turned by ang)
-    const ca=Math.cos(d.ang),sa=Math.sin(d.ang),bx=d.c.x+(-14)*ca+(-10)*sa,bz=d.c.z-(-14)*sa+(-10)*ca;
-    d.bld={x:bx,y:gh+2.6,z:bz,name:'the white building',dead:false,task:1};
+    // overwatch2 item 2: the compound from its own stream of the seed (the same seed, the same compound), a static
+    // shadow caster (the mid cascade's list, CSM.stat: taken out again by tqClear, onClear)
+    const g=tqAdd(owCompound(d.c,d.ang,tqRng((d.seed^0x5bd1e995)>>>0),{route:d.route})),gh=groundHeight(d.c.x,d.c.z),U=g.userData;d.cmp=g;
+    csmStatic(g);g.traverse(m=>{if(m.userData.ow==='yard')m.castShadow=false;});
+    // the white building's centre, in the world (its local centre turned by ang)
+    const ca=Math.cos(d.ang),sa=Math.sin(d.ang),bx=d.c.x+U.bld.x*ca+U.bld.z*sa,bz=d.c.z-U.bld.x*sa+U.bld.z*ca;
+    d.bld={x:bx,y:gh+U.bld.y,z:bz,aimH:U.bld.H/2,name:'the white building',dead:false,task:1};   // aimH: the ball aims at its roof's centre
     const pk=tqAdd(owPickup()),p0=d.route[0];
     d.veh={g:pk,x:p0.x,y:groundHeight(p0.x,p0.z),z:p0.z,h:Math.atan2(d.route[1].x-p0.x,-(d.route[1].z-p0.z)),i:0,f:0,moving:false,stopped:false,name:'the white pickup',dead:false,task:1};
     pk.position.set(p0.x,d.veh.y+0.06,p0.z);pk.rotation.y=-d.veh.h;
-    // the dirt track, with its spur inside the gate to the parked car (local 4,1)
-    {const t1=performance.now(),sp={x:d.c.x+4*ca+1*sa,z:d.c.z-4*sa+1*ca};d.track=tqAdd(owTrack([sp].concat(d.route),d.c,gh+0.05,d.ang));d.ms.track=+(performance.now()-t1).toFixed(1);}
+    // the dirt track, with its spur inside the gate to the parked vehicles (U.spur), draped on the yard as outside
+    {const t1=performance.now(),sp={x:d.c.x+U.spur.x*ca+U.spur.z*sa,z:d.c.z-U.spur.x*sa+U.spur.z*ca};d.track=tqAdd(owTrack([sp].concat(d.route),d.c,null,d.ang));d.ms.track=+(performance.now()-t1).toFixed(1);}
     TASK.tgts.push(d.bld,d.veh);TASK.sens=true;irDirty=true;
     d.tgt=d.bld;tqDest(d.c.x,d.c.z,'Compound','CMPD');
   },
@@ -17746,7 +18188,7 @@ TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limi
     const t=d.tgt===d.veh?d.veh:d.c;initAudio();if(AC.retract)st.gearDown=false;st.flapIdx=0;
     apEngage(st,'orbit',{cx:t.x,cz:t.z,r:OW_R,y:Math.max(st.pos.y-GEAR,(OW_ALT-FIELD_FT)/M2FT),v:AC.vcruise,dir:1});st.ap.tk=1;st.ap.sensor=true;
     toast((d.tgt===d.veh?'Orbit following the pickup':'Orbit: the compound')+', 3,000 ft. AUTO again: your airplane',3);return true;},
-  always(d,dt){owVehTick(d,dt);owTrackLight(d.track);
+  always(d,dt){owVehTick(d,dt);owTrackLight(d.track);owCmpTick(d,dt);
     if(DEST&&DEST.task&&d.tgt===d.veh){DEST.x=d.veh.x;DEST.z=d.veh.z;}
     // the orbit follows the pickup while the ball is locked on it (the crew's track), at a truck's pace
     if(st.ap&&st.ap.mode==='orbit'&&d.tgt===d.veh&&(SENSOR.tgt===d.veh||st.ap.tk)){const k=Math.min(1,dt*0.6);st.ap.cx+=(d.veh.x-st.ap.cx)*k;st.ap.cz+=(d.veh.z-st.ap.cz)*k;}
@@ -21474,7 +21916,7 @@ function sensorFovName(){const z=clamp(SENSOR.zoom,0,MTSB_FOV.length-1),L=MTSB_F
 // aircraft lights) live on layer 1 and go in a second pass without the override, as
 // grey hot points. Black hot is the same with the grey inverted (uInvert), the points
 // then darken the frame through multiply blending. No render target, no extra pass.
-const IR={pass:false,t:0,ic:[]};let irDirty=true;
+const IR={pass:false,t:0,ic:[],shade:0.14};let irDirty=true;
 const IR_BG=new THREE.Color(),_irFog=new THREE.Color(),_irSun=new V3();
 const IR_WHITE=new THREE.DataTexture(new Uint8Array([255,255,255,255]),1,1,THREE.RGBAFormat);IR_WHITE.needsUpdate=true;
 const IR_MAT=new THREE.ShaderMaterial({
@@ -21533,6 +21975,7 @@ function irHook(){
   if(!IR.pass)return;
   const u=IR_MAT.uniforms,d=this.userData,m=Array.isArray(this.material)?this.material[0]:this.material;   // a multi material mesh: its first (graphics item 8)
   u.uHeat.value=d.irHeat;u.uVar.value=d.irVar;u.uSprite.value=this.isSprite?1:0;
+  u.uShade.value=d.irShade!=null?d.irShade:IR.shade;   // overwatch2 item 2: an object's own face shading (the compound's stucco after sunset)
   u.uAlpha.value=d.irSkip?0:this.isSprite?m.opacity:1;
   IR_MAT.depthWrite=!d.irNoDepth;   // runways item 3: the runway pavement and paint lie in draw order, not by depth (rwPaint)
   const map=!this.isSprite&&m&&m.map;
@@ -21577,6 +22020,7 @@ function renderIR(){
   u.uInvert.value=inv?1:0;u.uTime.value=(performance.now()/1000)%97;
   u.uAmb.value=night?0.06:TOD.id==='sunset'||TOD.hb?0.1:0.13;u.uShade.value=night?0.05:0.14;u.uHot.value=0.8;
   if(SENSOR.mode==='nir'){u.uInvert.value=0;u.uAmb.value=0.3;u.uShade.value=0.2;u.uHot.value=0.12;}   // sensor item 3: NIR at night
+  IR.shade=u.uShade.value;
   camera.updateMatrixWorld();
   _irSun.copy(sun.position).normalize().transformDirection(camera.matrixWorldInverse);u.uSun.value.copy(_irSun);
   // the sky is cold; the haze fades to it
@@ -22069,6 +22513,8 @@ function preJobs(){
     // runways item 5: every airport's fine detail (signs, windsocks, jet bridges, vehicles, stand and edge paint) is hidden
     // beyond 3 km; its programs linked here with it all shown, so none links when a field's detail first comes on in flight
     ['airport detail',()=>preAt(()=>{const v=APT_ENV.map(E=>E.fine.visible);APT_ENV.forEach(E=>{E.fine.visible=true;});try{r.compile(scene,camera);}finally{APT_ENV.forEach((E,i)=>{E.fine.visible=v[i];});}})],
+    // overwatch2 item 2: the OVERWATCH compound's materials (a sample built, compiled, drawn and disposed: owWarm)
+    ['compound',()=>preAt(()=>owWarm())],
     ['frame',()=>preAt(M=>preFrame(M,A))],
     ['post chain',()=>{if(!GFX.post)return;preAt(M=>{
       const bg=scene.background,lm=camera.layers.mask;scene.background=null;r.setRenderTarget(E);r.clear(true,true,false);
@@ -22329,7 +22775,7 @@ function sensorGateUpdate(dt){
   const g=GATE.el||(GATE.el=$('shGate')),S=SENSOR,W=hudSens.clientWidth,H=hudSens.clientHeight;
   const kind=S.tgt?'pt':S.track?'ar':S.geo?'geo':'';let show=false,x=0,y=0,w=0;
   if(kind){
-    if(kind==='pt')_gtP.set(S.tgt.x,S.tgt.y+1.5,S.tgt.z);else _gtP.copy(kind==='ar'?S.track:S.geo);
+    if(kind==='pt')_gtP.set(S.tgt.x,sensorAimY(S.tgt),S.tgt.z);else _gtP.copy(kind==='ar'?S.track:S.geo);
     const d=camera.position.distanceTo(_gtP);shProj(_gtP,_gtP);
     if(_gtP.z<1&&Math.abs(_gtP.x)<1.2&&Math.abs(_gtP.y)<1.2){show=true;x=(_gtP.x+1)/2*W;y=(1-_gtP.y)/2*H;
       const fr=sensorFovV()*Math.PI/180,m=kind==='pt'?5:30;
@@ -23844,10 +24290,11 @@ function targetUnder(p,maxD){
   for(const t of STRIKE.targets){if(t.dead)continue;
     const d=Math.hypot(t.x-p.x,t.z-p.z);if(d<bd){bd=d;best=t;}}
   // a tasking's targets (Overwatch's building and pickup): LOCK takes them a little wider, Easy wider still
-  // overwatch2: measured where the line of sight passes the target's height, not where it meets the ground behind it (from
-  // 4 km at 3,000 ft the ray over the white building lands 28 m beyond it, nearer the pickup by the gate)
+  // overwatch2: measured where the line of sight passes the target's aim point (sensorAimY, the height the slew and the
+  // track aim at), not where it meets the ground behind it (from 4 km at 3,000 ft the ray over the white building lands
+  // 28 m beyond it, nearer the pickup by the gate)
   const L=SENSOR.los,up=p===SENSOR.spot&&L&&L.y<-0.02;
-  if(TASK.on)for(const t of TASK.tgts){if(t.dead)continue;const k=up?(t.y-p.y)/L.y:0,d=Math.hypot(t.x-(p.x+L.x*k),t.z-(p.z+L.z*k)),lim=Math.max(maxD,rookie()?200:110);if(d<lim&&d<(best?bd:lim)){bd=d;best=t;}}
+  if(TASK.on)for(const t of TASK.tgts){if(t.dead)continue;const k=up?(sensorAimY(t)-p.y)/L.y:0,d=Math.hypot(t.x-(p.x+L.x*k),t.z-(p.z+L.z*k)),lim=Math.max(maxD,rookie()?200:110);if(d<lim&&d<(best?bd:lim)){bd=d;best=t;}}
   // sensor item 5: in free flight the freeway traffic can be point tracked (a car within 30 m, Easy 50 m)
   if(!best&&!STRIKE.active&&!TASK.on&&cars.length){const lim=rookie()?50:30;let bk=-1,bc=lim;
     for(let k=0;k<cars.length;k++){const c=cars[k],x=c.r===0?FWY_X+c.off:c.s,z=c.r===0?c.s:I10_Z+c.off,d=Math.hypot(x-p.x,z-p.z);if(d<bc){bc=d;bk=k;}}
@@ -23877,8 +24324,11 @@ function sensorTrackHere(){
 }
 // ball angles that put target t under the crosshair (SENSOR_AIM); false past the gimbal limits
 const SENSOR_AIM={az:0,el:0};
+// overwatch2 item 2: one aim point per target, used by the slew, the track, the gate and LOCK's miss (targetUnder):
+// 1.5 m over its spot, or t.aimH over it (the white building: its roof's centre)
+const sensorAimY=t=>t.y+(t.aimH!=null?t.aimH:1.5);
 function sensorAim(t){
-  sensorOrigin(_so);_gbr.set(t.x-_so.x,(t.y+1.5)-_so.y,t.z-_so.z).normalize();
+  sensorOrigin(_so);_gbr.set(t.x-_so.x,sensorAimY(t)-_so.y,t.z-_so.z).normalize();
   const g=gimAngles(_gbr,SENSOR.az,SENSOR.el,true);SENSOR_AIM.az=g.az;SENSOR_AIM.el=g.el;
   return !g.clamped;
 }
@@ -23946,7 +24396,7 @@ function sensorUpdate(dt){
   sensorOrigin(_so);
   if(!S.losOK||S.az!==S._az||S.el!==S._el||now-S._t>1500){sensorDir(S.az,S.el,S.los);S.losOK=true;}
   S._t=now;
-  const lock=S.tgt?_st2.set(S.tgt.x,S.tgt.y+1.5,S.tgt.z):S.track||S.geo;
+  const lock=S.tgt?_st2.set(S.tgt.x,sensorAimY(S.tgt),S.tgt.z):S.track||S.geo;
   if(S.cueT>0)S.cueT-=dt;
   if(S.lrfT>0)S.lrfT-=dt;
   if(!lock){S._lk=null;S.acq=false;}
@@ -23970,7 +24420,7 @@ function sensorUpdate(dt){
       S.az=wrapPi(S.az+da*k);S.el+=de*k;
       // arrived: a slew onto a target ends in a geo stare on its spot, so the inertially held ball stays on it as the
       // aircraft circles (slew to nose just stops)
-      if(Math.abs(da)<0.0015&&Math.abs(de)<0.0015){if(!g.nose){S.geo=new V3(g.x,g.y+1.5,g.z);S.maskT=0;}S.slewTo=null;}
+      if(Math.abs(da)<0.0015&&Math.abs(de)<0.0015){if(!g.nose){S.geo=new V3(g.x,sensorAimY(g),g.z);S.maskT=0;}S.slewTo=null;}
       sensorDir(S.az,S.el,S.los);}
   } else {
     // the thumb (slewSensor's command, this frame) and the finger on the picture (dragX/dragY, radians)
@@ -23992,7 +24442,7 @@ function sensorUpdate(dt){
   // masking: the airframe (ray test), or for a track the terrain between the ball and the target
   S.maskChk-=dt;if(S.maskChk<=0||!(dt>0)){S.maskChk=0.1;S.mask=sensorMasked(_so,_sd);}
   let masked=S.mask;
-  if(!masked&&(S.tgt||S.track)&&S.acq&&terrainBlocks(_so,S.tgt?_st2.set(S.tgt.x,S.tgt.y+1.5,S.tgt.z):S.track))masked=true;
+  if(!masked&&(S.tgt||S.track)&&S.acq&&terrainBlocks(_so,S.tgt?_st2.set(S.tgt.x,sensorAimY(S.tgt),S.tgt.z):S.track))masked=true;
   S.masked=masked;
   if(masked&&(S.tgt||S.track)&&S.acq){S.maskT+=dt;if(S.maskT>0.3)sensorBreak(rookie()?'Lost it, something is in the way':'TRACK LOST, MASKED','MASK');}
   else S.maskT=0;
