@@ -51,12 +51,14 @@ async def layout(pg, label):
     s = r['sub']
     others = [k for k in ('fox', 'gun', 'flr', 'view', 'hint', 'thr', 'card', 'seek', 'hud', 'pause', 'tk', 'map') if r[k]]
     hit = [k for k in others if ovl(s, r[k])] if s else ['no subtitle']
-    ok(f'{label}: the subtitle shows in the bottom strip on one line, overlapping nothing (buttons, VIEW, stick, throttle, card, seeker, gauges)',
-       s and r['subOn'] and not hit and s['h'] < 30 and s['y'] + s['h'] > r['H'] * 0.75 and r['seek'] is not None, {'hit': hit, 'sub': s, 'seek': r['seek']})
+    # schoolhud item 3: the calls are the top caption under pause (above 26% of the height), the wave card the bottom one
+    ok(f'{label}: the subtitle shows at the top under pause on one line, overlapping nothing (buttons, VIEW, stick, throttle, card, seeker, gauges)',
+       s and r['subOn'] and not hit and s['h'] < 30 and s['y'] + s['h'] <= r['H'] * 0.26 + 0.5 and r['seek'] is not None, {'hit': hit, 'sub': s, 'seek': r['seek']})
     c = r['card']
     bad = [k for k in ('hud', 'pause', 'tk', 'map') if r[k] and ovl(c, r[k])]
-    ok(f'{label}: the wave card is one line each (no wrap) and overlaps no gauge, pause or ticker',
-       c and not bad and r['cardT']['h'] < 24 and r['cardS']['h'] < 22, {'bad': bad, 'card': c, 'hud': r['hud'], 'tk': r['tk']})
+    one = r['W'] >= 700   # at 568 wide the card sits under the readouts (no room at the bottom) and may take two lines
+    ok(f'{label}: the wave card is ' + ('one line each (no wrap)' if one else 'two lines at most') + ' and overlaps no gauge, pause or ticker',
+       c and not bad and r['cardT']['h'] < (24 if one else 40) and (not r['cardS'] or r['cardS']['h'] < 22), {'bad': bad, 'card': c, 'hud': r['hud'], 'tk': r['tk']})
     f = r['flr']
     fb = [k for k in ('fox', 'gun', 'view', 'thr', 'sub') if r[k] and ovl(f, r[k])]
     ok(f'{label}: FLARES 60 pt or larger, on screen, overlapping nothing', f and min(f['w'], f['h']) >= 60 and not fb and f['x'] + f['w'] <= r['W'] and f['y'] + f['h'] <= r['H'], (f, fb))
@@ -66,7 +68,7 @@ async def layout(pg, label):
 ARROWS = """()=>{const u=document.getElementById('uiroot').getBoundingClientRect(),R=e=>{if(typeof e==='string')e=document.querySelector(e);if(!e)return null;const c=getComputedStyle(e);
     if(c.display==='none'||c.visibility==='hidden')return null;const r=e.getBoundingClientRect();return r.width<1?null:{x:r.x,y:r.y,w:r.width,h:r.height}};
   const f={};for(const [k,s] of [['map','#map'],['hud','#hud'],['pause','#bPause'],['card','#miss'],['tk','#tk'],['stick','#stickHint'],['view','#bCam'],['fox','#bFox'],['gun','#bGun'],['flr','#bFlr'],['thr','#thr']]){const r=R(s);if(r)f[k]=r;}
-  const sb=document.getElementById('dfSub').getBoundingClientRect();f.strip={x:sb.x,y:sb.bottom-28,w:sb.width,h:28};
+  const ms=document.getElementById('miss'),sb=(ms.parentNode.id==='cap'?ms:document.getElementById('stickHint')).getBoundingClientRect();f.strip={x:sb.x,y:sb.bottom-28,w:sb.width,h:28};   // schoolhud: the wave card's strip at the bottom
   const a=[...document.querySelectorAll('#dfHud .dfArr.on')].map(e=>({k:'g',b:R(e.firstChild),t:R(e.lastChild),txt:e.innerText}));
   const m=document.querySelector('#dfHud .dfMw.on');if(m)a.push({k:'r',b:R(m.firstChild),t:R(m.lastChild),txt:m.innerText,vis:m.classList.contains('vis')});
   return {f:f,a:a,W:innerWidth,H:innerHeight}}"""
@@ -95,7 +97,7 @@ async def arrows(pg, label):
     ok(f'{label}: three bandit arrows and the missile arrow, each with its label', len(g) == 3 and m and not m['vis'] and all(x['t'] for x in r['a']) and re.match(r"^(5|6|7) o'clock", m['txt'] or ''), [(x['k'], x['txt']) for x in r['a']])
     ok(f'{label}: no arrow or label on the gauges, map, pause, wave card, ticker, stick, VIEW, weapons, throttle or call strip', not hits, hits[:6])
     ok(f'{label}: no two arrows or labels overlap (the green one makes way for the red)', not pairs, pairs[:4])
-    ok(f'{label}: the missile at 6 o\'clock rides the bottom of the track, above the call strip', m and m['b']['y'] + m['b']['h'] / 2 > r['H'] * 0.6 and m['b']['y'] + m['b']['h'] <= r['f']['strip']['y'], m and m['b'])
+    ok(f'{label}: the missile at 6 o\'clock rides the bottom of the track, above the wave card\'s strip', m and m['b']['y'] + m['b']['h'] / 2 > r['H'] * 0.6 and m['b']['y'] + m['b']['h'] <= r['f']['strip']['y'], m and m['b'])
     return r
 
 async def main():
