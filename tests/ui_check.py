@@ -18,6 +18,7 @@ SIZES = [(667, 375)] if '-q' in sys.argv else [(667, 375), (844, 390), (932, 430
 if '--size' in sys.argv:   # one landscape size (and its portrait), e.g. --size 844x390
     SIZES = [tuple(int(v) for v in sys.argv[sys.argv.index('--size')+1].split('x'))]
 MIN_TAP = 44
+RING = "()=>document.getElementById('stickHint').getBoundingClientRect().right"   # schoolhud: the stick ring's right edge
 failures = []
 
 # "hit" marks what a thumb can press: those must never overlap each other.
@@ -30,7 +31,7 @@ GROUPS = [
     ('hudcard', '#hud .card',                      False),
     ('minimap', '#map',                            True),
     ('dest',    '#hDest:not([hidden])',            True),
-    ('radio',   '#atc.on, #lesson.lc.call #lesRow', False),   # fix2 item 11: the caption (#cap > #atc), or the lesson strip's call line
+    ('radio',   '#atc.on',                         False),   # schoolhud: the caption, top centre under pause
     ('mission', '#miss.on',                        False),
     ('lesson',  '#lesson.on',                      False),
     ('sixpack', '#sixpack.on',                     False),
@@ -38,6 +39,7 @@ GROUPS = [
     ('ticker',  '#tk.on .tkP',                     False),  # the now playing pill (its 44 pt button is in 'button')
     ('jump',    '#jumpLt.on',                      False),
     ('sidecfg', '#sideToast.on',                   False),  # the flap / gear / trim / autopilot readout beside the throttle
+    ('tcas',    '#tcas.on',                        False),
 ]
 COVERS = ('hudcard', 'radio', 'mission', 'sixpack', 'ticker', 'warn', 'jump', 'sidecfg')
 
@@ -69,6 +71,7 @@ def contains(a, b):
 
 async def audit(pg, label, w, h, only=None):
     els = await pg.evaluate(COLLECT, GROUPS)
+    ringR = await pg.evaluate(RING)
     hits = [e for e in els if e['hit']]
     bad, cover = [], []
     for i in range(len(hits)):
@@ -78,9 +81,12 @@ async def audit(pg, label, w, h, only=None):
             ox, oy = overlap(a, b)
             if ox > 0.5 and oy > 0.5:
                 bad.append(f"{a['kind']}:{a['id']} x {b['kind']}:{b['id']} ({ox:.0f}x{oy:.0f}px)")
+    tc, zone = any(e['kind'] == 'tcas' for e in els), next((e for e in els if e['kind'] == 'stick' and e['id'] == 'stickZone'), None)
     for c in [e for e in els if e['kind'] in COVERS]:
         for t in hits:
             if contains(c, t) or contains(t, c): continue
+            # schoolhud: the task card beside the TCAS panel starts at the stick ring's edge, over the touch zone only
+            if tc and zone and t is zone and c['kind'] in ('mission', 'jump', 'lesson') and c['x'] >= ringR - 0.5: continue
             ox, oy = overlap(c, t)
             if ox > 0.5 and oy > 0.5:
                 cover.append(f"{c['kind']}:{c['id']} over {t['kind']}:{t['id']} ({ox:.0f}x{oy:.0f}px)")
@@ -119,9 +125,10 @@ SETSAFE = """([t,l,r,b])=>{const s=document.documentElement.style;s.setProperty(
 TOPG = [
     ('pause',   '#bPause', 1), ('map', '#map', 1), ('hudcard', '#hud .card', 1), ('ap', '#hAp.on', 1),
     ('ticker',  '#tk.on', 1), ('music', '#tkCtl.on', 1), ('mission', '#miss.on', 1), ('jump', '#jumpLt.on', 1),
-    ('warn',    '#warn.on', 1), ('toast', '#toast.on', 1), ('radio', '#atc.on, #lesson.lc.call #lesRow', 1), ('badge', '.badge.on', 1), ('lesson', '#lesson.on', 1),
+    ('warn',    '#warn.on', 1), ('toast', '#toast.on', 1), ('radio', '#atc.on', 1), ('badge', '.badge.on', 1), ('lesson', '#lesson.on', 1),
     ('lookpad', '#lookPad', 1), ('dest', '#hDest:not([hidden])', 1),
     ('stick',   '#stickZone', 0), ('throttle', '#thr', 0), ('button', '#dock button', 0),
+    ('tcas', '#tcas.on', 0),
 ]
 # hold the sim for one frame, put up the warning, the jump light and a lesson on top of what
 # TOP put up (the frame loop would clear them), and measure everything in the same breath
@@ -146,9 +153,10 @@ TOPSET = """([g,o])=>{const K=window.__kgeu,$=id=>document.getElementById(id);K.
   return out;}"""
 TOPUNDO = """()=>{const u=window.__topUndo||[];for(let i=u.length-1;i>=0;i--){const [e,c,t]=u[i];e.className=c;if(t!==null)e.textContent=t;}window.__topUndo=null;window.__kgeu.stepFrame(0,true);}"""
 
-async def top_audit(pg, label, w, h, need, **o):
+async def top_audit(pg, label, w, h, need, anyof=(), **o):
     """no overlap among the top elements or between them and the controls; all inside the safe area"""
     els = await pg.evaluate(TOPSET, [TOPG, o])
+    ringR = await pg.evaluate(RING)
     t, l, r, b = SAFE[(w, h)]
     bad, out = [], []
     for i in range(len(els)):
@@ -156,6 +164,11 @@ async def top_audit(pg, label, w, h, need, **o):
             a, c = els[i], els[j]
             if not (a['top'] or c['top']): continue            # control vs control: audit() does those
             if contains(a, c) or contains(c, a): continue
+            # schoolhud: with the TCAS panel up beside a two column dock (667 wide, Hard) the task card's band starts at the stick
+            # ring's right edge: over the stick's invisible touch zone (it takes no touches), never over the ring
+            zone = next((e for e in els if e['kind'] == 'stick'), None)
+            if any(e['kind'] == 'tcas' for e in els) and zone and {a['kind'], c['kind']} & {'stick'} and {a['kind'], c['kind']} & {'mission', 'jump', 'lesson'} \
+               and min(x['x'] for x in (a, c) if x['kind'] != 'stick') >= ringR - 0.5: continue   # right of the ring
             ox, oy = overlap(a, c)
             if ox > 0.5 and oy > 0.5:
                 bad.append(f"{a['kind']}:{a['id']} x {c['kind']}:{c['id']} ({ox:.0f}x{oy:.0f}px)")
@@ -164,6 +177,7 @@ async def top_audit(pg, label, w, h, need, **o):
         if e['x'] < l-0.5 or e['y'] < t-0.5 or e['x']+e['w'] > w-r+0.5 or e['y']+e['h'] > h-b+0.5:
             out.append(f"{e['kind']}:{e['id']} ({e['x']:.0f},{e['y']:.0f} {e['w']:.0f}x{e['h']:.0f})")
     missing = sorted(need - {e['kind'] for e in els})
+    if anyof and h >= 390 and not (set(anyof) & {e['kind'] for e in els}): missing.append(' or '.join(anyof))   # schoolhud: one of them (two at most in the column)
     tag = f'{w}x{h} {label}'
     for name, lst in (('top overlap', bad), ('outside the safe area', out), ('not showing', missing)):
         if lst:
@@ -187,17 +201,19 @@ async def top_scene(pg, label, w, h, shot, lesson=True):
     if n != 1:
         failures.append(f'{w}x{h} {label}: {n} badges up at once (they take turns in one slot)'); print(f'  FAIL {w}x{h} {label}: {n} badges up at once')
     # fix2 item 11: the top column shows two at most and only above 26% of the height: the warning first (under 415 px
-    # tall it is the only one), then the mission pill with the jump lamps inside it; the toast waits. Then without the warning.
-    await top_audit(pg, label, w, h, BASE - {'toast'}, jump=True)
+    # tall it is the only one). Then without the warning.
+    # schoolhud item 3: the mission pill (the jump lamps in it) is the bottom task card, always up; the top column holds the
+    # warning and one of the toast and the caption (the toast first: it answers what the pilot did)
+    await top_audit(pg, label, w, h, (BASE - {'toast', 'radio'}) | {'mission', 'jump'}, anyof=('toast', 'radio'), jump=True)
     await pg.evaluate(TOPUNDO)
-    await top_audit(pg, label + ', no warning', w, h, (BASE - {'toast', 'warn'}) | {'mission', 'jump'}, jump=True, nowarn=True)
+    await top_audit(pg, label + ', no warning', w, h, (BASE - {'warn', 'toast', 'radio'}) | {'mission', 'jump'}, anyof=('toast', 'radio'), jump=True, nowarn=True)
     await audit(pg, label + ', full layout', w, h)
     os.makedirs(SHOTS, exist_ok=True)
     await pg.screenshot(path=os.path.join(SHOTS, shot))
     await pg.evaluate(TOPUNDO)
     if lesson:
         await pg.evaluate("()=>{if(!window.__kgeu.MISS.on)document.getElementById('miss').classList.remove('on')}")
-        await top_audit(pg, label + ', lesson', w, h, (BASE - {'toast'}) | {'lesson'}, lesson=True)
+        await top_audit(pg, label + ', lesson', w, h, (BASE - {'toast', 'radio'}) | {'lesson'}, anyof=('toast', 'radio'), lesson=True)
         await audit(pg, label + ', lesson, full layout', w, h)
         await pg.screenshot(path=os.path.join(SHOTS, shot.replace('.png', '_lesson.png')))
         await pg.evaluate(TOPUNDO)

@@ -201,6 +201,13 @@ body.appr #lesM{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #miss{ display:none; flex-direction:row; align-items:center; justify-content:center; gap:7px; max-width:min(60vw, 420px, 100%); min-width:0; padding:2px 11px; border-radius:12px;
   background:rgba(20,16,12,.72); border:1px solid rgba(255,255,255,.1); white-space:nowrap; pointer-events:none; font:600 13px/17px var(--font); letter-spacing:.02em; }
 #miss.on{ display:flex; }
+#jumpLt b{ min-width:0; overflow:hidden; text-overflow:ellipsis; }
+/* schoolhud item 3: the pill is the bottom task card: its instruction wraps to a second line where the band is narrow (beside
+   the TCAS panel, 568 wide), never an ellipsis halfway through what to do */
+#cap > #miss{ flex-wrap:wrap; white-space:normal; row-gap:0; text-align:center; }
+#cap > #miss #missT{ white-space:normal; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
+#cap > #miss #missS{ white-space:nowrap; }
+#cap > #miss.call #missT, #cap > #miss.call #missS, #cap.narrow > #miss #missS{ display:none; }   /* a jump call in its place; a narrow band: the instruction alone */
 #missT{ flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; font-weight:800; }
 #missS{ flex:0 100 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; color:var(--soft); font-weight:600; }
 #missS:empty, #miss.chip #missS{ display:none; }
@@ -213,6 +220,8 @@ body.appr #lesM{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 /* stepstall: the old step's ghost while the new one slides in (stepSlide) */
 .stepGhost{ position:absolute; margin:0; padding:0; pointer-events:none; overflow:hidden; white-space:normal; z-index:1; }
 .stepGhost b{ font-weight:700; }
+/* schoolhud: the step just done, ticked as it slides out */
+.stepOk{ display:inline-block; color:#5dff8a; font-weight:800; margin-right:5px; font-style:normal; }
 @keyframes missPg{ 30%{ border-color:rgba(43,255,106,.95); box-shadow:0 0 8px rgba(43,255,106,.5); } }
 @media (prefers-reduced-motion: reduce){ #miss.pulse{ animation:none; } }
 #warn{ font-size:24px; text-align:center; font-weight:800; letter-spacing:.06em; color:#fff; background:var(--warn); border-radius:6px; padding:2px 16px; display:none; line-height:1.15; }
@@ -229,7 +238,10 @@ body.touch #warn{ font-size:20px; padding:2px 12px; }
    after the call ends. Settings, Radio row: Captions Off (kgeuCap) hides it, the audio plays on. */
 #uiroot > #cap{ position:absolute; left:calc(var(--padL) + 126px); right:calc(var(--padR) + var(--col) + 150px); bottom:calc(var(--padB) + 8px); display:flex; flex-direction:column;
   align-items:center; justify-content:flex-end; pointer-events:none; z-index:5; }
-body.capOff #uiroot > #cap, body.crashOn #uiroot > #cap{ display:none; }
+#uiroot > #cap.side{ align-items:flex-start; justify-content:flex-start; }
+body.crashOn #uiroot > #cap, body.crashOn #topCol > #atc, body.crashOn #topCol > #dfSub{ display:none; }
+/* Settings, Radio captions Off: the top captions go, the task card stays (it cannot be turned off) */
+body.capOff #atc, body.capOff #dfSub{ display:none !important; }
 #atc, #dfSub span, #dzHint{ max-width:100%; box-sizing:border-box; background:rgba(12,14,18,.72); border:1px solid rgba(255,255,255,.1); border-radius:9px; color:#fff; }
 #atc{ font:500 12px/13px var(--font); opacity:0; transition:opacity .35s, visibility 0s linear .35s; padding:2px 9px; text-align:left; backdrop-filter:none; -webkit-backdrop-filter:none; }
 #atc:not(.on){ position:absolute; visibility:hidden; }
@@ -243,14 +255,18 @@ body.capOff #uiroot > #cap, body.crashOn #uiroot > #cap{ display:none; }
 #atc .plain{ color:var(--sand); font-weight:700; font-size:12px; line-height:13px; }
 /* where the subtitle rides in the top column (a lesson, the hood) or the lower left (the hood at 568): as before item 11 */
 #topCol > #atc, #uiroot > #atc{ font-size:12px; line-height:1.3; }
-#topCol > #atc .tx, #uiroot > #atc .tx{ -webkit-line-clamp:3; } #topCol > #atc .plain, #uiroot > #atc .plain{ -webkit-line-clamp:2; font-size:14px; line-height:1.3; }
-#topCol > #atc.hasPlain .tx, #uiroot > #atc.hasPlain .tx{ font-size:11px; }
+/* schoolhud: compact, two lines at most (the station's line, or in Easy the station's line on one and its plain words on the next) */
+#topCol > #atc .tx{ -webkit-line-clamp:2; } #topCol > #atc .plain{ -webkit-line-clamp:1; font-size:13px; line-height:1.3; }
+#topCol > #atc.hasPlain .tx{ font-size:11px; -webkit-line-clamp:1; }
+/* under the hood at 568 (the lower left, school1 item 7) the subtitle keeps its three lines */
+#uiroot > #atc .tx{ -webkit-line-clamp:3; } #uiroot > #atc .plain{ -webkit-line-clamp:2; font-size:14px; line-height:1.3; } #uiroot > #atc.hasPlain .tx{ font-size:11px; }
 #topCol.short > #warn{ font-size:16px; padding:1px 10px; }
 #topCol.short > #atc .tx, #topCol.short > #atc .plain{ -webkit-line-clamp:1; } #topCol.short > #atc.hasPlain .tx{ display:none; }   /* one line above 26% */
+#topCol.short.c2 > #atc .tx{ -webkit-line-clamp:2; line-height:15px; } #topCol.short.c2 > #atc.hasPlain .tx{ display:-webkit-box; -webkit-line-clamp:1; } #topCol.short.c2 > #atc .plain{ line-height:15px; }   /* schoolhud: two lines where 40 px fit (a 390 px tall phone) */
 /* the drop zone hint shares the caption's place, and gives it up to a call */
 #dzHint{ display:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font:800 14px/18px var(--font); letter-spacing:.04em; padding:2px 10px; text-shadow:0 0 3px #000; }
 #dzHint.on{ display:block; animation:dzPulse 1.6s ease-in-out infinite; }
-#atc.on ~ #dzHint, body.dfOn #dzHint{ display:none; }
+body.dfOn #dzHint{ display:none; }
 @keyframes dzPulse{ 50%{ opacity:.7; } }
 /* flap, gear, trim and autopilot changes: a small readout beside the throttle, 2 s then it fades;
    the centre of the screen stays clear (sideCfg places it left of the dock, level with the throttle) */
@@ -1235,8 +1251,7 @@ body.touch #lesM{ font-size:12px; }
 /* fix2 item 11 (round 2): out of the middle. In landscape (not the hood, not lesson 1's coach card) the lesson panel is a
    compact strip at the bottom between the stick and the buttons (hudFit sets --lcX, --lcW): the title and LOG / End on
    the header line, the instruction on one line with the numbers after it when they fit (else a short second line), the
-   cue bars in one row. A call on the air (Dana, Frank, the tower) takes the instruction's place while it is on (#lesCap,
-   the speaker tinted as on #cap), then the instruction comes back; #cap itself stays hidden (body.lesLc). */
+   cue bars in one row. Schoolhud: the instruction is never covered; a call on the air is the top caption (#atc in #topCol). */
 #lesRow{ display:contents; } #lesCap{ display:none; }
 body #uiroot > #lesson.lc{ left:var(--lcX, 50%); right:auto; top:auto; bottom:calc(var(--padB) + 4px); transform:translateX(-50%); width:max-content; max-width:var(--lcW, min(60vw, 480px));
   grid-template-columns:minmax(0,1fr) auto; column-gap:8px; row-gap:0; align-items:center; padding:2px 4px 2px 9px; border:1px solid rgba(255,255,255,.1); border-radius:9px;
@@ -1258,9 +1273,6 @@ body #uiroot > #lesson.lc.on{ display:grid; }
 /* graded holds: the cue strip is the panel's bottom row (14 px, the numbers live in it), the instruction one line above it */
 body #uiroot > #lesson.lc.cueOn #lesRow{ -webkit-line-clamp:1; }
 #uiroot > #lesson.lc #lesCue.on{ display:flex; height:14px; align-items:center; overflow:hidden; }
-#uiroot > #lesson.lc.call #lesI, #uiroot > #lesson.lc.call #lesM{ display:none; }
-#uiroot > #lesson.lc.call #lesCap{ display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; font-size:13px; line-height:15px; font-weight:600; }
-body #uiroot > #lesson.lc.cueOn.call #lesCap{ -webkit-line-clamp:1; }
 /* under 700 px wide: the title a 10 px label, the panel from the stick ring to the buttons (hudFit), End 56 px wide */
 @media (max-width:699px){ #uiroot > #lesson.lc #lesT{ font-size:10px; line-height:12px; letter-spacing:.06em; }
   #uiroot > #lesson.lc #lesQuit{ min-width:56px; width:56px; } }
@@ -1274,8 +1286,6 @@ body #uiroot > #lesson.lc.cueOn.call #lesCap{ -webkit-line-clamp:1; }
   #uiroot > #lesson.lc #lesCue{ gap:5px; } #uiroot > #lesson.lc #lesCue .cue{ flex:0 1 auto; min-width:0; }
   #uiroot > #lesson.lc #lesCue .cue i{ display:none; } #uiroot > #lesson.lc #lesCue .cue b{ font-size:10px; letter-spacing:0; }
   #uiroot > #lesson.lc #lesCue .near b{ color:var(--caution); } }
-#lesCap b{ color:var(--radio); font-weight:700; } #lesCap.cfi b{ color:var(--sand); }
-body.lesLc #uiroot > #cap > #atc{ display:none; }
 /* crash: a one line reason at the top, then a compact card at the bottom (3.9) */
 /* WASTED (phone3 item 7): slow motion, the picture to black and white under a vignette, then the word,
    then the crash card. Only opacity, transform and the canvas filter move. Tap anywhere skips it. */
@@ -2288,14 +2298,16 @@ setTimeout(function(){var s=document.getElementById('splash');if(s&&!s.classList
   <div id="dfW"><button id="bFox" aria-label="Fox 2, fire a heat missile"><b id="bFoxL">FOX 2</b><i id="bFoxN">x6</i><u id="bFoxW" aria-hidden="true"></u></button><button id="bGun" aria-label="Gun, hold to fire"><b>GUN</b><i id="bGunN">510</i></button><button id="bFlr" aria-label="Flares"><b>FLARES</b><i id="bFlrN">30</i></button><button id="bBrk" aria-label="Break, a hard defensive turn with flares"><b>BREAK</b><i id="bBrkN">READY</i></button><button id="bSix" aria-label="Check six, hold to look behind"><b>CHECK 6</b><i>HOLD</i></button></div>
   <canvas id="fd" class="anch" aria-hidden="true"></canvas>
   <div id="dfHud" class="anch" aria-hidden="true"><div class="dfSeek"><b></b></div><div class="dfRad"><b></b><span></span></div><div class="dfLead"></div><div class="dfPip"><b></b><i></i><em></em></div><div class="dfMw"><b></b><span></span></div></div>
-  <!-- fix2 item 11: the one bottom caption, between the stick and the buttons (hudFit places it): the radio and CFI
-       subtitle (#atc), the dogfight's line (#dfSub) and the drop zone hint -->
-  <div id="cap"><div id="atc" class="card"></div><div id="dfSub" role="status"></div><div id="dzHint">Head for the red smoke</div></div>
+  <!-- schoolhud item 3: the bottom task card's place, between the stick and the buttons (hudFit places it): the mission,
+       tasking or challenge pill (#miss, the jump lamps inside) and the drop zone hint. The lesson card (#lesson) holds the
+       same band in a lesson. Nothing voiced lands here: the captions are in the top column -->
+  <div id="cap"><div id="miss" class="card"><b id="missT"></b><span id="missS"></span><span id="jumpLt"><i class="r"></i><i class="g"></i><b></b></span></div><div id="dzHint">Head for the red smoke</div></div>
   <div id="tkReply" role="group" aria-label="Answer the radio" aria-hidden="true"></div>
   <div id="divCard" role="group" aria-label="Diversion: Glendale, a heading and a time" aria-hidden="true"><div class="dvR"><button type="button" data-h="-10" aria-label="Heading minus 10">&minus;10</button><button type="button" data-h="-5" aria-label="Heading minus 5">&minus;5</button><output id="divH" aria-live="polite"><b>360</b><small>HDG</small></output><button type="button" data-h="5" aria-label="Heading plus 5">+5</button><button type="button" data-h="10" aria-label="Heading plus 10">+10</button></div><div class="dvR"><button type="button" data-m="-1" aria-label="One minute less">&minus;1</button><output id="divM" aria-live="polite"><b>5</b><small>MIN</small></output><button type="button" data-m="1" aria-label="One minute more">+1</button><button type="button" id="divSet" aria-label="Set the diversion to Glendale"><b>SET</b><small>GLENDALE</small></button></div></div>
   <div id="lookPad" role="slider" aria-label="Free look, drag to swing the camera"><svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 13c2-3.2 4.3-4.8 7-4.8s5 1.6 7 4.8c-2 3.2-4.3 4.8-7 4.8S8 16.2 6 13z"/><circle cx="13" cy="13" r="2" fill="currentColor"/><path d="M13 1.5v3M11.5 3l1.5-1.5L14.5 3M13 24.5v-3M11.5 23l1.5 1.5 1.5-1.5M1.5 13h3M3 11.5L1.5 13 3 14.5M24.5 13h-3M23 11.5l1.5 1.5-1.5 1.5"/></svg><i>LOOK</i></div>
-  <!-- the top centre column under pause (fix2 item 11): the mission pill (jump light inside), the rear threat, warning, toast -->
-  <div id="topCol"><div id="miss" class="card"><b id="missT"></b><span id="missS"></span><span id="jumpLt"><i class="r"></i><i class="g"></i><b></b></span></div><div id="dfSix" role="status"><i></i><span></span></div><div id="warn"></div><div id="toast"></div></div>
+  <!-- the top centre column under pause (schoolhud item 3): the voice and radio caption (#atc: the tower, ground, Dana, Frank,
+       mission control; #dfSub: the dogfight's calls), the rear threat, the warning, a toast -->
+  <div id="topCol"><div id="atc" class="card"></div><div id="dfSub" role="status"></div><div id="dfSix" role="status"><i></i><span></span></div><div id="warn"></div><div id="toast"></div></div>
   <!-- crash: the reason as one line at the top, then after 3 s a small card at the bottom
        that leaves the fireball in view -->
   <div id="crashTop" aria-live="assertive"></div>
@@ -13361,7 +13373,7 @@ function sideCfg(t,sub,kind){
   const W3=ui.left+ui.width/3,W23=ui.left+ui.width*2/3,H3=ui.top+ui.height/3,H23=ui.top+ui.height*2/3;
   // what it may not cover: the controls, the stick zone, the ticker, the badges, the look pad, the lesson
   // panel, the centre column; nor the centre third of the screen (phone3 item 4)
-  const block=[];for(const e of document.querySelectorAll('#dock button,#thr,#stickZone,#tk.on,#tkCtl.on,#badges .badge.on,#lookPad,#lesson.on,#divCard.on,#topCol > .on,'+(innerHeight>innerWidth?'#cap > .on,':'')+'#hDest,#tcas.on,#dfW')){
+  const block=[];for(const e of document.querySelectorAll('#dock button,#thr,#stickZone,#tk.on,#tkCtl.on,#badges .badge.on,#lookPad,#lesson.on,#divCard.on,#topCol > .on,#cap > .on,#hDest,#tcas.on,#dfW')){
     const r=e.getBoundingClientRect();if(r.width&&r.height&&getComputedStyle(e).display!=='none')block.push(r);}
   const lr=$('lesson').classList.contains('on')?$('lesson').getBoundingClientRect():null;
   // the edge of the buttons actually beside a band of the screen (the dock's box has gaps)
@@ -13388,8 +13400,6 @@ function sideCfg(t,sub,kind){
   const top=typeof pick[1]==='function'?pick[1](sideEl.offsetHeight):pick[1];
   sideEl.style.right=Math.round(ui.right-pick[0])+'px';
   sideEl.style.top=Math.round(top-ui.top)+'px';
-  // landscape: the caption under the readout goes up to the top column while the readout shows (HF.sideT, capHome)
-  if(!por&&cpr&&cpr.height){const s=sideEl.getBoundingClientRect();if(s.left<cpr.right&&cpr.left<s.right&&s.top<cpr.bottom&&cpr.top<s.bottom){HF.sideT=performance.now()+2600;capHome();}}
   sideEl.classList.add('on');cfgT=2;sideEl.dataset.kind=kind||'';
   if(kind)hapCfg(kind);
 }
@@ -14022,23 +14032,19 @@ function apprTick(){
   if(want&&L.parentNode!==T)T.insertBefore(L,T.firstChild);else if(!want&&L.parentNode===T)APPR.home.p.insertBefore(L,APPR.home.n);
   capHome();
 }
-// the subtitle's place (fix2 item 11): the bottom caption (#cap); the top column while the lesson panel holds the bottom
-// centre or the six pack does (under the hood); under the hood on a narrow screen the lower left (CSS: #uiroot > #atc)
+// the caption's place (schoolhud item 3): always the top column under pause, in every mode; under the hood on a narrow
+// screen the lower left (CSS: #uiroot > #atc), where it always was
 function capHome(){
-  const L=$('lesson'),T=$('topCol'),cap=$('cap'),nar=HOOD.on&&innerWidth<600,lesLow=L.classList.contains('on')&&L.parentNode!==T;
+  const L=$('lesson'),T=$('topCol'),nar=HOOD.on&&innerWidth<600,lesLow=L.classList.contains('on')&&L.parentNode!==T;
   // round 2: in landscape the lesson panel is the compact bottom strip (.lc) and carries the calls itself
   const lc=lesLow&&!HOOD.on&&!L.classList.contains('tut')&&innerWidth>innerHeight;
   if(lc!==L.classList.contains('lc'))L.classList.toggle('lc',lc);if(lc!==document.body.classList.contains('lesLc'))document.body.classList.toggle('lesLc',lc);
-  const call=lc&&atcEl.classList.contains('on');if(call!==L.classList.contains('call')){if(call)capFill();L.classList.toggle('call',call);}
-  const home=nar?T.parentNode:(HOOD.on||(lesLow&&!lc)||((HF.capTop||HF.sideT>performance.now())&&!lc&&innerWidth>innerHeight))?T:cap;
-  if(atcEl.parentNode!==home){if(home===cap)cap.insertBefore(atcEl,cap.firstChild);else home.appendChild(atcEl);}
+  // portrait with the lesson card up in the column (the approach, the hood): no room under it above 26%, so the caption takes
+  // the card's usual place above the throttle, right of the middle third
+  const cap=$('cap'),home=nar?T.parentNode:innerHeight>innerWidth&&L.classList.contains('on')&&L.parentNode===T?cap:T;
+  if(atcEl.parentNode!==home){if(home===T)T.insertBefore(atcEl,$('dfSub'));else if(home===cap)cap.insertBefore(atcEl,cap.firstChild);else home.appendChild(atcEl);}   // under a lesson card the column holds (portrait, the hood)
 }
-// the call on the air copied into the lesson strip's instruction line: the speaker tinted, the plain line in Easy
-function capMirror(){capFill();capHome();}
-function capFill(){const c=$('lesCap'),b=atcEl.querySelector('b'),pl=atcEl.querySelector('.plain'),tx=atcEl.querySelector('.tx');if(!c)return;
-  c.textContent='';if(b){const e=document.createElement('b');e.textContent=b.textContent+': ';c.appendChild(e);}
-  c.appendChild(document.createTextNode(pl?pl.textContent:tx?[...tx.childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join(''):''));
-  c.classList.toggle('cfi',atcEl.classList.contains('cfi'));}
+function capMirror(){capHome();}
 // ---- fix2 item 11: the middle of the screen is the view ----
 // The clear zone is x W/3..2W/3 by y 26%..80%: no banner, pill, caption, toast or prompt there (the world markers, the sensor
 // reticle and its readout, the dogfight's boxes, are the view and are left alone). hudFit runs every 8th frame and on a toast
@@ -14047,7 +14053,7 @@ function capFill(){const c=$('lesCap'),b=atcEl.querySelector('b'),pl=atcEl.query
 // threat, the subtitle when it is up there (a lesson), the mission pill, a toast); (3) the bottom caption's box, from the stick ring's right edge + 12 px to
 // the buttons' left edge - 12 px, 8 px above the bottom inset (in portrait: above the throttle, right of the clear zone).
 const HF={n:0,topR:-1,capLine:null,cap:'',want:0};
-const HF_PRI={warn:1,dfSix:2,atc:3,miss:4,toast:5};   // the lesson panel, when it is in the column, is never held
+const HF_PRI={warn:1,dfSix:2,toast:3,atc:4,dfSub:4};   // schoolhud: a toast answers what the player did, so it goes before a caption when only one fits   // the lesson panel, when it is in the column, is never held
 function hudFit(){
   const ui=$('uiroot'),U=ui.getBoundingClientRect(),W=U.width,H=U.height;if(!W||!H||document.body.classList.contains('menuOn'))return;
   if(LES.on&&lesEl.classList.contains('on'))stepGeo(STEPX.les,lesEl.classList.contains('lc')?$('lesRow'):lesI);   // stepstall: the card's place, for the next step's ghost
@@ -14070,17 +14076,24 @@ function hudFit(){
   const obs=[...document.querySelectorAll('#dock button,#dfW button,#lookPad,#badges .badge.on,#tk.on,#tkCtl.on,#tkReply.on,#divCard.on,#hud .card,#bPause')].map(R).filter(Boolean);
   const bad=r=>r.bottom>lim+0.5||obs.some(o=>r.left<o.right&&o.left<r.right&&r.top<o.bottom&&o.top<r.bottom);
   const fit=(mx=2)=>{for(const k of kids)if(k.classList.contains('hold'))k.classList.remove('hold');
-    const on=kids.filter(k=>k.id!=='lesson'&&k.classList.contains('on')&&R(k)).sort((x,y)=>(HF_PRI[x.id]||9)-(HF_PRI[y.id]||9));
+    const on=kids.filter(k=>k.id!=='lesson'&&k.id!=='miss'&&k.classList.contains('on')&&R(k)).sort((x,y)=>(HF_PRI[x.id]||9)-(HF_PRI[y.id]||9));   // the task card is never held
     // the subtitle in the column in a lesson or under the hood is held only by the count: it is the instructor talking
+    if(missEl.parentNode===T&&missEl.classList.contains('on'))mx=Math.max(1,mx-1);   // the pill up here (no room for it below) is one of the two
     for(let i=on.length-1;i>(bug?-1:0);i--){const vis=on.filter(k=>!k.classList.contains('hold'));
-      if(vis.length<=mx&&!vis.some(k=>(k.id!=='atc'||!(LES.on||HOOD.on))&&bad(k.getBoundingClientRect())))break;   // a TCAS-crowded subtitle (HF.capTop) obeys the 26% line
+      if(vis.length<=mx&&!vis.some(k=>(k.id!=='atc'||!HOOD.on)&&bad(k.getBoundingClientRect())))break;   // the caption obeys the 26% line (under the hood the column keeps its old rule)
       on[i].classList.add('hold');}
+    // schoolhud: a held one that fits after all (a tall toast held, a one line caption after it) comes back
+    const back=k=>{k.classList.remove('hold');const vis=on.filter(x=>!x.classList.contains('hold'));
+      if(vis.length>mx||vis.some(x=>(x.id!=='atc'||!HOOD.on)&&bad(x.getBoundingClientRect()))){k.classList.add('hold');return false;}return true;};
+    for(const k of on)if(k.classList.contains('hold'))back(k);
+    // the caption held at two lines: one line beside the others rather than none
+    if(atcEl.classList.contains('hold')&&on.includes(atcEl)&&T.classList.contains('c2')){T.classList.remove('c2');if(!back(atcEl))T.classList.add('c2');}
     const f=on[0]&&on[0].getBoundingClientRect();return f?{w:T.getBoundingClientRect().width,bad:bad(f)}:null;};   // w: the column's room, not a short message's
   if(hood){   // under the hood the lesson card and the subtitle keep their own layout (school1 item 7)
     if(body.classList.contains('topRow'))body.classList.remove('topRow');T.classList.remove('short');for(const k of kids)k.classList.remove('hold');}
   else if(!portrait){
     if(body.classList.contains('topRow')){body.classList.remove('topRow');HF.row=0;}
-    T.classList.toggle('short',lim-T.getBoundingClientRect().top<60);   // one line messages (a 16 px warning) before measuring
+    {const room=lim-T.getBoundingClientRect().top;T.classList.toggle('short',room<60);T.classList.toggle('c2',room>=40);}   // one line messages (a 16 px warning) before measuring; the caption keeps two lines from 40 px (schoolhud)
     const f=fit();
     if(!bug&&f&&(f.bad||f.w<100)){const p=R($('bPause'));
       if(p){const x0=p.right-U.left+8,yT=p.top,yB=p.bottom;let x1=W-(thr?W-(thr.right-U.left):10);
@@ -14090,7 +14103,8 @@ function hudFit(){
   // (3) the bottom caption
   const cap=$('cap'),dk=R($('dock'));let L,Rt,B;
   const padR=thr?W-(thr.right-U.left):10;
-  if(portrait){const ct=Math.min(thr?thr.top:1e9,dk?dk.top:1e9)-U.top;L=Math.ceil(W*2/3)+6;Rt=W-padR;B=Math.round(H-Math.min(ct,H))+8;}
+  if(portrait){const ct=Math.min(thr?thr.top:1e9,dk?dk.top:1e9)-U.top;L=Math.ceil(W*2/3)+6;Rt=W-padR;B=Math.round(H-Math.min(ct,H))+8;
+    const tq=$('tcas').classList.contains('on')?R($('tcas')):null;if(tq&&tq.left-U.left<Rt&&tq.right-U.left>L)B=Math.max(B,Math.round(U.bottom-tq.top)+6);}   // schoolhud: above the TCAS panel
   else{const sh=R($('stickHint')),sz=R($('stickZone')),bot=thr?thr.bottom-U.top:H-10;B=Math.round(H-bot)+8;
     const Lh=(sh?sh.right-U.left:126)+12,Lz=Math.max(Lh,sz?sz.right-U.left+12:0);
     const y1=H-B,y0=y1-40,sv=document.body.classList.contains('sensorOn');
@@ -14101,20 +14115,30 @@ function hudFit(){
     // 120 px; else over the TCAS panel (a few seconds) rather than under the thumb; else from the stick ring. The
     // dogfight's weapons crowd the bottom, so its line starts at the stick ring as before.
     const df=document.body.classList.contains('dfOn');
-    // (rule d) never over the TCAS panel: where the panel leaves under 120 px beside the stick zone, the subtitle goes up to
-    // the top column for the call (HF.capTop, capHome), where it takes the mission pill's row while it is on
-    let up=false;
-    if(!df&&Ra-Lz>=120){L=Lz;Rt=Ra;}else if(Ra<Rd&&!df){up=true;L=Lz;Rt=Rd;}else if(Ra-Lh>=120){L=Lh;Rt=Ra;}else{L=Lh;Rt=Rd;}
-    if(up!==HF.capTop){HF.capTop=up;capHome();}
+    // (rule d) never over the TCAS panel: where the panel leaves under 120 px beside the stick zone, the card starts at the stick
+    // ring instead (its thumb zone, not its ring); only where even that is too narrow does it span the panel
+    if(!df&&Ra-Lz>=120){L=Lz;Rt=Ra;}else if(Ra-Lh>=120){L=Lh;Rt=Ra;}else{L=Lh;Rt=Rd;}
     if(sv){const r=R($('shBL'));if(r&&r.top-U.top<y1&&r.bottom-U.top>y0&&r.right-U.left<Rt)L=Math.max(L,r.right-U.left+12);}
     // the lesson strip (round 2): the same band, clear of the stick zone when that leaves 200 px, centred, min(60vw, 480)
     // (round 4) always clear of the stick's whole touch zone (#stickZone, 36% wide): from its right edge + 8 px to the buttons
     // - 8 px (over the TCAS panel when that is all the room); under 700 px wide the whole of that band, else min(60vw, 480) centred
-    const les=$('lesson');if(les.classList.contains('lc')){const nw=W<700,lr=[Lz-4,(Ra-Lz>=200?Ra:Rd)+4];
+    // schoolhud: the TCAS panel crowding the band (667 wide, two button columns): the card starts at the stick ring's edge
+    // (over the stick's touch zone, never its ring) rather than lying under the panel
+    const les=$('lesson');if(les.classList.contains('lc')){const nw=W<700,lr=Ra-Lz>=200?[Lz-4,Ra+4]:Ra-Lh>=130?[Lh-4,Ra+4]:[Lz-4,Rd+4];
       const v=Math.round(U.left+(lr[0]+lr[1])/2)+'px|'+Math.floor(nw?lr[1]-lr[0]:Math.min(W*0.6,480,lr[1]-lr[0]))+'px';
-      if(v!==HF.lc){HF.lc=v;const q=v.split('|');les.style.setProperty('--lcX',q[0]);les.style.setProperty('--lcW',q[1]);}}}
-  const k=Math.round(L)+'|'+Math.round(W-Rt)+'|'+B;
-  if(k!==HF.cap){HF.cap=k;cap.style.left=Math.round(L)+'px';cap.style.right=Math.round(W-Rt)+'px';cap.style.bottom=B+'px';}
+      if(v!==HF.lc){HF.lc=v;const q=v.split('|');les.style.setProperty('--lcX',q[0]);les.style.setProperty('--lcW',q[1]);}
+      const lq=R(les);if(lq&&missEl.classList.contains("on"))B=Math.max(B,Math.round(U.bottom-lq.top)+6);}}   // a pill in a lesson: above the card
+  // schoolhud: no room for the card at the bottom (under 100 px: 568 wide with three button columns and a 47 px inset leave 64), it
+  // goes in the left column under the readouts, above the stick, outside the middle third
+  let side=-1;
+  if(!portrait&&Rt-L<100){const mp=R($("map")),sh=R($("stickHint"));let lb=0;
+    for(const e of [$('hud'),$('hDest'),$('navLog')]){const r=R(e);if(r&&getComputedStyle(e).display!=='none')lb=Math.max(lb,r.bottom-U.top);}
+    const top=Math.round(lb+6);if(mp&&(!sh||sh.top-U.top-top>=26)){side=top;L=mp.left-U.left;Rt=W/3-4;}else side=-2;}
+  // and where even that is taken (a destination readout there too): the pill heads the top column, as before schoolhud
+  const mt=side===-2;if(mt!==(missEl.parentNode===T)){if(mt)T.insertBefore(missEl,T.firstChild);else cap.insertBefore(missEl,cap.firstChild);}
+  const k=Math.round(L)+'|'+Math.round(W-Rt)+'|'+B+'|'+side;
+  if(k!==HF.cap){HF.cap=k;cap.classList.toggle('narrow',Rt-L<220);cap.style.left=Math.round(L)+'px';cap.style.right=Math.round(W-Rt)+'px';
+    cap.style.bottom=side<0?B+'px':'auto';cap.style.top=side<0?'auto':side+'px';cap.classList.toggle('side',side>=0);}
 }
 // Settings, Radio row: Captions On/Off (kgeuCap); Off hides the bottom caption, the radio plays on
 const CAPS={on:true};try{CAPS.on=localStorage.getItem('kgeuCap')!=='0';}catch(e){}
@@ -18667,8 +18691,9 @@ const angD=(a,b)=>Math.abs((((a-b)%360)+540)%360-180);
 const dev=f=>(f>=0?'+':'')+Math.round(f)+' ft',h3=h=>String(Math.round(h)%360||360).padStart(3,'0');
 function lesShow(i,m){if(lesI.textContent!==i)lesI.textContent=i;lesM.textContent=m;}
 // ---- stepstall item 2: a step change, smooth ----
-// The card's old step slides out to the left as a ghost (14 px, 120 ms) and the new one slides in from the right after it
-// (14 px, 220 ms from 100 ms; sideways, so the ghost never crosses the title row above it),
+// The card's old step slides out to the left as a ghost, ticked (a green check, 14 px, 240 ms), and the new one slides in
+// from the right at the same moment (schoolhud item 2: no delay, from half opacity, 10 px, 200 ms, so it reads from the
+// frame the step completes; sideways, so the ghost never crosses the title row above it),
 // transforms and opacity only, so the compositor runs them and nothing is laid out again. The ghost's place and font come
 // from hudFit's own layout pass (stepGeo, every 8th frame, before it writes anything), never read at the step. One
 // ghost element per slot, made once. The chime: the leaderboard's chime notes and timbre (two notes, quieter), rendered
@@ -18693,23 +18718,24 @@ function stepGeo(S,el){if(!el)return;const p=el.offsetParent;if(!p){S.geo=null;r
 function stepSlide(S,el,html){
   const rm=STEPX.rm&&STEPX.rm.matches,G=S.geo;
   try{if(S.anim)S.anim.cancel();S.el=el;   // a swap before the last one ended: the new one starts from the top
-    S.anim=el.animate(rm?[{opacity:0},{opacity:1}]:[{transform:'translateX(14px)',opacity:0},{transform:'translateX(0)',opacity:1}],
-      {duration:rm?160:220,delay:rm?0:100,easing:'cubic-bezier(.2,.8,.2,1)',fill:'backwards'});
+    // schoolhud item 2: the new step is readable from its first frame (no delay, from half opacity), a 200 ms ease out
+    S.anim=el.animate(rm?[{opacity:0.5},{opacity:1}]:[{transform:'translateX(10px)',opacity:0.5},{transform:'translateX(0)',opacity:1}],
+      {duration:rm?160:200,easing:'cubic-bezier(.23,1,.32,1)',fill:'backwards'});
     if(!html||!G||G.el!==el||!G.p.isConnected)return;
     let g=S.ghost;if(!g){g=S.ghost=document.createElement('div');g.className='stepGhost';g.setAttribute('aria-hidden','true');}
     if(g.getAnimations)g.getAnimations().forEach(a=>a.cancel());
-    g.innerHTML=html;const q=g.style;q.left=G.x+'px';q.top=G.y+'px';q.width=G.w+'px';q.maxHeight=G.h+'px';q.font=G.font;q.color=G.color;q.lineHeight=G.lh;
+    g.innerHTML='<i class="stepOk" aria-hidden="true">\u2713</i>'+html;const q=g.style;   // the step just done, tickedq.left=G.x+'px';q.top=G.y+'px';q.width=G.w+'px';q.maxHeight=G.h+'px';q.font=G.font;q.color=G.color;q.lineHeight=G.lh;
     if(g.parentNode!==G.p)G.p.appendChild(g);
-    const a=g.animate(rm?[{opacity:1},{opacity:0}]:[{transform:'translateX(0)',opacity:1},{transform:'translateX(-14px)',opacity:0}],{duration:120,easing:'ease-in',fill:'forwards'});
+    const a=g.animate(rm?[{opacity:1},{opacity:0}]:[{transform:'translateX(0)',opacity:1},{transform:'translateX(-14px)',opacity:0}],{duration:rm?160:240,easing:'cubic-bezier(.23,1,.32,1)',fill:'forwards'});
     a.onfinish=()=>{if(g.parentNode)g.parentNode.removeChild(g);a.cancel();};}catch(e){}}
 // every frame of a lesson (tick, after apprTick): the card's visible content (the call on the air in the compact strip,
 // else the instruction) and the instruction itself (the step: the chime, even while a call covers it)
 function stepCard(){
   if(!LES.on||!lesEl.classList.contains('on'))return;
   const ins=lesI.textContent;if(ins!==STEPX.ins){const was=STEPX.ins;STEPX.ins=ins;if(was&&ins&&running&&!paused)stepChime();}
-  const lc=lesEl.classList.contains('lc'),call=lc&&lesEl.classList.contains('call'),cap=$('lesCap');
-  const key=(call?'c':'i')+(call?cap.textContent:ins),S=STEPX.les;if(key===S.key)return;
-  const old=S.key?S.html:'';S.key=key;S.html=call?cap.innerHTML:'<b>'+stepEsc(ins)+'</b>';STEPX.hold=true;
+  const lc=lesEl.classList.contains('lc');
+  const key='i'+ins,S=STEPX.les;if(key===S.key)return;
+  const old=S.key?S.html:'';S.key=key;S.html='<b>'+stepEsc(ins)+'</b>';STEPX.hold=true;
   if(old&&running&&!paused)stepSlide(S,lc?$('lesRow'):lesI,old);}
 function airStart(u,v,altFt,hdg,kt,flap,thr){
   const y=(altFt-FIELD_FT)/M2FT+GEAR,h=hdg*Math.PI/180,V=kt/MS2KT/Math.sqrt(1.097*Math.exp(-y/9200)/1.225);

@@ -12,10 +12,10 @@
 #             the caption gone within 4.5 s of the radio going quiet (--shot DIR: hud_airdrop_844x390_call.png)
 #   range     the strike range with Gila's call up        dogfight  the wave pill and a SENTRY line
 #   tasking   Lifeline's brief accepted, its instruction   lesson    a lesson with Dana's line
-#   free      free flight with a toast and the landing badge; Settings, Radio row: Captions Off hides #cap
+#   free      free flight with a toast and the landing badge; Settings, Radio row: Captions Off hides the top caption
 #             (--shot DIR: hud_settings_captions_844.png)
-# lesson: the compact strip at the bottom (its top edge below 80% at 844 and 932, 72% at 568) carries Dana's line in its
-# instruction line; free also checks the in flight +XP pill under pause and the bug banner heading the top column.
+# lesson: the compact strip at the bottom (its top edge below 80% at 844 and 932, 72% at 568) keeps its instruction while
+# Dana's line is the top caption (schoolhud item 3: captions at the top under pause, the task card at the bottom, every mode); free also checks the in flight +XP pill under pause and the bug banner heading the top column.
 # Run: .venv/bin/python tests/hud_centre_check.py [--case NAME[,NAME]] [--size WxH] [--shot DIR]
 # (one case and one size a call fits in two minutes; the tasking and the airdrop take about 50 s a size)
 import asyncio, os, sys
@@ -69,9 +69,9 @@ AUDIT = """()=>{const W=innerWidth,H=innerHeight,Z=[W/3,H*0.26,2*W/3,H*0.80];
   const lr=document.getElementById('lesson').getBoundingClientRect();
   return {lesFrac:lr.height?lr.top/H:1,hudPause:hu.right>pa.left&&hu.top<pa.bottom,zone:zone,lap:[...new Set(lap)],top:tc,pill:vis(pill)?pill.innerText.replace(/\\s+/g,' ').trim():'',pillR:[pr.left,pr.top,pr.right,pr.bottom].map(Math.round),W:W,H:H};}"""
 
-CAPINFO = """()=>{const a=document.getElementById('atc'),c=document.getElementById('cap'),b=a.querySelector('b'),cs=getComputedStyle(c);
+CAPINFO = """()=>{const a=document.getElementById('atc'),b=a.querySelector('b'),cs=getComputedStyle(a);
   return {on:a.classList.contains('on'),in:a.parentNode.id,who:b?b.textContent:'',col:b?getComputedStyle(b).color:'',txt:a.textContent,
-    shown:cs.display!=='none'&&getComputedStyle(a).visibility!=='hidden'&&parseFloat(getComputedStyle(a).opacity)>0.05,r:[...Object.values(a.getBoundingClientRect().toJSON())].map(Math.round)}}"""
+    shown:cs.display!=='none'&&cs.visibility!=='hidden'&&parseFloat(cs.opacity)>0.05,col2:[...document.getElementById('topCol').children].map(k=>k.id+(k.classList.contains('on')?'+on':'')+(k.classList.contains('hold')?'+hold':'')).join(' '),op:cs.opacity,r:[...Object.values(a.getBoundingClientRect().toJSON())].map(Math.round)}}"""
 
 PLACE_DZ = f"""()=>{{const K={K},D=K.DZ,s=K.state(),f=D.f,x=D.rel.x-f.x*4828,z=D.rel.z-f.z*4828,gh=K.groundHeight?K.groundHeight(x,z):0;
   const V=140/1.94384;s.pos.set(x,(gh||0)+305+2,z);s.vel.set(f.x*V,0,f.z*V);s.quat.setFromEuler(new THREE.Euler(0.03,-Math.atan2(f.x,-f.z),0,'YXZ'));
@@ -130,7 +130,15 @@ async def case_airdrop(b, url):
             a = await audit(pg, tag)
             ok(f'{tag}: the pill reads ONE MINUTE while the call is on', a['pill'] == 'ONE MINUTE', a['pill'])
             c = await pg.evaluate(CAPINFO)
-            ok(f'{tag}: the caption is the Loadmaster, tinted, at the bottom (portrait: above the throttle)', c['shown'] and c['in'] == 'cap' and c['who'] == 'Loadmaster' and c['col'] == 'rgb(127, 212, 255)' and (c['r'][7] >= w * 2 / 3 if h > w else c['r'][1] > h * 0.8 - 1), c)
+            # schoolhud item 3: the caption at the top under pause, the task card (the pill) at the bottom (portrait: above the throttle)
+            # the Loadmaster's line, or whatever replaced it on the air by now (a new line replaces the old one)
+            lm = await pg.evaluate(f"()=>{K}.radioLog().some(l=>l.who==='Loadmaster')")
+            ok(f'{tag}: the caption (the Loadmaster said one minute) is tinted, in the top column above 26% of the height', lm and c['shown'] and c['in'] == 'topCol' and c['col'] == 'rgb(127, 212, 255)' and c['r'][6] <= h * 0.26 + 0.5, c)
+            side = await pg.evaluate("()=>document.getElementById('cap').classList.contains('side')")
+            # where the bottom band is too narrow for it (568 wide, the C-130's three button columns) it sits under the readouts
+            tc = await pg.evaluate("()=>document.getElementById('miss').parentNode.id==='topCol'")
+            ok(f'{tag}: the pill is the bottom card (or under the readouts, or atop the column, where the bottom has no room)', (w < 600) if tc else (a['pillR'][2] <= w / 3 + 0.5 and w < 600) if side else
+               (a['pillR'][0] >= w * 2 / 3 - 1 if h > w else a['pillR'][1] >= h * 0.8 - 1), (side, a['pillR']))
             if SHOT and name == 'iPhone':
                 os.makedirs(SHOT, exist_ok=True); await pg.screenshot(path=os.path.join(SHOT, f'check_airdrop_{w}x{h}.png'))
         ok(f'airdrop {w}x{h}: no page errors', not pg.errs, pg.errs[:3])
@@ -185,6 +193,10 @@ async def case_dogfight(b, url):
             if 'SENTRY' in sub: break
         ok(f'dogfight {w}x{h}: a SENTRY line, the speaker tinted', '<b>SENTRY: </b>' in sub, sub[:80])
         a = await audit(pg, f'dogfight {w}x{h}')
+        sr = await pg.evaluate("()=>{const r=document.querySelector('#dfSub span').getBoundingClientRect();return {p:document.getElementById('dfSub').parentNode.id,b:r.bottom,H:innerHeight}}")
+        pl = await pg.evaluate("()=>({p:document.getElementById('miss').parentNode.id,side:document.getElementById('cap').classList.contains('side')})")
+        ok(f'dogfight {w}x{h}: the SENTRY caption at the top, the wave pill at the bottom (568: under the readouts)', sr['p'] == 'topCol' and sr['b'] <= sr['H'] * 0.26 + 0.5
+           and (a['pillR'][1] >= h * 0.8 - 1 or (w < 600 and (pl['side'] or pl['p'] == 'topCol'))), (sr, a['pillR'], pl))
         ok(f'dogfight {w}x{h}: the wave pill is one line', a['pill'].startswith('WAVE') and a['pillR'][3] - a['pillR'][1] <= 26, (a['pill'], a['pillR']))
         if SHOT and w == 844: await pg.screenshot(path=os.path.join(SHOT, 'check_dogfight_844.png'))
         ok(f'dogfight {w}x{h}: no page errors', not pg.errs, pg.errs[:3])
@@ -197,7 +209,11 @@ async def case_tasking(b, url):
         await pg.evaluate(f"()=>{{{K}.TASK.test.noBrief=true;{K}.taskStart('lifeline',{{seed:7}})}}"); await pg.wait_for_timeout(400)
         await pg.evaluate(DRAW, 60)
         a = await audit(pg, f'tasking {w}x{h}')
-        ok(f'tasking {w}x{h}: the instruction is in the pill', a['pill'].startswith('1/'), a['pill'])
+        pl = await pg.evaluate("()=>({p:document.getElementById('miss').parentNode.id,side:document.getElementById('cap').classList.contains('side')})")
+        # the bottom card; at 568 wide with the C-130's three button columns there is no room at the bottom: under the readouts,
+        # or (a destination readout there too) heading the top column as before schoolhud
+        ok(f'tasking {w}x{h}: the instruction is in the pill, the bottom card (568: under the readouts or atop the column)', a['pill'].startswith('1/') and
+           (a['pillR'][1] >= h * 0.8 - 1 or (w < 600 and (pl['side'] or pl['p'] == 'topCol'))), (a['pill'], a['pillR'], pl))
         if SHOT and w == 844: await pg.screenshot(path=os.path.join(SHOT, 'check_tasking_844.png'))
         ok(f'tasking {w}x{h}: no page errors', not pg.errs, pg.errs[:3])
         await pg.context.close()
@@ -213,17 +229,18 @@ async def case_lesson(b, url):
             if c['who'] == 'Dana' and c['on']: break
             await pg.evaluate(DRAW, 3)
         await pg.evaluate(DRAW, 2)
-        L = await pg.evaluate("""()=>{const l=document.getElementById('lesson'),c=document.getElementById('lesCap'),b=c.querySelector('b'),r=l.getBoundingClientRect();
-          return {lc:l.classList.contains('lc'),call:l.classList.contains('call'),who:b?b.textContent.replace(/:\s*$/,''):'',sp:b?/: $/.test(b.textContent):false,col:b?getComputedStyle(b).color:'',txt:c.textContent,
-            capShown:c.getBoundingClientRect().height>0,top:Math.round(r.top),frac:+(r.top/innerHeight).toFixed(3),bottom:Math.round(r.bottom),
-            atcShown:getComputedStyle(document.getElementById('atc')).display!=='none'&&document.getElementById('atc').getBoundingClientRect().height>0}}""")
+        L = await pg.evaluate("""()=>{const l=document.getElementById('lesson'),a=document.getElementById('atc'),b=a.querySelector('b'),i=document.getElementById('lesI'),r=l.getBoundingClientRect(),ar=a.getBoundingClientRect();
+          return {lc:l.classList.contains('lc'),call:l.classList.contains('call'),who:b?b.textContent:'',col:b?getComputedStyle(b).color:'',in:a.parentNode.id,
+            atcBottom:Math.round(ar.bottom),H:innerHeight,ins:i.textContent,insShown:i.getBoundingClientRect().height>0&&parseFloat(getComputedStyle(i).opacity)>0.5,
+            top:Math.round(r.top),frac:+(r.top/innerHeight).toFixed(3),bottom:Math.round(r.bottom)}}""")
         print(f'  info lesson {w}x{h}: the panel spans y {L["top"]}..{L["bottom"]} (top at {L["frac"]} of the height)')
-        ok(f'lesson {w}x{h}: the CFI line is in the lesson panel, Dana tinted sand, no separate caption', L['lc'] and L['call'] and L['capShown'] and L['who'] == 'Dana' and L['sp'] and L['col'] == 'rgb(246, 193, 119)' and not L['atcShown'], L)
+        ok(f'lesson {w}x{h}: Dana is the top caption (tinted sand, above 26%), the instruction stays on the card', L['lc'] and not L['call'] and L['who'] == 'Dana' and L['in'] == 'topCol'
+           and L['col'] == 'rgb(246, 193, 119)' and L['atcBottom'] <= L['H'] * 0.26 + 0.5 and L['insShown'] and L['ins'], L)
         ok(f'lesson {w}x{h}: the panel top below {0.72 if w < 600 else 0.80} of the height', L['frac'] >= (0.72 if w < 600 else 0.80), L['frac'])
         L2 = await pg.evaluate(f"""()=>{{const K={K},a=document.getElementById('atc'),l=document.getElementById('lesson');
           for(let i=0;i<30*45;i++){{K.stepFrame(1/30,false,true);if(!a.classList.contains('on'))break;}}
           return {{off:!a.classList.contains('on'),call:l.classList.contains('call'),i:document.getElementById('lesI').getBoundingClientRect().height>0,txt:document.getElementById('lesI').textContent}}}}""")
-        ok(f'lesson {w}x{h}: after the call the instruction is back', L2['off'] and not L2['call'] and L2['i'] and L2['txt'], L2)
+        ok(f'lesson {w}x{h}: after the call the caption is gone and the instruction is still there', L2['off'] and not L2['call'] and L2['i'] and L2['txt'], L2)
         await audit(pg, f'lesson {w}x{h}')
         if SHOT and w == 844: await pg.screenshot(path=os.path.join(SHOT, 'check_lesson_844.png'))
         ok(f'lesson {w}x{h}: no page errors', not pg.errs, pg.errs[:3])
@@ -245,7 +262,7 @@ async def case_free(b, url):
     await pg.evaluate(f"()=>{K}.say('Glendale Tower','Skyhawk 8401L, runway 1, cleared for takeoff.',['t_cleared_to'])")
     await pg.evaluate(DRAW, 10)
     c = await pg.evaluate(CAPINFO)
-    ok('Captions Off: the tower line plays but #cap is hidden', c['on'] and not c['shown'] and 'cleared for takeoff' in c['txt'], c)
+    ok('Captions Off: the tower line plays but the top caption is hidden', c['on'] and not c['shown'] and 'cleared for takeoff' in c['txt'], c)
     await pg.evaluate(f"()=>{K}.setCap(true)")
     await pg.evaluate(DRAW, 2)
     c = await pg.evaluate(CAPINFO)
