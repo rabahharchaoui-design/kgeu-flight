@@ -5,9 +5,9 @@
 # (the warning, the count), a talk-on without the sensor on it (reacquire) then with it, the score, the card, the device
 # board and XP. Then: two seeds roll two different taskings; Easy's plain lines and the ball swinging to the target.
 # The whole run lands inside 3 to 7 minutes of sim time (overwatch2: the compound 9 to 16 km out). Run: .venv/bin/python tests/tasking_overwatch_check.py
-import asyncio, json
+import asyncio, json, os
 from playwright.async_api import async_playwright
-from harness import serve, launch, page, Checks, finger
+from harness import serve, launch, page, Checks, finger, ROOT
 ok = Checks()
 K = 'window.__kgeu'
 STEP = "(n)=>{for(let i=0;i<n;i++)window.__kgeu.stepFrame(0.1,false,true)}"
@@ -111,6 +111,16 @@ async def main():
         c = await pg.evaluate("()=>({on:document.getElementById('missOv').classList.contains('on'),t:document.getElementById('mTitle').textContent,l:[...document.querySelectorAll('#mLines .gl')].map(e=>e.innerText.replace(/\\s+/g,' ')),retry:document.getElementById('mRetry').textContent})")
         ok('the results card: Overwatch, the lines, the time against par, its Leaderboard line (resBoard), RETRY OVERWATCH', c['on'] and c['t'].startswith('Overwatch: ') and any(x.startswith('Leaderboard') for x in c['l']) and not any('this device' in x for x in c['l']) and c['retry'] == 'RETRY OVERWATCH', c)
         await shot(pg, '/tmp/tasking_ow_card.png')
+        # overwatch2 item 4b: every Mission Control, Saber 6 and pilot line on the air carries its recorded clips, each in
+        # radio/clips.json with a file; the opening call names the terrain, the colour and the type
+        L = [l for l in await pg.evaluate(f"()=>{K}.radioLog()") if l['who'] in ('Mission Control', 'Saber 6') or l.get('kind') == 'pilot']
+        CL = set(json.load(open(os.path.join(ROOT, 'radio', 'clips.json'))))
+        nc = [l['text'][:60] for l in L if not l.get('clips')]
+        bad = sorted({c for l in L for c in (l.get('clips') or []) if c not in CL or not os.path.exists(os.path.join(ROOT, 'radio', c + '.m4a'))})
+        ok(f'every Mission Control, Saber 6 and pilot line on the air ({len(L)}) carries clips, all in clips.json with a file (4b)', len(L) >= 10 and not nc and not bad, (nc[:3], bad[:5]))
+        op = next((l for l in L if 'overwatch on a compound' in l['text']), None)
+        tg = await pg.evaluate(f"()=>{{const d={K}.TASK.d;return {{terr:d.terrain,col:d.target.col,type:d.target.type}}}}")
+        ok('the opening call\'s clips: the terrain phrase, the colour and the type words (4b)', op and 'm_terr_' + tg['terr'] in op['clips'] and op['clips'][-2:] == ['m_col_' + tg['col'], 'm_ty_' + tg['type']], (op and op['clips'], tg))
         ok('no console errors', not pg.errs, pg.errs[:3])
         # replays differ
         rolls = []

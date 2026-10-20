@@ -13,6 +13,7 @@ without gaps, then written as mono AAC at 64 kbps.
 
     python3 tools/make_radio.py            # write radio/*.m4a and radio/clips.json
     python3 tools/make_radio.py --check    # report what is missing, write nothing
+    python3 tools/make_radio.py --force    # re-render every clip (by default a clip whose m4a exists is kept as it is)
 
 Red Flag Dogfight (d_*): the cockpit warning voice d_c_* (Samantha, dry), the wingman Viper 2 d_w_* and the
 AWACS controller Sentry d_a_* (DF_VOICES: the first installed voice of each list, both radio filtered).
@@ -346,6 +347,84 @@ DF_AWACS = dict({
    **{f'num_{n}': w for n, w in ((5, 'five'), (10, 'ten'), (11, 'eleven'), (12, 'twelve'), (13, 'thirteen'), (14, 'fourteen'),
                                  (15, 'fifteen'), (16, 'sixteen'), (17, 'seventeen'), (18, 'eighteen'), (19, 'nineteen'), (20, 'twenty'))})
 
+# overwatch2 item 4b: the OVERWATCH radio, stitched like the tower ("whole sentences and number words"). Mission Control
+# (m_*) and the ground team Saber 6 (s_*) are two more radio filtered voices (OW_VOICES: the first one installed of each
+# list); our own calls are Evan (p_*, the pilot voice). A line is whole where its text never changes and the pieces
+# either side of its variable slots where it does: the vehicle (a colour and a type, with "the" variants for "the red
+# pickup"), the numbers (digits, "point", the words ten to twenty and the knots), the eight directions and the position
+# read as a crew does it (north, three three degrees, three two decimal six, west ...). The game assembles them
+# (owClipsMC, owClipsS6, owClipsP in index.html).
+OW_VOICES = {
+    'm': (('Reed (English (US))', 'Eddy (English (US))', 'Daniel (English (UK))', 'Daniel'), 185),
+    's': (('Nathan (Enhanced)', 'Tom (Enhanced)', 'Tom', 'Alex'), 200),
+}
+OW_DIRW = (('n', 'north'), ('ne', 'north east'), ('e', 'east'), ('se', 'south east'),
+           ('s', 'south'), ('sw', 'south west'), ('w', 'west'), ('nw', 'north west'))
+OW_NUMW = {10: 'ten', 11: 'eleven', 12: 'twelve', 13: 'thirteen', 14: 'fourteen', 15: 'fifteen', 16: 'sixteen',
+           17: 'seventeen', 18: 'eighteen', 19: 'nineteen', 20: 'twenty', 25: 'twenty five', 30: 'thirty',
+           35: 'thirty five', 40: 'forty', 45: 'forty five', 50: 'fifty', 55: 'fifty five', 60: 'sixty'}
+# the vehicles (OWV_CK, OWV_TK in the game): every voice names them
+OW_VEH = dict({'ty_pickup': 'pickup', 'ty_compact': 'compact pickup', 'ty_suv': 'S U V', 'ty_sedan': 'sedan'},
+              **{f'col_{c}': c for c in ('white', 'red', 'silver', 'black', 'tan', 'blue')},
+              **{f'the_{c}': 'the ' + c for c in ('white', 'red', 'silver', 'black', 'tan', 'blue')})
+OW_MC = dict({
+    'cs_skyguardian_s': 'Sky Guardian zero tango charlie,',
+    'cs_skyguardian':   'Sky Guardian one niner zero tango charlie,',
+    'task_open':      'Mission Control. Tasking: overwatch on a compound',
+    'terr_flats':     'out on the open flats,',
+    'terr_foothills': 'in the foothills,',
+    'terr_valley':    'in a desert valley,',
+    'terr_wash':      'by a dry wash,',
+    'point':   'point',
+    'miles':   'miles',
+    'of_luke': 'of Luke,',
+    'degrees': 'degrees,',
+    'decimal': 'decimal',
+    'task_climb':  'Climb to three thousand, set up an orbit, sensor on the white building. The vehicle of interest is a',
+    'copy_unable': 'Copy unable. Take your time, the compound is on your map. Call us when you have eyes on.',
+    'losing':      'Mission Control, we are losing the window. Get eyes on the compound now, the vehicle is starting up.',
+    'copy_keep':   'Copy. Keep eyes on the white building. Report when the vehicle departs.',
+    'moving':      'Mission Control, we show the vehicle moving. Pick it up and follow it.',
+    'neg_parked':  'Negative, we show it still parked. Keep watching.',
+    'neg_that':    'Negative, that is',
+    'our_vehicle': 'Our vehicle is',
+    'still_parked': 'still parked. Keep watching.',
+    'copy_follow': 'Copy, vehicle moving. Follow it. Hold your standoff, one to three miles, do not overfly.',
+    'overhead':    'Mission Control, you are overhead the vehicle. They will hear you. Open it up.',
+    'talk_saber':  'talk Saber six onto the vehicle.',
+    'sensor_back': 'get your sensor back on',
+    'timeout':     'Mission Control, we are out of time on this one. Knock it off, R T B.',
+}, **{f'dir_{k}': w for k, w in OW_DIRW}, **{f'n_{n}': w for n, w in enumerate(
+    ('zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'niner'))},
+   **{f'c_{n}': OW_NUMW[n] for n in range(10, 21)}, **OW_VEH)
+OW_S6 = dict({
+    'intercept': 'Mission Control, Saber six, two vehicles moving to intercept. Request a talk-on to',
+    'have_it':   'Mission Control, Saber six, we have it ourselves now. Saber six has the vehicle.',
+    'contact':   'Contact',
+    'has_it':    'Saber six has it from here. Thanks for the eyes.',
+}, **OW_VEH)
+# our side: the digits are the existing p_n_* (BOTH), the callsign the existing p_cs_skyguardian_s
+OW_PILOT = dict({
+    'mission_control': 'Mission Control,',
+    'saber6':          'Saber six,',
+    'on_station':      'on station, eyes on the white building.',
+    'veh_departing':   'vehicle departing.',
+    'departing_cmp':   'vehicle departing the compound,',
+    'heading':         'heading',
+    'your_vehicle':    'your vehicle is',
+    'point':           'point',
+    'miles':           'miles',
+    'of_you_heading':  'of you, heading',
+    'of_you':          'of you,',
+    'on_track':        'on the dirt track,',
+    'on_road':         'on the road,',
+    'about':           'about',
+    'knots':           'knots.',
+    'stopped_track':   'stopped on the dirt track.',
+    'stopped_road':    'stopped on the road.',
+    'reacq':           'stand by, reacquiring.',
+}, **{f'dir_{k}': w for k, w in OW_DIRW}, **{f'c_{n}': w for n, w in OW_NUMW.items()}, **OW_VEH)
+
 
 def installed(names, voices):
     for v in names:
@@ -385,6 +464,11 @@ def manifest():
     for k, v in DF_COCKPIT.items():     m['d_c_' + k] = ('dc', v)
     for k, v in DF_WING.items():        m['d_w_' + k] = ('dw', v)
     for k, v in DF_AWACS.items():       m['d_a_' + k] = ('da', v)
+    for tag, d in (('m', OW_MC), ('s', OW_S6), ('p', OW_PILOT)):   # overwatch2 item 4b: never over an existing clip
+        for k, v in d.items():
+            cid = tag + '_' + k
+            assert cid not in m, cid
+            m[cid] = (tag, v)
     return m
 
 
@@ -401,6 +485,8 @@ def render(cid, voice, text, tmp):
         v, rate = cockpit_voice(), COCKPIT_RATE
     elif voice in DF_VOICES:
         v, rate = installed(DF_VOICES[voice][0], voice_list()), DF_VOICES[voice][1]
+    elif voice in OW_VOICES:
+        v, rate = installed(OW_VOICES[voice][0], voice_list()), OW_VOICES[voice][1]
     else:
         v, rate = (TOWER_VOICE, TOWER_RATE) if voice == 't' else (PILOT_VOICE, PILOT_RATE)
     subprocess.run(['say', '-v', v, '-r', str(rate), '-o', aiff, text], check=True)
@@ -438,6 +524,11 @@ def main():
             print(f'no dogfight voice installed for {tag}: tried {", ".join(names)}', file=sys.stderr)
             return 2
 
+    for tag, (names, _) in OW_VOICES.items():
+        if not installed(names, voices):
+            print(f'no overwatch voice installed for {tag}: tried {", ".join(names)}', file=sys.stderr)
+            return 2
+
     os.makedirs(OUT, exist_ok=True)
     tmp = os.path.join(OUT, '.tmp')
     os.makedirs(tmp, exist_ok=True)
@@ -462,6 +553,9 @@ def main():
     dsz = sum(os.path.getsize(os.path.join(OUT, c + '.m4a')) for c in df)
     print(f'dogfight: {len(df)} clips, {dsz/1024:.0f} KB; cockpit {installed(DF_VOICES["dc"][0], voices)}, '
           f'wingman {installed(DF_VOICES["dw"][0], voices)}, AWACS {installed(DF_VOICES["da"][0], voices)}')
+    print(f'overwatch: Mission Control {installed(OW_VOICES["m"][0], voices)}, Saber 6 {installed(OW_VOICES["s"][0], voices)}; '
+          + ', '.join(f'{t} {sum(c.startswith(t + "_") for c in m if m[c][0] == t and c[2:] in d)}'
+                      for t, d in (('m', OW_MC), ('s', OW_S6), ('p', OW_PILOT))))
     return 0
 
 

@@ -15234,7 +15234,7 @@ function musicLoadList(list){
 // still shows its text and clicks the squelch, which is a fine degraded mode
 function radioLoad(){
   if(RADIO.loaded||!actx)return;RADIO.loaded=true;
-  fetch('radio/clips.json?v=4').then(r=>r.json()).then(list=>{   // ?v: a cached list from before 5.4 would miss the dogfight clips
+  fetch('radio/clips.json?v=5').then(r=>r.json()).then(list=>{   // ?v: a cached older list would miss the dogfight clips (4) or the OVERWATCH ones (5)
     RADIO.want=list.length;let i=0;
     const next=()=>{if(i>=list.length)return;const id=list[i++];
       fetch('radio/'+id+'.m4a').then(r=>r.arrayBuffer())
@@ -17306,8 +17306,8 @@ function tqLL(x,z){const g=geoLL(x,z),la=g[0],lo=-g[1];   // the map's own posit
 function tqClk(x,z){const h=-_euH.setFromQuaternion(st.quat,'YXZ').y;let r=Math.atan2(x-st.pos.x,-(z-st.pos.z))-h;r=((r%(2*Math.PI))+2*Math.PI)%(2*Math.PI);return Math.round(r/(Math.PI/6))%12||12;}
 
 // ---- the radio: Mission Control and the other stations, text through the one voice queue ----
-// o.plain: the plain English line Easy shows under it; o.clips: recorded clips when there are any (none: the squelch
-// and the text, the existing cue). Lines from one tasking keep their order (same priority, no cut).
+// o.plain: the plain English line Easy shows under it; o.clips: recorded clips when there are any (OVERWATCH: owClipsMC,
+// owClipsS6; none: the squelch and the text, the existing cue). Lines from one tasking keep their order (same priority, no cut).
 function tqSay(who,text,o){o=o||{};
   const l={who:who,text:text,clips:o.clips||null,plain:o.plain!=null?o.plain:'',task:1};
   TASK.log.push({t:+st.time.toFixed(1),who:who,text:text});
@@ -17323,7 +17323,7 @@ function tqQuietTick(dt){const q=TASK.quiet;if(!q)return;q.t+=dt;
   if(!busy||q.t>=q.max){TASK.quiet=null;q.fn();}}
 // our side of it: a readback in the pilot's voice (the recorded Wilco / Roger when that is the word)
 const TQ_RB={WILCO:['Wilco, ','p_rb_wilco'],ROGER:['Roger, ','p_rb_roger']};
-function tqPilot(text,clip){const l={who:AC.cs,kind:'pilot',text:text,clips:clip?[clip,csP()]:null,task:1};
+function tqPilot(text,clip){const l={who:AC.cs,kind:'pilot',text:text,clips:Array.isArray(clip)?clip:clip?[clip,csP()]:null,task:1};   // clip: a readback's word (with the callsign) or the whole line's clips
   TASK.log.push({t:+st.time.toFixed(1),who:'You',text:text});return vqAdd(l,{pri:2,ttl:30});}
 // ask: shows the buttons once the line they answer is on the air (or right away without one). opts: [{k:'WILCO',
 // say:'text' (our readback, default 'Wilco, <cs>.'), fn}], o.line, o.wait (s before o.late runs, the asker's silence),
@@ -17425,7 +17425,7 @@ function taskUpdate(dt){
   if(S.obj){const o=S.obj(d);if(o){const k=o.join('|');if(k!==TASK.objK){TASK.objK=k;tqObj(o[0],o[1],o[2]);}}}
   if(S.tick&&S.tick(d,dt)){if(TASK.si+1<D.stages.length)tqStageGo(TASK.si+1);else taskEnd();}
   // the overall cap: a tasking is 3 to 6 minutes; past its limit Mission Control calls it
-  if(!TASK.done&&D.limit&&st.time-d.t0>D.limit){d.timeout=1;tqMC(AC.csS+', Mission Control, we are out of time on this one. Knock it off, RTB.',{plain:'Time is up. The tasking ends here.'});taskEnd();}
+  if(!TASK.done&&D.limit&&st.time-d.t0>D.limit){d.timeout=1;tqMC(AC.csS+', Mission Control, we are out of time on this one. Knock it off, RTB.',{plain:'Time is up. The tasking ends here.',clips:TASK.id==='overwatch'?owClipsMC('cs','timeout'):null});taskEnd();}
 }
 // the end: score, the board (the Worker grants the XP), the card (after the last call has had a moment)
 function taskEnd(){if(TASK.done)return;TASK.done=true;TASK.ask=null;tqReplyUI();
@@ -19115,6 +19115,27 @@ function owTrackLight(m){if(!m)return;_owL.copy(hemi.color).multiplyScalar(hemi.
 // the sensor on a target: the ball's ground point within r metres of it
 function owOn(t,r){if(t&&t.T&&SENSOR.tgt&&SENSOR.tgt.decoy&&SENSOR.tgt!==t)return false;   /* overwatch2 item 4a: locked on a decoy, the vehicle is not watched */
   return !!(t&&SENSOR.valid&&(SENSOR.tgt===t||Math.hypot(SENSOR.spot.x-t.x,SENSOR.spot.z-t.z)<r));}   // a lock on it counts
+// overwatch2 item 4b: the OVERWATCH radio is recorded (tools/make_radio.py: OW_MC m_*, OW_S6 s_*, OW_PILOT p_*), stitched
+// like the tower's calls: whole sentences where the text never changes, the pieces either side of a slot where it does.
+// owClips(v,parts): a part 'cs' is the callsign (ours in the pilot voice, else the short SkyGuardian one, the only
+// tasking aircraft; another type's goes unvoiced), a string the voice's clip, an array clips as they are. An id not
+// loaded is skipped by radioSpeak; the caption is the text either way
+const OW_CW={m:new Set([10,11,12,13,14,15,16,17,18,19,20]),p:new Set([10,11,12,13,14,15,16,17,18,19,20,25,30,35,40,45,50,55,60])};
+function owClips(v,parts){const o=[];for(const p of parts){if(Array.isArray(p))o.push(...p);
+    else if(p==='cs'){if(v==='p')o.push(csPs());else if(AC.id==='mq9b')o.push(v+'_cs_skyguardian_s');}else o.push(v+'_'+p);}return o;}
+function owClipsMC(){return owClips('m',[...arguments]);}
+function owClipsS6(){return owClips('s',[...arguments]);}
+function owClipsP(){return owClips('p',[...arguments]);}
+// a number as the text writes it ('6.2', 25): a word clip where there is one (ten to twenty, the knots), the digits
+// under ten, else digit by digit; then 'point' and the decimals
+function owNumC(v,x){const [a,b]=String(x).split('.'),n=+a,o=OW_CW[v]&&OW_CW[v].has(n)?[v+'_c_'+n]:a.split('').map(d=>v+'_n_'+d);
+  if(b!=null)o.push(v+'_point',...b.split('').map(d=>v+'_n_'+d));return o;}
+const owDirC=(v,b)=>v+'_dir_'+['n','ne','e','se','s','sw','w','nw'][Math.round(b/45)%8];   // tqDir's eight
+// a vehicle ({type, col} or a fleet vehicle {type, ck}): 'red pickup', or the: 'the red pickup'
+const owVehC=(v,q,the)=>[v+(the?'_the_':'_col_')+(q.ck||q.col),v+'_ty_'+q.type];
+// tqLL's position as a crew reads it: north, three three degrees, three two decimal six, west, one one two degrees, ...
+function owLLC(x,z){const m=tqLL(x,z).match(/N(\d+)°(\d+)\.(\d)′ W(\d+)°(\d+)\.(\d)′/);if(!m)return [];const D=s=>s.split('').map(d=>'m_n_'+d);
+  return ['m_dir_n',...D(m[1]),'m_degrees',...D(m[2]),'m_decimal',...D(m[3]),'m_dir_w',...D(m[4]),'m_degrees',...D(m[5]),'m_decimal',...D(m[6])];}
 TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limit:600,
   needMap:1,   // the site and its track need the map data's roads and the real elevation (taskStart waits for them)
   prep:()=>{owSlotsBuild();return !!OW_SLOT.list;},   // and the slots built from them
@@ -19180,34 +19201,35 @@ TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limi
     if(TASK.si>=2){d.totT+=dt;if(owOn(d.tgt,rookie()?110:70))d.tot+=dt;}
     if(TASK.si>=3){const r=Math.hypot(st.pos.x-d.veh.x,st.pos.z-d.veh.z),lo=rookie()?1000:1400,hi=rookie()?6500:5600;d.bandT+=dt;if(r>=lo&&r<=hi)d.band+=dt;
       if(r<800&&!st.onGround&&TASK.t-d.overT>20){d.overT=TASK.t;d.over++;
-        tqMC(AC.csS+', Mission Control, you are overhead the vehicle. They will hear you. Open it up.',{plain:'Too close: you are right over them. Fly further away.'});}}
+        tqMC(AC.csS+', Mission Control, you are overhead the vehicle. They will hear you. Open it up.',{plain:'Too close: you are right over them. Fly further away.',clips:owClipsMC('cs','overhead')});}}
   },
   stages:[
     {id:'takeoff',name:'Take off from Luke runway 3L',
       obj:d=>['Take off, Luke 3L',st.onGround?'AUTO takes off for you. The compound is on the map':'Climbing'],
       enter(d){tqQuiet(()=>{const l=tqMC(AC.csS+', Mission Control. Tasking: overwatch on a compound '+OW_TERR[d.terrain]+', '+tqDsW(d.dist)+' '+tqDir(d.brg)+' of Luke, '+tqLL(d.c.x,d.c.z)+'. Climb to 3,000, set up an orbit, sensor on the white building. The vehicle of interest is '+d.target.name.replace('the ','a ')+'.',
-          {plain:'Fly to the compound on your map, circle it at 3,000 ft and point the camera at the white building. Watch for '+d.target.name+'.'});
-        tqAsk([{k:'WILCO'},{k:'UNABLE',fn:()=>tqMC('Copy unable. Take your time, the compound is on your map. Call us when you have eyes on.',{plain:'No rush. Find the compound on the map.'})}],{line:l});});},
+          {plain:'Fly to the compound on your map, circle it at 3,000 ft and point the camera at the white building. Watch for '+d.target.name+'.',
+           clips:owClipsMC('cs','task_open','terr_'+d.terrain,owNumC('m',tqDsW(d.dist).split(' ')[0]),'miles',[owDirC('m',d.brg)],'of_luke',owLLC(d.c.x,d.c.z),'task_climb',owVehC('m',d.target))});
+        tqAsk([{k:'WILCO'},{k:'UNABLE',fn:()=>tqMC('Copy unable. Take your time, the compound is on your map. Call us when you have eyes on.',{plain:'No rush. Find the compound on the map.',clips:owClipsMC('copy_unable')})}],{line:l});});},
       tick:d=>!st.onGround&&st.agl>40},
     {id:'station',name:'Orbit the compound at 3,000 ft, sensor on the white building',
       obj(d){const r=tqD(d.c.x,d.c.z),ft=tqMSL(),on=owOn(d.bld,rookie()?110:70);
         const need=r>4000?tqDs(r)+' to go. Tap AUTO for the orbit':ft<OW_FLOOR?'Climb: '+(Math.round(ft/100)*100).toLocaleString('en-US')+' of 3,000 ft':!on?(camMode===2?'Put the cross on the white building, LOCK':'Tap SENSOR, find the white building'):'Holding it';
         return ['On station',need];},
       tick(d,dt){const ok=tqD(d.c.x,d.c.z)<4000&&tqMSL()>=OW_FLOOR&&owOn(d.bld,rookie()?110:70);d.onT=ok?d.onT+dt:0;
-        if(d.onT>=2){d.station=st.time-d.t0;tqPilot('Mission Control, '+AC.csS+', on station, eyes on the white building.');return true;}
+        if(d.onT>=2){d.station=st.time-d.t0;tqPilot('Mission Control, '+AC.csS+', on station, eyes on the white building.',owClipsP('mission_control','cs','on_station'));return true;}
         // the window will not wait: a minute past the on station par the vehicle goes anyway
         if(st.time-d.t0>d.lateT){d.station=null;d.late=1;return true;}return false;}},
     {id:'watch',name:'Watch the white building. REPORT when the vehicle departs',
       obj(d){return ['Eyes on the building',d.veh.moving?'It is moving: REPORT':'REPORT the moment the vehicle departs'];},
       enter(d){d.w0=st.time;if(d.late)d.dep=2;
-        const l=d.late?tqMC(AC.csS+', Mission Control, we are losing the window. Get eyes on the compound now, the vehicle is starting up.',{plain:'Hurry: get the camera on the compound, the vehicle is about to leave.'})
-          :tqMC('Copy. Keep eyes on the white building. Report when the vehicle departs.',{plain:'Watch the white building. Tap REPORT when the vehicle drives off.'});
+        const l=d.late?tqMC(AC.csS+', Mission Control, we are losing the window. Get eyes on the compound now, the vehicle is starting up.',{plain:'Hurry: get the camera on the compound, the vehicle is about to leave.',clips:owClipsMC('cs','losing')})
+          :tqMC('Copy. Keep eyes on the white building. Report when the vehicle departs.',{plain:'Watch the white building. Tap REPORT when the vehicle drives off.',clips:owClipsMC('copy_keep')});
         tqAsk([{k:'REPORT',sub:'vehicle departs',say:'',fn:()=>owReport(d)}],{line:l,keep:1});},
       tick(d){if(!d.veh.moving&&!d.veh.stopped&&st.time-d.w0>=d.dep){d.veh.moving=true;d.depT=st.time;}
         // overwatch2 item 4a: a decoy may leave first (never when the window is already late)
         if(d.dcy&&!d.dcy.go&&!d.late&&st.time-d.w0>=d.dcy.t){d.dcy.go=1;d.dcyGo=1;d.dcyDepT=st.time;d.fleet.list[1+d.dcy.i].moving=true;}
         if(d.veh.moving&&d.repDelay==null&&st.time-d.depT>40){d.repDelay=99;TASK.ask=null;tqReplyUI();
-          tqMC(AC.csS+', Mission Control, we show the vehicle moving. Pick it up and follow it.',{plain:'The vehicle left without your call. Follow it.'});owFollowGo(d);}
+          tqMC(AC.csS+', Mission Control, we show the vehicle moving. Pick it up and follow it.',{plain:'The vehicle left without your call. Follow it.',clips:owClipsMC('cs','moving')});owFollowGo(d);}
         return !!d.following;}},
     {id:'follow',name:'Follow it at a standoff, 1 to 3 nm. Do not overfly',
       obj(d){const r=Math.hypot(st.pos.x-d.veh.x,st.pos.z-d.veh.z),lo=rookie()?1000:1400,hi=rookie()?6500:5600;
@@ -19217,10 +19239,10 @@ TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limi
     {id:'talkon',name:'Talk Saber 6 onto the vehicle',
       obj:d=>['Talk-on to Saber 6',owOn(d.veh,rookie()?110:70)?'REPORT where it is':'Sensor on '+d.veh.name+' first'],
       enter(d){const v=d.veh;d.sab={x:v.x+Math.sin(d.saber.a)*d.saber.r,z:v.z-Math.cos(d.saber.a)*d.saber.r};
-        tqSay('Saber 6','Mission Control, Saber 6, two vehicles moving to intercept. Request a talk-on to '+d.veh.name+'.',{plain:'The ground team wants you to tell them where '+d.veh.name+' is.'});
-        const l=tqMC(AC.csS+', talk Saber 6 onto the vehicle.',{plain:'Tap REPORT to tell the team where '+d.veh.name+' is.'});
+        tqSay('Saber 6','Mission Control, Saber 6, two vehicles moving to intercept. Request a talk-on to '+d.veh.name+'.',{plain:'The ground team wants you to tell them where '+d.veh.name+' is.',clips:owClipsS6('intercept',owVehC('s',d.veh,1))});
+        const l=tqMC(AC.csS+', talk Saber 6 onto the vehicle.',{plain:'Tap REPORT to tell the team where '+d.veh.name+' is.',clips:owClipsMC('cs','talk_saber')});
         tqAsk([{k:'REPORT',sub:'talk-on',say:'',fn:()=>owTalk(d)}],{line:l,wait:35,late:()=>{d.talk=0;
-          tqSay('Saber 6','Mission Control, Saber 6, we have it ourselves now. Saber 6 has the vehicle.',{plain:'The team found it without your help.'});d.end=st.time;}});},
+          tqSay('Saber 6','Mission Control, Saber 6, we have it ourselves now. Saber 6 has the vehicle.',{plain:'The team found it without your help.',clips:owClipsS6('have_it')});d.end=st.time;}});},
       tick:d=>d.end!=null&&st.time-d.end>4}],
   score(d){
     const tot=d.totT>0?d.tot/d.totT:0,band=d.bandT>0?d.band/d.bandT:0;
@@ -19237,31 +19259,34 @@ TASKS.overwatch={name:'Overwatch',role:'Surveillance',ac:'mq9b',base:'luke',limi
   cleanup(d){TASK.sens=false;if(SENSOR.tgt&&SENSOR.tgt.task){SENSOR.tgt=null;}if(SENSOR.slewTo&&SENSOR.slewTo.task)SENSOR.slewTo=null;}
 };
 function owReport(d){
-  if(!d.veh.moving&&!d.veh.stopped){d.falseRep++;tqPilot('Mission Control, '+AC.csS+', vehicle departing.');
+  if(!d.veh.moving&&!d.veh.stopped){d.falseRep++;tqPilot('Mission Control, '+AC.csS+', vehicle departing.',owClipsP('mission_control','cs','veh_departing'));
     // overwatch2 item 4a: only a decoy has left (the player called the wrong vehicle)
     const dv=d.dcy&&d.dcy.go?d.fleet.list[1+d.dcy.i]:null;if(dv)d.dcyRep=(d.dcyRep||0)+1;
-    if(dv)tqMC('Negative, that is '+dv.name+'. Our vehicle is '+d.veh.name+', still parked. Keep watching.',{plain:'Wrong vehicle: that is '+dv.name+'. Keep watching for '+d.veh.name+'.'});
-    else tqMC('Negative, we show it still parked. Keep watching.',{plain:'Not yet: the vehicle has not moved. Keep watching.'});
+    if(dv)tqMC('Negative, that is '+dv.name+'. Our vehicle is '+d.veh.name+', still parked. Keep watching.',{plain:'Wrong vehicle: that is '+dv.name+'. Keep watching for '+d.veh.name+'.',clips:owClipsMC('neg_that',owVehC('m',dv,1),'our_vehicle',owVehC('m',d.veh,1),'still_parked')});
+    else tqMC('Negative, we show it still parked. Keep watching.',{plain:'Not yet: the vehicle has not moved. Keep watching.',clips:owClipsMC('neg_parked')});
     tqAsk([{k:'REPORT',sub:'vehicle departs',say:'',fn:()=>owReport(d)}],{keep:1});return;}
   d.repDelay=st.time-d.depT;
   const b=d.route.length>2?tqBrg(d.route[1].x,d.route[1].z,d.route[2].x,d.route[2].z):0;
-  tqPilot('Mission Control, '+AC.csS+', vehicle departing the compound, '+d.veh.short+', heading '+tqDir(b)+'.');
+  tqPilot('Mission Control, '+AC.csS+', vehicle departing the compound, '+d.veh.short+', heading '+tqDir(b)+'.',owClipsP('mission_control','cs','departing_cmp',owVehC('p',d.veh),'heading',[owDirC('p',b)]));
   owFollowGo(d);
 }
 function owFollowGo(d){d.tgt=d.veh;d.following=1;
   // a lock on the building moves to the pickup (the crew slews the track); the destination follows it
   if(SENSOR.tgt===d.bld)SENSOR.tgt=d.veh;
   if(DEST&&DEST.task){DEST.name='The '+d.veh.short;DEST.short=d.veh.T.cap;destUI(true);}
-  const l=tqMC('Copy, vehicle moving. Follow it. Hold your standoff, 1 to 3 miles, do not overfly.',{plain:'Follow '+d.veh.name+' from 1 to 3 miles away. Do not fly over it.'});
+  const l=tqMC('Copy, vehicle moving. Follow it. Hold your standoff, 1 to 3 miles, do not overfly.',{plain:'Follow '+d.veh.name+' from 1 to 3 miles away. Do not fly over it.',clips:owClipsMC('copy_follow')});
   tqAsk([{k:'WILCO'}],{line:l,wait:15});
 }
 function owTalk(d){const v=d.veh;
-  if(!owOn(v,rookie()?110:70)){d.talkMiss=(d.talkMiss||0)+1;tqPilot('Saber 6, '+AC.csS+', stand by, reacquiring.');
-    const l=tqMC(AC.csS+', get your sensor back on '+d.veh.name+'.',{plain:'Point the camera at '+d.veh.name+' first, then REPORT.'});
+  if(!owOn(v,rookie()?110:70)){d.talkMiss=(d.talkMiss||0)+1;tqPilot('Saber 6, '+AC.csS+', stand by, reacquiring.',owClipsP('saber6','cs','reacq'));
+    const l=tqMC(AC.csS+', get your sensor back on '+d.veh.name+'.',{plain:'Point the camera at '+d.veh.name+' first, then REPORT.',clips:owClipsMC('cs','sensor_back',owVehC('m',d.veh,1))});
     tqAsk([{k:'REPORT',sub:'talk-on',say:'',fn:()=>owTalk(d)}],{line:l,wait:30,late:()=>{d.talk=0;d.end=st.time;}});return;}
   const r=Math.hypot(v.x-d.sab.x,v.z-d.sab.z),b=tqBrg(d.sab.x,d.sab.z,v.x,v.z),kt=Math.max(5,Math.round(v.spd*MS2KT/5)*5),on=v.onRoad?'on the road':'on the dirt track';   // knots: the game speaks knots everywhere (units_check)
-  tqPilot('Saber 6, '+AC.csS+', your vehicle is '+v.name+', '+(r/1609.34).toFixed(1)+' miles '+tqDir(b)+' of you, '+(v.moving?'heading '+tqDir(((v.h*180/Math.PI)%360+360)%360)+' '+on+', about '+kt+' knots.':'stopped '+on+'.'));
-  tqSay('Saber 6','Contact '+v.name+'. Saber 6 has it from here. Thanks for the eyes.',{plain:'The team sees it. Job done.'});
+  const vh=((v.h*180/Math.PI)%360+360)%360;
+  tqPilot('Saber 6, '+AC.csS+', your vehicle is '+v.name+', '+(r/1609.34).toFixed(1)+' miles '+tqDir(b)+' of you, '+(v.moving?'heading '+tqDir(vh)+' '+on+', about '+kt+' knots.':'stopped '+on+'.'),
+    owClipsP('saber6','cs','your_vehicle',owVehC('p',v,1),owNumC('p',(r/1609.34).toFixed(1)),'miles',[owDirC('p',b)],
+      ...(v.moving?['of_you_heading',[owDirC('p',vh)],v.onRoad?'on_road':'on_track','about',owNumC('p',kt),'knots']:['of_you',v.onRoad?'stopped_road':'stopped_track'])));
+  tqSay('Saber 6','Contact '+v.name+'. Saber 6 has it from here. Thanks for the eyes.',{plain:'The team sees it. Job done.',clips:owClipsS6('contact',owVehC('s',v,1),'has_it')});
   d.talk=1;d.end=st.time;
 }
 // ---- LIFELINE (C-130H Hercules, resupply) ----
