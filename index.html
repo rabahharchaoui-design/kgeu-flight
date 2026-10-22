@@ -304,6 +304,21 @@ body.appr #tcasRA svg{ width:56px; height:56px; } body.appr #tcasRA b{ font-size
 body.easy #dArrow{ width:38px; height:38px; }
 #dTxt{ display:flex; flex-direction:column; min-width:0; line-height:1.15; } #dTxt b,#dTxt span{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } #dTxt span{ font-size:12px; color:#f0d6ad; }
 body.hasDest #stickZone{ top:calc(var(--padT) + max(178px, var(--hudH) + 60px)); }
+/* overwatch2 item 5: the ball view, 8 px under the left readout block (--tgtBot from shTgtBot), under the map when it is hidden */
+body.sensorOn #hDest{ top:calc(var(--tgtBot, calc(var(--padT) + var(--map) + 2px)) + 8px); }
+/* portrait: nothing to its right at that height (the dial is above), so the card takes up to two thirds and the name reads whole;
+   the top column above the block is a one line strip in its own row under the map, always reserved (30 px, --topBot from
+   shTgtBot) so nothing moves when a caption comes on; the block and, with the block hidden (DCLT 2), the card start 6 px under it */
+@media (orientation:portrait){ body.sensorOn #hDest{ top:max(calc(var(--tgtBot, 0px) + 8px), calc(var(--topBot, calc(var(--padT) + var(--map) + 38px)) + 6px)); max-width:min(260px, calc(66.6vw - var(--padL))); }
+  body.sensorOn #topCol, body.sensorOn.appr #topCol{ top:calc(var(--padT) + var(--map) + 8px); max-height:30px; overflow:hidden; }   /* #hud is hidden in the ball view: straight under the map */
+  body.sensorOn #shTgt{ top:max(calc(var(--padT) + var(--map) + 44px), calc(var(--topBot, 0px) + 6px)); }   /* 6 px under the strip's row (--topBot) */
+  body.sensorOn #topCol.c2 > #atc .tx, body.sensorOn #topCol.c2 > #atc .plain{ display:block; white-space:nowrap; } body.sensorOn #topCol.c2 > #atc.hasPlain .tx{ display:none; }   /* one line here, even where hudFit allows two */
+  body.sensorOn #topCol > *{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  body.sensorOn #topCol > #atc .tx, body.sensorOn #topCol > #atc .plain{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:0; }
+  body.sensorOn #topCol > #atc.hasPlain .tx{ display:none; } }
+@media (orientation:landscape){ body.sensorOn.hasDest #stickZone{ top:max(calc(var(--padT) + max(178px, var(--hudH) + 60px)), calc(var(--destBot, 0px) + 8px)); } }
+/* ... and the SLEW hint ring under it: on a short screen (568x320) it shrinks (96 to 48 px) and drops to the corner rather than sit under the card */
+@media (orientation:landscape) and (max-height:360px){ body.sensorOn.hasDest #stickHint{ bottom:calc(var(--padB) + 8px); width:clamp(48px, calc(var(--vvh) - var(--padB) - 16px - var(--destBot, 0px)), 96px); height:clamp(48px, calc(var(--vvh) - var(--padB) - 16px - var(--destBot, 0px)), 96px); font-size:10px; letter-spacing:.04em; } }
 #mapOv{ background:transparent; padding:0; z-index:12; touch-action:none; }
 #fmap{ position:absolute; inset:0; touch-action:none; }
 #mapOv .mbar{ position:absolute; display:flex; gap:8px; }
@@ -827,9 +842,11 @@ body.lookOn.touch #tkReply{ width:min(268px, calc(50% - var(--icon) / 2 - 8px - 
    under them, right aligned, clear of the mission card in the centre column */
 body.sensorOn #tkReply{ top:calc(var(--padT) + 30px); left:auto; right:var(--padR); transform-origin:right center;
   width:min(268px, calc(100% - max(50%, calc(var(--padL) + var(--map) + var(--hudW) + 16px + var(--topW) / 2)) - var(--topW) / 2 - var(--padR) - 8px)); }
-/* portrait: the ball's readouts sit under the map, so the replies keep their place right of pause */
-@media (orientation:portrait){ body.sensorOn #tkReply{ top:var(--padT); left:calc(50% + var(--icon) / 2 + 8px); right:auto; transform-origin:left center;
-  width:min(268px, calc(50% - var(--icon) / 2 - 8px - var(--padR))); } }
+/* portrait (overwatch2 item 5): pause is top right and the top row holds the ball's mode lines and the dial, so the replies go
+   under pause, right aligned, clear of the dial (map + 92 px); the azimuth line steps down under them */
+@media (orientation:portrait){ body.sensorOn #tkReply{ top:calc(var(--padT) + var(--icon) + 8px); left:auto; right:var(--padR); transform-origin:right center;
+  width:min(268px, calc(100% - var(--padL) - var(--map) - 92px - var(--padR))); }
+  body.sensorOn.tkReplyOn #shTR{ top:calc(var(--padT) + var(--icon) * 2 + 14px); } }
 /* Easy's ball readout runs to three lines (bearing, from the nose, down): while a reply is up it keeps its first */
 body.sensorOn.tkReplyOn #shTR{ display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:1; overflow:hidden; }
 /* the music ticker lives top right: it steps aside while a reply is up */
@@ -13649,7 +13666,7 @@ function layoutViewport(){
 const VP={w:0,h:0,t:[]};
 // everything that depends on the screen's size, at once: the CSS viewport, the canvas and the camera, the controls.
 // iOS settles its sizes late, so it runs again a few times after each trigger.
-function relayout(){layoutViewport();if(typeof resize==='function'&&window.__glReady)resize();if(window.layoutCtl)layoutCtl(true);if(typeof hudFit==='function'&&running)hudFit();}
+function relayout(){layoutViewport();if(typeof resize==='function'&&window.__glReady)resize();if(window.layoutCtl)layoutCtl(true);if(typeof hudFit==='function'&&running)hudFit();if(window.shTBok)shTgtBot();}
 function relayoutSoon(){relayout();VP.t.forEach(clearTimeout);VP.t=[60,250,600,1200].map(ms=>setTimeout(relayout,ms));}
 if(window.visualViewport){
   visualViewport.addEventListener('resize',layoutViewport);
@@ -15380,17 +15397,19 @@ function vqPump(){
   if(!live&&!h.offAir)return;                                      // off the air: it plays after Resume
   playLine(radioQ.shift());
 }
+// a line's caption in the top column (#atc): who in bold, the words, and Easy's plain English under them
+function atcShow(l,sp){
+  atcEl.innerHTML='';const tx=document.createElement('span');tx.className='tx';atcEl.appendChild(tx);   // .tx clamps at three lines
+  const b=document.createElement('b');b.textContent=l.who;tx.appendChild(b);tx.appendChild(document.createTextNode(l.text));
+  const pl=rookie()?plainOf(l):'';atcEl.classList.toggle('hasPlain',!!pl);atcEl.classList.toggle('cfi',sp);
+  if(pl){const e=document.createElement('span');e.className='plain';e.textContent=pl;atcEl.appendChild(e);}
+  atcEl.classList.add('on');HF.capLine=l;capMirror();if(!HF.want)HF.want=1;}   // stepstall: the caption's box laid out on the next frame (hudFit), not up to 8 frames later
 function playLine(l){
   l.cut=false;l.dead=false;l.aired=true;
   const live=radioLive(),sp=isCFI(l);
   RADIO.log.push({who:l.who,kind:l.kind,text:l.text,clips:Array.isArray(l.clips)?l.clips.slice():l.clips,t:st?+st.time.toFixed(2):0,amb:!!l.amb||(REGION.az?CHAT:CHAT_R[REGION.id]||[]).some(p=>p.indexOf(l)>=0),type:AC.id});
   if(RADIO.log.length>200)RADIO.log.shift();
-  if(live&&!l.df){                                                 // the grade card speaks without a subtitle; the dogfight's go to its strip (below)
-    atcEl.innerHTML='';const tx=document.createElement('span');tx.className='tx';atcEl.appendChild(tx);   // .tx clamps at three lines
-    const b=document.createElement('b');b.textContent=l.who;tx.appendChild(b);tx.appendChild(document.createTextNode(l.text));
-    const pl=rookie()?plainOf(l):'';atcEl.classList.toggle('hasPlain',!!pl);atcEl.classList.toggle('cfi',sp);
-    if(pl){const e=document.createElement('span');e.className='plain';e.textContent=pl;atcEl.appendChild(e);}
-    atcEl.classList.add('on');HF.capLine=l;capMirror();if(!HF.want)HF.want=1;}   // stepstall: the caption's box laid out on the next frame (hudFit), not up to 8 frames later
+  if(live&&!l.df)atcShow(l,sp);                                    // the grade card speaks without a subtitle; the dogfight's go to its strip (below)
   const c={line:l,pri:l.pri,t0:VQ.clock,speech:sp,tok:++VQ.tok,fin:false};
   c.rec={pri:l.pri,who:l.who,text:l.text,speech:sp,a0:vqNow(),a1:null};VQ.log.push(c.rec);if(VQ.log.length>100)VQ.log.shift();
   let d;
@@ -23669,6 +23688,28 @@ function sensorFxUpdate(on,ts){
 // ---- the overlay (sensor item 4: generic symbology in the style of public MQ-9 video, docs/mtsb.md) ----
 const shEl={TL:$('shTL'),TR:$('shTR'),BL:$('shBL'),BR:$('shBR'),Mid:$('shMid'),Tgt:$('shTgt')};
 function shSet(k,t){if(shEl[k].textContent!==t)shEl[k].textContent=t;}
+// overwatch2 item 5: in the ball view the destination card (#hDest) sits 8 px under the left block (#shTgt), whatever the
+// block holds (mode, Easy or Hard, declutter, SPI ---). --tgtBot: the block's rendered bottom in #uiroot px, written when its
+// size changes (ResizeObserver), when #sensorHud's classes change (on, dc1, dc2: it shrinks or goes) and on a resize; none
+// while the block is hidden (the CSS falls back to straight under the map). Off the frame: the observers only.
+let shTB='||';
+// Portrait also writes --topBot: the bottom of the top column's one line strip under the map (the radio caption), taken
+// as the column's rendered top plus its reserved row (max-height), so the block and the card start under it whether a
+// caption is up or not and nothing moves when one comes on the air.
+const shPort=matchMedia('(orientation:portrait)');
+function shVar(k,v,o){if(v!==o){if(v)document.body.style.setProperty(k,v);else document.body.style.removeProperty(k);}}
+function shTgtBot(){const e=shEl.Tgt,h=$('sensorHud'),u=$('uiroot'),d=$('hDest'),T=$('topCol'),on=h.classList.contains('on'),uy=u.getBoundingClientRect().top,o=shTB.split('|');
+  let t='',v='',w='';
+  if(on&&shPort.matches){const m=parseFloat(getComputedStyle(T).maxHeight);if(m>0)t=Math.ceil(T.getBoundingClientRect().top-uy+m)+'px';}
+  shVar('--topBot',t,o[0]);
+  if(on&&getComputedStyle(e).display!=='none'){const r=e.getBoundingClientRect();if(r.height>0)v=Math.ceil(r.bottom-uy)+'px';}
+  shVar('--tgtBot',v,o[1]);
+  // and the card's own bottom: the slew pad's touch zone starts under it (a slew there would clear the destination)
+  if(on&&!d.hidden){const r=d.getBoundingClientRect();if(r.height>0)w=Math.ceil(r.bottom-uy)+'px';}
+  shVar('--destBot',w,o[2]);shTB=t+'|'+v+'|'+w;}
+if(window.ResizeObserver){const ro=new ResizeObserver(shTgtBot);ro.observe(shEl.Tgt);ro.observe($('hDest'));}
+new MutationObserver(shTgtBot).observe($('sensorHud'),{attributes:true,attributeFilter:['class']});
+window.shTBok=1;   // relayout() calls it too (the safe area insets move the block without resizing it)
 // a world point's latitude and longitude (degrees, signed). Arizona: anchored on Luke AFB as the taskings read it
 // (tqLL); a world region: its airport at the origin
 function geoLL(x,z){if(REGION.az)return [33.5350-(z-LUKE.z)/110950,-(112.3831-(x-LUKE.x)/92530)];
@@ -26728,7 +26769,7 @@ const APP_VER='2026-10-19-schoolhud';          // keep version.json in step when
     get P(){return E.P;}};
 })();
 
-window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.holdF=n|0;},pfx:()=>{const L=PFX.last||{};return {w:L.w,h:L.h,sw:L.sw,sh:L.sh,bloomed:!!L.bloomed,smaa:!!L.smaa,sharp:L.sharp||0,samples:L.samples||0,layer:!!L.layer,box:L.box||null,split:!!L.split,full:L.full||null,webgl2:renderer.capabilities.isWebGL2,msaaRT:!!(PFX.rt&&PFX.rt.isWebGLMultisampleRenderTarget),allocN:PFX.allocN,scale:GFX.scale,rs:L.rs!=null?L.rs:GFX.rs,post:GFX.post,sens:GFX.sens};},setScale:s=>GFX.setScale(+s),sharpOff:v=>{PFX_SHARP.off=!!v;},msaaOff:v=>{PFX.msOff=!!v;},csmNBT:a=>{if(a)CSM.NBT=a.slice();if(CSM.n)csmRadii();return CSM.NBT.slice();},layerOff:v=>{PFX.layerOff=!!v;},splitOff:v=>{PFX.layerOff=!!v;},gfxBusy:()=>({applying:gfxApplying(),resumeWait:GFX.resumeWait,preDone:PRE.done,warmDone:WARM.done,busy:GFX.busy}),stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>({id:p.id,name:p.name,cacheKey:p.cacheKey,usedTimes:p.usedTimes})),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),tqStage:i=>tqStageGo(i),inFrame:()=>FRAME_IN,stepx:()=>({cfi:{plays:CFIV.plays,want:CFIV.want,got:CFIV.got,err:CFIV.err,miss:CFIV.miss.length,sets:CFIV.sets.slice()},ls:{n:LSQ.n,pend:LSQ.m.size},chime:!!STEPX.buf,last:STEPX.last,ghost:!!(STEPX.les.ghost&&STEPX.les.ghost.parentNode),geo:STEPX.les.geo&&{el:STEPX.les.geo.el.id,p:STEPX.les.geo.p.id,x:STEPX.les.geo.x,y:STEPX.les.geo.y,w:STEPX.les.geo.w,h:STEPX.les.geo.h},key:STEPX.les.key.slice(0,40)}),lsFlush:lsFlush,taskGo:()=>taskGo(),taskStop:()=>taskStop(),owSiteOK:(x,z)=>owSiteOK(x,z),owSiteInfo:(x,z)=>owSiteInfo(x,z),owRoadPt:(x,z)=>owRoadPt(x,z),owFallback:OW_FALLBACK,OW_LIM:OW_LIM,OW_RMAX:()=>OW_RMAX,owSlots:()=>({n:OW_SLOT.list&&OW_SLOT.list.length,ms:+OW_SLOT.ms.toFixed(1),busy:OW_SLOT.busy}),owPeople:()=>owPplInfo(),owPeopleLod:v=>{OWP_FORCE=v==null?null:+v;},owVeh:()=>owVehInfo(),owVehLod:v=>{OWV_FORCE=v==null?null:+v;},owOn:(t,r)=>owOn(t,r),owGnd:(x,z)=>groundHeight(x,z),puff:(x,y,z)=>puff(x,y,z),owTalk:()=>{const d=TASK.d;if(!d.sab)d.sab={x:d.veh.x+1500,z:d.veh.z};owTalk(d);},mapdReady:()=>!!MAPD.ready,taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
+window.__kgeu={hudFit:()=>hudFit(),HF:HF,setCap:v=>setCap(v),gfxHold:n=>{GFX.holdF=n|0;},pfx:()=>{const L=PFX.last||{};return {w:L.w,h:L.h,sw:L.sw,sh:L.sh,bloomed:!!L.bloomed,smaa:!!L.smaa,sharp:L.sharp||0,samples:L.samples||0,layer:!!L.layer,box:L.box||null,split:!!L.split,full:L.full||null,webgl2:renderer.capabilities.isWebGL2,msaaRT:!!(PFX.rt&&PFX.rt.isWebGLMultisampleRenderTarget),allocN:PFX.allocN,scale:GFX.scale,rs:L.rs!=null?L.rs:GFX.rs,post:GFX.post,sens:GFX.sens};},setScale:s=>GFX.setScale(+s),sharpOff:v=>{PFX_SHARP.off=!!v;},msaaOff:v=>{PFX.msOff=!!v;},csmNBT:a=>{if(a)CSM.NBT=a.slice();if(CSM.n)csmRadii();return CSM.NBT.slice();},layerOff:v=>{PFX.layerOff=!!v;},splitOff:v=>{PFX.layerOff=!!v;},gfxBusy:()=>({applying:gfxApplying(),resumeWait:GFX.resumeWait,preDone:PRE.done,warmDone:WARM.done,busy:GFX.busy}),stalls:()=>({thr:STALL.thr,count:STALL.count,worst:STALL.worst,skip:Object.assign({},STALL.skip),skipAll:stallSkip(),log:STALL.log.slice(),prev:STALL.prev.slice(),lastMarks:STALL.lastMarks.slice(),progN:renderer.info.programs.length}),stallsClear:()=>stallClear(),stallsThr:ms=>{STALL.thr=+ms;},stallMark:stallMark,stallSpin:ms=>{STALL.spin=+ms||0;},stallsJSON:()=>stallJSON(),progN:()=>{progScan();return {n:renderer.info.programs.length,max:PROGHW.max,compiles:PROGHW.compiles};},progList:()=>renderer.info.programs.map(p=>({id:p.id,name:p.name,cacheKey:p.cacheKey,usedTimes:p.usedTimes})),PFX:()=>({frames:PFX.frames,bloomed:PFX.bloomed,w:PFX.w,h:PFX.h,bk:PFX.bk,post:GFX.post,exp:renderer.toneMappingExposure,tm:renderer.toneMapping}),fpsStats:fpsStats,fpsReset:fpsReset,GFX:GFX,tierFromSignals:tierFromSignals,dynFeed:(a,l,d)=>GFX.dynFeed(a,l,d),thermalFeed:(a,l,d)=>GFX.thermalFeed(a,l,d),boot:()=>({t:BOOT.t,slow:BOOT.slow,ft:BOOT.ft,pre:PRE,texN:renderer.info.memory.textures,geoN:renderer.info.memory.geometries,progN:renderer.info.programs.length}),TASK:TASK,TASKS:TASKS,taskStart:(id,o)=>taskStart(id,o),tqStage:i=>tqStageGo(i),inFrame:()=>FRAME_IN,stepx:()=>({cfi:{plays:CFIV.plays,want:CFIV.want,got:CFIV.got,err:CFIV.err,miss:CFIV.miss.length,sets:CFIV.sets.slice()},ls:{n:LSQ.n,pend:LSQ.m.size},chime:!!STEPX.buf,last:STEPX.last,ghost:!!(STEPX.les.ghost&&STEPX.les.ghost.parentNode),geo:STEPX.les.geo&&{el:STEPX.les.geo.el.id,p:STEPX.les.geo.p.id,x:STEPX.les.geo.x,y:STEPX.les.geo.y,w:STEPX.les.geo.w,h:STEPX.les.geo.h},key:STEPX.les.key.slice(0,40)}),lsFlush:lsFlush,taskGo:()=>taskGo(),taskStop:()=>taskStop(),owSiteOK:(x,z)=>owSiteOK(x,z),owSiteInfo:(x,z)=>owSiteInfo(x,z),owRoadPt:(x,z)=>owRoadPt(x,z),owFallback:OW_FALLBACK,OW_LIM:OW_LIM,OW_RMAX:()=>OW_RMAX,owSlots:()=>({n:OW_SLOT.list&&OW_SLOT.list.length,ms:+OW_SLOT.ms.toFixed(1),busy:OW_SLOT.busy}),owPeople:()=>owPplInfo(),owPeopleLod:v=>{OWP_FORCE=v==null?null:+v;},owVeh:()=>owVehInfo(),owVehLod:v=>{OWV_FORCE=v==null?null:+v;},owOn:(t,r)=>owOn(t,r),owGnd:(x,z)=>groundHeight(x,z),puff:(x,y,z)=>puff(x,y,z),owTalk:()=>{const d=TASK.d;if(!d.sab)d.sab={x:d.veh.x+1500,z:d.veh.z};owTalk(d);},mapdReady:()=>!!MAPD.ready,taskAnswer:k=>tqAnswer(k),tkLL:tqLL,tkMC:(t,o)=>tqMC(t,o),capTest:(t,p)=>{atcShow({who:'Mission Control',text:t,plain:p||'',task:1},false);atcT=1e6;},tkAsk:(a,o)=>tqAsk(a,o),tkQuiet:(f,m)=>tqQuiet(f,m),
   task:()=>({on:TASK.on,id:TASK.id,stage:TASK.stage&&TASK.stage.id,si:TASK.si,brief:TASK.brief,done:TASK.done,res:TASK.res,ask:TASK.ask&&{shown:TASK.ask.shown,opts:TASK.ask.opts.map(o=>o.k),t:TASK.ask.t},d:TASK.d,log:TASK.log.slice(),seed:TASK.seed}),
   tabGo:id=>tabGo(id),xpPop:(a,r,o)=>xpPop(a,r,o),XPP:XPP,resBoardHook:o=>resBoard(o),WST:WST,appr:()=>APPR.on,toFinal:d=>{const e=DEST&&DEST.rwy?DEST:RWY_ENDS.reduce((b,e)=>Math.hypot(st.pos.x-e.x,st.pos.z-e.z)<Math.hypot(st.pos.x-b.x,st.pos.z-b.z)?e:b);
     const back=Math.atan2(-Math.sin(e.h),Math.cos(e.h)),x=e.x+Math.sin(back)*d,z=e.z-Math.cos(back)*d;placeAir(x,z,d*Math.tan(GS)*M2FT,Math.atan2(e.x-x,-(e.z-z)),AC.vapp*MS2KT);},landTip:(g,c)=>landTip(g,c),missTip:missTip,runName:()=>runName(),runRestart:()=>runRestart(),RUNSTART:()=>RUNSTART,pzRestart:()=>pzRestart(),crashRetry:()=>crashRetry(),MAPD:MAPD,DZ:DZ,dzBuild:()=>dzBuild(),dzPredict:(a)=>dzPredict(...a,[0,0]),runMode:runMode,RUN:RUN,runs:()=>{try{return JSON.parse(localStorage.getItem('kgeuRuns')||'[]');}catch(e){return [];}},TOUCH:TOUCH,setStickSens:setStickSens,setInvPitch:setInvPitch,touchIn:touchIn,state:()=>st,trimSpawn:g=>trimSpawn(st,g),windSeed:windSeed,toast:toast,start:start,plane:()=>plane,freeCam:(o)=>{FREECAM=o;},prop:()=>Object.assign({},PROPST),ab:()=>Object.assign({},ABST),HD:()=>HD,warm:()=>WARM.done,running:()=>running,glProgs:()=>renderer.info.programs.length,R3:()=>({scene:scene,renderer:renderer,camera:camera}),
