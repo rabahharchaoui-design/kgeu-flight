@@ -58,7 +58,13 @@ async def run(b, url, new):
         out['shared_' + name] = await frame_ms(pg)
     # each tasking at its busiest against its nearest existing mode
     if new:
+        for _ in range(120):   # overwatch2: the compound's site slots are scanned off the frame once the map data is in
+            if (await pg.evaluate(f"()=>{K}.owSlots()"))['n']: break
+            await pg.wait_for_timeout(500)
         await pg.evaluate(f"()=>{{const K={K};K.TASK.test.noBrief=true;K.taskStart('overwatch',{{seed:42}})}}")
+        for _ in range(40):
+            if await pg.evaluate(f"()=>!!{K}.TASK.d"): break
+            await pg.wait_for_timeout(250)
         await pg.evaluate(PLACE, await pg.evaluate(f"()=>{{const K={K},d=K.TASK.d;return [d.c.x+2400,d.c.z,(3000-1071)/3.28084,0,64]}}"))
         await pg.evaluate(f"()=>{{const K={K},d=K.TASK.d;K.auto();K.TASK.d.veh.moving=true;}}"); await settle(1)
         await pg.evaluate(f"()=>{{const K={K};let k=0;while(K.camMode()!==2&&k++<5)K.cycleCam();K.SENSOR.tgt=K.TASK.d.veh;}}"); await settle(2)
