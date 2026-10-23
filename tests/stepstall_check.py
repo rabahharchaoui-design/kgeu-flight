@@ -309,7 +309,13 @@ async def part_c():
                 await c_step(pg, f'{tg} pattern step {ph}', f"const s=K.state();s.onGround=false;K.LES.ph={ph};K.cfi('{line}')")
             await pg.evaluate(f"()=>{{const K={K};if(K.LES.on)document.getElementById('lesQuit').click();K.stepFrame(1/30);}}")
             # OVERWATCH: each stage, with a mission control line (the stage's own radio)
+            for _ in range(120):   # overwatch2: the compound's site slots are scanned off the frame once the map data is in
+                if (await pg.evaluate(f"()=>{K}.owSlots()"))['n']: break
+                await pg.wait_for_timeout(500)
             await pg.evaluate(f"()=>{{const K={K};K.TASK.test.noBrief=true;K.taskStart('overwatch',{{seed:7}});}}"); await pg.wait_for_timeout(600)
+            for _ in range(40):
+                if await pg.evaluate(f"()=>!!{K}.TASK.d"): break
+                await pg.wait_for_timeout(250)
             await pg.evaluate(f"()=>{{const K={K};if(K.TASK.brief&&K.taskGo)K.taskGo();for(let i=0;i<6;i++)K.stepFrame(1/30);}}")
             n = await pg.evaluate(f"()=>{K}.TASK.def.stages.length")
             for i in range(1, n):

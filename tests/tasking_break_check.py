@@ -58,7 +58,14 @@ async def main():
         for skill in ('rookie', 'pilot'):
             pg = await page(b, url, vp={'width': W, 'height': H}, storage={'kgeuOnboard': skill, 'kgeuTut': '1', 'kgeuCoach': '3', 'kgeuTOD': 'night' if skill == 'rookie' else 'day'})
             for tid in ('overwatch', 'lifeline', 'shepherd', 'finder'):
+                if tid == 'overwatch':   # overwatch2: the compound's site slots are scanned off the frame once the map data is in
+                    for _ in range(120):
+                        if (await pg.evaluate(f"()=>{K}.owSlots()"))['n']: break
+                        await pg.wait_for_timeout(500)
                 await pg.evaluate(f"()=>{{const K={K};K.TASK.test.roll={EXTREME[tid]};K.taskStop();K.taskStart('{tid}',{{seed:77}})}}"); await pg.wait_for_timeout(350)
+                for _ in range(40):
+                    if await pg.evaluate(f"()=>!!{K}.TASK.d"): break
+                    await pg.wait_for_timeout(250)
                 await audit(pg, '#tkBrief', f'{skill} {tid} briefing (longest roll)')
                 if tid in ('finder', 'shepherd'): await shot(pg, f'brief_{tid}_{skill}')
                 await pg.evaluate(f"()=>{{const K={K};K.TASK.test.roll=null;K.taskGo()}}")
